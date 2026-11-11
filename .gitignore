@@ -1,0 +1,5 @@
+/build/
+/.mygo/
+/bin/
+*.test
+.DS_Store
