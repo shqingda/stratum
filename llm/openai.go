@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -297,6 +298,25 @@ type Chat struct {
 	BaseURL string // the URL before /chat/completions, e.g. https://openrouter.ai/api/v1
 	Auth    Auth
 	HTTP    *http.Client
+	Compat  ChatCompat
+}
+
+// ChatCompat covers how servers that speak Chat Completions differ.
+type ChatCompat struct {
+	// MaxTokensField names the output limit: "max_tokens" when empty, or
+	// "max_completion_tokens".
+	MaxTokensField string
+	// Thinking is how a request asks for reasoning:
+	//   ""           reasoning_effort, as OpenAI does
+	//   "none"       not at all
+	//   "deepseek"   thinking {type: enabled} and reasoning_effort
+	//   "zai"        thinking {type: enabled}
+	//   "qwen"       enable_thinking
+	//   "openrouter" reasoning {effort}
+	Thinking string
+	// ReplayReasoning sends an assistant message's reasoning back as
+	// reasoning_content (DeepSeek requires it after tool calls).
+	ReplayReasoning bool
 }
 
 func (p *Chat) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
@@ -310,7 +330,7 @@ func (p *Chat) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] 
 			}
 			header = h
 		}
-		resp, err := client{p.HTTP}.post(ctx, strings.TrimSuffix(p.BaseURL, "/")+"/chat/completions", header, chatBody(req))
+		resp, err := client{p.HTTP}.post(ctx, strings.TrimSuffix(p.BaseURL, "/")+"/chat/completions", header, chatBody(req, p.Compat))
 		if err != nil {
 			yield(Event{}, err)
 			return
@@ -327,7 +347,7 @@ func (p *Chat) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] 
 	}
 }
 
-func chatBody(req Request) map[string]any {
+func chatBody(req Request, compat ChatCompat) map[string]any {
 	var msgs []any
 	if req.System != "" {
 		msgs = append(msgs, map[string]any{"role": "system", "content": req.System})
@@ -337,8 +357,13 @@ func chatBody(req Request) map[string]any {
 		var parts []any
 		var calls []any
 		var images bool
+		var reasoning strings.Builder
 		for _, p := range m.Parts {
 			switch {
+			case p.Thinking != nil:
+				if p.Thinking.Provider == "" || p.Thinking.Provider == chatName {
+					reasoning.WriteString(p.Thinking.Text)
+				}
 			case p.Text != "":
 				text.WriteString(p.Text)
 				parts = append(parts, map[string]any{"type": "text", "text": p.Text})
@@ -360,6 +385,9 @@ func chatBody(req Request) map[string]any {
 				continue
 			}
 			msg := map[string]any{"role": "assistant", "content": text.String()}
+			if compat.ReplayReasoning {
+				msg["reasoning_content"] = reasoning.String()
+			}
 			if len(calls) > 0 {
 				msg["tool_calls"] = calls
 			}
@@ -377,11 +405,9 @@ func chatBody(req Request) map[string]any {
 		"stream_options": map[string]any{"include_usage": true},
 	}
 	if req.MaxTokens > 0 {
-		body["max_tokens"] = req.MaxTokens
+		body[cmp.Or(compat.MaxTokensField, "max_tokens")] = req.MaxTokens
 	}
-	if req.Effort != "" {
-		body["reasoning_effort"] = req.Effort
-	}
+	chatThinking(body, req.Effort, compat.Thinking)
 	if len(req.Tools) > 0 {
 		tools := make([]any, len(req.Tools))
 		for i, t := range req.Tools {
@@ -391,6 +417,30 @@ func chatBody(req Request) map[string]any {
 	}
 	return body
 }
+
+// chatThinking asks for reasoning the way the server understands. An empty
+// effort leaves the server's default.
+func chatThinking(body map[string]any, effort, format string) {
+	if effort == "" {
+		return
+	}
+	switch format {
+	case "none":
+	case "deepseek":
+		body["thinking"] = map[string]any{"type": "enabled"}
+		body["reasoning_effort"] = effort
+	case "zai":
+		body["thinking"] = map[string]any{"type": "enabled"}
+	case "qwen":
+		body["enable_thinking"] = true
+	case "openrouter":
+		body["reasoning"] = map[string]any{"effort": effort}
+	default:
+		body["reasoning_effort"] = effort
+	}
+}
+
+const chatName = "chat"
 
 type chatCall struct {
 	id, name string
@@ -498,7 +548,7 @@ func (s *chatStream) event(ev sseEvent) (bool, error) {
 // finish sends what the stream held back to its end: the reasoning, the
 // tool calls, the usage and the stop.
 func (s *chatStream) finish() error {
-	if s.reasoning.Len() > 0 && !s.emit(Event{Type: ThinkingDone, Thinking: &Thinking{Text: s.reasoning.String()}}) {
+	if s.reasoning.Len() > 0 && !s.emit(Event{Type: ThinkingDone, Thinking: &Thinking{Text: s.reasoning.String(), Provider: chatName}}) {
 		return nil
 	}
 	for _, i := range s.order {

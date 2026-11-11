@@ -96,7 +96,10 @@ func (c *Codex) Login(ctx context.Context, in Interaction) (Credential, error) {
 	var code string
 	var err error
 	if cb != nil {
-		code, err = cb.wait(ctx)
+		var q url.Values
+		if q, err = cb.wait(ctx); err == nil {
+			code = q.Get("code")
+		}
 	} else {
 		var pasted string
 		if pasted, err = in.Paste(ctx); err == nil {
@@ -223,6 +226,7 @@ func codexCredential(t tokenResponse) (Credential, error) {
 	}
 	return Credential{
 		Kind:      KindOAuth,
+		Method:    "codex",
 		Access:    t.AccessToken,
 		Refresh:   t.RefreshToken,
 		Expires:   time.Now().Add(time.Duration(t.ExpiresIn) * time.Second),

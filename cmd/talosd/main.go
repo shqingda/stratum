@@ -14,6 +14,9 @@ import (
 	"os/signal"
 	"strings"
 
+	"maps"
+	"slices"
+
 	"golang.org/x/term"
 
 	"talos/llm/auth"
@@ -22,9 +25,10 @@ import (
 const usage = `usage: talosd <command> [flags]
 
 commands:
-  login <provider>   sign in (chatgpt, anthropic, openai, google, openrouter, deepseek, custom)
+  login <provider>   sign in; talosd login -h lists the providers
   logout <account>   forget an account's credential
   accounts           list signed-in accounts
+  models [provider]  list models (* marks the default)
   chat               talk to a model; -h for flags
 `
 
@@ -48,6 +52,8 @@ func main() {
 		}
 	case "accounts":
 		err = accounts(store)
+	case "models":
+		err = models(ctx, args)
 	case "chat":
 		err = chat(ctx, store, args)
 	case "-h", "--help", "help":
@@ -63,11 +69,21 @@ func main() {
 
 func login(ctx context.Context, store auth.Store, args []string) error {
 	fs := flag.NewFlagSet("login", flag.ExitOnError)
-	device := fs.Bool("device", false, "chatgpt: sign in with a code on another device")
+	with := fs.String("with", "", "sign in with `method` instead of an API key: "+methodIDs())
+	device := fs.Bool("device", false, "codex: sign in with a code on another device")
 	as := fs.String("as", "", "store as provider/`label`, for a second account")
+	region := fs.String("region", "", "use the provider's regional endpoint, e.g. cn")
 	base := fs.String("base-url", "", "the endpoint address (required for custom)")
-	fs.Usage = func() { fmt.Fprintln(os.Stderr, "usage: talosd login <provider> [flags]"); fs.PrintDefaults() }
-	if len(args) == 0 {
+	api := fs.String("api", "chat", "custom: the protocol, chat or anthropic")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "usage: talosd login <provider> [flags]\n\nproviders:")
+		for _, p := range auth.Providers {
+			fmt.Fprintf(os.Stderr, "  %-11s %s%s\n", p.ID, p.Name, loginsNote(p))
+		}
+		fmt.Fprintln(os.Stderr, "\nflags:")
+		fs.PrintDefaults()
+	}
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
 		fs.Usage()
 		os.Exit(2)
 	}
@@ -75,45 +91,62 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 	fs.Parse(args[1:])
 	p, ok := auth.Lookup(id)
 	if !ok || strings.Contains(id, "/") {
-		return fmt.Errorf("unknown provider %q", id)
+		return fmt.Errorf("unknown provider %q; run talosd login -h", id)
 	}
 	account := id
 	if *as != "" {
 		account = id + "/" + *as
 	}
+	if *with == "" && p.KeyURL == "" && len(p.Logins) > 0 {
+		*with = p.Logins[0] // the provider takes no key
+	}
+	if *region != "" {
+		if *base = p.Regions[*region]; *base == "" {
+			return fmt.Errorf("%s has no region %q", p.Name, *region)
+		}
+	}
 
 	var c auth.Credential
 	var err error
-	if p.OAuth {
-		codex := &auth.Codex{}
+	if *with != "" {
+		m := auth.Methods[*with]
+		if m == nil || !slices.Contains(p.Logins, *with) {
+			return fmt.Errorf("%s does not offer sign-in %q", p.Name, *with)
+		}
 		in := auth.Interaction{
 			OpenURL: func(u string) error {
-				fmt.Println("Opening the browser to sign in. If it does not open, visit:\n\n  " + u + "\n")
+				fmt.Println(m.Label + ": opening the browser. If it does not open, visit:\n\n  " + u + "\n")
 				exec.Command("open", u).Start()
 				return nil
 			},
 			DeviceCode: func(code, uri string) {
-				fmt.Printf("Visit %s and enter the code:\n\n  %s\n\nWaiting…\n", uri, code)
+				fmt.Printf("%s: visit %s and enter the code\n\n  %s\n\nWaiting…\n", m.Label, uri, code)
+				exec.Command("open", uri).Start()
 			},
 			Paste: func(ctx context.Context) (string, error) {
-				fmt.Print("Port 1455 is busy. After signing in, paste the address the browser shows: ")
+				fmt.Print("The callback port is busy. After signing in, paste the address the browser shows: ")
 				return readLine()
 			},
 		}
-		if *device {
+		if codex, ok := m.Flow.(*auth.Codex); ok && *device {
 			c, err = codex.LoginDevice(ctx, in)
 		} else {
-			c, err = codex.Login(ctx, in)
+			c, err = m.Flow.Login(ctx, in)
 		}
 	} else {
 		if p.ID == "custom" && *base == "" {
 			return errors.New("custom needs -base-url, e.g. http://localhost:11434/v1")
 		}
-		if p.KeyURL != "" {
-			fmt.Println("Create a key at " + p.KeyURL)
-		}
 		var key string
-		key, err = readSecret(p.Name + " API key: ")
+		if v := os.Getenv(p.KeyEnv); p.KeyEnv != "" && v != "" {
+			fmt.Println("Using the key in $" + p.KeyEnv)
+			key = v
+		} else {
+			if p.KeyURL != "" {
+				fmt.Println("Create a key at " + p.KeyURL)
+			}
+			key, err = readSecret(p.Name + " API key: ")
+		}
 		if err == nil && key == "" && p.ID != "custom" {
 			err = errors.New("no key")
 		}
@@ -123,6 +156,9 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 		return err
 	}
 	c.BaseURL = *base
+	if p.ID == "custom" {
+		c.API = *api
+	}
 	if err := store.Set(account, c); err != nil {
 		return err
 	}
@@ -132,6 +168,18 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 	}
 	fmt.Println("Signed in:", who)
 	return nil
+}
+
+func methodIDs() string {
+	ids := slices.Sorted(maps.Keys(auth.Methods))
+	return strings.Join(ids, ", ")
+}
+
+func loginsNote(p auth.Provider) string {
+	if len(p.Logins) == 0 {
+		return ""
+	}
+	return "  (-with " + strings.Join(p.Logins, ", ") + ")"
 }
 
 func accounts(store auth.Store) error {
@@ -149,6 +197,9 @@ func accounts(store auth.Store) error {
 			continue
 		}
 		detail := string(c.Kind)
+		if c.Method != "" {
+			detail += " (" + c.Method + ")"
+		}
 		if c.Email != "" {
 			detail += "  " + c.Email
 		}

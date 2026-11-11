@@ -206,8 +206,8 @@ func TestOpenCodex(t *testing.T) {
 	}))
 	defer api.Close()
 	store := &Memory{}
-	store.Set("chatgpt", Credential{Kind: KindOAuth, Access: "tok", AccountID: "acct-1", Expires: time.Now().Add(time.Hour), BaseURL: api.URL})
-	p, err := Open(store, "chatgpt")
+	store.Set("codex", Credential{Kind: KindOAuth, Access: "tok", AccountID: "acct-1", Expires: time.Now().Add(time.Hour), BaseURL: api.URL})
+	p, err := Open(store, "codex")
 	if err != nil {
 		t.Fatal(err)
 	}

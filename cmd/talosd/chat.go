@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"talos/llm"
 	"talos/llm/auth"
@@ -31,6 +32,7 @@ func chat(ctx context.Context, store auth.Store, args []string) error {
 
 	var p llm.Provider
 	var provider string
+	var plan bool // the account spends a subscription, so dollars mean nothing
 	if *demo {
 		p, provider = llm.Demo{}, "demo"
 	} else {
@@ -53,11 +55,15 @@ func chat(ctx context.Context, store auth.Store, args []string) error {
 			return err
 		}
 		provider, _, _ = strings.Cut(*account, "/")
+		if cred, err := store.Get(*account); err == nil {
+			plan = auth.Subscription(cred)
+		}
 	}
+	loadCatalog(ctx)
 	if *model == "" {
 		*model = llm.DefaultModel(provider)
 		if *model == "" && !*demo {
-			return fmt.Errorf("%s has no default model; pass -model", provider)
+			return fmt.Errorf("%s has no default model; pass -model (talosd models %s lists them)", provider, provider)
 		}
 	}
 	root, err := os.OpenRoot(*dir)
@@ -73,6 +79,7 @@ func chat(ctx context.Context, store auth.Store, args []string) error {
 		out:      os.Stdout,
 		model:    *model,
 		provider: provider,
+		plan:     plan,
 		req: llm.Request{
 			Model:     *model,
 			Effort:    *effort,
@@ -113,6 +120,7 @@ type conversation struct {
 	out      io.Writer
 	model    string
 	provider string
+	plan     bool
 	req      llm.Request
 	usage    llm.Usage
 }
@@ -174,7 +182,7 @@ func (c *conversation) turn(ctx context.Context, text string) error {
 func (c *conversation) summary(r llm.Reply) string {
 	u := r.Usage
 	s := fmt.Sprintf("%s · in %d (cached %d) · out %d", r.Stop, u.Input, u.CacheRead, u.Output)
-	if m, ok := llm.FindModel(c.provider, c.model); ok {
+	if m, ok := llm.FindModel(c.provider, c.model); ok && !c.plan {
 		s += fmt.Sprintf(" · session ≈$%.4f", m.Cost(c.usage))
 	}
 	return s
@@ -251,4 +259,26 @@ func or(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// loadCatalog refreshes the model list once a day; offline, the cached or
+// built-in list serves.
+func loadCatalog(ctx context.Context) {
+	llm.LoadCatalog(ctx, filepath.Join(auth.Dir, "models", "models.dev.json"), 24*time.Hour, auth.CatalogNames())
+}
+
+func models(ctx context.Context, args []string) error {
+	loadCatalog(ctx)
+	provider := ""
+	if len(args) > 0 {
+		provider = args[0]
+	}
+	for _, m := range llm.Models(provider) {
+		def := " "
+		if m.ID == llm.DefaultModel(m.Provider) {
+			def = "*"
+		}
+		fmt.Printf("%s %-10s %-40s %7dk  $%g/$%g\n", def, m.Provider, m.ID, m.Context/1000, m.Price.Input, m.Price.Output)
+	}
+	return nil
 }

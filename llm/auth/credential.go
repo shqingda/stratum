@@ -38,6 +38,14 @@ type Credential struct {
 	AccountID string `json:"accountId,omitempty"`
 	// Email names the account to the user, where the provider tells it.
 	Email string `json:"email,omitempty"`
+	// Method is the sign-in that issued an OAuth credential ("codex",
+	// "chatgpt", "xai", "openrouter"); it knows how to refresh it.
+	Method string `json:"method,omitempty"`
+	// ClientID is the OAuth client the provider issued at sign-in, where it
+	// issues one per sign-in (Sign in with ChatGPT).
+	ClientID string `json:"clientId,omitempty"`
+	// API is the wire protocol of a custom endpoint: "chat" or "anthropic".
+	API string `json:"api,omitempty"`
 	// BaseURL overrides the provider's endpoint (a proxy, or a custom
 	// OpenAI-compatible server).
 	BaseURL string `json:"baseUrl,omitempty"`
@@ -243,7 +251,7 @@ func (s *Source) Credential(ctx context.Context) (Credential, error) {
 	if fresh.Email == "" {
 		fresh.Email = c.Email
 	}
-	fresh.BaseURL = c.BaseURL
+	fresh.BaseURL, fresh.API, fresh.Method = c.BaseURL, c.API, c.Method
 	if err := s.Store.Set(s.Account, fresh); err != nil {
 		return Credential{}, err
 	}

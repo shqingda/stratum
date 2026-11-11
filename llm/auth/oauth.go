@@ -41,22 +41,26 @@ func randomState() string {
 type callback struct {
 	srv  *http.Server
 	ln   net.Listener
-	code chan string
+	got  chan url.Values
 	errs chan error
 }
 
-// listenCallback serves path on 127.0.0.1:port and delivers the code of the
-// first redirect whose state matches. Port 0 picks a free port.
+// listenCallback serves path on 127.0.0.1:port and delivers the query of the
+// first redirect that carries a code and, unless state is empty, the
+// matching state. Port 0 picks a free port.
 func listenCallback(port int, path, state string) (*callback, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return nil, err
 	}
-	cb := &callback{ln: ln, code: make(chan string, 1), errs: make(chan error, 1)}
+	cb := &callback{ln: ln, got: make(chan url.Values, 1), errs: make(chan error, 1)}
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Browsers keep spare connections open; closing them stops a later
+		// sign-in's redirect from landing on this finished one.
+		w.Header().Set("Connection", "close")
 		if e := q.Get("error"); e != "" {
 			msg := e
 			if d := q.Get("error_description"); d != "" {
@@ -66,20 +70,19 @@ func listenCallback(port int, path, state string) (*callback, error) {
 			cb.fail(errors.New(msg))
 			return
 		}
-		if q.Get("state") != state {
+		if state != "" && q.Get("state") != state {
 			w.WriteHeader(http.StatusBadRequest)
 			page(w, "Sign-in failed", "The sign-in did not come from Talos. Start it again from the app.")
 			return
 		}
-		code := q.Get("code")
-		if code == "" {
+		if q.Get("code") == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			page(w, "Sign-in failed", "No authorization code came back.")
 			return
 		}
 		page(w, "Signed in", "You can close this tab and return to Talos.")
 		select {
-		case cb.code <- code:
+		case cb.got <- q:
 		default:
 		}
 	})
@@ -97,15 +100,20 @@ func (cb *callback) fail(err error) {
 
 func (cb *callback) port() int { return cb.ln.Addr().(*net.TCPAddr).Port }
 
-func (cb *callback) wait(ctx context.Context) (string, error) {
+func (cb *callback) wait(ctx context.Context) (url.Values, error) {
 	select {
-	case c := <-cb.code:
-		return c, nil
+	case q := <-cb.got:
+		return q, nil
 	case err := <-cb.errs:
-		return "", err
+		return nil, err
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return nil, ctx.Err()
 	}
+}
+
+// redirectURI is the callback's address for path.
+func (cb *callback) redirectURI(host, path string) string {
+	return fmt.Sprintf("http://%s:%d%s", host, cb.port(), path)
 }
 
 func (cb *callback) close() {
@@ -129,6 +137,7 @@ type tokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
 	ExpiresIn    int    `json:"expires_in"`
+	Scope        string `json:"scope"`
 }
 
 // postForm posts a form to a token endpoint.
