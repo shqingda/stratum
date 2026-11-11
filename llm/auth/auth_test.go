@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"talos/llm"
+	"github.com/shqingda/talos/llm"
 )
 
 func fakeJWT(claims map[string]any) string {

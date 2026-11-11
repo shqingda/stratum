@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"talos/llm"
+	"github.com/shqingda/talos/llm"
 )
 
 func TestChatGPTLogin(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"talos/proto"
+	"github.com/shqingda/talos/proto"
 )
 
 // A scripted kernel: tests answer the commands a client sends with frames

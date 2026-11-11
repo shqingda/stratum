@@ -23,7 +23,7 @@ import (
 	"slices"
 	"strconv"
 
-	"talos/proto"
+	"github.com/shqingda/talos/proto"
 )
 
 // Phase is where the connection stands.

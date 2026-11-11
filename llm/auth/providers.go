@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"talos/llm"
+	"github.com/shqingda/talos/llm"
 )
 
 // Flow is one way to sign in with a browser or a device code.

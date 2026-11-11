@@ -1,4 +1,4 @@
-module talos
+module github.com/shqingda/talos
 
 go 1.27.4
 

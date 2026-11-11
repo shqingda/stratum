@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"talos/llm"
-	"talos/llm/auth"
+	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/talos/llm/auth"
 )
 
 // chat runs a conversation in the terminal with two read-only tools, a
