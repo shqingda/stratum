@@ -18,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/shqingda/talos/kernel/agent"
+	"github.com/shqingda/talos/kernel/changes"
 	"github.com/shqingda/talos/kernel/perm"
 	"github.com/shqingda/talos/kernel/sandbox"
 	"github.com/shqingda/talos/kernel/store"
@@ -28,7 +29,8 @@ import (
 
 // Manager runs the sessions of one kernel.
 type Manager struct {
-	Store *store.Store
+	Store   *store.Store
+	changes *changes.Log
 	// Open connects to an account's provider.
 	Open func(account string) (llm.Provider, error)
 	// Defaults fills an account and model a new session leaves empty.
@@ -47,11 +49,12 @@ type Manager struct {
 
 // New makes a manager with the default tools.
 func New(st *store.Store, open func(string) (llm.Provider, error)) *Manager {
-	return &Manager{Store: st, Open: open, Tools: tools.Default(), Sandboxed: sandbox.Available()}
+	return &Manager{Store: st, changes: changes.New(st), Open: open, Tools: tools.Default(), Sandboxed: sandbox.Available()}
 }
 
 // run is a turn in progress.
 type run struct {
+	turnSeq   int64
 	cancel    context.CancelFunc
 	queued    []string
 	approvals map[string]*pending
@@ -220,7 +223,11 @@ func (m *Manager) Update(ctx context.Context, u proto.SessionUpdate) (proto.Sess
 
 // Delete removes a session, stopping its turn.
 func (m *Manager) Delete(ctx context.Context, id string) error {
-	m.Cancel(id)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if r := m.runs[id]; r != nil {
+		r.cancel()
+	}
 	return m.Store.DeleteSession(ctx, id)
 }
 
@@ -281,9 +288,12 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 
 // turn runs one turn to its end and records it.
 func (m *Manager) turn(ctx context.Context, x store.Session, r *run, text string) error {
-	if err := m.record(ctx, x.ID, proto.EventTurnStart, proto.TurnStart{Text: text}); err != nil {
+	start, err := m.Store.Append(context.WithoutCancel(ctx), x.ID, proto.EventTurnStart, proto.TurnStart{Text: text})
+	if err != nil {
 		return err
 	}
+	r.turnSeq = start.Seq
+	m.publish(toProto(start))
 	if x.Title == "" {
 		x.Title = titleOf(text)
 		m.Store.UpdateSession(context.WithoutCancel(ctx), x)
@@ -317,9 +327,11 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 	}
 	ag := &agent.Agent{
 		Provider: provider,
-		Tools:    &runner{m: m, sessionID: x.ID, run: r, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed}},
-		Sink:     sink{m: m, ctx: ctx, sessionID: x.ID},
-		Clock:    m.Clock,
+		Tools: &runner{m: m, sessionID: x.ID, run: r, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
+			return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
+		}}},
+		Sink:  sink{m: m, ctx: ctx, sessionID: x.ID},
+		Clock: m.Clock,
 	}
 	cfg := agent.Config{
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: systemPrompt(x, m.Sandboxed),

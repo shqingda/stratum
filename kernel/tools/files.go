@@ -110,8 +110,24 @@ var WriteFile = fileTool(&Tool{
 		}
 		defer root.Close()
 		_, statErr := root.Lstat(name)
-		if err := writeAtomic(root, name, []byte(a.Content)); err != nil {
+		var before []byte
+		if env.RecordChange != nil {
+			before, err = readFile(root, name)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return "", fmt.Errorf("read %s before writing: %w", a.Path, err)
+			}
+			if err == nil && before == nil {
+				before = []byte{}
+			}
+		}
+		after := []byte(a.Content)
+		if err := writeAtomic(root, name, after); err != nil {
 			return "", err
+		}
+		if env.RecordChange != nil {
+			if err := env.RecordChange(env.filePath, before, after); err != nil {
+				return "", fmt.Errorf("file %s was changed, but recording change failed: %w", a.Path, err)
+			}
 		}
 		verb := "Wrote"
 		if errors.Is(statErr, fs.ErrNotExist) {
@@ -175,8 +191,14 @@ var EditFile = fileTool(&Tool{
 			n = 1
 		}
 		s = strings.Replace(s, a.OldText, a.NewText, n)
-		if err := writeAtomic(root, name, []byte(s)); err != nil {
+		after := []byte(s)
+		if err := writeAtomic(root, name, after); err != nil {
 			return "", err
+		}
+		if env.RecordChange != nil {
+			if err := env.RecordChange(env.filePath, b, after); err != nil {
+				return "", fmt.Errorf("file %s was changed, but recording change failed: %w", a.Path, err)
+			}
 		}
 		return fmt.Sprintf("Edited %s (%d replacement%s)", a.Path, n, plural(n)), nil
 	},

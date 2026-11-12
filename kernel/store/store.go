@@ -57,6 +57,21 @@ CREATE TABLE IF NOT EXISTS receipts (
 	at         INTEGER NOT NULL
 );
 PRAGMA user_version = 1;
+CREATE TABLE IF NOT EXISTS change_blobs (
+	hash TEXT PRIMARY KEY,
+	data BLOB NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS file_changes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+	turn_seq INTEGER NOT NULL,
+	path TEXT NOT NULL,
+	before_hash TEXT REFERENCES change_blobs(hash),
+	after_hash TEXT REFERENCES change_blobs(hash),
+	mode INTEGER NOT NULL,
+	reverted INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS file_changes_turn ON file_changes(session_id, turn_seq, id);
 `
 
 // Open opens or creates the database at path; ":memory:" for tests.

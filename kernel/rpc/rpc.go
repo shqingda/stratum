@@ -209,5 +209,35 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		}
 		return proto.Receipt{ID: r.ID, Method: r.Method, Status: r.Status, Error: r.Error}, nil
 	}
+	// --- 任务3 ---
+	if result, err, handled := s.handleChanges(ctx, cmd); handled {
+		return result, err
+	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
+}
+
+// --- 任务3 ---
+
+func (s *Server) handleChanges(ctx context.Context, cmd proto.Command) (any, error, bool) {
+	switch cmd.Method {
+	case proto.MethodChangesList:
+		p, err := params[proto.SessionRef](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		result, err := s.Sessions.ChangesList(ctx, p.SessionID)
+		return result, err, true
+	case proto.MethodChangesDiff, proto.MethodChangesRevert, proto.MethodChangesRedo:
+		p, err := params[proto.ChangeQuery](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		if cmd.Method == proto.MethodChangesDiff {
+			result, err := s.Sessions.ChangesDiff(ctx, p)
+			return result, err, true
+		}
+		result, err := s.Sessions.ChangesApply(ctx, p, cmd.Method == proto.MethodChangesRedo)
+		return result, err, true
+	}
+	return nil, nil, false
 }

@@ -270,3 +270,45 @@ type Receipt struct {
 	Status string `json:"status"` // accepted, completed, failed, unknown
 	Error  string `json:"error,omitempty"`
 }
+
+// --- 任务3 ---
+
+const (
+	MethodChangesList    = "changes.list"
+	MethodChangesDiff    = "changes.diff"
+	MethodChangesRevert  = "changes.revert"
+	MethodChangesRedo    = "changes.redo"
+	EventChangesReverted = "changes.reverted"
+	EventChangesRedone   = "changes.redone"
+)
+
+// ChangeQuery selects a turn and, for diff, one recorded absolute path.
+type ChangeQuery struct {
+	SessionID string `json:"sessionId,omitempty"`
+	TurnSeq   int64  `json:"turnSeq,omitempty"`
+	Path      string `json:"path,omitempty"`
+}
+
+type ChangeFile struct {
+	Path    string `json:"path,omitempty"`
+	Added   int    `json:"added,omitempty"`
+	Removed int    `json:"removed,omitempty"`
+}
+
+type ChangeTurn struct {
+	TurnSeq int64        `json:"turnSeq,omitempty"`
+	Files   []ChangeFile `json:"files,omitempty"`
+}
+
+// Nil text denotes an absent file; a pointer to an empty string is an empty file.
+type ChangeDiff struct {
+	Path   string  `json:"path,omitempty"`
+	Before *string `json:"before,omitempty"`
+	After  *string `json:"after,omitempty"`
+}
+
+type ChangeResult struct {
+	TurnSeq   int64    `json:"turnSeq,omitempty"`
+	Paths     []string `json:"paths,omitempty"`
+	Conflicts []string `json:"conflicts,omitempty"`
+}
