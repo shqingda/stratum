@@ -26,7 +26,7 @@ func TestFixtures(t *testing.T) {
 		"codex/cancel", "codex/error-model", "codex/image", "codex/max-tokens", "codex/max-tokens-unsupported",
 		"codex/text", "codex/thinking", "codex/tool", "codex/tool-result", "codex/tools-parallel",
 		"openai/model-unavailable", "openai/text", "openai/tool",
-		"xai/effort-unsupported", "xai/text", "xai/thinking-default", "xai/thinking-low", "xai/tool",
+		"xai/effort-unsupported", "xai/text", "xai/thinking", "xai/thinking-default", "xai/thinking-low", "xai/tool",
 	}
 	for i, name := range want {
 		want[i] = filepath.Join("testdata", filepath.FromSlash(name)) + ".sse"
@@ -179,6 +179,9 @@ func fixtureRequest(t *testing.T, provider, scenario string) Request {
 		}
 		if scenario == "thinking-low" {
 			r.Model, r.Effort = "grok-4.7", "low"
+		}
+		if provider == "xai" && scenario == "thinking" {
+			r.Model, r.MaxTokens = "grok-4.7", 1024
 		}
 	case "tool", "tool-result":
 		r.Tools = []Tool{tool}
