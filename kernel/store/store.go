@@ -56,7 +56,6 @@ CREATE TABLE IF NOT EXISTS receipts (
 	error      TEXT NOT NULL DEFAULT '',
 	at         INTEGER NOT NULL
 );
-PRAGMA user_version = 1;
 CREATE TABLE IF NOT EXISTS change_blobs (
 	hash TEXT PRIMARY KEY,
 	data BLOB NOT NULL
@@ -93,6 +92,10 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: %w", err)
+	}
+	if err := migrateSearch(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: search migration: %w", err)
 	}
 	return &Store{db: db}, nil
 }
@@ -174,8 +177,18 @@ func (s *Store) Sessions(ctx context.Context) ([]Session, error) {
 
 // DeleteSession removes a session and its events.
 func (s *Store) DeleteSession(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id=?`, id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM message_search WHERE session_id=?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id=?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Event is an entry of a session's log. Seq counts from 1 per session and
@@ -207,6 +220,11 @@ func (s *Store) Append(ctx context.Context, sessionID, typ string, data any) (Ev
 	if _, err := tx.ExecContext(ctx, `INSERT INTO events (session_id, seq, type, data, at) VALUES (?,?,?,?,?)`,
 		sessionID, seq, typ, b, now.UnixMilli()); err != nil {
 		return Event{}, err
+	}
+	if typ == MessageEvent {
+		if err := indexMessage(ctx, tx, sessionID, seq, b); err != nil {
+			return Event{}, err
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE sessions SET updated_at=? WHERE id=?`, now.UnixMilli(), sessionID); err != nil {
 		return Event{}, err
