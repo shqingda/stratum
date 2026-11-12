@@ -41,6 +41,7 @@ func Resolve(root, input string) (Path, error) {
 	// the parts that do not exist yet.
 	var tail []string
 	cur := p
+	links := 0
 	for {
 		real, err := filepath.EvalSymlinks(cur)
 		if err == nil {
@@ -51,6 +52,26 @@ func Resolve(root, input string) (Path, error) {
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return Path{}, err
+		}
+		// A dangling link still names a target; do not mistake it for a missing file.
+		info, statErr := os.Lstat(cur)
+		if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
+			return Path{}, statErr
+		}
+		if statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+			links++
+			if links > 255 {
+				return Path{}, errors.New("workspace: too many symbolic links")
+			}
+			target, err := os.Readlink(cur)
+			if err != nil {
+				return Path{}, err
+			}
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(cur), target)
+			}
+			cur = target
+			continue
 		}
 		parent := filepath.Dir(cur)
 		if parent == cur {

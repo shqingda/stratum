@@ -53,3 +53,26 @@ func TestSensitive(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveDanglingInternal(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	for input, rel := range map[string]string{"link": "missing", "link/file": "missing/file"} {
+		p, err := Resolve(root, input)
+		if err != nil || !p.Inside || p.Abs != filepath.Join(root, rel) || p.Rel != rel {
+			t.Errorf("%s: %+v, %v", input, p, err)
+		}
+	}
+	// Cleaning a dangling target can expose a cycle that EvalSymlinks cannot follow.
+	if err := os.Symlink("missing/../cycle", filepath.Join(root, "cycle")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Resolve(root, "cycle"); err == nil {
+		t.Fatal("resolved a dangling symlink cycle")
+	}
+}

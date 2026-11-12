@@ -15,6 +15,7 @@ import (
 
 func call(t *testing.T, env Env, tool *Tool, args any) (string, error) {
 	t.Helper()
+	tool = Set{tool}.Get(tool.Name)
 	b, _ := json.Marshal(args)
 	if _, err := tool.Access(env, b); err != nil {
 		return "", err
