@@ -186,7 +186,8 @@ func TestToolCardViews(t *testing.T) {
 		{"edit", cardEntry("edit_file", map[string]string{"path": "add.go", "old_text": "func Add(a, b int) int { return a - b }\n", "new_text": "func Add(a, b int) int { return a + b }\n"}, "Edited add.go (1 replacement)"), false, []string{"add.go", "+1", "−1", "撤销"}},
 		{"write", cardEntry("write_file", map[string]string{"path": "README.md", "content": "# calc\n\nAdd(2, 3) == 5\n"}, "Created README.md (4 lines)"), false, []string{"新写入", "+3", "−0"}},
 		{"write-empty", cardEntry("write_file", map[string]string{"path": "empty.txt", "content": ""}, "Wrote empty.txt (1 lines)"), false, []string{"新写入", "+0", "−0"}},
-		{"replace-all", cardEntry("edit_file", map[string]any{"path": "a.go", "old_text": "old\n", "new_text": "new\n", "replace_all": true}, "Edited a.go (3 replacements)"), false, []string{"同一片段替换 3 处 · 下方显示一处", "+3", "−3"}},
+		{"replace-all", cardEntry("edit_file", map[string]any{"path": "a.go", "old_text": "foo", "new_text": "bar", "replace_all": true}, "Edited a.go (2 replacements)"), false, []string{"同一片段替换 2 处 · 下方显示一处", "+1", "−1"}},
+		{"line-endings", cardEntry("edit_file", map[string]string{"path": "a.go", "old_text": "package calc\r\n\r\n", "new_text": "package calc\n\n"}, "Edited a.go (1 replacement)"), false, []string{"换行格式已变更", "+0", "−0", "package calc"}},
 		{"shell", cardEntry("shell", map[string]string{"command": "go test ./..."}, "=== RUN TestAdd\n--- PASS: TestAdd\nok calc\n"), true, []string{"ok calc"}},
 		{"shell-failed", cardEntry("shell", map[string]string{"command": "go test ./..."}, shell), true, []string{"退出码 1", "… 已省略前 5 行", "[exit status 1]"}},
 		{"shell-empty", cardEntry("shell", map[string]string{"command": "true"}, "(no output)"), true, []string{"(no output)"}},
@@ -337,5 +338,37 @@ func TestToolCardNarrowViews(t *testing.T) {
 				snapshot(t, tt, name)
 			})
 		}
+	}
+}
+
+func TestToolCardDiffAccuracy(t *testing.T) {
+	for _, tc := range []struct {
+		name, old, next string
+		copies          int
+		endings         bool
+		added, removed  string
+	}{
+		// Both matches may be on the same line (foofoo -> barbar).
+		{"same-line-replacements", "foo", "bar", 2, false, "+1", "−1"},
+		{"crlf-to-lf", "a\r\nb\r\n", "a\nb\n", 1, true, "+0", "−0"},
+		{"lf-to-crlf", "a\nb\n", "a\r\nb\r\n", 1, true, "+0", "−0"},
+		{"mixed-endings", "a\r\nb\n", "a\nb\n", 1, true, "+0", "−0"},
+		{"unchanged-crlf", "a\r\n", "a\r\n", 1, false, "+0", "−0"},
+		{"missing-final-newline", "a\n", "a", 1, false, "+1", "−1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output := "Edited a.go (1 replacement)"
+			if tc.copies > 1 {
+				output = fmt.Sprintf("Edited a.go (%d replacements)", tc.copies)
+			}
+			e := cardEntry("edit_file", map[string]any{"path": "a.go", "old_text": tc.old, "new_text": tc.next, "replace_all": tc.copies > 1}, output)
+			tt := ui.NewTester(cardApp(e).View, 1200, 780)
+			if tt.HasText("换行格式已变更") != tc.endings || !tt.HasText(tc.added) || !tt.HasText(tc.removed) {
+				t.Fatalf("wrong fragment counts or line-ending notice: %q", tt.Texts())
+			}
+			if tc.copies > 1 && (!tt.HasText("同一片段替换 2 处 · 下方显示一处") || tt.HasText("+2") || tt.HasText("−2")) {
+				t.Fatalf("replacement count was mistaken for changed file lines: %q", tt.Texts())
+			}
+		})
 	}
 }

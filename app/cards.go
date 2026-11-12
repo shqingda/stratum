@@ -21,6 +21,7 @@ type cardDiff struct {
 	oldText, newText string
 	lines            []diffLine
 	replaced         bool
+	lineEndings      bool
 	added, removed   int
 }
 
@@ -100,7 +101,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 			if e.Text == "write_file" && args.Content != nil {
 				suffix := fmt.Sprintf(" %s (%d lines)", args.Path, strings.Count(*args.Content, "\n")+1)
 				if e.Output == "Created"+suffix || e.Output == "Wrote"+suffix {
-					a.diffCard(c, e, args.Path, "", *args.Content, "新写入", 1)
+					a.diffCard(c, e, args.Path, "", *args.Content, "新写入")
 					return
 				}
 			}
@@ -110,7 +111,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 					if n > 1 {
 						note = fmt.Sprintf("同一片段替换 %d 处 · 下方显示一处", n)
 					}
-					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note, n)
+					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note)
 					return
 				}
 			}
@@ -158,13 +159,14 @@ func editReplacements(output, path string) int {
 	return n
 }
 
-func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, note string, copies int) {
+func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, note string) {
 	p := a.p
 	box := ui.Column(c.Key("card:"+e.CallID)).Margin(10, 0).Radius(10).Background(p.Card).InsetShadow(0, 0, 0, .5, p.Edge2).Clip()
 	diff := ui.Local(box, "diff", func() cardDiff { return cardDiff{} })
 	if diff.lines == nil || diff.oldText != oldText || diff.newText != newText {
 		*diff = cardDiff{oldText: oldText, newText: newText}
 		diff.lines, diff.replaced = lineDiff(oldText, newText)
+		diff.lineEndings = oldText != newText && strings.ReplaceAll(oldText, "\r\n", "\n") == strings.ReplaceAll(newText, "\r\n", "\n")
 		for _, line := range diff.lines {
 			if line.sign == "+" {
 				diff.added++
@@ -178,12 +180,18 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 		note = strings.TrimSpace(note + " · 整体替换（超过 2000 行）")
 		note = strings.TrimPrefix(note, "· ")
 	}
+	if diff.lineEndings {
+		if note != "" {
+			note += " · "
+		}
+		note += "换行格式已变更"
+	}
 	box.Children(func() {
 		ui.Row(c).Height(36).Padding(0, 8, 0, 12).Gap(8).AlignItems(ui.Center).Children(func() {
 			sym(c, "pencil", 15, p.Fg2)
 			ui.Text(c, path).Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0).Tooltip(path)
-			ui.Text(c, fmt.Sprintf("+%d", diff.added*copies)).Font("monospace").FontSize(12).TextColor(p.Plus).Shrink(0)
-			ui.Text(c, fmt.Sprintf("−%d", diff.removed*copies)).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0)
+			ui.Text(c, fmt.Sprintf("+%d", diff.added)).Font("monospace").FontSize(12).TextColor(p.Plus).Shrink(0)
+			ui.Text(c, fmt.Sprintf("−%d", diff.removed)).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0)
 			ui.Spacer(c)
 			ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label("撤销 " + path).Disabled(true).DimDisabled(false).Tooltip("撤销尚未接入").Children(func() {
 				sym(c, "arrow.uturn.backward", 15, p.Fg2)
