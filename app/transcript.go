@@ -115,7 +115,7 @@ func (a *App) entry(c *ui.Context, e *client.Entry, i int) {
 			}
 		})
 	case client.Tool:
-		a.step(c, e)
+		a.card(c, e)
 	case client.Notice:
 		ui.Text(c, e.Text).FontSize(12).TextColor(p.Mute).Margin(4, 0, 10, 0).Selectable()
 	}

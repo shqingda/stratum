@@ -67,6 +67,7 @@ type Entry struct {
 	Done   bool
 	CallID string
 	Failed bool
+	Args   json.RawMessage // a tool call's original arguments
 }
 
 // Unknown is a mutation whose outcome a disconnect left unknown.
@@ -541,7 +542,7 @@ func (c *Client) tool(call llm.ToolCall) *Entry {
 	}
 	var args map[string]any
 	_ = json.Unmarshal(call.Args, &args)
-	return c.add(&Entry{Role: Tool, Text: call.Name, Detail: summarize(args), CallID: call.ID})
+	return c.add(&Entry{Role: Tool, Text: call.Name, Detail: summarize(args), CallID: call.ID, Args: call.Args})
 }
 
 func (c *Client) toolResult(r llm.ToolResult) {
