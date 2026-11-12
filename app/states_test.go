@@ -81,8 +81,8 @@ func TestStateMatrix(t *testing.T) {
 			a.C.Current = &a.C.Sessions[0]
 		}, want: []string{"project-1", "会话 01：检查工作区"}, scroll: "sidebar"},
 		{name: "sidebar-long-title", setup: func(a *App) { a.C.Sessions[0].Title = string([]rune(strings.Repeat("修复 Talos 边界 ", 8))[:80]) }, want: []string{"修复 Talos 边界"}},
-		{name: "sidebar-search-hit", setup: func(a *App) { a.query = "CLIENT" }, want: []string{"client 按日志重建"}},
-		{name: "sidebar-search-miss", setup: func(a *App) { a.query = "完全不存在的会话" }, want: []string{"完全不存在的会话"}},
+		{name: "palette-hit", setup: func(a *App) { a.pal, a.query = true, "CLIENT" }, want: []string{"按日志重建", "talos · 3 时"}},
+		{name: "palette-miss", setup: func(a *App) { a.pal, a.query = true, "完全不存在的会话" }, want: []string{"没有匹配的会话或操作"}},
 		{name: "sidebar-waiting", setup: func(a *App) { a.C.Approvals = []proto.Approval{stateApproval("waiting")} }, want: []string{"需要你", "审批"}},
 		{name: "sidebar-relative-times", setup: func(a *App) {
 			a.C.Sessions = nil
@@ -186,10 +186,7 @@ func TestStateMatrix(t *testing.T) {
 						t.Errorf("missing %q in %q", want, tt.Texts())
 					}
 				}
-				if tc.name == "sidebar-search-hit" && tt.HasText("沙箱 profile") {
-					t.Error("nonmatching session is shown")
-				}
-				if tc.name == "sidebar-search-miss" && tt.HasText("client 按日志重建") {
+				if tc.name == "palette-hit" && tt.HasText("site · ") {
 					t.Error("nonmatching session is shown")
 				}
 				if tc.name == "transcript-output-45-lines" && (!tt.HasText("line 40:") || tt.HasText("line 41:")) {

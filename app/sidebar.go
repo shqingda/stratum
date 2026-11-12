@@ -63,9 +63,13 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 
 func (a *App) search(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Children(func() {
+	b := ui.ButtonBase(c.Key("search")).Row().Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Label("搜索")
+	if b.Clicked() {
+		a.openPalette(c)
+	}
+	b.Children(func() {
 		sym(c, "search", 15, p.Mute)
-		ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").KeyShortcuts(ui.Cmd, ui.KeyK).Placeholder("搜索").PlaceholderColor(p.Mute).FontSize(13).Grow(1).SingleLine()
+		ui.Text(c, "搜索").FontSize(13).TextColor(p.Mute).Grow(1)
 		ui.Text(c, "⌘K").FontSize(11).TextColor(p.Mute)
 	})
 }
@@ -91,14 +95,10 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 // the rest by workspace, each newest first.
 func (a *App) sessions(c *ui.Context) {
 	a.visibleSessions = a.visibleSessions[:0]
-	q := strings.ToLower(strings.TrimSpace(a.query))
 	var waiting []proto.Session
 	var folders []string
 	byFolder := map[string][]proto.Session{}
 	for _, s := range a.C.Sessions {
-		if q != "" && !strings.Contains(strings.ToLower(title(s)), q) {
-			continue
-		}
 		if a.state(s) == "wait" {
 			waiting = append(waiting, s)
 			continue

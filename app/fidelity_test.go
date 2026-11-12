@@ -116,6 +116,15 @@ func screen3() *App {
 	return a
 }
 
+// screen4 is the third mockup's right window: ⌘K over a session, dark.
+func screen4() *App {
+	a := screen2()
+	a.draft = ""
+	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "11", Title: "测试里跑 go test 要进沙箱", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-8 * 24 * time.Hour)})
+	a.pal, a.query = true, "沙箱"
+	return a
+}
+
 func replace(s, old, new string) string {
 	for i := 0; i+len(old) <= len(s); i++ {
 		if s[i:i+len(old)] == old {
@@ -135,6 +144,7 @@ func TestFidelity(t *testing.T) {
 		{"screen1", screen1, 1440, 880, true},
 		{"screen2", screen2, 1200, 860, false},
 		{"screen3", screen3, 700, 600, false},
+		{"screen4", screen4, 700, 600, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tt := ui.NewTester(tc.app().View, tc.w, tc.h)

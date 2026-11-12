@@ -21,6 +21,11 @@ func TestTask8NewAndSearchShortcuts(t *testing.T) {
 	if a.query != "client" || a.draft != "保留草稿" {
 		t.Fatalf("query %q, draft %q", a.query, a.draft)
 	}
+	tt.Key(0, ui.KeyEscape)
+	if a.pal || a.query != "" {
+		t.Fatalf("Escape left the palette open: %v %q", a.pal, a.query)
+	}
+	task8NoCommand(t, a)
 	tt.Key(ui.Cmd, ui.KeyN)
 	var create proto.SessionCreate
 	task8Command(t, a, proto.MethodSessionCreate, &create)
@@ -57,16 +62,20 @@ func TestTask8SessionShortcuts(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPaletteOpensSession finds a session in the ⌘K palette and opens it
+// with Enter.
+func TestPaletteOpensSession(t *testing.T) {
 	a := task8App()
-	a.query = "client"
 	tt := task8Tester(a, false)
-	tt.Key(ui.Cmd, ui.Key2)
-	task8NoCommand(t, a)
-	tt.Key(ui.Cmd, ui.Key1)
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Type("client")
+	tt.Key(0, ui.KeyEnter)
 	var ref proto.SessionRef
 	task8Command(t, a, proto.MethodSessionGet, &ref)
-	if ref.SessionID != "3" {
-		t.Fatalf("filtered shortcut opened %q", ref.SessionID)
+	if ref.SessionID != "3" || a.pal {
+		t.Fatalf("opened %q, palette open %v", ref.SessionID, a.pal)
 	}
 }
 
@@ -132,9 +141,10 @@ func TestTask8SearchAndMenuKeepTheirKeys(t *testing.T) {
 	a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell"}}
 	tt := task8Tester(a, false)
 	tt.Key(ui.Cmd, ui.KeyK)
-	tt.Type("修复")
+	tt.Type("没有这个")
 	tt.Key(0, ui.KeyEnter)
 	tt.Key(ui.Cmd, ui.KeyEnter)
+	tt.Key(0, ui.KeyEscape) // closes the palette, not the running turn
 	task8NoCommand(t, a)
 	task8Click(t, tt, "询问")
 	tt.Key(0, ui.KeyEscape)
@@ -227,7 +237,7 @@ func TestTask8SearchFocusViews(t *testing.T) {
 		tt := task8Tester(a, dark)
 		tt.Key(ui.Cmd, ui.KeyK)
 		tt.Type("client")
-		if !tt.Focused("搜索") || !tt.HasText("client 按日志重建") || tt.HasText("首页文案改写") {
+		if !tt.Focused("搜索") || !tt.HasText("talos · 3 时") || tt.HasText("site · ") {
 			t.Fatalf("search focus/filter failed: %q", tt.Texts())
 		}
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]

@@ -18,12 +18,11 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyK, func() {
-		if a.noSide {
-			a.noSide = false // the search is in the sidebar; it focuses once shown
-			c.After(0)
-			return
+		if a.pal {
+			a.pal, a.query = false, ""
+		} else {
+			a.openPalette(c)
 		}
-		a.searchInput.Focus(c)
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBackslash, func() {
 		if !c.ShortcutRepeated() {
@@ -41,7 +40,7 @@ func (a *App) keys(c *ui.Context) {
 		key  ui.Key
 	}{{0, ui.KeyEnter}, {ui.Cmd, ui.KeyEnter}, {0, ui.KeyEscape}} {
 		c.OnWindowShortcut(key.mods, key.key, func() {
-			if !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods == ui.Cmd && !a.searchInput.Focused(c)) {
+			if !a.pal && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods == ui.Cmd && !a.searchInput.Focused(c)) {
 				a.keyRepeat = false
 				a.actionKey(key.mods, key.key)
 			}

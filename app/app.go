@@ -47,6 +47,8 @@ type App struct {
 	opened map[string]bool // tool calls whose output shows
 	inWork bool            // building a finished turn's folded work
 	noSide bool            // the sidebar is hidden
+	pal    bool            // the ⌘K palette shows
+	palSel int             // its row chosen by the arrow keys
 	stats  map[string][2]int
 	rv     review
 	seen   map[string]time.Time // when approvals first showed
@@ -153,6 +155,7 @@ func (a *App) View(c *ui.Context) {
 		}
 		a.main(c)
 	})
+	a.palette(c)
 	a.keys(c)
 }
 
