@@ -13,8 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/shqingda/talos/kernel/boot"
 	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/llm/auth"
 )
@@ -295,9 +295,7 @@ func or(a, b string) string {
 
 // loadCatalog refreshes the model list once a day; offline, the cached or
 // built-in list serves.
-func loadCatalog(ctx context.Context) {
-	llm.LoadCatalog(ctx, filepath.Join(auth.Dir, "models", "models.dev.json"), 24*time.Hour, auth.CatalogNames())
-}
+func loadCatalog(ctx context.Context) { boot.LoadCatalog(ctx) }
 
 func models(ctx context.Context, args []string) error {
 	loadCatalog(ctx)
