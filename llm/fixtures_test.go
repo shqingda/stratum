@@ -23,7 +23,7 @@ func TestFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"codex/cancel", "codex/error-model", "codex/image", "codex/max-tokens-unsupported",
+		"codex/cancel", "codex/error-model", "codex/image", "codex/max-tokens", "codex/max-tokens-unsupported",
 		"codex/text", "codex/thinking", "codex/tool", "codex/tool-result", "codex/tools-parallel",
 		"openai/model-unavailable", "openai/text", "openai/tool",
 		"xai/effort-unsupported", "xai/text", "xai/thinking-default", "xai/thinking-low", "xai/tool",
@@ -69,10 +69,13 @@ func TestFixtures(t *testing.T) {
 				wantStop, wantPaths = StopToolUse, []string{"alpha.txt", "beta.txt"}
 			case "max-tokens":
 				wantStop = StopMaxTokens
+				if r.Usage.Output != req.MaxTokens {
+					t.Errorf("output tokens = %d, want recorded limit %d", r.Usage.Output, req.MaxTokens)
+				}
 			case "max-tokens-unsupported":
-				// This records the ignored Codex limit, not a max-tokens truncation fixture.
+				// Before the fix, codexBody deleted the limit from this recorded request.
 				if provider != "codex" || r.Usage.Output <= req.MaxTokens {
-					t.Fatalf("want evidence of the Codex output limit being unsupported, got %+v", r.Usage)
+					t.Fatalf("want evidence of the Codex adapter ignoring the output limit, got %+v", r.Usage)
 				}
 			}
 			if r.Stop != wantStop {
@@ -132,6 +135,13 @@ func replayFixture(t *testing.T, provider, scenario string, req Request) (Reply,
 	var want map[string]any
 	if err := json.Unmarshal(read(".req.json"), &want); err != nil {
 		t.Fatal(err)
+	}
+	if provider == "codex" && scenario == "max-tokens-unsupported" {
+		if _, exists := want["max_output_tokens"]; exists {
+			t.Fatal("pre-fix recording unexpectedly contains max_output_tokens")
+		}
+		// Keep the pre-fix recording intact; only the expected copy gains the fixed field.
+		want["max_output_tokens"] = float64(req.MaxTokens)
 	}
 	for key := range *got {
 		if strings.HasPrefix(key, "_") {

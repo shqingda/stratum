@@ -96,12 +96,11 @@ func responsesBody(req Request) map[string]any {
 }
 
 // codexBody adapts a Responses body to the ChatGPT backend, which requires
-// instructions, rejects max_output_tokens and keys its cache by session.
+// instructions and keys its cache by session.
 func codexBody(body map[string]any, req Request) {
 	if req.System == "" {
 		body["instructions"] = "You are a helpful assistant."
 	}
-	delete(body, "max_output_tokens")
 	body["text"] = map[string]any{"verbosity": "low"}
 	body["include"] = []string{"reasoning.encrypted_content"}
 	body["tool_choice"] = "auto"

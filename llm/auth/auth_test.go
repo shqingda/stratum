@@ -216,7 +216,7 @@ func TestOpenCodex(t *testing.T) {
 	if err != nil || r.Message.PlainText() != "hi" {
 		t.Fatalf("%+v %v", r, err)
 	}
-	if got["_path"] != "/codex/responses" || got["instructions"] == nil || got["prompt_cache_key"] != "s1" || got["max_output_tokens"] != nil || got["store"] != false {
+	if got["_path"] != "/codex/responses" || got["instructions"] == nil || got["prompt_cache_key"] != "s1" || got["max_output_tokens"] != float64(100) || got["store"] != false {
 		t.Errorf("body %v", got)
 	}
 	if hdr.Get("Authorization") != "Bearer tok" || hdr.Get("chatgpt-account-id") != "acct-1" || hdr.Get("originator") != "talos" || hdr.Get("session_id") != "s1" {
