@@ -203,7 +203,7 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 
 func (c *Client) ready(f proto.Frame) []proto.Command {
 	if f.Version != proto.Version {
-		c.fail(fmt.Sprintf("The kernel speaks protocol %d; this app speaks %d.", f.Version, proto.Version))
+		c.fail(fmt.Sprintf("内核协议版本为 %d，应用协议版本为 %d。", f.Version, proto.Version))
 		return nil
 	}
 	c.Phase, c.Err, c.Instance = Handshaking, "", f.Instance
@@ -257,7 +257,7 @@ func (c *Client) response(f proto.Frame) []proto.Command {
 			c.fail(f.Error.Message)
 			return nil
 		}
-		c.notice("%s failed: %s", p.method, f.Error.Message)
+		c.notice("%s 失败：%s", p.method, f.Error.Message)
 		return nil
 	}
 	if p.done != nil {
@@ -304,7 +304,7 @@ func (c *Client) create() proto.Command {
 	p.done = func(r json.RawMessage) []proto.Command {
 		var s proto.Session
 		if err := json.Unmarshal(r, &s); err != nil || s.ID == "" {
-			c.fail("session.create returned no session")
+			c.fail("创建会话未返回会话信息")
 			return nil
 		}
 		c.upsertSession(s)
@@ -325,7 +325,7 @@ func (c *Client) bind(id string) proto.Command {
 		}
 		var s proto.Snapshot
 		if err := json.Unmarshal(r, &s); err != nil || s.Session.ID == "" {
-			c.fail("session.get returned no session")
+			c.fail("读取会话未返回会话信息")
 			return nil
 		}
 		c.Current = &s.Session
@@ -366,7 +366,7 @@ func (c *Client) catchUp() proto.Command {
 		}
 		var page proto.EventPage
 		if err := json.Unmarshal(r, &page); err != nil {
-			c.fail("events: " + err.Error())
+			c.fail("读取事件失败：" + err.Error())
 			return nil
 		}
 		for _, e := range page.Events {
@@ -479,7 +479,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)
-		c.notice("Retrying (attempt %d): %s", r.Attempt, r.Error)
+		c.notice("正在重试（第 %d 次）：%s", r.Attempt, r.Error)
 	case proto.EventTurnEnd:
 		var t proto.TurnEnd
 		_ = json.Unmarshal(e.Data, &t)
@@ -489,9 +489,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		c.Usage = c.Usage.Add(t.Usage)
 		switch {
 		case t.Stopped:
-			c.notice("Stopped.")
+			c.notice("已停止。")
 		case t.Error != "":
-			c.notice("The turn failed: %s", t.Error)
+			c.notice("本轮执行失败：%s", t.Error)
 		}
 	}
 	return nil
@@ -594,14 +594,14 @@ func (c *Client) Disconnected(err error) {
 	if err != nil {
 		c.Err = err.Error()
 	} else {
-		c.Err = "The kernel exited."
+		c.Err = "内核已退出。"
 	}
 }
 
 // --- commands the user starts ---
 
 // ErrNotReady is returned when the connection cannot take commands now.
-var ErrNotReady = fmt.Errorf("not connected")
+var ErrNotReady = fmt.Errorf("未连接")
 
 func (c *Client) mutation(method string, params any, done func(json.RawMessage) []proto.Command) ([]proto.Command, error) {
 	if !c.CanAct() {
@@ -614,7 +614,7 @@ func (c *Client) mutation(method string, params any, done func(json.RawMessage) 
 // waits in Queued until the turn takes it.
 func (c *Client) Prompt(text string) ([]proto.Command, error) {
 	if strings.TrimSpace(text) == "" {
-		return nil, fmt.Errorf("nothing to send")
+		return nil, fmt.Errorf("没有可发送的内容")
 	}
 	session := c.Current
 	return c.mutation(proto.MethodPrompt, proto.Prompt{SessionID: sessionID(session), Text: text}, func(r json.RawMessage) []proto.Command {
@@ -636,7 +636,7 @@ func sessionID(s *proto.Session) string {
 // Cancel stops the current turn.
 func (c *Client) Cancel() ([]proto.Command, error) {
 	if !c.Busy {
-		return nil, fmt.Errorf("nothing is running")
+		return nil, fmt.Errorf("当前没有运行中的任务")
 	}
 	return c.mutation(proto.MethodCancel, proto.SessionRef{SessionID: sessionID(c.Current)}, nil)
 }
@@ -645,14 +645,14 @@ func (c *Client) Cancel() ([]proto.Command, error) {
 // the rest of the session.
 func (c *Client) Answer(id string, allow, always bool) ([]proto.Command, error) {
 	if c.Answering[id] {
-		return nil, fmt.Errorf("already answered")
+		return nil, fmt.Errorf("已回答此审批")
 	}
 	cmds, err := c.mutation(proto.MethodApprovalRespond, proto.ApprovalAnswer{SessionID: sessionID(c.Current), ApprovalID: id, Allow: allow, Always: always}, nil)
 	if err == nil {
 		c.Answering[id] = true
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
 			delete(c.Answering, id)
-			c.notice("Approval failed: %s", e.Message)
+			c.notice("审批失败：%s", e.Message)
 			return nil
 		}
 	}
@@ -696,7 +696,7 @@ func (c *Client) Delete(id string) ([]proto.Command, error) {
 // approval mode. The kernel's session.updated event brings the result.
 func (c *Client) Update(u proto.SessionUpdate) ([]proto.Command, error) {
 	if u.Mode != nil && !slices.Contains([]string{"ask", "auto", "full"}, *u.Mode) {
-		return nil, fmt.Errorf("unknown approval mode %q", *u.Mode)
+		return nil, fmt.Errorf("未知权限模式 %q", *u.Mode)
 	}
 	u.SessionID = sessionID(c.Current)
 	return c.mutation(proto.MethodSessionUpdate, u, func(r json.RawMessage) []proto.Command {

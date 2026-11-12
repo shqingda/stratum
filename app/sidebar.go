@@ -47,7 +47,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		})
 		a.search(c)
 		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
-			if a.navItem(c, "new", "plus.bubble", "新会话", "⌘N").Clicked() {
+			if a.navItem(c, "new", "plus.bubble", "新会话", "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
 				a.do(a.C.NewSession())
 			}
 			a.navItem(c, "cron", "clock.arrow.circlepath", "定时任务", "")
@@ -62,7 +62,7 @@ func (a *App) search(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Children(func() {
 		sym(c, "magnifyingglass", 13, p.Mute)
-		ui.TextInputBase(c, &a.query).Placeholder("搜索").PlaceholderColor(p.Mute).FontSize(13).Grow(1).SingleLine()
+		ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").KeyShortcuts(ui.Cmd, ui.KeyK).Placeholder("搜索").PlaceholderColor(p.Mute).FontSize(13).Grow(1).SingleLine()
 		ui.Text(c, "⌘K").FontSize(11).TextColor(p.Mute)
 	})
 }
@@ -87,6 +87,7 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 // sessions lists the sessions: the ones waiting on the user first, then
 // the rest by workspace, each newest first.
 func (a *App) sessions(c *ui.Context) {
+	a.visibleSessions = a.visibleSessions[:0]
 	q := strings.ToLower(strings.TrimSpace(a.query))
 	var waiting []proto.Session
 	var folders []string
@@ -151,6 +152,7 @@ func (a *App) state(s proto.Session) string {
 }
 
 func (a *App) sessionRow(c *ui.Context, s proto.Session) {
+	a.visibleSessions = append(a.visibleSessions, s.ID)
 	p := a.p
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)

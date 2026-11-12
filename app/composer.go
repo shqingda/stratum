@@ -56,9 +56,9 @@ func (a *App) box(c *ui.Context) {
 		})
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
 			if cur != nil {
-				a.pill(c, "model", "", cur.Model)
-				a.pill(c, "effort", "brain", efforts[cur.Effort])
-				a.pill(c, "mode", "shield.lefthalf.filled", modes[cur.Mode])
+				a.modelPill(c, cur.Model)
+				a.effortPill(c, efforts[cur.Effort])
+				a.modePill(c, modes[cur.Mode])
 			}
 			ui.Spacer(c)
 			a.goButton(c)

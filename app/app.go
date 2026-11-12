@@ -45,6 +45,15 @@ type App struct {
 	list   ui.ListState // the transcript
 	md     markdown.Options
 	opened map[string]bool // tool calls whose output shows
+
+	searchInput                               ui.Handle
+	keyRepeat                                 bool
+	visibleSessions                           []string
+	menuSession                               string
+	modelMenu, effortMenu, modeMenu           bool
+	modelsRequested                           bool
+	modelsPending, modelsAccount, modelsError string
+	modelsLoadedAccount                       string
 }
 
 // New returns an app over c, not connected yet.
@@ -86,13 +95,13 @@ func (a *App) Serve(ctx context.Context, srv *rpc.Server, update func(func())) {
 			if json.Unmarshal(sc.Bytes(), &f) != nil {
 				continue
 			}
-			update(func() { a.send(a.C.Receive(f)) })
+			update(func() { a.receive(f) })
 		}
 		err := sc.Err()
 		if err == nil {
 			err = io.EOF
 		}
-		update(func() { a.C.Disconnected(err) })
+		update(func() { a.C.Disconnected(err); a.modelsPending = "" })
 	}()
 }
 
@@ -115,6 +124,7 @@ func (a *App) do(cmds []proto.Command, err error) {
 
 // View builds a frame of the window.
 func (a *App) View(c *ui.Context) {
+	a.syncMenus()
 	isDark := c.Theme().Dark
 	a.p = PaletteFor(isDark)
 	c.SetTheme(Theme(a.p, isDark))
@@ -126,6 +136,7 @@ func (a *App) View(c *ui.Context) {
 		a.sidebar(c, vibrant)
 		a.main(c)
 	})
+	a.keys(c)
 }
 
 func (a *App) main(c *ui.Context) {
