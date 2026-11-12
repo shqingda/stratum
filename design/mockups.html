@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talos 样稿</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #DADDE3; font: 13.5px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum"; }
+.stage { padding: 72px 40px; display: grid; justify-content: center; gap: 72px; overflow-x: auto; }
+.stage.ink { background: #0B0C10; }
+.stage.paper { background: #E4E7EC; }
+.pair2 { display: flex; gap: 40px; align-items: flex-start; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-feature-settings: normal; }
+
+/* themes */
+.light { --bg:#F4F5F7; --side:rgba(234,236,240,.92); --pane:#FBFBFC; --card:#FFFFFF; --fg:#12131A; --fg2:#5B6272; --mute:#8A91A0; --faint:#B7BCC6;
+  --edge:rgba(18,19,26,.10); --edge2:rgba(18,19,26,.16); --sel:rgba(18,19,26,.055); --hover:rgba(18,19,26,.035); --chip:rgba(18,19,26,.05);
+  --acc:#12131A; --onacc:#F4F5F7; --live:#2B5FA6; --livebg:rgba(43,95,166,.08);
+  --plus:#3B7356; --plusbg:rgba(59,115,86,.10); --minus:#A8474B; --minusbg:rgba(168,71,75,.09);
+  --shadow: 0 0 0 .5px rgba(18,19,26,.22), 0 2px 6px rgba(18,19,26,.06), 0 30px 80px -24px rgba(18,19,26,.35);
+  --pop: 0 0 0 .5px rgba(18,19,26,.14), 0 12px 32px -8px rgba(18,19,26,.22); }
+.dark { --bg:#12131A; --side:rgba(23,25,34,.94); --pane:#15161E; --card:#1C1E28; --fg:#E8EAEF; --fg2:#A9B1C1; --mute:#6E7587; --faint:#454A58;
+  --edge:rgba(169,177,193,.10); --edge2:rgba(169,177,193,.16); --sel:rgba(169,177,193,.09); --hover:rgba(169,177,193,.05); --chip:rgba(169,177,193,.08);
+  --acc:#E8EAEF; --onacc:#12131A; --live:#7AA8EA; --livebg:rgba(122,168,234,.10);
+  --plus:#7DB89A; --plusbg:rgba(125,184,154,.10); --minus:#DD878B; --minusbg:rgba(221,135,139,.10);
+  --shadow: 0 0 0 .5px rgba(0,0,0,.9), inset 0 0 0 .5px rgba(255,255,255,.08), 0 30px 90px -20px rgba(0,0,0,.8);
+  --pop: 0 0 0 .5px rgba(0,0,0,.8), inset 0 .5px 0 rgba(255,255,255,.08), 0 18px 48px -8px rgba(0,0,0,.6); }
+
+/* window */
+.win { position: relative; border-radius: 12px; overflow: hidden; display: flex; background: var(--bg); color: var(--fg); box-shadow: var(--shadow); flex: none; }
+.side { width: 252px; flex: none; background: var(--side); border-right: .5px solid var(--edge); display: flex; flex-direction: column; }
+.side-top { height: 52px; display: flex; align-items: center; padding: 0 12px 0 18px; gap: 8px; }
+.lights { display: flex; gap: 8px; margin-right: auto; }
+.lights b { width: 12px; height: 12px; border-radius: 50%; }
+.light .lights b:nth-child(1) { background:#FF5F57; } .light .lights b:nth-child(2) { background:#FEBC2E; } .light .lights b:nth-child(3) { background:#28C840; }
+.dark .lights b { background: #3A3D48; }
+.dark .lights.on b:nth-child(1) { background:#FF5F57; } .dark .lights.on b:nth-child(2) { background:#FEBC2E; } .dark .lights.on b:nth-child(3) { background:#28C840; }
+.ib { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--fg2); font-size: 17px; }
+.ib.on { background: var(--sel); color: var(--fg); }
+.search { margin: 0 10px 8px; height: 30px; border-radius: 8px; background: var(--chip); display: flex; align-items: center; gap: 7px; padding: 0 9px; color: var(--mute); font-size: 13px; }
+.search i { font-size: 15px; } .search kbd { margin-left: auto; }
+kbd { font: 11px -apple-system; color: var(--mute); letter-spacing: .02em; }
+.nav { padding: 2px 8px 6px; }
+.it { height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--fg); white-space: nowrap; }
+.it i { font-size: 16px; color: var(--fg2); width: 16px; }
+.it kbd { margin-left: auto; }
+.list { flex: 1; overflow: hidden; padding: 0 8px; position: relative; }
+.grp { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; margin-top: 10px; font-size: 11.5px; font-weight: 600; color: var(--mute); }
+.grp i { font-size: 13px; }
+.grp .n { margin-left: auto; font-weight: 500; }
+.row { height: 30px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--fg2); white-space: nowrap; position: relative; }
+.row .t { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.row .m { font-size: 11.5px; color: var(--mute); }
+.row.on { background: var(--sel); color: var(--fg); }
+.row.hov { background: var(--hover); }
+.row.hov .m { display: none; }
+.row .acts { display: none; gap: 2px; color: var(--mute); font-size: 15px; }
+.row.hov .acts { display: flex; }
+.st { width: 12px; height: 14px; flex: none; display: grid; place-items: center; }
+.st.vein::before { content: ""; width: 2px; height: 12px; border-radius: 0; background: var(--live); }
+.st.vein.run::before { animation: beat 1.6s ease-in-out infinite; }
+.st.wait::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--live); }
+.st.unread::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--fg2); }
+.st.fail::before { content: ""; width: 7px; height: 2px; background: var(--minus); }
+.badge { font-size: 11px; font-weight: 600; color: var(--live); background: var(--livebg); padding: 1px 6px; border-radius: 5px; }
+.foot { height: 52px; display: flex; align-items: center; gap: 9px; padding: 0 14px; border-top: .5px solid var(--edge); }
+.av { width: 24px; height: 24px; border-radius: 6px; background: var(--acc); color: var(--onacc); font-size: 11px; font-weight: 600; display: grid; place-items: center; }
+.foot .who { font-size: 12.5px; line-height: 1.25; } .foot .who small { display: block; color: var(--mute); font-size: 11px; }
+.foot .ib { margin-left: auto; }
+.fade-b::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 36px; background: linear-gradient(transparent, var(--side)); pointer-events: none; }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.bar { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 20px; border-bottom: .5px solid transparent; }
+.bar.line { border-bottom-color: var(--edge); }
+.bar h1 { font-size: 13.5px; font-weight: 600; margin: 0; white-space: nowrap; }
+.crumb { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--mute); white-space: nowrap; }
+.crumb i { font-size: 14px; }
+.sp { flex: 1; }
+.btn { height: 28px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--fg); box-shadow: inset 0 0 0 .5px var(--edge2); white-space: nowrap; background: var(--card); }
+.btn i { font-size: 15px; color: var(--fg2); }
+.btn.pri { background: var(--acc); color: var(--onacc); box-shadow: none; }
+.btn.pri i { color: var(--onacc); }
+.btn.ghost { background: none; box-shadow: none; color: var(--fg2); }
+.btn .split { width: .5px; align-self: stretch; margin: 6px 0 6px 4px; background: var(--edge2); }
+.add { color: var(--plus); } .del { color: var(--minus); }
+
+.flow { flex: 1; overflow: hidden; position: relative; }
+.col { width: 640px; max-width: calc(100% - 56px); margin: 0 auto; padding: 18px 0 40px; }
+.fade-t::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 28px; background: linear-gradient(var(--bg), transparent); z-index: 1; }
+
+.you { position: relative; padding: 0 0 0 14px; margin: 4px 0 18px; font-weight: 500; }
+.you::before { content: ""; position: absolute; left: 0; top: 3px; bottom: 3px; width: 2px; background: var(--faint); }
+.you .att { display: flex; gap: 6px; margin-top: 8px; font-weight: 400; }
+.fchip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border-radius: 6px; background: var(--chip); font-size: 12px; color: var(--fg2); }
+.fchip i { font-size: 13px; }
+
+.turn { position: relative; padding-left: 14px; }
+.turn::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; background: transparent; }
+.turn.live::before { background: var(--livebg); }
+.turn.live::after { content: ""; position: absolute; left: 0; top: 4px; width: 2px; height: 56px; background: linear-gradient(transparent, var(--live), transparent); animation: flow 2.8s cubic-bezier(.45,0,.25,1) infinite; }
+@keyframes flow { from { transform: translateY(-40px); opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } to { transform: translateY(var(--h, 520px)); opacity: 0; } }
+@keyframes beat { 50% { opacity: .35; } }
+
+.fold { display: flex; align-items: center; gap: 7px; height: 26px; font-size: 12.5px; color: var(--mute); }
+.fold i.ch { font-size: 13px; }
+.fold b { font-weight: 500; color: var(--fg2); }
+.steps { margin: 2px 0 8px; }
+.step { display: flex; align-items: center; gap: 8px; height: 25px; font-size: 12.5px; color: var(--fg2); white-space: nowrap; }
+.step > i { font-size: 15px; color: var(--mute); width: 16px; }
+.step code { font: 12px ui-monospace, "SF Mono", monospace; color: var(--fg); }
+.step .r { margin-left: auto; color: var(--mute); font-size: 11.5px; }
+.prose { margin: 8px 0 12px; }
+.prose p { margin: 0 0 10px; }
+.prose code, .ic { font: 12.5px ui-monospace, "SF Mono", monospace; background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+.prose ul { margin: 0 0 10px; padding-left: 18px; } .prose li { margin: 3px 0; } .prose li::marker { color: var(--mute); }
+
+.card { border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--edge2); margin: 10px 0; overflow: hidden; }
+.card .hd { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 12px; font-size: 12.5px; }
+.card .hd > i { font-size: 15px; color: var(--fg2); }
+.card .hd .fn { font: 12.5px ui-monospace, "SF Mono", monospace; color: var(--fg); }
+.card .hd .r { margin-left: auto; display: flex; gap: 2px; }
+.dl { font: 12px/20px ui-monospace, "SF Mono", monospace; display: grid; grid-template-columns: 34px 14px 1fr; border-top: .5px solid var(--edge); }
+.dl > span { padding: 0 6px; white-space: pre; }
+.dl .ln { text-align: right; color: var(--faint); padding-right: 4px; }
+.dl .sg { color: var(--mute); padding: 0; }
+.dl .p { background: var(--plusbg); } .dl .p.sg { color: var(--plus); }
+.dl .x { background: var(--minusbg); } .dl .x.sg { color: var(--minus); }
+.kw { color: var(--fg); font-weight: 600; } .str { color: var(--fg2); } .cm { color: var(--mute); font-style: italic; } .fnn { color: var(--fg); }
+
+.ask { border-radius: 12px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--edge2), 0 0 0 4px var(--livebg); padding: 14px 14px 12px 16px; margin: 12px 0; }
+.ask .k { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg2); }
+.ask .k b { color: var(--fg); font-weight: 600; }
+.ask .k .r { margin-left: auto; color: var(--mute); font-size: 11.5px; display: flex; align-items: center; gap: 4px; }
+.ask pre { margin: 10px 0 8px; padding: 9px 11px; border-radius: 8px; background: var(--chip); font: 12.5px ui-monospace, "SF Mono", monospace; color: var(--fg); }
+.ask pre .pr { color: var(--mute); user-select: none; }
+.ask .why { font-size: 12px; color: var(--mute); display: flex; gap: 14px; }
+.ask .why span { display: inline-flex; align-items: center; gap: 4px; }
+.ask .btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ask .btn kbd { color: inherit; opacity: .55; margin-left: 2px; }
+
+.running { display: flex; align-items: center; gap: 8px; height: 28px; font-size: 12.5px; }
+.shim { background: linear-gradient(90deg, var(--fg2) 0%, var(--fg2) 40%, var(--fg) 50%, var(--fg2) 60%, var(--fg2) 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shim 2.4s linear infinite; }
+@keyframes shim { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.caret { display: inline-block; width: 7px; height: 15px; vertical-align: -2px; background: var(--live); margin-left: 1px; animation: beat 1s steps(1) infinite; }
+
+.meta { display: flex; gap: 12px; font-size: 11.5px; color: var(--mute); margin: 4px 0 0; }
+.meta span { display: inline-flex; align-items: center; gap: 4px; }
+.changed { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px 0 12px; border-radius: 10px; box-shadow: inset 0 0 0 .5px var(--edge2); margin: 12px 0 6px; font-size: 12.5px; }
+.changed i { font-size: 15px; color: var(--fg2); }
+.changed .r { margin-left: auto; display: flex; gap: 6px; }
+.code { border-radius: 10px; background: var(--chip); margin: 10px 0 12px; overflow: hidden; }
+.code .hd { display: flex; align-items: center; height: 30px; padding: 0 8px 0 12px; font-size: 11.5px; color: var(--mute); }
+.code .hd i { margin-left: auto; font-size: 14px; }
+.code pre { margin: 0; padding: 0 12px 11px; font: 12.5px/1.6 ui-monospace, "SF Mono", monospace; }
+
+.dock { flex: none; padding: 0 0 12px; }
+.dock .col { padding: 0; }
+.queue { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 12px; margin: 0 10px -1px; border-radius: 10px 10px 0 0; background: var(--pane); box-shadow: inset 0 0 0 .5px var(--edge); font-size: 12.5px; color: var(--fg2); }
+.queue i { font-size: 14px; color: var(--mute); }
+.queue .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue .ib { width: 24px; height: 24px; font-size: 14px; }
+.box { position: relative; border-radius: 14px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--edge2), 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -12px rgba(0,0,0,.12); padding: 12px 10px 8px 14px; }
+.dark .box { box-shadow: inset 0 0 0 .5px var(--edge2), inset 0 .5px 0 rgba(255,255,255,.05), 0 12px 32px -12px rgba(0,0,0,.6); }
+.box .txt { min-height: 44px; padding-right: 4px; }
+.box .ph { color: var(--mute); }
+.box .mention { color: var(--fg); background: var(--chip); border-radius: 4px; padding: 0 4px; font: 12.5px ui-monospace, "SF Mono", monospace; }
+.ctl { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
+.pill { height: 28px; padding: 0 8px; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--fg2); white-space: nowrap; }
+.pill i { font-size: 15px; }
+.pill .cv { font-size: 12px; color: var(--mute); }
+.pill.icon { width: 28px; padding: 0; justify-content: center; }
+.ring { height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 6px; font-size: 11.5px; color: var(--mute); }
+.go { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--acc); color: var(--onacc); font-size: 16px; margin-left: 4px; }
+.go.stop { background: var(--fg); }
+.go.stop::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--bg); }
+.go.idle { background: var(--chip); color: var(--mute); }
+.status { display: flex; gap: 14px; justify-content: center; margin-top: 8px; font-size: 11.5px; color: var(--mute); white-space: nowrap; }
+.status span { display: inline-flex; align-items: center; gap: 4px; }
+.status i { font-size: 13px; }
+
+/* review */
+.review { width: 452px; flex: none; border-left: .5px solid var(--edge); background: var(--pane); display: flex; flex-direction: column; }
+.tabs { height: 52px; display: flex; align-items: center; gap: 2px; padding: 0 10px; }
+.tab { height: 28px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--fg2); font-weight: 500; }
+.tab.on { background: var(--sel); color: var(--fg); }
+.tab .c { font-size: 11px; color: var(--mute); font-weight: 500; }
+.seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--chip); margin: 0 12px; }
+.seg span { height: 24px; padding: 0 10px; border-radius: 6px; display: inline-flex; align-items: center; font-size: 12px; color: var(--fg2); }
+.seg span.on { background: var(--card); color: var(--fg); box-shadow: 0 0 0 .5px var(--edge2), 0 1px 2px rgba(0,0,0,.08); font-weight: 500; }
+.rv-sub { display: flex; align-items: center; height: 40px; border-bottom: .5px solid var(--edge); }
+.rv-sub .tot { margin-left: auto; margin-right: 14px; font: 12px ui-monospace, "SF Mono", monospace; }
+.files { padding: 6px 8px; border-bottom: .5px solid var(--edge); }
+.file { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 6px; font-size: 12.5px; }
+.file.on { background: var(--sel); }
+.file i { font-size: 14px; color: var(--mute); }
+.file .p { color: var(--mute); }
+.file .d { margin-left: auto; font: 11.5px ui-monospace, "SF Mono", monospace; display: flex; gap: 6px; }
+.file .M { font: 600 10.5px -apple-system; color: var(--mute); width: 12px; text-align: center; }
+.diff { flex: 1; overflow: hidden; padding: 10px 0; }
+.hunk { display: flex; align-items: center; height: 30px; padding: 0 8px 0 14px; font: 11.5px ui-monospace, "SF Mono", monospace; color: var(--mute); }
+.hunk .btn { margin-left: auto; height: 24px; font-size: 11.5px; padding: 0 8px; }
+.diff .dl { border-top: 0; grid-template-columns: 38px 38px 16px 1fr; }
+.rv-foot { height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-top: .5px solid var(--edge); }
+.rv-foot .msg { flex: 1; height: 28px; border-radius: 7px; background: var(--chip); display: flex; align-items: center; padding: 0 10px; font-size: 12.5px; color: var(--mute); }
+
+/* palette, empty */
+.scrim { position: absolute; inset: 0; background: rgba(6,7,10,.45); }
+.light .scrim { background: rgba(18,19,26,.18); }
+.pal { position: absolute; left: 50%; top: 84px; width: 520px; margin-left: -260px; border-radius: 14px; background: var(--card); box-shadow: var(--pop); overflow: hidden; }
+.pal .in { height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 15px; border-bottom: .5px solid var(--edge); }
+.pal .in i { font-size: 18px; color: var(--mute); }
+.pal .in .cur { width: 1.5px; height: 18px; background: var(--fg); margin-left: -8px; }
+.pal .sec { padding: 6px 6px 2px; }
+.pal .sec h4 { margin: 6px 10px 4px; font-size: 11.5px; font-weight: 600; color: var(--mute); }
+.opt { height: 34px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px; font-size: 13px; }
+.opt i { font-size: 16px; color: var(--fg2); width: 18px; }
+.opt .s { color: var(--mute); font-size: 12px; }
+.opt kbd { margin-left: auto; }
+.opt.on { background: var(--sel); }
+.opt mark { background: none; color: var(--fg); font-weight: 600; }
+.pal .ft { height: 36px; display: flex; align-items: center; gap: 14px; padding: 0 14px; border-top: .5px solid var(--edge); font-size: 11.5px; color: var(--mute); }
+.pal .ft span { display: inline-flex; gap: 5px; align-items: center; }
+.pal .ft kbd { background: var(--chip); border-radius: 4px; padding: 0 4px; }
+.hello { position: absolute; inset: 52px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 60px; }
+.hello h2 { font-size: 22px; font-weight: 600; letter-spacing: -.015em; margin: 22px 0 6px; }
+.hello p { margin: 0 0 26px; color: var(--fg2); }
+.hello .box { width: 540px; }
+.recent { width: 540px; margin-top: 22px; }
+.recent h5 { font-size: 11.5px; font-weight: 600; color: var(--mute); margin: 0 0 4px 10px; }
+.cap { color: #8C93A3; font-size: 12.5px; margin: -48px 0 0; }
+.ink .cap { color: #5E6577; }
+
+/* settings */
+.snav { width: 220px; flex: none; background: var(--side); border-right: .5px solid var(--edge); padding: 0 8px; }
+.snav .side-top { padding-left: 10px; }
+.snav h3 { font-size: 11.5px; color: var(--mute); font-weight: 600; margin: 8px 10px 4px; }
+.sbody { flex: 1; overflow: hidden; }
+.sbody .in { width: 600px; margin: 0 auto; padding: 8px 0 40px; }
+.sbody h2 { font-size: 20px; font-weight: 650; letter-spacing: -.015em; margin: 0 0 4px; }
+.sbody .lead { color: var(--fg2); margin: 0 0 22px; font-size: 13px; }
+.sbody h4 { font-size: 13px; font-weight: 600; margin: 24px 0 8px; display: flex; align-items: center; }
+.sbody h4 .btn { margin-left: auto; }
+.group { border-radius: 10px; background: var(--card); box-shadow: inset 0 0 0 .5px var(--edge2); }
+.li { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 12px 8px 14px; }
+.li + .li { border-top: .5px solid var(--edge); }
+.li .lg { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--chip); font-size: 17px; color: var(--fg); flex: none; }
+.li .tx { flex: 1; min-width: 0; line-height: 1.35; }
+.li .tx small { display: block; color: var(--mute); font-size: 12px; }
+.li .tx b { font-weight: 500; }
+.tag { font-size: 11px; font-weight: 500; color: var(--fg2); background: var(--chip); padding: 1px 6px; border-radius: 5px; margin-left: 6px; }
+.meter { width: 120px; }
+.meter .tr { height: 4px; border-radius: 2px; background: var(--chip); overflow: hidden; }
+.meter .tr i { display: block; height: 100%; background: var(--fg2); }
+.meter small { display: flex; justify-content: space-between; font-size: 11px; color: var(--mute); margin-top: 4px; }
+.sel { height: 28px; padding: 0 8px 0 10px; border-radius: 7px; box-shadow: inset 0 0 0 .5px var(--edge2); background: var(--card); display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
+.sel .a { color: var(--mute); }
+.sel i { font-size: 13px; color: var(--mute); margin-left: 2px; }
+.sw { width: 34px; height: 20px; border-radius: 10px; background: var(--edge2); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.sw.on { background: var(--acc); }
+.sw.on::after { left: 16px; background: var(--onacc); }
+.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mode { border-radius: 10px; padding: 12px; box-shadow: inset 0 0 0 .5px var(--edge2); background: var(--card); font-size: 12px; color: var(--fg2); line-height: 1.45; }
+.mode b { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--fg); margin-bottom: 4px; }
+.mode.on { box-shadow: inset 0 0 0 1.5px var(--fg); }
+
+/* sign in */
+.onb { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 70px; position: relative; }
+.onb h2 { font-size: 22px; font-weight: 650; letter-spacing: -.015em; margin: 20px 0 6px; }
+.onb p.l { color: var(--fg2); margin: 0 0 26px; text-align: center; }
+.onb .group { width: 460px; }
+.onb .li { min-height: 50px; }
+.onb .li.on { box-shadow: inset 2px 0 0 var(--live); }
+.devwait { padding: 4px 14px 14px 56px; font-size: 12.5px; color: var(--fg2); }
+.devwait .code { display: inline-flex; gap: 6px; margin: 8px 0; }
+.devwait .code span { width: 28px; height: 34px; border-radius: 6px; background: var(--chip); display: grid; place-items: center; font: 600 16px ui-monospace, "SF Mono", monospace; color: var(--fg); }
+.devwait .code span.d { background: none; width: 10px; color: var(--mute); }
+.onb .more { width: 460px; margin-top: 10px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mute); }
+.onb .priv { margin-top: 18px; font-size: 11.5px; color: var(--mute); display: flex; gap: 5px; align-items: center; }
+
+/* terminal, plan */
+.panel { width: 452px; display: flex; flex-direction: column; background: var(--pane); }
+.term > div { white-space: pre; }
+.term { flex: 1; padding: 6px 14px; font: 12px/1.65 ui-monospace, "SF Mono", monospace; color: var(--fg2); overflow: hidden; }
+.term .c { color: var(--fg); } .term .pr { color: var(--mute); } .term .ok { color: var(--plus); } .term .bad { color: var(--minus); }
+.term .cur { display: inline-block; width: 7px; height: 14px; background: var(--fg); vertical-align: -2px; }
+.tsub { display: flex; align-items: center; gap: 4px; height: 40px; padding: 0 10px; border-bottom: .5px solid var(--edge); }
+.ttab { height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px; color: var(--fg2); display: inline-flex; align-items: center; gap: 6px; }
+.ttab.on { background: var(--sel); color: var(--fg); }
+.ttab .st { width: 8px; }
+.plan { flex: 1; padding: 14px 18px; overflow: hidden; }
+.plan h5 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+.plan .sub { font-size: 12px; color: var(--mute); margin: 0 0 14px; }
+.ps { display: flex; gap: 10px; padding: 7px 0; font-size: 13px; line-height: 1.45; position: relative; }
+.ps .bx { width: 16px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1.2px var(--faint); flex: none; margin-top: 2px; display: grid; place-items: center; font-size: 11px; }
+.ps.done { color: var(--mute); }
+.ps.done .bx { background: var(--fg2); box-shadow: none; color: var(--bg); }
+.ps.now .bx { box-shadow: inset 0 0 0 1.5px var(--live); }
+.ps.now .bx::after { content: ""; width: 6px; height: 6px; border-radius: 2px; background: var(--live); }
+.ps small { display: block; font-size: 12px; color: var(--mute); }
+.ps .ic { font-size: 11.5px; }
+@media (prefers-reduced-motion: reduce) { .turn.live::after, .shim, .caret, .st.vein.run::before { animation: none; } .shim { color: var(--fg2); background: none; } }
+</style>
+</head>
+<body>
+
+<!-- 1 · dark, at work, review open -->
+<div class="stage ink">
+<div class="win dark" style="width:1440px;height:880px">
+  <aside class="side">
+    <div class="side-top"><div class="lights on"><b></b><b></b><b></b></div><span class="ib"><i class="ti ti-layout-sidebar-left-collapse"></i></span><span class="ib"><i class="ti ti-edit"></i></span></div>
+    <div class="search"><i class="ti ti-search"></i>搜索<kbd>⌘K</kbd></div>
+    <div class="nav">
+      <div class="it"><i class="ti ti-message-plus"></i>新会话<kbd>⌘N</kbd></div>
+      <div class="it"><i class="ti ti-clock-play"></i>定时任务</div>
+      <div class="it"><i class="ti ti-puzzle"></i>技能与 MCP</div>
+    </div>
+    <div class="list fade-b">
+      <div class="grp">需要你<span class="n">1</span></div>
+      <div class="row on"><span class="st wait"></span><span class="t">修复 Add 测试</span><span class="badge">审批</span></div>
+      <div class="grp"><i class="ti ti-folder"></i>talos<span class="n"><i class="ti ti-plus"></i></span></div>
+      <div class="row"><span class="st vein run"></span><span class="t">沙箱 profile 收紧到只读 .git</span><span class="m">2 分</span></div>
+      <div class="row hov"><span class="st unread"></span><span class="t">client 按日志重建</span><span class="m">1 时</span><span class="acts"><i class="ti ti-pin"></i><i class="ti ti-archive"></i></span></div>
+      <div class="row"><span class="st"></span><span class="t">协议定稿：回执与快照</span><span class="m">昨天</span></div>
+      <div class="row"><span class="st fail"></span><span class="t">models.dev 目录合并</span><span class="m">昨天</span></div>
+      <div class="grp"><i class="ti ti-folder"></i>calc</div>
+      <div class="row"><span class="st"></span><span class="t">给 Sub 补表驱动测试</span><span class="m">周一</span></div>
+      <div class="grp"><i class="ti ti-folder"></i>site</div>
+      <div class="row"><span class="st"></span><span class="t">首页文案改写</span><span class="m">周一</span></div>
+      <div class="row"><span class="st"></span><span class="t">把 OG 图换成新标志</span><span class="m">10 月</span></div>
+    </div>
+    <div class="foot"><div class="av">QS</div><div class="who">ChatGPT Pro<small>还剩 74% · 4 时后重置</small></div><span class="ib"><i class="ti ti-settings"></i></span></div>
+  </aside>
+  <div class="main">
+    <div class="bar">
+      <h1>修复 Add 测试</h1>
+      <span class="crumb"><i class="ti ti-folder"></i>calc<i class="ti ti-git-branch" style="margin-left:6px"></i>fix-add</span>
+      <span class="sp"></span>
+      <span class="btn"><i class="ti ti-brand-vscode"></i>打开<span class="split"></span><i class="ti ti-chevron-down" style="font-size:13px"></i></span>
+      <span class="btn"><i class="ti ti-git-commit"></i>提交<span class="mono add" style="font-size:12px">+9</span><span class="mono del" style="font-size:12px">−3</span></span>
+      <span class="ib on"><i class="ti ti-layout-sidebar-right"></i></span>
+    </div>
+    <div class="flow fade-t">
+      <div class="col">
+        <div class="you">Add 的测试挂了，帮我修一下；顺便看看 README 里的示例对不对<div class="att"><span class="fchip"><i class="ti ti-file-code"></i>add_test.go</span></div></div>
+        <div class="turn live" style="--h:560px">
+          <div class="fold"><i class="ti ti-chevron-right ch"></i><span>思考了 <b>6 秒</b></span></div>
+          <div class="fold"><i class="ti ti-chevron-right ch"></i><span>浏览了 <b>4 个文件</b>，搜索 <b>1 次</b></span></div>
+          <div class="prose"><p><code>Add</code> 把 <code>a + b</code> 写成了 <code>a - b</code>，测试期望 <code>Add(2, 3) == 5</code>。README 里的示例输出也跟着写错了。</p></div>
+          <div class="card">
+            <div class="hd"><i class="ti ti-pencil"></i><span class="fn">add.go</span><span class="mono add" style="font-size:12px">+1</span><span class="mono del" style="font-size:12px">−1</span><span class="r"><span class="btn ghost"><i class="ti ti-arrow-back-up"></i>撤销</span></span></div>
+            <div class="dl"><span class="ln">3</span><span class="x sg">−</span><span class="x"><span class="kw">func</span> Add(a, b <span class="kw">int</span>) <span class="kw">int</span> { <span class="kw">return</span> a - b }</span><span class="ln">3</span><span class="p sg">+</span><span class="p"><span class="kw">func</span> Add(a, b <span class="kw">int</span>) <span class="kw">int</span> { <span class="kw">return</span> a + b }</span></div>
+          </div>
+          <div class="card">
+            <div class="hd"><i class="ti ti-pencil"></i><span class="fn">README.md</span><span class="mono add" style="font-size:12px">+2</span><span class="mono del" style="font-size:12px">−2</span><span class="r"><span class="btn ghost"><i class="ti ti-arrow-back-up"></i>撤销</span></span></div>
+          </div>
+          <div class="ask">
+            <div class="k"><span class="st wait"></span><b>运行命令</b>需要你允许<span class="r"><i class="ti ti-clock"></i>等了 14 秒</span></div>
+            <pre><span class="pr">~/Projects/calc $ </span>go test ./... -run TestAdd -v</pre>
+            <div class="why"><span><i class="ti ti-shield-lock"></i>沙箱内：无网络，只写工作区</span><span><i class="ti ti-adjustments"></i>当前模式：询问</span></div>
+            <div class="btns"><span class="btn">拒绝<kbd>esc</kbd></span><span class="btn">本会话都允许<kbd>⌘⏎</kbd></span><span class="btn pri">允许<kbd>⏎</kbd></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dock"><div class="col">
+      <div class="queue"><i class="ti ti-corner-down-right"></i><span class="t">测试过了就顺手把 Sub 也检查一遍</span><span class="ib"><i class="ti ti-arrow-up"></i></span><span class="ib"><i class="ti ti-pencil"></i></span><span class="ib"><i class="ti ti-x"></i></span></div>
+      <div class="box">
+        <div class="txt ph">运行中：回车排队，⌘回车立即插话</div>
+        <div class="ctl">
+          <span class="pill icon"><i class="ti ti-plus"></i></span>
+          <span class="pill">gpt-6-luna<i class="ti ti-chevron-down cv"></i></span>
+          <span class="pill"><i class="ti ti-brain"></i>中</span>
+          <span class="pill"><i class="ti ti-shield-half"></i>询问</span>
+          <span class="sp"></span>
+          <span class="ring" title="上下文 18%"><svg width="14" height="14" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--edge2)" stroke-width="2"/><circle cx="9" cy="9" r="7" fill="none" stroke="var(--fg2)" stroke-width="2" stroke-dasharray="7.9 44" transform="rotate(-90 9 9)"/></svg>18%</span>
+          <span class="go stop"></span>
+        </div>
+      </div>
+      <div class="status"><span><i class="ti ti-device-laptop"></i>本机</span><span><i class="ti ti-git-branch"></i>fix-add</span><span><i class="ti ti-lock"></i>沙箱开启</span></div>
+    </div></div>
+  </div>
+  <aside class="review">
+    <div class="tabs"><span class="tab on">变更<span class="c">3</span></span><span class="tab">终端</span><span class="tab">计划</span><span class="tab">文件</span><span class="sp"></span><span class="ib"><i class="ti ti-dots"></i></span></div>
+    <div class="rv-sub"><span class="seg"><span class="on">本轮</span><span>未提交</span></span><span class="tot"><span class="add">+9</span> <span class="del">−3</span></span></div>
+    <div class="files">
+      <div class="file on"><span class="M">M</span>add.go<span class="d"><span class="add">+1</span><span class="del">−1</span></span></div>
+      <div class="file"><span class="M">M</span>README.md<span class="d"><span class="add">+2</span><span class="del">−2</span></span></div>
+      <div class="file"><span class="M" style="color:var(--plus)">A</span><span><span class="p">internal/</span>sub_test.go</span><span class="d"><span class="add">+6</span><span class="del" style="opacity:0">−0</span></span></div>
+    </div>
+    <div class="diff">
+      <div class="hunk">@@ -1,3 +1,3 @@<span class="btn"><i class="ti ti-arrow-back-up"></i>撤销此块</span></div>
+      <div class="dl"><span class="ln">1</span><span class="ln">1</span><span class="sg"></span><span><span class="kw">package</span> calc</span>
+        <span class="ln">2</span><span class="ln">2</span><span class="sg"></span><span></span>
+        <span class="ln x">3</span><span class="ln x"></span><span class="x sg">−</span><span class="x"><span class="kw">func</span> Add(a, b <span class="kw">int</span>) <span class="kw">int</span> { <span class="kw">return</span> a - b }</span>
+        <span class="ln p"></span><span class="ln p">3</span><span class="p sg">+</span><span class="p"><span class="kw">func</span> Add(a, b <span class="kw">int</span>) <span class="kw">int</span> { <span class="kw">return</span> a + b }</span>
+        <span class="ln">4</span><span class="ln">4</span><span class="sg"></span><span></span>
+        <span class="ln">5</span><span class="ln">5</span><span class="sg"></span><span><span class="cm">// Sub returns a minus b.</span></span>
+        <span class="ln">6</span><span class="ln">6</span><span class="sg"></span><span><span class="kw">func</span> Sub(a, b <span class="kw">int</span>) <span class="kw">int</span> { <span class="kw">return</span> a - b }</span>
+      </div>
+      <div class="hunk" style="margin-top:14px">README.md · @@ -12,7 +12,7 @@</div>
+      <div class="dl"><span class="ln">12</span><span class="ln">12</span><span class="sg"></span><span>```go</span>
+        <span class="ln">13</span><span class="ln">13</span><span class="sg"></span><span>fmt.Println(calc.Add(2, 3))</span>
+        <span class="ln x">14</span><span class="ln x"></span><span class="x sg">−</span><span class="x"><span class="cm">// Output: -1</span></span>
+        <span class="ln p"></span><span class="ln p">14</span><span class="p sg">+</span><span class="p"><span class="cm">// Output: 5</span></span>
+        <span class="ln">15</span><span class="ln">15</span><span class="sg"></span><span>```</span>
+      </div>
+    </div>
+    <div class="rv-foot"><span class="msg">修复 Add 并更正 README 示例</span><span class="btn pri"><i class="ti ti-git-commit"></i>提交</span></div>
+  </aside>
+</div>
+<p class="cap">工作中：左侧蓝色血脉亮起并缓缓流动；侧栏里等你审批的会话置顶。Review 面板只看本轮改动，可按块撤销。</p>
+</div>
+
+<!-- 2 · light, finished -->
+<div class="stage paper">
+<div class="win light" style="width:1200px;height:860px">
+  <aside class="side">
+    <div class="side-top"><div class="lights"><b></b><b></b><b></b></div><span class="ib"><i class="ti ti-layout-sidebar-left-collapse"></i></span><span class="ib"><i class="ti ti-edit"></i></span></div>
+    <div class="search"><i class="ti ti-search"></i>搜索<kbd>⌘K</kbd></div>
+    <div class="nav">
+      <div class="it"><i class="ti ti-message-plus"></i>新会话<kbd>⌘N</kbd></div>
+      <div class="it"><i class="ti ti-clock-play"></i>定时任务</div>
+      <div class="it"><i class="ti ti-puzzle"></i>技能与 MCP</div>
+    </div>
+    <div class="list fade-b">
+      <div class="grp"><i class="ti ti-folder"></i>talos</div>
+      <div class="row"><span class="st vein run"></span><span class="t">沙箱 profile 收紧到只读 .git</span><span class="m">2 分</span></div>
+      <div class="row"><span class="st"></span><span class="t">协议定稿：回执与快照</span><span class="m">昨天</span></div>
+      <div class="grp"><i class="ti ti-folder"></i>calc</div>
+      <div class="row on"><span class="st"></span><span class="t">修复 Add 测试</span><span class="m">刚刚</span></div>
+      <div class="row"><span class="st"></span><span class="t">给 Sub 补表驱动测试</span><span class="m">周一</span></div>
+      <div class="grp"><i class="ti ti-folder"></i>site</div>
+      <div class="row"><span class="st"></span><span class="t">首页文案改写</span><span class="m">周一</span></div>
+    </div>
+    <div class="foot"><div class="av">QS</div><div class="who">ChatGPT Pro<small>还剩 71% · 4 时后重置</small></div><span class="ib"><i class="ti ti-settings"></i></span></div>
+  </aside>
+  <div class="main">
+    <div class="bar line">
+      <h1>修复 Add 测试</h1>
+      <span class="crumb"><i class="ti ti-folder"></i>calc<i class="ti ti-git-branch" style="margin-left:6px"></i>fix-add</span>
+      <span class="sp"></span>
+      <span class="btn"><i class="ti ti-brand-vscode"></i>打开<span class="split"></span><i class="ti ti-chevron-down" style="font-size:13px"></i></span>
+      <span class="btn"><i class="ti ti-git-commit"></i>提交<span class="mono add" style="font-size:12px">+9</span><span class="mono del" style="font-size:12px">−3</span></span>
+      <span class="ib"><i class="ti ti-layout-sidebar-right"></i></span>
+    </div>
+    <div class="flow">
+      <div class="col">
+        <div class="you">Add 的测试挂了，帮我修一下；顺便看看 README 里的示例对不对</div>
+        <div class="turn">
+          <div class="fold"><i class="ti ti-chevron-down ch"></i><span>工作了 <b>38 秒</b></span></div>
+          <div class="steps">
+            <div class="step"><i class="ti ti-bulb"></i>思考了 6 秒</div>
+            <div class="step"><i class="ti ti-file-search"></i>浏览 <code>add.go</code> <code>add_test.go</code> <code>README.md</code></div>
+            <div class="step"><i class="ti ti-pencil"></i>编辑 <code>add.go</code><span class="mono add" style="font-size:11.5px">+1</span><span class="mono del" style="font-size:11.5px">−1</span></div>
+            <div class="step"><i class="ti ti-pencil"></i>编辑 <code>README.md</code><span class="mono add" style="font-size:11.5px">+2</span><span class="mono del" style="font-size:11.5px">−2</span></div>
+            <div class="step"><i class="ti ti-terminal-2"></i>运行 <code>go test ./...</code><span class="r">通过 · 0.4 秒</span></div>
+          </div>
+          <div class="prose">
+            <p>修好了。<code>Add</code> 原来返回的是 <code>a - b</code>，改回 <code>a + b</code> 后测试全部通过：</p>
+          </div>
+          <div class="code"><div class="hd">输出<i class="ti ti-copy"></i></div><pre>=== RUN   TestAdd
+--- PASS: TestAdd (0.00s)
+ok  	calc	0.412s</pre></div>
+          <div class="prose">
+            <p>另外两处顺手改了：</p>
+            <ul><li>README 的示例输出从 <code>-1</code> 改为 <code>5</code>。</li><li><code>Sub</code> 没有测试，我没动它；需要的话可以补一组表驱动测试。</li></ul>
+          </div>
+          <div class="changed"><i class="ti ti-files"></i>改了 2 个文件<span class="mono add" style="font-size:12px">+3</span><span class="mono del" style="font-size:12px">−3</span><span class="r"><span class="btn ghost"><i class="ti ti-arrow-back-up"></i>全部撤销</span><span class="btn">查看变更</span></span></div>
+          <div class="meta"><span><i class="ti ti-cpu"></i>gpt-6-luna</span><span>输入 4.1k</span><span>输出 182</span><span>缓存 3.2k</span><span><i class="ti ti-copy"></i></span><span><i class="ti ti-refresh"></i></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="dock"><div class="col">
+      <div class="box">
+        <div class="txt">再给 <span class="mention">@sub.go</span> 补一组表驱动测试<span class="caret" style="background:var(--fg)"></span></div>
+        <div class="ctl">
+          <span class="pill icon"><i class="ti ti-plus"></i></span>
+          <span class="pill">gpt-6-luna<i class="ti ti-chevron-down cv"></i></span>
+          <span class="pill"><i class="ti ti-brain"></i>中</span>
+          <span class="pill"><i class="ti ti-shield-half"></i>询问</span>
+          <span class="sp"></span>
+          <span class="ring"><svg width="14" height="14" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--edge2)" stroke-width="2"/><circle cx="9" cy="9" r="7" fill="none" stroke="var(--fg2)" stroke-width="2" stroke-dasharray="9.2 44" transform="rotate(-90 9 9)"/></svg>21%</span>
+          <span class="go"><i class="ti ti-arrow-up"></i></span>
+        </div>
+      </div>
+      <div class="status"><span><i class="ti ti-device-laptop"></i>本机</span><span><i class="ti ti-git-branch"></i>fix-add</span><span><i class="ti ti-lock"></i>沙箱开启</span></div>
+    </div></div>
+  </div>
+</div>
+<p class="cap">做完：过程收成一行「工作了 38 秒」，展开是每一步；改动汇总在末尾，一键查看或撤销。没有东西在跑，所以整屏没有一点蓝。</p>
+</div>
+
+<!-- 3 · new session and ⌘K -->
+<div class="stage paper">
+<div class="pair2">
+  <div class="win light" style="width:700px;height:600px">
+    <div class="main">
+      <div class="bar"><div class="lights" style="margin-right:14px"><b></b><b></b><b></b></div><span class="ib"><i class="ti ti-layout-sidebar-left-expand"></i></span><span class="sp"></span></div>
+      <div class="hello">
+        <svg width="44" height="44" viewBox="0 0 120 120"><rect x="54" y="30" width="12" height="70" fill="var(--live)"/><rect x="30" y="18" width="60" height="12" fill="var(--fg)"/></svg>
+        <h2>在 calc 里做点什么</h2>
+        <p>Talos 会先读代码，改动前按你的权限模式询问。</p>
+        <div class="box">
+          <div class="txt ph">描述任务，用 @ 引用文件，/ 调用技能</div>
+          <div class="ctl">
+            <span class="pill icon"><i class="ti ti-plus"></i></span>
+            <span class="pill"><i class="ti ti-folder"></i>calc<i class="ti ti-chevron-down cv"></i></span>
+            <span class="pill"><i class="ti ti-git-branch"></i>main<i class="ti ti-chevron-down cv"></i></span>
+            <span class="pill">gpt-6-luna<i class="ti ti-chevron-down cv"></i></span>
+            <span class="sp"></span>
+            <span class="go idle"><i class="ti ti-arrow-up"></i></span>
+          </div>
+        </div>
+        <div class="recent"><h5>继续</h5>
+          <div class="row"><span class="st"></span><span class="t">给 Sub 补表驱动测试</span><span class="m">周一</span></div>
+          <div class="row hov"><span class="st"></span><span class="t">修复 Add 测试</span><span class="m">刚刚</span><span class="acts"><i class="ti ti-arrow-right"></i></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="win dark" style="width:700px;height:600px">
+    <aside class="side" style="width:200px">
+      <div class="side-top"><div class="lights on"><b></b><b></b><b></b></div></div>
+      <div class="list" style="padding-top:44px">
+        <div class="row on"><span class="st"></span><span class="t">修复 Add 测试</span></div>
+        <div class="row"><span class="st vein run"></span><span class="t">沙箱 profile 收紧</span></div>
+        <div class="row"><span class="st"></span><span class="t">协议定稿</span></div>
+      </div>
+    </aside>
+    <div class="main"><div class="bar"><h1>修复 Add 测试</h1></div>
+      <div class="col" style="opacity:.6"><div class="you">Add 的测试挂了，帮我修一下</div></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="pal" style="margin-left:-350px">
+      <div class="in"><i class="ti ti-search"></i>沙箱<span class="cur"></span></div>
+      <div class="sec"><h4>会话</h4>
+        <div class="opt on"><i class="ti ti-message"></i><span><mark>沙箱</mark> profile 收紧到只读 .git</span><span class="s">talos</span><kbd>⏎</kbd></div>
+        <div class="opt"><i class="ti ti-message"></i><span>测试里跑 go test 要进<mark>沙箱</mark></span><span class="s">talos · 上周</span></div>
+      </div>
+      <div class="sec"><h4>操作</h4>
+        <div class="opt"><i class="ti ti-shield-half"></i>切换权限模式<span class="s">询问 → 自动</span><kbd>⇧⌘M</kbd></div>
+        <div class="opt"><i class="ti ti-lock-open"></i><span>本会话关闭<mark>沙箱</mark>运行</span></div>
+      </div>
+      <div class="sec" style="padding-bottom:6px"><h4>文件</h4>
+        <div class="opt"><i class="ti ti-file-code"></i><span class="mono" style="font-size:12.5px">kernel/<mark>sandbox</mark>/sandbox.go</span><span class="s">talos</span></div>
+      </div>
+      <div class="ft"><span><kbd>↑↓</kbd>选择</span><span><kbd>⏎</kbd>打开</span><span><kbd>⌘⏎</kbd>在新窗口打开</span></div>
+    </div>
+  </div>
+</div>
+<p class="cap">新会话：只有标志、一句话和输入框。⌘K：会话、操作和文件放在同一处搜索。</p>
+</div>
+
+<!-- 4 · settings -->
+<div class="stage paper">
+<div class="win light" style="width:1120px;height:800px">
+  <aside class="snav">
+    <div class="side-top"><div class="lights"><b></b><b></b><b></b></div></div>
+    <div class="it"><i class="ti ti-adjustments-horizontal"></i>通用</div>
+    <div class="it" style="background:var(--sel)"><i class="ti ti-user-circle"></i>账号与模型</div>
+    <div class="it"><i class="ti ti-shield-half"></i>权限与沙箱</div>
+    <div class="it"><i class="ti ti-palette"></i>外观</div>
+    <div class="it"><i class="ti ti-keyboard"></i>快捷键</div>
+    <div class="it"><i class="ti ti-puzzle"></i>技能与 MCP</div>
+    <h3 style="margin-top:18px">关于</h3>
+    <div class="it"><i class="ti ti-info-circle"></i>Talos 0.2.0<kbd>检查更新</kbd></div>
+  </aside>
+  <div class="main">
+    <div class="bar"></div>
+    <div class="sbody"><div class="in">
+      <h2>账号与模型</h2>
+      <p class="lead">凭据存在钥匙串里。订阅账号按额度计，不显示费用。</p>
+      <h4>账号<span class="btn"><i class="ti ti-plus"></i>添加账号</span></h4>
+      <div class="group">
+        <div class="li"><span class="lg"><i class="ti ti-brand-openai"></i></span><span class="tx"><b>ChatGPT</b><span class="tag">Pro</span><small>Sign in with ChatGPT · 11 月 13 日到期</small></span><span class="meter"><span class="tr"><i style="width:71%"></i></span><small><span>剩 71%</span><span>4 时后重置</span></small></span><span class="ib"><i class="ti ti-dots"></i></span></div>
+        <div class="li"><span class="lg"><i class="ti ti-brand-x"></i></span><span class="tx"><b>xAI</b><span class="tag">X 订阅</span><small>设备码登录 · 11 月 21 日到期</small></span><span class="meter"><span class="tr"><i style="width:92%"></i></span><small><span>剩 92%</span><span>本周</span></small></span><span class="ib"><i class="ti ti-dots"></i></span></div>
+        <div class="li"><span class="lg"><i class="ti ti-route"></i></span><span class="tx"><b>OpenRouter</b><small>API key · sk-or-…3f9a</small></span><span class="mono" style="font-size:12px;color:var(--fg2)">本月 $4.12</span><span class="ib"><i class="ti ti-dots"></i></span></div>
+      </div>
+      <h4>模型分工</h4>
+      <div class="group">
+        <div class="li"><span class="tx"><b>主 agent</b><small>你直接对话的那个</small></span><span class="sel"><span class="a">ChatGPT</span>gpt-6.1-sol<i class="ti ti-selector"></i></span><span class="sel">高<i class="ti ti-selector"></i></span></div>
+        <div class="li"><span class="tx"><b>子 agent</b><small>探索代码、并行的小任务</small></span><span class="sel"><span class="a">ChatGPT</span>gpt-6-luna<i class="ti ti-selector"></i></span><span class="sel">中<i class="ti ti-selector"></i></span></div>
+        <div class="li"><span class="tx"><b>标题与压缩</b><small>起会话名、上下文满时写摘要</small></span><span class="sel"><span class="a">xAI</span>grok-build-0.1<i class="ti ti-selector"></i></span><span class="sel">低<i class="ti ti-selector"></i></span></div>
+        <div class="li"><span class="tx"><b>额度用尽时换备用账号</b><small>先 xAI，再 OpenRouter；换过会在对话里提示</small></span><span class="sw on"></span></div>
+      </div>
+      <h4>新会话默认权限</h4>
+      <div class="modes">
+        <div class="mode"><b><i class="ti ti-eye"></i>询问</b>只读自动；改文件、跑命令都先问你。</div>
+        <div class="mode on"><b><i class="ti ti-shield-half"></i>自动</b>工作区内改文件、沙箱里跑命令不再问。</div>
+        <div class="mode"><b><i class="ti ti-shield-off"></i>完全</b>都不问。只在你信任的仓库用。</div>
+      </div>
+    </div></div>
+  </div>
+</div>
+<p class="cap">设置：订阅账号显示剩余额度而非费用；主 agent、子 agent、标题与压缩各自选账号和模型；额度用尽自动换备用。</p>
+</div>
+
+<!-- 5 · first sign-in, and the terminal and plan panels -->
+<div class="stage ink">
+<div class="pair2">
+  <div class="win dark" style="width:760px;height:700px">
+    <div class="main">
+      <div class="bar"><div class="lights on"><b></b><b></b><b></b></div></div>
+      <div class="onb">
+        <svg width="48" height="48" viewBox="0 0 120 120"><rect x="54" y="30" width="12" height="70" fill="var(--live)"/><rect x="30" y="18" width="60" height="12" fill="var(--fg)"/></svg>
+        <h2>连接一个模型</h2>
+        <p class="l">用你已有的订阅登录最省事。之后随时可以在设置里加别的。</p>
+        <div class="group">
+          <div class="li on"><span class="lg"><i class="ti ti-brand-openai"></i></span><span class="tx"><b>Sign in with ChatGPT</b><small>Plus、Pro、Business 订阅</small></span><span class="st vein run"></span></div>
+          <div class="devwait">已在浏览器打开登录页，完成后自动回来。<br>浏览器打不开？在另一台设备访问 <span class="ic">auth.openai.com/codex/device</span> 输入：
+            <div class="code"><span>K</span><span>7</span><span>Q</span><span>M</span><span class="d">-</span><span>4</span><span>X</span><span>2</span><span>P</span></div>
+            <div style="display:flex;gap:8px"><span class="btn"><i class="ti ti-copy"></i>复制代码</span><span class="btn ghost">取消</span></div>
+          </div>
+          <div class="li"><span class="lg"><i class="ti ti-brand-x"></i></span><span class="tx"><b>X 订阅</b><small>SuperGrok、X Premium+</small></span><i class="ti ti-chevron-right" style="color:var(--mute)"></i></div>
+          <div class="li"><span class="lg"><i class="ti ti-route"></i></span><span class="tx"><b>OpenRouter</b><small>浏览器授权，换一把 key</small></span><i class="ti ti-chevron-right" style="color:var(--mute)"></i></div>
+          <div class="li"><span class="lg"><i class="ti ti-key"></i></span><span class="tx"><b>API key</b><small>Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax、自定义</small></span><i class="ti ti-chevron-right" style="color:var(--mute)"></i></div>
+        </div>
+        <div class="priv"><i class="ti ti-lock"></i>凭据只存在本机钥匙串，Talos 没有服务器。</div>
+      </div>
+    </div>
+  </div>
+  <div class="win dark" style="width:904px;height:700px">
+    <div class="panel" style="border-right:.5px solid var(--edge)">
+      <div class="tabs"><div class="lights on" style="margin:0 12px 0 8px"><b></b><b></b><b></b></div><span class="tab">变更<span class="c">3</span></span><span class="tab on">终端</span><span class="tab">计划</span></div>
+      <div class="tsub"><span class="ttab on"><span class="st vein run"></span>go test</span><span class="ttab">zsh</span><span class="ib" style="width:24px;height:24px;font-size:14px"><i class="ti ti-plus"></i></span><span class="sp"></span><span class="ib" style="width:24px;height:24px;font-size:14px"><i class="ti ti-player-stop"></i></span></div>
+      <div class="term">
+<div><span class="pr">~/calc $</span> <span class="c">go test ./... -v</span></div>
+<div>=== RUN   TestAdd</div>
+<div class="ok">--- PASS: TestAdd (0.00s)</div>
+<div>=== RUN   TestSub</div>
+<div>=== RUN   TestSub/negative</div>
+<div class="bad">    sub_test.go:18: Sub(-2, 3) = 1, want -5</div>
+<div class="bad">--- FAIL: TestSub (0.00s)</div>
+<div class="bad">    --- FAIL: TestSub/negative (0.00s)</div>
+<div>FAIL</div>
+<div class="bad">FAIL	calc	0.391s</div>
+<div style="margin-top:8px"><span class="pr">~/calc $</span> <span class="c">go test ./... -run TestSub</span><span class="cur"></span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="tabs"><span class="tab">变更<span class="c">3</span></span><span class="tab">终端</span><span class="tab on">计划</span></div>
+      <div class="plan">
+        <h5>给 Sub 补表驱动测试</h5>
+        <p class="sub">4 步 · 已完成 2 步 · 由 Talos 维护，你可以改</p>
+        <div class="ps done"><span class="bx"><i class="ti ti-check"></i></span><span>读 sub.go 和现有测试</span></div>
+        <div class="ps done"><span class="bx"><i class="ti ti-check"></i></span><span>写表驱动用例：正数、负数、零、溢出边界</span></div>
+        <div class="ps now"><span class="bx"></span><span>跑测试，修掉失败的用例<small>负数用例失败：<span class="ic">Sub(-2, 3) = 1</span>，期望 -5</small></span></div>
+        <div class="ps"><span class="bx"></span><span>更新 README 的 Sub 示例</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap">首次登录：订阅登录在前，浏览器打不开时给设备码。终端与计划是 Review 面板的另两页：命令输出原样保留，计划里正在做的那一步是蓝色的。</p>
+</div>
+
+</body>
+</html>
