@@ -45,6 +45,8 @@ type App struct {
 	list   ui.ListState // the transcript
 	md     markdown.Options
 	opened map[string]bool // tool calls whose output shows
+	rv     review
+	seen   map[string]time.Time // when approvals first showed
 
 	searchInput                               ui.Handle
 	keyRepeat                                 bool
@@ -58,7 +60,8 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, opened: map[string]bool{}}
+	return &App{C: c, now: time.Now, opened: map[string]bool{},
+		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 
 // Serve connects the app to a kernel on in-process pipes until ctx ends.
@@ -125,6 +128,7 @@ func (a *App) do(cmds []proto.Command, err error) {
 // View builds a frame of the window.
 func (a *App) View(c *ui.Context) {
 	a.syncMenus()
+	a.syncReview()
 	isDark := c.Theme().Dark
 	a.p = PaletteFor(isDark)
 	c.SetTheme(Theme(a.p, isDark))
@@ -139,11 +143,21 @@ func (a *App) View(c *ui.Context) {
 	a.keys(c)
 }
 
+// helloShown is an empty session, whose composer sits in the middle.
+func (a *App) helloShown() bool {
+	return a.C.CanAct() && len(a.C.Entries) == 0 && len(a.C.Approvals) == 0
+}
+
 func (a *App) main(c *ui.Context) {
 	p := a.p
 	ui.Column(c).Grow(1).MinWidth(0).Background(p.Bg).Children(func() {
 		a.bar(c)
 		a.transcript(c)
-		a.composer(c)
+		if !a.helloShown() {
+			a.composer(c)
+		}
 	})
+	if a.rv.open {
+		a.reviewPanel(c)
+	}
 }

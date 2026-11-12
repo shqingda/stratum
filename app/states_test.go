@@ -159,7 +159,10 @@ func TestStateMatrix(t *testing.T) {
 			if phase == client.Disconnected {
 				a.C.Err = "连接已断开：测试错误"
 			}
-		}, want: []string{map[bool]string{true: "新建一个会话开始", false: "正在连接内核…"}[phase == client.Ready]}})
+		}, want: []string{map[client.Phase]string{
+			client.Starting: "正在启动…", client.Handshaking: "正在连接…", client.Syncing: "正在同步…",
+			client.Disconnected: "连接已断开：测试错误", client.Ready: "新建一个会话开始",
+		}[phase]}})
 	}
 	for _, size := range [][2]int{{760, 480}, {1200, 780}, {1800, 1100}} {
 		states = append(states, state{name: fmt.Sprintf("window-%dx%d", size[0], size[1]), setup: func(a *App) { a.C = working().C }, width: size[0], height: size[1], want: []string{"需要你允许", "修复 Add 测试"}})

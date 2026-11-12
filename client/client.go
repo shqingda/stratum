@@ -108,6 +108,8 @@ type Client struct {
 	Answering map[string]bool
 	Usage     llm.Usage // of the current session's turns this connection saw end
 
+	Changes Changes
+
 	Accounts []proto.Account
 	Models   []proto.Model // of the account last asked about
 	Unknown  []Unknown
@@ -134,7 +136,9 @@ func New(cwd string) *Client {
 }
 
 func newClient(cwd, launch string) *Client {
-	return &Client{Cwd: cwd, launch: launch, pending: map[string]*pending{}, Answering: map[string]bool{}}
+	c := &Client{Cwd: cwd, launch: launch, pending: map[string]*pending{}, Answering: map[string]bool{}}
+	c.resetChanges()
+	return c
 }
 
 // CanAct reports whether commands that change things may be sent now.
@@ -353,6 +357,7 @@ func (c *Client) resetTranscript() {
 	clear(c.Answering)
 	c.buffer, c.overflow = nil, false
 	c.cursor = 0
+	c.resetChanges()
 }
 
 // catchUp reads the current session's log after the cursor, page by page,
@@ -440,6 +445,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	if e.Seq != 0 {
 		c.cursor = e.Seq
 	}
+	c.changesEvent(e)
 	switch e.Type {
 	case proto.EventTurnStart:
 		c.Busy = true

@@ -13,31 +13,41 @@ var efforts = map[string]string{"": "默认", "minimal": "最低", "low": "低",
 // waiting for the running turn above it, the session's settings in it and
 // a status line under it.
 func (a *App) composer(c *ui.Context) {
-	p := a.p
 	ui.Row(c).Justify(ui.Center).Padding(0, 28, 12, 28).Shrink(0).Children(func() {
-		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() {
-			for i, q := range a.C.Queued {
-				ui.Row(c.Key(i)).Height(34).Padding(0, 6, 0, 12).Margin(0, 10, -1, 10).Gap(8).AlignItems(ui.Center).
-					Radius(10, 10, 0, 0).Background(p.Pane).Border(.5, p.Edge).Children(func() {
-					sym(c, "arrow.turn.down.right", 12, p.Mute)
-					ui.Text(c, q).FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-				})
-			}
-			a.box(c)
-			if a.err != "" {
-				ui.Text(c, a.err).FontSize(11.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
-			} else {
-				a.status(c)
-			}
-		})
+		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() { a.dock(c) })
 	})
+}
+
+// dock is the composer with the prompts queued above it and the status
+// or the last error under it, at the foot of a transcript or in the middle
+// of an empty session.
+func (a *App) dock(c *ui.Context) {
+	p := a.p
+	for i, q := range a.C.Queued {
+		ui.Row(c.Key(i)).Height(34).Padding(0, 6, 0, 12).Margin(0, 10, -1, 10).Gap(8).AlignItems(ui.Center).
+			Radius(10, 10, 0, 0).Background(p.Pane).Border(.5, p.Edge).Children(func() {
+			sym(c, "arrow.turn.down.right", 12, p.Mute)
+			ui.Text(c, q).FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		})
+	}
+	a.box(c)
+	if a.err != "" {
+		ui.Text(c, a.err).FontSize(11.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
+	} else {
+		a.status(c)
+	}
 }
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(12, 10, 8, 14).
-		Shadow(0, 8, 24, -12, ui.RGBA(0, 0, 0, .12)).Children(func() {
+	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(12, 10, 8, 14)
+	if p == dark {
+		box.Shadow(0, 12, 32, -12, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .05))
+	} else {
+		box.Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .04)).Shadow(0, 8, 24, -12, ui.RGBA(0, 0, 0, .12))
+	}
+	box.Children(func() {
 		ph := "让 Talos 做点什么"
 		if a.C.Busy {
 			ph = "运行中：回车排队"
@@ -75,10 +85,10 @@ func (a *App) pill(c *ui.Context, key, symbol, label string) ui.Element {
 	}
 	b.Children(func() {
 		if symbol != "" {
-			sym(c, symbol, 13, p.Fg2)
+			sym(c, symbol, 14, p.Fg2)
 		}
 		ui.Text(c, label).FontSize(12.5).TextColor(p.Fg2).SingleLine()
-		sym(c, "chevron.down", 9, p.Mute)
+		sym(c, "chevron.down", 10, p.Mute)
 	})
 	return b
 }

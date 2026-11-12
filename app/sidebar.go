@@ -53,7 +53,12 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 			a.navItem(c, "cron", "clock.arrow.circlepath", "定时任务", "")
 			a.navItem(c, "skills", "puzzlepiece.extension", "技能与 MCP", "")
 		})
-		ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
+		list := ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
+		// The list fades into the footer rather than being cut at it.
+		if h := list.Bounds().H; h > 0 {
+			black := ui.RGBA(0, 0, 0, 1)
+			list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: 1 - 36/h}, {Color: ui.Transparent, At: 1}}})
+		}
 		a.footer(c)
 	})
 }
@@ -74,7 +79,7 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 		it.Background(p.Hover)
 	}
 	it.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 14, p.Fg2) })
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 15, p.Fg2) })
 		ui.Text(c, label).FontSize(13).TextColor(p.Fg).SingleLine()
 		ui.Spacer(c)
 		if kbd != "" {
