@@ -1,0 +1,42 @@
+event: response.created
+data: {"sequence_number":0,"type":"response.created","response":{"created_at":1794474413,"completed_at":null,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"function","description":"Read a text file.","name":"read_file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":false}],"top_p":0.95,"usage":null,"user":null,"incomplete_details":null,"status":"in_progress","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+
+event: response.in_progress
+data: {"sequence_number":1,"type":"response.in_progress","response":{"created_at":1794474413,"completed_at":null,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"function","description":"Read a text file.","name":"read_file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":false}],"top_p":0.95,"usage":null,"user":null,"incomplete_details":null,"status":"in_progress","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+
+event: response.output_item.added
+data: {"sequence_number":2,"type":"response.output_item.added","item":{"id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","summary":[],"type":"reasoning","status":"in_progress"},"output_index":0}
+
+event: response.reasoning_summary_part.added
+data: {"sequence_number":3,"type":"response.reasoning_summary_part.added","item_id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","output_index":0,"part":{"text":"","type":"summary_text"},"summary_index":0}
+
+event: response.reasoning_summary_text.delta
+data: {"sequence_number":4,"type":"response.reasoning_summary_text.delta","delta":"I will call read_file","item_id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","output_index":0,"summary_index":0}
+
+event: response.reasoning_summary_text.delta
+data: {"sequence_number":5,"type":"response.reasoning_summary_text.delta","delta":" exactly once for hello.txt.","item_id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","output_index":0,"summary_index":0}
+
+event: response.reasoning_summary_text.done
+data: {"sequence_number":6,"type":"response.reasoning_summary_text.done","item_id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","output_index":0,"summary_index":0,"text":"I will call read_file exactly once for hello.txt."}
+
+event: response.reasoning_summary_part.done
+data: {"sequence_number":7,"type":"response.reasoning_summary_part.done","item_id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","output_index":0,"part":{"text":"I will call read_file exactly once for hello.txt.","type":"summary_text"},"summary_index":0}
+
+event: response.output_item.done
+data: {"sequence_number":8,"type":"response.output_item.done","item":{"id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","summary":[{"text":"I will call read_file exactly once for hello.txt.","type":"summary_text"}],"type":"reasoning","status":"completed"},"output_index":0}
+
+event: response.output_item.added
+data: {"sequence_number":9,"type":"response.output_item.added","item":{"arguments":"","call_id":"call-REDACTED_ACCOUNT-0","name":"read_file","type":"function_call","id":"fc_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1_0","status":"in_progress"},"output_index":1}
+
+event: response.function_call_arguments.delta
+data: {"sequence_number":10,"type":"response.function_call_arguments.delta","delta":"{\"path\":\"hello.txt\"}","item_id":"fc_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1_0","output_index":1}
+
+event: response.function_call_arguments.done
+data: {"sequence_number":11,"type":"response.function_call_arguments.done","arguments":"{\"path\":\"hello.txt\"}","item_id":"fc_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1_0","name":"read_file","output_index":1}
+
+event: response.output_item.done
+data: {"sequence_number":12,"type":"response.output_item.done","item":{"arguments":"{\"path\":\"hello.txt\"}","call_id":"call-REDACTED_ACCOUNT-0","name":"read_file","type":"function_call","id":"fc_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1_0","status":"completed"},"output_index":1}
+
+event: response.completed
+data: {"sequence_number":13,"type":"response.completed","response":{"created_at":1794474413,"completed_at":1794474416,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[{"id":"rs_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1","summary":[{"text":"I will call read_file exactly once for hello.txt.","type":"summary_text"}],"type":"reasoning","status":"completed"},{"arguments":"{\"path\":\"hello.txt\"}","call_id":"call-REDACTED_ACCOUNT-0","name":"read_file","type":"function_call","id":"fc_92017e1e-6f6a-95bb-bf43-4daf2c13d4f1_0","status":"completed"}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[{"type":"function","description":"Read a text file.","name":"read_file","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]},"strict":false}],"top_p":0.95,"usage":{"input_tokens":287,"input_tokens_details":{"cached_tokens":128},"output_tokens":424,"output_tokens_details":{"reasoning_tokens":413},"total_tokens":711,"num_sources_used":0,"num_server_side_tools_used":0,"cost_in_usd_ticks":10326000,"context_details":{"input_tokens":287,"output_tokens":427}},"user":null,"incomplete_details":null,"status":"completed","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+

@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +21,7 @@ import (
 
 // chat runs a conversation in the terminal with two read-only tools, a
 // stand-in for the kernel until G1.
-func chat(ctx context.Context, store auth.Store, args []string) error {
+func chat(ctx context.Context, store auth.Store, args []string) (err error) {
 	fs := flag.NewFlagSet("chat", flag.ExitOnError)
 	account := fs.String("account", "", "signed-in account to use (default: the only one)")
 	model := fs.String("model", "", "model id (default: the provider's default)")
@@ -28,6 +29,19 @@ func chat(ctx context.Context, store auth.Store, args []string) error {
 	prompt := fs.String("p", "", "send one prompt, print the answer and exit")
 	demo := fs.Bool("demo", false, "use the offline demo model")
 	dir := fs.String("dir", ".", "directory the tools may read")
+	record := fs.String("record", "", "")
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage of %s:\n", fs.Name())
+		visible := flag.NewFlagSet(fs.Name(), flag.ContinueOnError)
+		visible.SetOutput(fs.Output())
+		fs.VisitAll(func(f *flag.Flag) {
+			if f.Name != "record" {
+				visible.Var(f.Value, f.Name, f.Usage)
+				visible.Lookup(f.Name).DefValue = f.DefValue
+			}
+		})
+		visible.PrintDefaults()
+	}
 	fs.Parse(args)
 
 	var p llm.Provider
@@ -57,6 +71,24 @@ func chat(ctx context.Context, store auth.Store, args []string) error {
 		provider, _, _ = strings.Cut(*account, "/")
 		if cred, err := store.Get(*account); err == nil {
 			plan = auth.Subscription(cred)
+		}
+	}
+	if *record != "" {
+		h := *http.DefaultClient
+		recorder := &llm.RecordTransport{Dir: *record, Base: h.Transport}
+		h.Transport = recorder
+		defer func() { err = errors.Join(err, recorder.Err()) }()
+		switch p := p.(type) {
+		case *llm.OpenAI:
+			p.HTTP = &h
+		case *llm.Chat:
+			p.HTTP = &h
+		case *llm.Anthropic:
+			p.HTTP = &h
+		case *llm.Gemini:
+			p.HTTP = &h
+		default:
+			return errors.New("this provider has no HTTP stream to record")
 		}
 	}
 	loadCatalog(ctx)

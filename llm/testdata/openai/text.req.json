@@ -1,0 +1,1 @@
+{"input":[{"content":[{"text":"Reply with exactly: Hello Talos.","type":"input_text"}],"role":"user"}],"instructions":"You are a helpful assistant. Answer briefly.","model":"gpt-6-luna","store":false,"stream":true}
