@@ -26,7 +26,7 @@ func TestFixtures(t *testing.T) {
 		"codex/cancel", "codex/error-model", "codex/image", "codex/max-tokens-unsupported",
 		"codex/text", "codex/thinking", "codex/tool", "codex/tool-result", "codex/tools-parallel",
 		"openai/model-unavailable", "openai/text", "openai/tool",
-		"xai/effort-unsupported", "xai/text", "xai/thinking-default", "xai/tool",
+		"xai/effort-unsupported", "xai/text", "xai/thinking-default", "xai/thinking-low", "xai/tool",
 	}
 	for i, name := range want {
 		want[i] = filepath.Join("testdata", filepath.FromSlash(name)) + ".sse"
@@ -97,7 +97,7 @@ func TestFixtures(t *testing.T) {
 			if len(calls) == 0 && strings.TrimSpace(r.Message.PlainText()) == "" {
 				t.Error("empty answer")
 			}
-			if scenario == "thinking" || scenario == "thinking-default" {
+			if scenario == "thinking" || scenario == "thinking-default" || scenario == "thinking-low" {
 				var summary strings.Builder
 				for _, part := range r.Message.Parts {
 					if part.Thinking != nil {
@@ -161,11 +161,14 @@ func fixtureRequest(t *testing.T, provider, scenario string) Request {
 	tool := Tool{Name: "read_file", Description: "Read a text file.", Schema: json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}`)}
 	switch scenario {
 	case "text":
-	case "thinking", "thinking-default", "effort-unsupported":
+	case "thinking", "thinking-default", "thinking-low", "effort-unsupported":
 		r.Effort = "high"
 		r.Messages = []Message{Text(User, "Find the smallest positive integer that leaves remainder 2 modulo 3, 3 modulo 5, and 2 modulo 7. Check your answer and briefly explain.")}
 		if scenario == "thinking-default" {
 			r.Effort = ""
+		}
+		if scenario == "thinking-low" {
+			r.Model, r.Effort = "grok-4.7", "low"
 		}
 	case "tool", "tool-result":
 		r.Tools = []Tool{tool}

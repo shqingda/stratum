@@ -16,11 +16,15 @@ request body, and replays every response without external network access.
 | OpenAI / Sign in with ChatGPT | gpt-6-luna | text, tool |
 | OpenAI / Sign in with ChatGPT | gpt-5-nano | model-unavailable |
 | xAI / X subscription | grok-build-0.1 | text, tool, thinking-default, effort-unsupported |
+| xAI / X subscription | grok-4.7 | thinking-low |
 
 The models were selected from `talosd models`: gpt-6-luna is the least expensive
 Codex model, and grok-build-0.1 is the least expensive xAI model. OpenAI's cheaper
 gpt-5-nano was rejected for the ChatGPT subscription, so its successful samples
 use gpt-6-luna. The rejected request is retained as model-unavailable.
+The user separately authorized trying the more expensive grok-4.7 with low effort.
+That additional request succeeded and is retained as thinking-low, with a real
+reasoning summary. It is not a high-effort fixture.
 
 ## Incomplete task requirements
 
@@ -56,7 +60,7 @@ go run llm/testdata/scrub.go -check llm/testdata
 go test ./llm -run 'TestFixtures|TestScrubFixtures'
 ```
 
-The recording run made 19 counted account HTTP requests: 17 model requests and
+The recording run made 20 counted account HTTP requests: 18 model requests and
 2 OAuth refreshes. One initial Codex limit capture was discarded after it was
 scrubbed before recording finished; the replacement was recorded completely.
 No Claude/Anthropic account was accessed.
