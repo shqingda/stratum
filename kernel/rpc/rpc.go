@@ -229,6 +229,13 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		}
 		return workspace(ctx, p.Cwd)
 	}
+	if cmd.Method == proto.MethodCommit {
+		p, err := params[proto.Commit](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return commit(ctx, p)
+	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
 }
 

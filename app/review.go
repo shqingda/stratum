@@ -199,6 +199,8 @@ func (a *App) reviewPanel(c *ui.Context) {
 		default:
 			a.reviewFiles(c, turns)
 			a.reviewDiff(c, turns)
+		}
+		if a.C.Current != nil {
 			a.reviewFoot(c, turns)
 		}
 	})
@@ -478,7 +480,8 @@ func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
 	})
 }
 
-// reviewFoot takes back, or redoes, the turn of the file shown.
+// reviewFoot commits the folder, and takes back or redoes the turn of
+// the file shown.
 func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 	p := a.p
 	var turn int64
@@ -489,29 +492,39 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 			}
 		}
 	}
-	if turn == 0 {
+	dirty := a.C.Workspace.Dirty
+	if turn == 0 && !dirty {
 		return
 	}
 	reverted := a.C.Changes.Reverted[turn]
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).Gap(8).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-		note := a.turnLabel(turn)
-		if reverted {
-			note = "已撤销：" + note
+		if dirty {
+			a.commitField(c)
+		} else {
+			note := a.turnLabel(turn)
+			if reverted {
+				note = "已撤销：" + note
+			}
+			ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, note).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+			})
 		}
-		ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, note).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
-		})
-		label := "撤销本轮"
-		if reverted {
-			label = "重做本轮"
+		if turn != 0 {
+			label := "撤销本轮"
+			if reverted {
+				label = "重做本轮"
+			}
+			b := a.button(c, "revert", label, "", !reverted && !dirty)
+			b.Disabled(a.C.Busy)
+			if a.C.Busy {
+				b.Tooltip("运行中不能恢复文件")
+			}
+			if b.Clicked() {
+				a.do(a.C.Revert(turn, reverted))
+			}
 		}
-		b := a.button(c, "revert", label, "", !reverted)
-		b.Disabled(a.C.Busy)
-		if a.C.Busy {
-			b.Tooltip("运行中不能恢复文件")
-		}
-		if b.Clicked() {
-			a.do(a.C.Revert(turn, reverted))
+		if dirty {
+			a.commitGo(c)
 		}
 	})
 }

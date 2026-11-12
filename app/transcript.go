@@ -67,6 +67,8 @@ func (a *App) bar(c *ui.Context) {
 			})
 		}
 		ui.Spacer(c)
+		a.openButton(c)
+		a.commitButton(c)
 		a.reviewToggle(c)
 	})
 }

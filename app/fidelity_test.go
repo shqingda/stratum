@@ -71,7 +71,7 @@ func screen1() *App {
 	a.rv.sel = client.DiffKey(3, "add.go")
 	c.Models = []proto.Model{{ID: "gpt-6-luna", Context: 200000, Reasoning: true}}
 	c.LastInput = 36000
-	c.Workspace.Branch = "fix-add"
+	c.Workspace.Branch, c.Workspace.Dirty, c.Workspace.Added, c.Workspace.Removed = "fix-add", true, 9, 3
 	return a
 }
 

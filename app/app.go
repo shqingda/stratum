@@ -52,6 +52,11 @@ type App struct {
 	stats  map[string][2]int
 	rv     review
 	seen   map[string]time.Time // when approvals first showed
+	openIn func(app, dir string) error
+
+	openMenu    bool
+	commitMsg   string
+	commitInput ui.Handle
 
 	searchInput                               ui.Handle
 	keyRepeat                                 bool
@@ -65,7 +70,7 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, opened: map[string]bool{},
+	return &App{C: c, now: time.Now, openIn: openIn, opened: map[string]bool{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 

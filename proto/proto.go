@@ -333,8 +333,12 @@ type SearchHit struct {
 	At        time.Time `json:"at,omitempty"`
 }
 
-// MethodWorkspace reads what a session's folder is in git.
-const MethodWorkspace = "workspace.info" // WorkspaceQuery → Workspace
+// MethodWorkspace reads what a session's folder is in git; MethodCommit
+// commits everything in it.
+const (
+	MethodWorkspace = "workspace.info"   // WorkspaceQuery → Workspace
+	MethodCommit    = "workspace.commit" // Commit → Workspace
+)
 
 type WorkspaceQuery struct {
 	Cwd string `json:"cwd"`
@@ -342,6 +346,16 @@ type WorkspaceQuery struct {
 
 // Workspace is a folder as git sees it. Branch is empty outside a
 // repository, and a short commit for a detached head.
+// Added and Removed count the lines not yet committed; Dirty is set
+// for any change, untracked files too.
 type Workspace struct {
-	Branch string `json:"branch,omitempty"`
+	Branch  string `json:"branch,omitempty"`
+	Dirty   bool   `json:"dirty,omitempty"`
+	Added   int    `json:"added,omitempty"`
+	Removed int    `json:"removed,omitempty"`
+}
+
+type Commit struct {
+	Cwd     string `json:"cwd"`
+	Message string `json:"message"`
 }

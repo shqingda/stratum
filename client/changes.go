@@ -109,6 +109,7 @@ func (c *Client) Revert(turn int64, redo bool) ([]proto.Command, error) {
 		method = proto.MethodChangesRedo
 	}
 	cmds, err := c.mutation(method, proto.ChangeQuery{SessionID: sessionID(c.Current), TurnSeq: turn}, func(r json.RawMessage) []proto.Command {
+		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
 			c.notice("%d 个文件在这之后又被改过，没有动它们：%v", len(res.Conflicts), res.Conflicts)

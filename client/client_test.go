@@ -468,4 +468,20 @@ func TestWorkspace(t *testing.T) {
 	if !c.Workspace.BranchStale {
 		t.Fatal("a turn's end did not make the branch stale")
 	}
+
+	cmds, _ = c.Commit("fix")
+	ci := one(t, cmds, proto.MethodCommit)
+	if p := params[proto.Commit](t, ci); p.Cwd != "/w" || p.Message != "fix" || !c.Workspace.Committing {
+		t.Fatalf("%+v %+v", p, c.Workspace)
+	}
+	c.Receive(resp(ci.ID, proto.Workspace{Branch: "fix-add"}))
+	if c.Workspace.Committing || c.Workspace.Dirty {
+		t.Fatalf("%+v", c.Workspace)
+	}
+	cmds, _ = c.Commit("fix")
+	ci = one(t, cmds, proto.MethodCommit)
+	c.Receive(proto.Frame{Type: proto.FrameResponse, ID: ci.ID, Error: proto.Errorf("internal", "git commit: nothing")})
+	if !c.Workspace.BranchStale || c.Entries[len(c.Entries)-1].Text != "提交失败：git commit: nothing" {
+		t.Fatalf("%+v", c.Workspace)
+	}
 }
