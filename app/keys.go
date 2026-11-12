@@ -29,7 +29,7 @@ func (a *App) keys(c *ui.Context) {
 		key  ui.Key
 	}{{0, ui.KeyEnter}, {ui.Cmd, ui.KeyEnter}, {0, ui.KeyEscape}} {
 		c.OnWindowShortcut(key.mods, key.key, func() {
-			if !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape) {
+			if !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods == ui.Cmd && !a.searchInput.Focused(c)) {
 				a.keyRepeat = false
 				a.actionKey(key.mods, key.key)
 			}
