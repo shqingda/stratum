@@ -57,12 +57,17 @@ type Request struct {
 	Command string
 	// Unrestricted asks to run outside the sandbox.
 	Unrestricted bool
+	// InstalledSkill is set only after the skill tool finds an installed snapshot.
+	InstalledSkill bool `json:"-"`
 }
 
 // Decide returns what happens to req in mode. sandboxed tells whether
 // commands can run in the sandbox here.
 func Decide(mode Mode, req Request, sandboxed bool) Decision {
 	if mode == Full {
+		return Allow
+	}
+	if req.Kind == Read && req.Tool == "skill" && req.InstalledSkill {
 		return Allow
 	}
 	for _, p := range req.Paths {

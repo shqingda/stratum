@@ -18,18 +18,19 @@ type runner struct {
 	sessionID string
 	run       *run
 	env       tools.Env
+	tools     tools.Set
 
 	mu     sync.Mutex
 	always map[string]bool // tools the user allowed for the session
 }
 
-func (r *runner) Specs() []llm.Tool { return r.m.Tools.Specs() }
+func (r *runner) Specs() []llm.Tool { return r.tools.Specs() }
 
 func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, error) {
 	fail := func(format string, args ...any) (llm.ToolResult, error) {
 		return llm.ToolResult{Content: fmt.Sprintf(format, args...), IsError: true}, nil
 	}
-	tool := r.m.Tools.Get(call.Name)
+	tool := r.tools.Get(call.Name)
 	if tool == nil {
 		return fail("There is no tool %q.", call.Name)
 	}

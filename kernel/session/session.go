@@ -20,6 +20,7 @@ import (
 	"github.com/shqingda/talos/kernel/agent"
 	"github.com/shqingda/talos/kernel/perm"
 	"github.com/shqingda/talos/kernel/sandbox"
+	"github.com/shqingda/talos/kernel/skills"
 	"github.com/shqingda/talos/kernel/store"
 	"github.com/shqingda/talos/kernel/tools"
 	"github.com/shqingda/talos/llm"
@@ -34,6 +35,7 @@ type Manager struct {
 	// Defaults fills an account and model a new session leaves empty.
 	Defaults func() (account, model string)
 	Tools    tools.Set
+	Skills   skills.Loader
 	// Sandboxed tells whether commands run in the sandbox.
 	Sandboxed bool
 	Clock     agent.Clock // real time when nil
@@ -315,14 +317,16 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 	if err != nil {
 		return llm.Usage{}, err
 	}
+	catalog := m.Skills.Load(x.Cwd)
+	turnTools := append(append(tools.Set(nil), m.Tools...), tools.Skill(catalog))
 	ag := &agent.Agent{
 		Provider: provider,
-		Tools:    &runner{m: m, sessionID: x.ID, run: r, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed}},
+		Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed}},
 		Sink:     sink{m: m, ctx: ctx, sessionID: x.ID},
 		Clock:    m.Clock,
 	}
 	cfg := agent.Config{
-		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: systemPrompt(x, m.Sandboxed),
+		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: systemPrompt(x, m.Sandboxed) + catalog.Prompt,
 		Steer: func() []string {
 			m.mu.Lock()
 			defer m.mu.Unlock()
@@ -440,17 +444,7 @@ func systemPrompt(x store.Session, sandboxed bool) string {
 	if sandboxed {
 		b.WriteString(sandbox.Describe() + "\n")
 	}
-	if agents, err := os.ReadFile(filepath.Join(x.Cwd, "AGENTS.md")); err == nil {
-		fmt.Fprintf(&b, "\nThe project's AGENTS.md:\n\n%s\n", clipText(string(agents), 16<<10))
-	}
 	return b.String()
-}
-
-func clipText(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "\n[…]"
 }
 
 func newID() string {
