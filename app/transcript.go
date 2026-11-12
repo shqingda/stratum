@@ -36,7 +36,7 @@ func (a *App) bar(c *ui.Context) {
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, 20).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		cur := a.C.Current
 		if cur == nil {
-			ui.Text(c, a.C.Phase.String()).FontSize(13.5).FontWeight(600).TextColor(p.Mute)
+			ui.Text(c, phaseText(a.C.Phase)).FontSize(13.5).FontWeight(600).TextColor(p.Mute)
 			return
 		}
 		ui.Text(c, title(*cur)).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
@@ -188,13 +188,13 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			ui.Text(c, ap.Reason).FontSize(12).TextColor(p.Mute)
 		}
 		ui.Row(c).Gap(8).Justify(ui.End).Margin(12, 0, 0, 0).Children(func() {
-			if a.button(c, "deny:"+ap.ID, "拒绝", "esc", false).Disabled(busy).Clicked() {
+			if a.button(c, "deny:"+ap.ID, "拒绝", a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, false, false))
 			}
-			if a.button(c, "always:"+ap.ID, "本会话都允许", "⌘⏎", false).Disabled(busy).Clicked() {
+			if a.button(c, "always:"+ap.ID, "本会话都允许", a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, true))
 			}
-			if a.button(c, "allow:"+ap.ID, "允许", "⏎", true).Disabled(busy).Clicked() {
+			if a.button(c, "allow:"+ap.ID, "允许", a.approvalHint(c, ap.ID, "⏎"), true).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, false))
 			}
 		})

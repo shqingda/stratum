@@ -43,22 +43,12 @@ func (a *App) box(c *ui.Context) {
 			ph = "运行中：回车排队"
 		}
 		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
-			LineHeight(1.45).AutoFocus().OnTextKey(func(k ui.TextKey) bool {
-			switch {
-			case k.Key == ui.KeyEnter && k.Mods == 0:
-				a.submit()
-				return true
-			case k.Key == ui.KeyEscape && a.C.Busy:
-				a.do(a.C.Cancel())
-				return true
-			}
-			return false
-		})
+			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey)
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
 			if cur != nil {
-				a.pill(c, "model", "", cur.Model)
-				a.pill(c, "effort", "brain", efforts[cur.Effort])
-				a.pill(c, "mode", "shield.lefthalf.filled", modes[cur.Mode])
+				a.modelPill(c, cur.Model)
+				a.effortPill(c, efforts[cur.Effort])
+				a.modePill(c, modes[cur.Mode])
 			}
 			ui.Spacer(c)
 			a.goButton(c)
@@ -124,7 +114,7 @@ func (a *App) status(c *ui.Context) {
 		}
 		item("laptopcomputer", "本机")
 		if a.C.Phase != client.Ready {
-			item("bolt.horizontal", a.C.Phase.String())
+			item("bolt.horizontal", phaseText(a.C.Phase))
 		}
 		item("lock", "沙箱开启")
 	})
