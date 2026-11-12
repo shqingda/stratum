@@ -2,36 +2,36 @@ package client
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 
+	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/proto"
 )
 
-// A scripted kernel: tests answer the commands a client sends with frames
-// shaped as the real kernel's (see testdata and e2e_test.go).
+// Unit tests answer the client's commands with frames shaped as the
+// kernel's; kernel_test.go runs it against a real one.
 
 const sid = "s1"
 
 func resp(id string, result any) proto.Frame {
 	b, _ := json.Marshal(result)
-	return proto.Frame{Type: proto.TypeResponse, ID: id, Result: b}
+	return proto.Frame{Type: proto.FrameResponse, ID: id, Result: b}
 }
 
-func errResp(id, msg string) proto.Frame {
-	return proto.Frame{Type: proto.TypeResponse, ID: id, Error: msg}
+func errResp(id, code, msg string) proto.Frame {
+	return proto.Frame{Type: proto.FrameResponse, ID: id, Error: proto.Errorf(code, "%s", msg)}
 }
 
-func ev(rev, seq uint64, typ string, data map[string]any) proto.Frame {
-	return proto.Frame{Type: proto.TypeEvent, Scope: "desk", Revision: rev,
-		Event: &proto.Event{SessionID: sid, Seq: seq, Type: typ, Data: data}}
+func ev(seq int64, typ string, data any) proto.Frame {
+	b, _ := json.Marshal(data)
+	return proto.Frame{Type: proto.FrameEvent, Event: &proto.Event{SessionID: sid, Seq: seq, Type: typ, Data: b}}
 }
 
-func msg(role, text string) map[string]any {
-	return map[string]any{"message": map[string]any{"role": role, "text": text}}
+func msg(role llm.Role, text string) llm.Message {
+	return llm.Message{Role: role, Parts: []llm.Part{{Text: text}}}
 }
 
-func session(id, title string) proto.Session { return proto.Session{ID: id, Title: title, Cwd: "/w"} }
+func sess(id, cwd string) proto.Session { return proto.Session{ID: id, Cwd: cwd, Mode: "ask"} }
 
 func one(t *testing.T, cmds []proto.Command, method string) proto.Command {
 	t.Helper()
@@ -52,29 +52,35 @@ func methods(cmds []proto.Command) []string {
 	return m
 }
 
-// connected returns a client bound to session s1 at revision rev and event
-// cursor cur, with the snapshot answered and history still outstanding.
-func connected(t *testing.T, rev, cur uint64, snap func(*proto.Snapshot)) (*Client, proto.Command) {
+func params[T any](t *testing.T, cmd proto.Command) T {
+	var v T
+	if err := json.Unmarshal(cmd.Params, &v); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// connected returns a client showing session s1, whose log holds log, with
+// the events command still outstanding when log is nil.
+func connected(t *testing.T, log []proto.Event) (*Client, proto.Command) {
 	t.Helper()
-	c := newClient("desk", "t")
-	hello := one(t, c.Receive(proto.Frame{Type: proto.TypeReady, ProtocolVer: 2}), "hello")
-	cmds := c.Receive(resp(hello.ID, map[string]any{}))
-	one(t, cmds, "workspace.current")
-	list := one(t, cmds, "session.list")
-	resume := one(t, c.Receive(resp(list.ID, []proto.Session{session(sid, "first"), session("s0", "older")})), "session.resume")
-	if resume.Params["sessionId"] != sid || c.Phase != Syncing {
-		t.Fatalf("resume %+v, phase %s", resume, c.Phase)
+	c := newClient("/w", "t")
+	init := one(t, c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version, Instance: "i1"}), proto.MethodInitialize)
+	cmds := c.Receive(resp(init.ID, proto.Hello{Version: proto.Version}))
+	one(t, cmds, proto.MethodAccounts)
+	list := one(t, cmds, proto.MethodSessionList)
+	get := one(t, c.Receive(resp(list.ID, []proto.Session{sess("s9", "/elsewhere"), sess(sid, "/w"), sess("s0", "/w")})), proto.MethodSessionGet)
+	if p := params[proto.SessionRef](t, get); p.SessionID != sid || c.Phase != Syncing {
+		t.Fatalf("bound %+v, phase %s", p, c.Phase)
 	}
-	current := one(t, c.Receive(resp(resume.ID, session(sid, "first"))), "session.current")
-	s := proto.Snapshot{Session: &proto.Session{ID: sid, Title: "first"}, Revision: rev, Cursor: cur, RunStatus: "idle"}
-	if snap != nil {
-		snap(&s)
+	events := one(t, c.Receive(resp(get.ID, proto.Snapshot{Session: sess(sid, "/w")})), proto.MethodEvents)
+	if log == nil {
+		return c, events
 	}
-	history := one(t, c.Receive(resp(current.ID, s)), "messages.read")
-	if c.Phase != Ready {
-		t.Fatalf("phase %s after snapshot", c.Phase)
+	if c.Receive(resp(events.ID, proto.EventPage{Events: log})) != nil || c.Phase != Ready {
+		t.Fatalf("phase %s after the log", c.Phase)
 	}
-	return c, history
+	return c, events
 }
 
 func texts(c *Client) []string {
@@ -85,251 +91,270 @@ func texts(c *Client) []string {
 	return out
 }
 
+func event(f proto.Frame) proto.Event { return *f.Event }
+
 func TestIdsAreUniqueAcrossLaunches(t *testing.T) {
-	a := New("desk").Receive(proto.Frame{Type: proto.TypeReady})
-	b := New("desk").Receive(proto.Frame{Type: proto.TypeReady})
-	if a[0].ID == b[0].ID {
-		t.Errorf("two launches both used id %s", a[0].ID)
-	}
-}
-
-func TestHistoryThenLive(t *testing.T) {
-	c, history := connected(t, 5, 4, nil)
-	if history.Params["before"] != uint64(5) {
-		t.Errorf("history before %v", history.Params["before"])
-	}
-	// A live event arrives before the history answer.
-	c.Receive(ev(6, 5, "message", msg("user", "second")))
-	c.Receive(resp(history.ID, proto.MessagePage{Items: []proto.StoredMessage{
-		stored(2, "user", "first"), stored(4, "assistant", "reply"),
-	}, HasOlder: true}))
-	want := []string{"user:first", "assistant:reply", "user:second"}
-	if fmt.Sprint(texts(c)) != fmt.Sprint(want) || !c.HasOlder {
-		t.Errorf("transcript %q, older %v", texts(c), c.HasOlder)
-	}
-}
-
-func stored(seq uint64, role, text string) proto.StoredMessage {
-	var m proto.StoredMessage
-	m.Seq, m.Message.Role, m.Message.Text = seq, role, text
-	return m
-}
-
-func TestFramesDuringSyncAreBufferedAndFiltered(t *testing.T) {
-	c := newClient("desk", "t")
-	hello := one(t, c.Receive(proto.Frame{Type: proto.TypeReady}), "hello")
-	list := one(t, c.Receive(resp(hello.ID, nil)), "session.list")
-	create := one(t, c.Receive(resp(list.ID, []proto.Session{})), "session.create")
-	current := one(t, c.Receive(resp(create.ID, session(sid, "New session"))), "session.current")
-	// Frames before the snapshot answer: rev 3 is covered by it, 4 and 5 are not.
-	c.Receive(ev(3, 3, "run.start", map[string]any{"runId": "r1"}))
-	c.Receive(ev(4, 4, "text.delta", map[string]any{"text": "lo"}))
-	c.Receive(ev(5, 5, "text.delta", map[string]any{"text": "!"}))
-	if len(c.Entries) != 0 {
-		t.Fatal("frames applied before the snapshot")
-	}
-	runID := "r1"
-	c.Receive(resp(current.ID, proto.Snapshot{Session: &proto.Session{ID: sid}, Revision: 3, Cursor: 3,
-		Busy: true, Stream: "Hel", RunID: &runID, RunStatus: "running"}))
-	if c.Phase != Ready || !c.Busy || c.RunID != "r1" {
-		t.Fatalf("phase %s busy %v run %q", c.Phase, c.Busy, c.RunID)
-	}
-	if got := texts(c); len(got) != 1 || got[0] != "assistant:Hello!" {
-		t.Errorf("stream %q", got)
-	}
-}
-
-func TestBufferOverflowRereads(t *testing.T) {
-	c := newClient("desk", "t")
-	hello := one(t, c.Receive(proto.Frame{Type: proto.TypeReady}), "hello")
-	list := one(t, c.Receive(resp(hello.ID, nil)), "session.list")
-	create := one(t, c.Receive(resp(list.ID, nil)), "session.create")
-	current := one(t, c.Receive(resp(create.ID, session(sid, ""))), "session.current")
-	for i := uint64(1); i <= maxBuffered+1; i++ {
-		c.Receive(ev(i, i, "text.delta", map[string]any{"text": "x"}))
-	}
-	cmds := c.Receive(resp(current.ID, proto.Snapshot{Session: &proto.Session{ID: sid}}))
-	one(t, cmds, "session.current")
-	if c.Phase != Syncing {
-		t.Errorf("phase %s after overflow", c.Phase)
-	}
-}
-
-func TestDuplicatesIgnoredGapRereads(t *testing.T) {
-	c, _ := connected(t, 10, 10, nil)
-	c.Receive(ev(11, 11, "text.delta", map[string]any{"text": "a"}))
-	c.Receive(ev(11, 11, "text.delta", map[string]any{"text": "a"}))
-	c.Receive(ev(10, 10, "text.delta", map[string]any{"text": "old"}))
-	if got := texts(c); len(got) != 1 || got[0] != "assistant:a" {
-		t.Fatalf("after duplicates %q", got)
-	}
-	cmds := c.Receive(ev(13, 13, "text.delta", map[string]any{"text": "c"}))
-	one(t, cmds, "session.current")
-	if c.Phase != Syncing || c.CanAct() {
-		t.Errorf("gap left phase %s", c.Phase)
-	}
-	if _, err := c.Prompt("x"); err == nil {
-		t.Error("prompt allowed while re-syncing")
-	}
-}
-
-func TestOutOfOrderResponses(t *testing.T) {
-	c, history := connected(t, 0, 0, nil)
-	p, _ := c.Prompt("hi")
-	m, _ := c.SearchModels("a")
-	m2, _ := c.SearchModels("ab")
-	// Answers in reverse order; the stale search answer is dropped.
-	c.Receive(resp(m2[0].ID, proto.ModelPage{Items: []proto.Model{{Provider: "x", ID: "ab"}}}))
-	c.Receive(resp(m[0].ID, proto.ModelPage{Items: []proto.Model{{Provider: "x", ID: "a"}}}))
-	c.Receive(resp(history.ID, proto.MessagePage{}))
-	c.Receive(resp(p[0].ID, map[string]any{"accepted": true}))
-	if len(c.Models) != 1 || c.Models[0].ID != "ab" {
-		t.Errorf("models %+v", c.Models)
-	}
-	for _, id := range []string{p[0].ID, m[0].ID, m2[0].ID, history.ID} {
-		if _, ok := c.pending[id]; ok {
-			t.Errorf("%s still pending", id)
-		}
-	}
-}
-
-func TestRunEventsAndTools(t *testing.T) {
-	c, _ := connected(t, 0, 0, nil)
-	frames := []proto.Frame{
-		ev(1, 1, "message", msg("user", "edit it")),
-		ev(2, 2, "run.start", map[string]any{"runId": "r1"}),
-		ev(3, 3, "text.delta", map[string]any{"text": "Looking."}),
-		ev(4, 4, "tool.start", map[string]any{"callId": "c1", "name": "read_file", "arguments": map[string]any{"path": "a.go"}}),
-		ev(5, 5, "tool.end", map[string]any{"callId": "c1", "result": map[string]any{"text": "no", "isError": true}}),
-		ev(6, 6, "text.delta", map[string]any{"text": "Done."}),
-		ev(7, 7, "message", msg("assistant", "Done.")),
-	}
-	for _, f := range frames {
-		c.Receive(f)
-	}
-	if !c.Busy || c.RunID != "r1" {
-		t.Fatalf("busy %v run %q", c.Busy, c.RunID)
-	}
-	cmds := c.Receive(ev(8, 8, "run.end", map[string]any{"runId": "r1", "status": "completed"}))
-	one(t, cmds, "session.list")
-	want := []string{"user:edit it", "assistant:Looking.", "tool:read_file", "assistant:Done."}
-	if fmt.Sprint(texts(c)) != fmt.Sprint(want) {
-		t.Errorf("transcript %q", texts(c))
-	}
-	tool := c.Entries[2]
-	if !tool.Done || !tool.Failed || tool.Detail != "a.go" || !c.Entries[1].Done {
-		t.Errorf("tool %+v, first reply done %v", tool, c.Entries[1].Done)
-	}
-	if c.Busy {
-		t.Error("still busy after run.end")
-	}
-}
-
-func TestApprovals(t *testing.T) {
-	pending := proto.Permission{ID: "a0", SessionID: sid, Tool: "shell", Reason: "run tests"}
-	c, _ := connected(t, 0, 0, func(s *proto.Snapshot) { s.Approvals = []proto.Permission{pending} })
-	c.Receive(proto.Frame{Type: proto.TypeApproval, Scope: "desk", Revision: 1,
-		Request: &proto.Permission{ID: "a1", SessionID: sid, Tool: "write_file"}})
-	if len(c.Approvals) != 2 {
-		t.Fatalf("approvals %+v", c.Approvals)
-	}
-	cmds, err := c.Answer("a1", true)
-	if err != nil || cmds[0].Method != "approval.respond" || cmds[0].Params["allow"] != true {
-		t.Fatalf("answer %+v %v", cmds, err)
-	}
-	if _, err := c.Answer("a1", false); err == nil {
-		t.Error("answered twice")
-	}
-	// A failed answer can be tried again.
-	deny, _ := c.Answer("a0", false)
-	c.Receive(errResp(deny[0].ID, "Approval expired"))
-	if c.Answering["a0"] {
-		t.Error("failed answer still in flight")
-	}
-	allow := true
-	c.Receive(proto.Frame{Type: proto.TypeResolved, Scope: "desk", Revision: 2, ID: "a1", Allow: &allow})
-	if len(c.Approvals) != 1 || c.Approvals[0].ID != "a0" || c.Answering["a1"] {
-		t.Errorf("after resolve %+v %v", c.Approvals, c.Answering)
-	}
-}
-
-func TestDisconnectThenReceipts(t *testing.T) {
-	c, _ := connected(t, 0, 0, nil)
-	p, _ := c.Prompt("hi")
-	read, _ := c.SearchModels("x")
-	_ = read
-	c.Disconnected(nil)
-	if c.Phase != Disconnected || len(c.Unknown) != 1 || c.Unknown[0].ID != p[0].ID {
-		t.Fatalf("phase %s unknown %+v", c.Phase, c.Unknown)
-	}
-	if _, err := c.Prompt("again"); err == nil {
-		t.Error("prompt while disconnected")
-	}
-	// A late answer from the old kernel changes nothing.
-	c.Receive(resp(p[0].ID, map[string]any{"accepted": true}))
-	// A new kernel: the client asks for the receipt and resumes the session.
-	hello := one(t, c.Receive(proto.Frame{Type: proto.TypeReady}), "hello")
-	cmds := c.Receive(resp(hello.ID, nil))
-	receipt := one(t, cmds, "command.receipt")
-	if receipt.Params["commandId"] != p[0].ID {
-		t.Errorf("receipt for %v", receipt.Params)
-	}
-	list := one(t, cmds, "session.list")
-	resume := one(t, c.Receive(resp(list.ID, []proto.Session{session("s9", "newer"), session(sid, "first")})), "session.resume")
-	if resume.Params["sessionId"] != sid {
-		t.Errorf("resumed %v, want the session shown before", resume.Params)
-	}
-	c.Receive(resp(receipt.ID, map[string]any{"receipt": proto.Receipt{ID: p[0].ID, Method: "prompt", Status: "completed"}}))
-	if c.Unknown[0].Outcome != "completed" {
-		t.Errorf("outcome %q", c.Unknown[0].Outcome)
-	}
-}
-
-func TestDeletedSessionShowsAnother(t *testing.T) {
-	c, _ := connected(t, 0, 0, nil)
-	del, err := c.Delete(sid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.Receive(resp(del[0].ID, map[string]any{}))
-	current := one(t, c.Receive(proto.Frame{Type: proto.TypeInvalidated, Scope: "desk", Revision: 1}), "session.current")
-	list := one(t, c.Receive(resp(current.ID, proto.Snapshot{})), "session.list")
-	resume := one(t, c.Receive(resp(list.ID, []proto.Session{session("s0", "older")})), "session.resume")
-	if resume.Params["sessionId"] != "s0" {
-		t.Errorf("resume %v", resume.Params)
-	}
-}
-
-func TestResumeFailureCreates(t *testing.T) {
-	c := newClient("desk", "t")
-	hello := one(t, c.Receive(proto.Frame{Type: proto.TypeReady}), "hello")
-	list := one(t, c.Receive(resp(hello.ID, nil)), "session.list")
-	resume := one(t, c.Receive(resp(list.ID, []proto.Session{session("gone", "")})), "session.resume")
-	one(t, c.Receive(errResp(resume.ID, "Session not found")), "session.create")
-}
-
-func TestModeAndModel(t *testing.T) {
-	c, _ := connected(t, 0, 0, nil)
-	if _, err := c.SetPermissionMode("yolo"); err == nil {
-		t.Error("unknown mode accepted")
-	}
-	mode, _ := c.SetPermissionMode("auto")
-	c.Receive(resp(mode[0].ID, map[string]any{"mode": "auto"}))
-	if c.Workspace.PermissionMode != "auto" {
-		t.Errorf("mode %q", c.Workspace.PermissionMode)
-	}
-	set, _ := c.SetModel("demo", "offline")
-	s := session(sid, "first")
-	s.ModelSelection = &proto.ModelSelection{Provider: "demo", Model: "offline"}
-	c.Receive(resp(set[0].ID, s))
-	if c.Current.ModelSelection == nil || c.Current.ModelSelection.Model != "offline" {
-		t.Errorf("current %+v", c.Current)
+	a, b := New("/w"), New("/w")
+	ca := a.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version})
+	cb := b.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version})
+	if ca[0].ID == cb[0].ID {
+		t.Error(ca[0].ID)
 	}
 }
 
 func TestProtocolMismatch(t *testing.T) {
-	c := newClient("desk", "t")
-	if cmds := c.Receive(proto.Frame{Type: proto.TypeReady, ProtocolVer: 3}); len(cmds) != 0 || c.Phase != Disconnected {
-		t.Errorf("protocol 3: %v, %s", methods(cmds), c.Phase)
+	c := newClient("/w", "t")
+	if cmds := c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version + 1}); cmds != nil || c.Phase != Disconnected || c.Err == "" {
+		t.Errorf("%v %s %q", cmds, c.Phase, c.Err)
+	}
+}
+
+func TestNoSessionCreatesOne(t *testing.T) {
+	c := newClient("/w", "t")
+	init := one(t, c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version}), proto.MethodInitialize)
+	list := one(t, c.Receive(resp(init.ID, nil)), proto.MethodSessionList)
+	create := one(t, c.Receive(resp(list.ID, []proto.Session{sess("s9", "/elsewhere")})), proto.MethodSessionCreate)
+	if p := params[proto.SessionCreate](t, create); p.Cwd != "/w" {
+		t.Errorf("%+v", p)
+	}
+	one(t, c.Receive(resp(create.ID, sess(sid, "/w"))), proto.MethodSessionGet)
+}
+
+func TestLogThenLive(t *testing.T) {
+	c, _ := connected(t, []proto.Event{
+		event(ev(1, proto.EventTurnStart, proto.TurnStart{Text: "hi"})),
+		event(ev(2, proto.EventMessage, msg(llm.User, "hi"))),
+		event(ev(3, proto.EventMessage, msg(llm.Assistant, "hello"))),
+		event(ev(4, proto.EventTurnEnd, proto.TurnEnd{Usage: llm.Usage{Input: 10}})),
+	})
+	c.Receive(ev(5, proto.EventTurnStart, nil))
+	c.Receive(ev(0, proto.EventTextDelta, proto.Delta{Text: "wor"}))
+	c.Receive(ev(0, proto.EventTextDelta, proto.Delta{Text: "ld"}))
+	if !c.Busy || c.Entries[len(c.Entries)-1].Text != "world" {
+		t.Errorf("%v %v", c.Busy, texts(c))
+	}
+	c.Receive(ev(6, proto.EventMessage, msg(llm.Assistant, "world!")))
+	c.Receive(ev(7, proto.EventTurnEnd, proto.TurnEnd{Usage: llm.Usage{Input: 5}}))
+	want := []string{"user:hi", "assistant:hello", "assistant:world!"}
+	if got := texts(c); len(got) != 3 || got[2] != want[2] || got[0] != want[0] || c.Busy || c.Usage.Input != 15 {
+		t.Errorf("%v busy %v usage %+v", got, c.Busy, c.Usage)
+	}
+	if !c.Entries[2].Done || c.Entries[2].Seq != 6 {
+		t.Errorf("%+v", c.Entries[2])
+	}
+}
+
+func TestEventsDuringSyncAreBuffered(t *testing.T) {
+	c, events := connected(t, nil)
+	c.Receive(ev(2, proto.EventMessage, msg(llm.User, "hi")))       // also in the log
+	c.Receive(ev(0, proto.EventTextDelta, proto.Delta{Text: "x"}))  // belongs to seq 3, in the log
+	c.Receive(ev(3, proto.EventMessage, msg(llm.Assistant, "xy")))  // also in the log
+	c.Receive(ev(0, proto.EventTextDelta, proto.Delta{Text: "ne"})) // newer
+	other := ev(1, proto.EventMessage, msg(llm.User, "elsewhere"))
+	other.Event.SessionID = "s0"
+	c.Receive(other)
+	c.Receive(resp(events.ID, proto.EventPage{Events: []proto.Event{
+		event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventMessage, msg(llm.User, "hi"))),
+		event(ev(3, proto.EventMessage, msg(llm.Assistant, "xy"))),
+	}}))
+	if got := texts(c); len(got) != 3 || got[2] != "assistant:ne" || c.Phase != Ready {
+		t.Errorf("%v %s", got, c.Phase)
+	}
+}
+
+func TestLogIsPaged(t *testing.T) {
+	c, events := connected(t, nil)
+	more := one(t, c.Receive(resp(events.ID, proto.EventPage{More: true, Events: []proto.Event{event(ev(1, proto.EventMessage, msg(llm.User, "a")))}})), proto.MethodEvents)
+	if p := params[proto.EventsQuery](t, more); p.After != 1 || c.Phase != Syncing {
+		t.Errorf("%+v %s", p, c.Phase)
+	}
+	c.Receive(resp(more.ID, proto.EventPage{Events: []proto.Event{event(ev(2, proto.EventMessage, msg(llm.User, "b")))}}))
+	if got := texts(c); len(got) != 2 || c.Phase != Ready {
+		t.Errorf("%v %s", got, c.Phase)
+	}
+}
+
+func TestBufferOverflowRereads(t *testing.T) {
+	c, events := connected(t, nil)
+	for i := range maxBuffered + 1 {
+		c.Receive(ev(int64(i+1), proto.EventMessage, msg(llm.User, "x")))
+	}
+	again := one(t, c.Receive(resp(events.ID, proto.EventPage{Events: []proto.Event{}})), proto.MethodEvents)
+	if p := params[proto.EventsQuery](t, again); p.After != 0 {
+		t.Errorf("%+v", p)
+	}
+}
+
+func TestDuplicatesIgnoredGapRereads(t *testing.T) {
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventMessage, msg(llm.User, "a")))})
+	if c.Receive(ev(1, proto.EventMessage, msg(llm.User, "a"))) != nil || len(c.Entries) != 1 {
+		t.Error("a duplicate was applied")
+	}
+	again := one(t, c.Receive(ev(3, proto.EventMessage, msg(llm.User, "c"))), proto.MethodEvents)
+	if p := params[proto.EventsQuery](t, again); p.After != 1 || c.Phase != Syncing {
+		t.Errorf("%+v %s", p, c.Phase)
+	}
+	c.Receive(resp(again.ID, proto.EventPage{Events: []proto.Event{
+		event(ev(2, proto.EventMessage, msg(llm.User, "b"))),
+		event(ev(3, proto.EventMessage, msg(llm.User, "c"))),
+	}}))
+	if got := texts(c); len(got) != 3 || got[1] != "user:b" || c.Phase != Ready {
+		t.Errorf("%v", got)
+	}
+}
+
+func TestToolsFromLogAndLive(t *testing.T) {
+	call := llm.Call("c1", "read_file", map[string]string{"path": "a.go"})
+	c, _ := connected(t, []proto.Event{
+		event(ev(1, proto.EventMessage, llm.Message{Role: llm.Assistant, Parts: []llm.Part{{Text: "Reading."}, {ToolCall: &call}}})),
+		event(ev(2, proto.EventMessage, llm.Message{Role: llm.User, Parts: []llm.Part{{ToolResult: &llm.ToolResult{CallID: "c1", Content: "1 package a"}}}})),
+	})
+	if got := texts(c); len(got) != 2 || got[1] != "tool:read_file" || c.Entries[1].Detail != "a.go" || !c.Entries[1].Done || c.Entries[1].Output != "1 package a" {
+		t.Fatalf("%v %+v", got, c.Entries[1])
+	}
+	shell := llm.Call("c2", "shell", map[string]string{"command": "go test"})
+	c.Receive(ev(3, proto.EventMessage, llm.Message{Role: llm.Assistant, Parts: []llm.Part{{ToolCall: &shell}}}))
+	c.Receive(ev(0, proto.EventToolStart, proto.ToolEvent{Call: shell}))
+	if e := c.Entries[2]; e.Done || e.Detail != "go test" || len(c.Entries) != 3 {
+		t.Errorf("%v %+v", texts(c), e)
+	}
+	c.Receive(ev(0, proto.EventToolEnd, proto.ToolEvent{Call: shell, Result: &llm.ToolResult{CallID: "c2", Content: "FAIL", IsError: true}}))
+	c.Receive(ev(4, proto.EventMessage, llm.Message{Role: llm.User, Parts: []llm.Part{{ToolResult: &llm.ToolResult{CallID: "c2", Content: "FAIL", IsError: true}}}}))
+	if e := c.Entries[2]; !e.Done || !e.Failed || len(c.Entries) != 3 {
+		t.Errorf("%v %+v", texts(c), e)
+	}
+}
+
+func TestApprovals(t *testing.T) {
+	c, _ := connected(t, []proto.Event{
+		event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventApprovalRequest, proto.Approval{ID: "a1", Tool: "edit_file"})),
+		event(ev(3, proto.EventApprovalResolved, proto.ApprovalAnswer{ApprovalID: "a1", Allow: true})),
+		event(ev(4, proto.EventApprovalRequest, proto.Approval{ID: "a2", Tool: "shell"})),
+	})
+	if len(c.Approvals) != 1 || c.Approvals[0].ID != "a2" || !c.Busy {
+		t.Fatalf("%+v", c.Approvals)
+	}
+	cmds, err := c.Answer("a2", true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := params[proto.ApprovalAnswer](t, cmds[0]); p.SessionID != sid || !p.Allow || !p.Always {
+		t.Errorf("%+v", p)
+	}
+	if _, err := c.Answer("a2", true, false); err == nil {
+		t.Error("answered twice")
+	}
+	c.Receive(errResp(cmds[0].ID, "not_found", "no approval a2 waiting"))
+	if c.Answering["a2"] {
+		t.Error("still answering after a failure")
+	}
+	cmds, _ = c.Answer("a2", false, false)
+	c.Receive(resp(cmds[0].ID, nil))
+	c.Receive(ev(5, proto.EventApprovalResolved, proto.ApprovalAnswer{ApprovalID: "a2"}))
+	if len(c.Approvals) != 0 || c.Answering["a2"] {
+		t.Errorf("%+v %v", c.Approvals, c.Answering)
+	}
+}
+
+func TestQueuedPrompt(t *testing.T) {
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil))})
+	cmds, err := c.Prompt("also this")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Receive(resp(cmds[0].ID, proto.PromptResult{Queued: true}))
+	if len(c.Queued) != 1 {
+		t.Fatal(c.Queued)
+	}
+	c.Receive(ev(2, proto.EventMessage, msg(llm.User, "also this")))
+	if len(c.Queued) != 0 {
+		t.Error(c.Queued)
+	}
+	cmds, _ = c.Cancel()
+	if p := params[proto.SessionRef](t, cmds[0]); p.SessionID != sid {
+		t.Error(p)
+	}
+	c.Receive(ev(3, proto.EventTurnEnd, proto.TurnEnd{Stopped: true}))
+	if _, err := c.Cancel(); err == nil || c.Entries[len(c.Entries)-1].Role != Notice {
+		t.Errorf("%v %v", err, texts(c))
+	}
+}
+
+func TestDisconnectThenReceipts(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	sent, _ := c.Prompt("hi")
+	c.ListModels("codex") // a read: not unknown
+	c.Disconnected(nil)
+	if len(c.Unknown) != 1 || c.Unknown[0].ID != sent[0].ID || c.Phase != Disconnected {
+		t.Fatalf("%+v", c.Unknown)
+	}
+	if _, err := c.Prompt("again"); err != ErrNotReady {
+		t.Error(err)
+	}
+	init := one(t, c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version, Instance: "i2"}), proto.MethodInitialize)
+	cmds := c.Receive(resp(init.ID, nil))
+	receipt := one(t, cmds, proto.MethodReceipt)
+	list := one(t, cmds, proto.MethodSessionList)
+	c.Receive(resp(receipt.ID, proto.Receipt{ID: sent[0].ID, Status: "unknown"}))
+	if c.Unknown[0].Outcome != "not received" {
+		t.Error(c.Unknown[0])
+	}
+	// The session shown before comes back, even if not the newest.
+	get := one(t, c.Receive(resp(list.ID, []proto.Session{sess("s2", "/w"), sess(sid, "/w")})), proto.MethodSessionGet)
+	if p := params[proto.SessionRef](t, get); p.SessionID != sid || c.Instance != "i2" {
+		t.Error(p)
+	}
+}
+
+func TestDeletedSessionShowsAnother(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	cmds, _ := c.Delete(sid)
+	list := one(t, c.Receive(resp(cmds[0].ID, nil)), proto.MethodSessionList)
+	get := one(t, c.Receive(resp(list.ID, []proto.Session{sess("s0", "/w")})), proto.MethodSessionGet)
+	if p := params[proto.SessionRef](t, get); p.SessionID != "s0" {
+		t.Error(p)
+	}
+	// Gone before it could be read: the list is read again.
+	list = one(t, c.Receive(errResp(get.ID, "not_found", "no session s0")), proto.MethodSessionList)
+	one(t, c.Receive(resp(list.ID, []proto.Session{})), proto.MethodSessionCreate)
+}
+
+func TestSessionUpdates(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	mode := "loose"
+	if _, err := c.Update(proto.SessionUpdate{Mode: &mode}); err == nil {
+		t.Error("bad mode accepted")
+	}
+	mode = "auto"
+	cmds, _ := c.Update(proto.SessionUpdate{Mode: &mode})
+	if p := params[proto.SessionUpdate](t, cmds[0]); p.SessionID != sid || *p.Mode != "auto" || p.Model != nil {
+		t.Errorf("%+v", p)
+	}
+	s := sess(sid, "/w")
+	s.Mode, s.Title = "auto", "Renamed"
+	c.Receive(ev(1, proto.EventSession, s))
+	other := ev(1, proto.EventSession, proto.Session{ID: "s7", Title: "new elsewhere"})
+	other.Event.SessionID = "s7"
+	c.Receive(other)
+	if c.Current.Mode != "auto" || c.Sessions[0].ID != "s7" {
+		t.Errorf("%+v %+v", c.Current, c.Sessions)
+	}
+	for _, x := range c.Sessions {
+		if x.ID == sid && x.Title != "Renamed" {
+			t.Errorf("%+v", x)
+		}
+	}
+}
+
+func TestOnlyLatestModelsKept(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	a, _ := c.ListModels("codex")
+	b, _ := c.ListModels("xai")
+	c.Receive(resp(b[0].ID, []proto.Model{{ID: "grok"}}))
+	c.Receive(resp(a[0].ID, []proto.Model{{ID: "gpt"}}))
+	if len(c.Models) != 1 || c.Models[0].ID != "grok" {
+		t.Error(c.Models)
 	}
 }

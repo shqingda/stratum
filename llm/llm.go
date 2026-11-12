@@ -46,53 +46,53 @@ const (
 // Message is one turn. Tool results travel in a user message, as every
 // provider's wire format puts them after the assistant's calls.
 type Message struct {
-	Role  Role
-	Parts []Part
+	Role  Role   `json:"role"`
+	Parts []Part `json:"parts"`
 }
 
 // Part is one piece of a message: exactly one of its fields is set.
 type Part struct {
-	Text       string
-	Thinking   *Thinking
-	Image      *Image
-	ToolCall   *ToolCall
-	ToolResult *ToolResult
+	Text       string      `json:"text,omitempty"`
+	Thinking   *Thinking   `json:"thinking,omitempty"`
+	Image      *Image      `json:"image,omitempty"`
+	ToolCall   *ToolCall   `json:"toolCall,omitempty"`
+	ToolResult *ToolResult `json:"toolResult,omitempty"`
 }
 
 // Thinking is reasoning the model showed. Signature (Anthropic) or Opaque
 // (OpenAI's encrypted reasoning) must go back unchanged in later turns.
 type Thinking struct {
-	Text      string
-	Signature string
-	Opaque    string
+	Text      string `json:"text,omitempty"`
+	Signature string `json:"signature,omitempty"`
+	Opaque    string `json:"opaque,omitempty"`
 	// Provider names whose wire format Signature and Opaque belong to;
 	// another provider drops them.
-	Provider string
+	Provider string `json:"provider,omitempty"`
 }
 
 // Image is an inline image.
 type Image struct {
-	MediaType string // image/png, image/jpeg…
-	Data      []byte
+	MediaType string `json:"mediaType"` // image/png, image/jpeg…
+	Data      []byte `json:"data"`
 }
 
 // ToolCall is the model asking to run a tool.
 type ToolCall struct {
-	ID   string
-	Name string
-	Args json.RawMessage // a JSON object
+	ID   string          `json:"id"`
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"` // a JSON object
 	// Signature is opaque provider state (Gemini's thought signature) that
 	// must go back with the call.
-	Signature string
+	Signature string `json:"signature,omitempty"`
 }
 
 // ToolResult answers a ToolCall.
 type ToolResult struct {
-	CallID  string
-	Name    string
-	Content string
-	Images  []Image
-	IsError bool
+	CallID  string  `json:"callId"`
+	Name    string  `json:"name"`
+	Content string  `json:"content"`
+	Images  []Image `json:"images,omitempty"`
+	IsError bool    `json:"isError,omitempty"`
 }
 
 // Tool is a tool offered to the model.
@@ -139,7 +139,11 @@ const (
 
 // Usage counts tokens; CacheRead and CacheWrite are parts of Input.
 type Usage struct {
-	Input, Output, CacheRead, CacheWrite, Reasoning int
+	Input      int `json:"input"`
+	Output     int `json:"output"`
+	CacheRead  int `json:"cacheRead,omitempty"`
+	CacheWrite int `json:"cacheWrite,omitempty"`
+	Reasoning  int `json:"reasoning,omitempty"`
 }
 
 // Add sums usage.

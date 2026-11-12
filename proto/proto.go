@@ -1,210 +1,272 @@
-// Package proto holds the Go side of Hikaro's JSONL RPC v2 wire format,
-// as packages/protocol/src/contracts.ts defines it. It decodes frames and
-// encodes commands; it keeps no state and never retries anything.
+// Package proto is Talos's protocol between a client (the app, a test)
+// and the kernel: JSON lines. A client sends commands; the kernel answers
+// each with a response and streams events.
+//
+// Every session keeps a log of durable events numbered by Seq, which is
+// also the session's revision. Streaming events (text as it is written)
+// have Seq 0 and are not kept. A client that reconnects reads a snapshot,
+// then the log after the revision it has.
 package proto
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"time"
+
+	"github.com/shqingda/talos/llm"
 )
 
-// Version is the protocol version this client speaks.
-const Version = 2
+// Version is the protocol version; initialize reports it.
+const Version = 1
 
-// MaxFrameBytes bounds one line of the wire, as the host does.
-const MaxFrameBytes = 1 << 20
+// MaxLine is the longest line either side sends.
+const MaxLine = 16 << 20
 
-// Command is one request line: {id, scope?, method, params}.
+// Command is a request from the client. ID names it, so that its receipt
+// can be looked up when the response was lost.
 type Command struct {
-	ID     string         `json:"id"`
-	Scope  string         `json:"scope,omitempty"`
-	Method string         `json:"method"`
-	Params map[string]any `json:"params"`
+	ID     string          `json:"id"`
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params,omitempty"`
 }
 
-// Encode returns the command as one line, with its trailing newline.
-func (c Command) Encode() ([]byte, error) {
-	if c.Params == nil {
-		c.Params = map[string]any{}
-	}
-	b, err := json.Marshal(c)
-	if err != nil {
-		return nil, err
-	}
-	if len(b)+1 > MaxFrameBytes {
-		return nil, fmt.Errorf("command %s is %d bytes, over the %d-byte frame limit", c.Method, len(b)+1, MaxFrameBytes)
-	}
-	return append(b, '\n'), nil
-}
-
-// Frame types the host sends.
+// Frame types.
 const (
-	TypeReady       = "ready"
-	TypeResponse    = "response"
-	TypeEvent       = "event"
-	TypeApproval    = "approval"
-	TypeResolved    = "approval.resolved"
-	TypeInvalidated = "session.invalidated"
+	FrameReady    = "ready"
+	FrameResponse = "response"
+	FrameEvent    = "event"
 )
 
-// Frame is any line the host sends. Fields that a type does not use are
-// left zero; Result keeps a response's result undecoded.
+// Frame is a line from the kernel.
 type Frame struct {
-	Type           string          `json:"type"`
-	ID             string          `json:"id,omitempty"`
-	Scope          string          `json:"scope,omitempty"`
-	Revision       uint64          `json:"revision,omitempty"`
-	HostInstanceID string          `json:"hostInstanceId,omitempty"`
-	ProtocolVer    int             `json:"protocolVersion,omitempty"`
-	Result         json.RawMessage `json:"result,omitempty"`
-	Error          string          `json:"error,omitempty"`
-	Event          *Event          `json:"event,omitempty"`
-	Request        *Permission     `json:"request,omitempty"`
-	Allow          *bool           `json:"allow,omitempty"`
+	Type string `json:"type"`
+	// ready
+	Version  int    `json:"version,omitempty"`
+	Instance string `json:"instance,omitempty"` // changes when the kernel restarts
+	// response
+	ID     string          `json:"id,omitempty"`
+	Result json.RawMessage `json:"result,omitempty"`
+	Error  *Error          `json:"error,omitempty"`
+	// event
+	Event *Event `json:"event,omitempty"`
 }
 
-// Event is an agent event as the host publishes it.
-type Event struct {
-	SessionID string         `json:"sessionId"`
-	Seq       uint64         `json:"seq"`
-	Type      string         `json:"type"`
-	Data      map[string]any `json:"data"`
-	Timestamp float64        `json:"timestamp"`
+// Error is a failed command.
+type Error struct {
+	Code    string `json:"code"` // bad_request, not_found, busy, internal
+	Message string `json:"message"`
 }
 
-// Permission is a pending approval request.
-type Permission struct {
-	ID                 string         `json:"id"`
-	SessionID          string         `json:"sessionId"`
-	AuthoritySessionID string         `json:"authoritySessionId,omitempty"`
-	Tool               string         `json:"tool"`
-	Reason             string         `json:"reason"`
-	Arguments          map[string]any `json:"arguments"`
-	Scope              string         `json:"scope,omitempty"`
+func (e *Error) Error() string { return e.Code + ": " + e.Message }
+
+// Errorf makes an Error.
+func Errorf(code, format string, args ...any) *Error {
+	return &Error{Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
-// Session is a session as the host projects it.
+// Methods.
+const (
+	MethodInitialize      = "initialize"       // → Hello
+	MethodSessionCreate   = "session.create"   // SessionCreate → Session
+	MethodSessionList     = "session.list"     // → []Session
+	MethodSessionGet      = "session.get"      // SessionRef → Snapshot
+	MethodSessionUpdate   = "session.update"   // SessionUpdate → Session
+	MethodSessionDelete   = "session.delete"   // SessionRef → {}
+	MethodPrompt          = "prompt"           // Prompt → PromptResult
+	MethodCancel          = "cancel"           // SessionRef → {}
+	MethodEvents          = "events"           // EventsQuery → EventPage
+	MethodApprovalRespond = "approval.respond" // ApprovalAnswer → {}
+	MethodAccounts        = "accounts.list"    // → []Account
+	MethodModels          = "models.list"      // ModelsQuery → []Model
+	MethodReceipt         = "receipt.get"      // ReceiptRef → Receipt
+)
+
+// Hello answers initialize.
+type Hello struct {
+	Version  int    `json:"version"`
+	Instance string `json:"instance"`
+}
+
+// Session is a conversation in a workspace.
 type Session struct {
-	ID             string          `json:"id"`
-	Title          string          `json:"title"`
-	Cwd            string          `json:"cwd"`
-	CreatedAt      float64         `json:"createdAt"`
-	ParentID       string          `json:"parentId,omitempty"`
-	ModelSelection *ModelSelection `json:"modelSelection,omitempty"`
+	ID      string    `json:"id"`
+	Title   string    `json:"title"`
+	Cwd     string    `json:"cwd"`
+	Account string    `json:"account"`
+	Model   string    `json:"model"`
+	Effort  string    `json:"effort,omitempty"`
+	Mode    string    `json:"mode"` // ask, auto, full
+	Created time.Time `json:"created"`
+	Updated time.Time `json:"updated"`
 }
 
-// ModelSelection names a provider's model.
-type ModelSelection struct {
-	Provider string `json:"provider"`
-	Model    string `json:"model"`
+// SessionCreate makes a session. Empty fields take defaults.
+type SessionCreate struct {
+	Cwd     string `json:"cwd"`
+	Title   string `json:"title,omitempty"`
+	Account string `json:"account,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Effort  string `json:"effort,omitempty"`
+	Mode    string `json:"mode,omitempty"`
 }
 
-// Snapshot is session.current's result: the scope's selected session and
-// its execution state as of Revision.
+// SessionRef names a session.
+type SessionRef struct {
+	SessionID string `json:"sessionId"`
+}
+
+// SessionUpdate changes the given fields of a session.
+type SessionUpdate struct {
+	SessionID string  `json:"sessionId"`
+	Title     *string `json:"title,omitempty"`
+	Account   *string `json:"account,omitempty"`
+	Model     *string `json:"model,omitempty"`
+	Effort    *string `json:"effort,omitempty"`
+	Mode      *string `json:"mode,omitempty"`
+}
+
+// Snapshot is a session's state at a revision.
 type Snapshot struct {
-	SessionRole     *string      `json:"sessionRole"`
-	Session         *Session     `json:"session"`
-	HostInstanceID  string       `json:"hostInstanceId"`
-	RunID           *string      `json:"runId"`
-	RunStatus       string       `json:"runStatus"`
-	Busy            bool         `json:"busy"`
-	Stream          string       `json:"stream"`
-	StreamTruncated bool         `json:"streamTruncated"`
-	Cursor          uint64       `json:"cursor"`
-	Revision        uint64       `json:"revision"`
-	Approvals       []Permission `json:"approvals"`
+	Session   Session    `json:"session"`
+	Revision  int64      `json:"revision"`
+	Running   bool       `json:"running"`
+	Queued    []string   `json:"queued,omitempty"`    // prompts waiting for the turn to take them
+	Approvals []Approval `json:"approvals,omitempty"` // waiting for the user
 }
 
-// Workspace is workspace.current's result.
-type Workspace struct {
-	Cwd            string `json:"cwd"`
-	PermissionMode string `json:"permissionMode"`
+// Prompt sends the user's message. While a turn runs, it joins that turn
+// after its current tool calls.
+type Prompt struct {
+	SessionID string `json:"sessionId"`
+	Text      string `json:"text"`
 }
 
-// Model is one entry of models.list.
+// PromptResult says what became of a prompt.
+type PromptResult struct {
+	Queued bool `json:"queued"` // joined the running turn
+}
+
+// EventsQuery reads a session's log after a revision.
+type EventsQuery struct {
+	SessionID string `json:"sessionId"`
+	After     int64  `json:"after"`
+	Limit     int    `json:"limit,omitempty"` // 500 when zero
+}
+
+// EventPage is part of a log.
+type EventPage struct {
+	Events []Event `json:"events"`
+	More   bool    `json:"more"`
+}
+
+// Event is something that happened in a session.
+type Event struct {
+	SessionID string          `json:"sessionId"`
+	Seq       int64           `json:"seq,omitempty"` // 0 for streaming events
+	Type      string          `json:"type"`
+	Data      json.RawMessage `json:"data,omitempty"`
+	At        time.Time       `json:"at"`
+}
+
+// Event types. Durable ones are kept in the log.
+const (
+	EventSession          = "session.updated"   // durable; Session
+	EventTurnStart        = "turn.start"        // durable; TurnStart
+	EventTurnEnd          = "turn.end"          // durable; TurnEnd
+	EventMessage          = "message"           // durable; llm.Message
+	EventApprovalRequest  = "approval.request"  // durable; Approval
+	EventApprovalResolved = "approval.resolved" // durable; ApprovalAnswer
+	EventTextDelta        = "text.delta"        // Delta
+	EventThinkingDelta    = "thinking.delta"    // Delta
+	EventToolStart        = "tool.start"        // ToolEvent
+	EventToolEnd          = "tool.end"          // ToolEvent
+	EventRetry            = "retry"             // Retry
+	EventUsage            = "usage"             // llm.Usage of one request
+)
+
+// TurnStart begins a turn.
+type TurnStart struct {
+	Text string `json:"text"`
+}
+
+// TurnEnd ends one. Error is empty for a turn that finished.
+type TurnEnd struct {
+	Usage   llm.Usage `json:"usage"`
+	Stopped bool      `json:"stopped,omitempty"` // the user cancelled
+	Error   string    `json:"error,omitempty"`
+}
+
+// Delta is streamed text.
+type Delta struct {
+	Text string `json:"text"`
+}
+
+// ToolEvent brackets a tool call.
+type ToolEvent struct {
+	Call   llm.ToolCall    `json:"call"`
+	Result *llm.ToolResult `json:"result,omitempty"`
+}
+
+// Retry says a request failed and is tried again.
+type Retry struct {
+	Attempt int    `json:"attempt"`
+	Error   string `json:"error"`
+}
+
+// Approval asks the user to allow a tool call.
+type Approval struct {
+	ID      string          `json:"id"`
+	Tool    string          `json:"tool"`
+	Args    json.RawMessage `json:"args"`
+	Kind    string          `json:"kind"` // read, write, exec
+	Paths   []string        `json:"paths,omitempty"`
+	Command string          `json:"command,omitempty"`
+	Reason  string          `json:"reason"`
+}
+
+// ApprovalAnswer is the user's answer. Always allows the tool for the rest
+// of the session.
+type ApprovalAnswer struct {
+	SessionID  string `json:"sessionId"`
+	ApprovalID string `json:"approvalId"`
+	Allow      bool   `json:"allow"`
+	Always     bool   `json:"always,omitempty"`
+}
+
+// Account is a signed-in provider account.
+type Account struct {
+	ID           string `json:"id"` // provider or provider/label
+	Provider     string `json:"provider"`
+	Name         string `json:"name"`
+	Email        string `json:"email,omitempty"`
+	Subscription bool   `json:"subscription"`
+}
+
+// ModelsQuery lists an account's models.
+type ModelsQuery struct {
+	Account string `json:"account"`
+}
+
+// Model is a model to pick.
 type Model struct {
-	Provider string `json:"provider"`
-	ID       string `json:"id"`
-	Name     string `json:"name"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Context   int     `json:"context"`
+	Reasoning bool    `json:"reasoning"`
+	Default   bool    `json:"default,omitempty"`
+	Input     float64 `json:"input"`  // dollars per million tokens
+	Output    float64 `json:"output"` // dollars per million tokens
 }
 
-// ModelPage is models.list's result.
-type ModelPage struct {
-	Items   []Model `json:"items"`
-	HasMore bool    `json:"hasMore"`
+// ReceiptRef names a command.
+type ReceiptRef struct {
+	ID string `json:"id"`
 }
 
-// StoredMessage is one item of messages.read.
-type StoredMessage struct {
-	Seq     uint64 `json:"seq"`
-	Message struct {
-		Role string `json:"role"`
-		Text string `json:"text"`
-	} `json:"message"`
-}
-
-// MessagePage is messages.read's result.
-type MessagePage struct {
-	Items    []StoredMessage `json:"items"`
-	HasOlder bool            `json:"hasOlder"`
-	HasNewer bool            `json:"hasNewer"`
-}
-
-// Receipt is a durable record of how the host handled a command.
+// Receipt says what became of a command.
 type Receipt struct {
 	ID     string `json:"id"`
 	Method string `json:"method"`
 	Status string `json:"status"` // accepted, completed, failed, unknown
 	Error  string `json:"error,omitempty"`
-}
-
-// PermissionModes are the workspace approval modes, as the TUI labels them.
-var PermissionModes = []string{"ask", "auto", "full"}
-
-// ErrUnknownType is returned for a frame whose type this client does not know.
-var ErrUnknownType = errors.New("unknown frame type")
-
-// Decode parses one line. It rejects malformed frames and those missing the
-// fields their type requires, so that state is only ever built from valid ones.
-func Decode(line []byte) (Frame, error) {
-	var f Frame
-	if len(line) > MaxFrameBytes {
-		return f, fmt.Errorf("frame of %d bytes is over the limit", len(line))
-	}
-	if err := json.Unmarshal(line, &f); err != nil {
-		return f, fmt.Errorf("malformed frame: %w", err)
-	}
-	switch f.Type {
-	case TypeReady:
-	case TypeResponse:
-		if f.ID == "" {
-			return f, errors.New("response without id")
-		}
-	case TypeEvent:
-		if f.Scope == "" || f.Event == nil || f.Event.SessionID == "" || f.Event.Type == "" {
-			return f, errors.New("event frame missing scope or event")
-		}
-	case TypeApproval:
-		if f.Scope == "" || f.Request == nil || f.Request.ID == "" {
-			return f, errors.New("approval frame missing scope or request")
-		}
-	case TypeResolved:
-		if f.Scope == "" || f.ID == "" || f.Allow == nil {
-			return f, errors.New("resolved frame missing scope, id or allow")
-		}
-	case TypeInvalidated:
-		if f.Scope == "" {
-			return f, errors.New("invalidated frame missing scope")
-		}
-	default:
-		return f, fmt.Errorf("%w %q", ErrUnknownType, f.Type)
-	}
-	return f, nil
-}
-
-// String reads a string field of an event's data.
-func (e *Event) String(key string) string {
-	s, _ := e.Data[key].(string)
-	return s
 }

@@ -30,6 +30,7 @@ commands:
   accounts           list signed-in accounts
   models [provider]  list models (* marks the default)
   chat               talk to a model; -h for flags
+  rpc                serve the kernel over stdio (JSON lines)
 `
 
 func main() {
@@ -52,6 +53,8 @@ func main() {
 		}
 	case "accounts":
 		err = accounts(store)
+	case "rpc", "--rpc":
+		err = serveRPC(ctx, store, args)
 	case "models":
 		err = models(ctx, args)
 	case "chat":
