@@ -1,0 +1,1 @@
+{"detail":"The 'gpt-5-nano' model is not supported when using Codex with a ChatGPT account.","error":{"type":"invalid_request_error","code":"model_not_found","message":"The 'gpt-5-nano' model is not supported when using Codex with a ChatGPT account."}}

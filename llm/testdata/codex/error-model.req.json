@@ -1,0 +1,1 @@
+{"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"Reply with exactly: Hello Talos.","type":"input_text"}],"role":"user"}],"instructions":"You are a helpful assistant. Answer briefly.","model":"talos-fixture-model-does-not-exist","parallel_tool_calls":true,"store":false,"stream":true,"text":{"verbosity":"low"},"tool_choice":"auto"}

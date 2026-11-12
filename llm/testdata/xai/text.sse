@@ -1,0 +1,60 @@
+event: response.created
+data: {"sequence_number":0,"type":"response.created","response":{"created_at":1794474323,"completed_at":null,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":0.95,"usage":null,"user":null,"incomplete_details":null,"status":"in_progress","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+
+event: response.in_progress
+data: {"sequence_number":1,"type":"response.in_progress","response":{"created_at":1794474323,"completed_at":null,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":0.95,"usage":null,"user":null,"incomplete_details":null,"status":"in_progress","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+
+event: response.output_item.added
+data: {"sequence_number":2,"type":"response.output_item.added","item":{"id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","summary":[],"type":"reasoning","status":"in_progress"},"output_index":0}
+
+event: response.reasoning_summary_part.added
+data: {"sequence_number":3,"type":"response.reasoning_summary_part.added","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"part":{"text":"","type":"summary_text"},"summary_index":0}
+
+event: response.reasoning_summary_text.delta
+data: {"sequence_number":4,"type":"response.reasoning_summary_text.delta","delta":"The user requested the","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"summary_index":0}
+
+event: response.reasoning_summary_text.delta
+data: {"sequence_number":5,"type":"response.reasoning_summary_text.delta","delta":" exact reply \"Hello ","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"summary_index":0}
+
+event: response.reasoning_summary_text.delta
+data: {"sequence_number":6,"type":"response.reasoning_summary_text.delta","delta":"Talos.\"","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"summary_index":0}
+
+event: response.reasoning_summary_text.done
+data: {"sequence_number":7,"type":"response.reasoning_summary_text.done","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"summary_index":0,"text":"The user requested the exact reply \"Hello Talos.\""}
+
+event: response.reasoning_summary_part.done
+data: {"sequence_number":8,"type":"response.reasoning_summary_part.done","item_id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":0,"part":{"text":"The user requested the exact reply \"Hello Talos.\"","type":"summary_text"},"summary_index":0}
+
+event: response.output_item.done
+data: {"sequence_number":9,"type":"response.output_item.done","item":{"id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","summary":[{"text":"The user requested the exact reply \"Hello Talos.\"","type":"summary_text"}],"type":"reasoning","status":"completed"},"output_index":0}
+
+event: response.output_item.added
+data: {"sequence_number":10,"type":"response.output_item.added","item":{"content":[],"id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","role":"assistant","type":"message","status":"in_progress"},"output_index":1}
+
+event: response.content_part.added
+data: {"sequence_number":11,"type":"response.content_part.added","content_index":0,"item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"part":{"type":"output_text","text":"","logprobs":[],"annotations":[]}}
+
+event: response.output_text.delta
+data: {"sequence_number":12,"type":"response.output_text.delta","content_index":0,"delta":"Hello","item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"logprobs":[]}
+
+event: response.output_text.delta
+data: {"sequence_number":13,"type":"response.output_text.delta","content_index":0,"delta":" Tal","item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"logprobs":[]}
+
+event: response.output_text.delta
+data: {"sequence_number":14,"type":"response.output_text.delta","content_index":0,"delta":"os","item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"logprobs":[]}
+
+event: response.output_text.delta
+data: {"sequence_number":15,"type":"response.output_text.delta","content_index":0,"delta":".","item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"logprobs":[]}
+
+event: response.output_text.done
+data: {"sequence_number":16,"type":"response.output_text.done","content_index":0,"item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"text":"Hello Talos.","logprobs":[]}
+
+event: response.content_part.done
+data: {"sequence_number":17,"type":"response.content_part.done","content_index":0,"item_id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","output_index":1,"part":{"type":"output_text","text":"Hello Talos.","logprobs":[],"annotations":[]}}
+
+event: response.output_item.done
+data: {"sequence_number":18,"type":"response.output_item.done","item":{"content":[{"type":"output_text","text":"Hello Talos.","logprobs":[],"annotations":[]}],"id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","role":"assistant","type":"message","status":"completed"},"output_index":1}
+
+event: response.completed
+data: {"sequence_number":19,"type":"response.completed","response":{"created_at":1794474323,"completed_at":1794474325,"id":"REDACTED_ACCOUNT","max_output_tokens":null,"model":"grok-build-0.1","object":"response","output":[{"id":"rs_7909e22d-3e5f-9190-a8eb-5504ce2715fd","summary":[{"text":"The user requested the exact reply \"Hello Talos.\"","type":"summary_text"}],"type":"reasoning","status":"completed"},{"content":[{"type":"output_text","text":"Hello Talos.","logprobs":[],"annotations":[]}],"id":"msg_7909e22d-3e5f-9190-a8eb-5504ce2715fd","role":"assistant","type":"message","status":"completed"}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"summary":null},"temperature":0.7,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":0.95,"usage":{"input_tokens":206,"input_tokens_details":{"cached_tokens":128},"output_tokens":335,"output_tokens_details":{"reasoning_tokens":331},"total_tokens":541,"num_sources_used":0,"num_server_side_tools_used":0,"cost_in_usd_ticks":7736000,"context_details":{"input_tokens":206,"output_tokens":343}},"user":null,"incomplete_details":null,"status":"completed","store":false,"metadata":{"system_fingerprint":"fp_1758720567b36303"},"background":false,"service_tier":"default","truncation":"disabled","top_logprobs":0,"presence_penalty":0.0,"frequency_penalty":0.0,"prompt_cache_key":null,"max_tool_calls":null,"safety_identifier":null,"error":null,"instructions":"You are a helpful assistant. Answer briefly."}}
+
