@@ -60,4 +60,4 @@
 ## 样稿
 
 - `brand-directions.html`：品牌方向的比较（已选 C）。
-- `mockups.html`：高保真样稿，包括主窗口与 Review、⌘K、设置、首次登录。其中的标志仍是旧的 T 形血脉，待换成新图标。
+- `mockups.html`：高保真样稿，包括主窗口与 Review、⌘K、设置、首次登录。
