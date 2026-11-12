@@ -358,3 +358,19 @@ func TestOnlyLatestModelsKept(t *testing.T) {
 		t.Error(c.Models)
 	}
 }
+
+// A model list that fails while a new session syncs leaves the sync alone.
+func TestModelsFailureDuringSync(t *testing.T) {
+	c := newClient("/w", "t")
+	c.Phase = Ready
+	c.Current = &proto.Session{ID: "s1"}
+	cmds, err := c.ListModels("chatgpt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Phase = Syncing
+	c.Receive(proto.Frame{Type: proto.FrameResponse, ID: cmds[0].ID, Error: proto.Errorf("test", "offline")})
+	if c.Phase != Syncing || c.Err != "" {
+		t.Fatalf("phase %v, err %q", c.Phase, c.Err)
+	}
+}

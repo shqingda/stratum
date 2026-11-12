@@ -721,6 +721,14 @@ func (c *Client) ListModels(account string) ([]proto.Command, error) {
 		_ = json.Unmarshal(r, &c.Models)
 		return nil
 	})
+	// The model list is never part of connecting: its failure, stale or
+	// not, must not end a handshake or sync that started after it.
+	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
+		if c.modelsReq == cmd.ID {
+			c.Models = nil // the app shows the error in its menu
+		}
+		return nil
+	}
 	c.modelsReq = cmd.ID
 	return []proto.Command{cmd}, nil
 }
