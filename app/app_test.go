@@ -13,7 +13,8 @@ import (
 	"github.com/shqingda/talos/proto"
 )
 
-var now = time.Date(2026, 11, 12, 15, 0, 0, 0, time.Local)
+var testZone = time.FixedZone("test-UTC+8", 8*60*60)
+var now = time.Date(2026, 11, 12, 15, 0, 0, 0, testZone)
 
 // working is a session at work: a prompt, steps, prose and an approval.
 func working() *App {
@@ -82,10 +83,18 @@ func snapshot(t *testing.T, tt *ui.Tester, name string) {
 	if dir == "" {
 		return
 	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	f, err := os.Create(filepath.Join(dir, name+".png"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
-	png.Encode(f, tt.Image())
+	if err := png.Encode(f, tt.Image()); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
