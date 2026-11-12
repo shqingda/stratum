@@ -151,6 +151,8 @@ type EventsQuery struct {
 	SessionID string `json:"sessionId"`
 	After     int64  `json:"after"`
 	Limit     int    `json:"limit,omitempty"` // 500 when zero
+	// --- 任务4 ---
+	Before int64 `json:"before,omitempty"`
 }
 
 // EventPage is part of a log.
@@ -269,4 +271,22 @@ type Receipt struct {
 	Method string `json:"method"`
 	Status string `json:"status"` // accepted, completed, failed, unknown
 	Error  string `json:"error,omitempty"`
+}
+
+// --- 任务4 ---
+
+const MethodSearch = "search"
+
+type SearchQuery struct {
+	Query     string `json:"query,omitempty"`
+	SessionID string `json:"sessionId,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
+}
+
+type SearchHit struct {
+	SessionID string    `json:"sessionId,omitempty"`
+	Seq       int64     `json:"seq,omitempty"`
+	Role      string    `json:"role,omitempty"`
+	Snippet   string    `json:"snippet,omitempty"`
+	At        time.Time `json:"at,omitempty"`
 }

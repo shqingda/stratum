@@ -159,6 +159,10 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		// --- 任务4 ---
+		if p.Before != 0 {
+			return s.Sessions.EventsBefore(ctx, p)
+		}
 		limit := p.Limit
 		if limit <= 0 || limit > 2000 {
 			limit = 500
@@ -209,5 +213,19 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		}
 		return proto.Receipt{ID: r.ID, Method: r.Method, Status: r.Status, Error: r.Error}, nil
 	}
+	// --- 任务4 ---
+	if cmd.Method == proto.MethodSearch {
+		return s.search(ctx, cmd)
+	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
+}
+
+// --- 任务4 ---
+
+func (s *Server) search(ctx context.Context, cmd proto.Command) (any, error) {
+	p, err := params[proto.SearchQuery](cmd)
+	if err != nil {
+		return nil, err
+	}
+	return s.Sessions.Search(ctx, p)
 }
