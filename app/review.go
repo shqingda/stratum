@@ -93,6 +93,9 @@ func (a *App) syncReview() {
 	if !a.C.CanAct() {
 		return
 	}
+	if a.C.Workspace.BranchStale {
+		a.quiet(a.C.ReadWorkspace())
+	}
 	ch := &a.C.Changes
 	// The list is read while the panel is closed too: finished turns say
 	// what they changed under them.

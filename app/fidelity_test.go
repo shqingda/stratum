@@ -39,6 +39,7 @@ func screen1() *App {
 	}
 	c.Entries = []*client.Entry{
 		{Key: 1, Role: client.User, Text: "Add 的测试挂了，帮我修一下；顺便看看 README 里的示例对不对", Done: true},
+		{Key: 20, Role: client.Thinking, Text: "先读 add.go 和测试，再看 README 的示例。", Done: true, Took: 6 * time.Second},
 		{Key: 2, Role: client.Tool, Text: "read_file", Detail: "add.go", CallID: "a", Done: true},
 		{Key: 3, Role: client.Tool, Text: "read_file", Detail: "add_test.go", CallID: "b", Done: true},
 		{Key: 4, Role: client.Tool, Text: "search", Detail: "Add(", CallID: "c", Done: true},
@@ -68,6 +69,9 @@ func screen1() *App {
 	}
 	a.rv.open = true
 	a.rv.sel = client.DiffKey(3, "add.go")
+	c.Models = []proto.Model{{ID: "gpt-6-luna", Context: 200000, Reasoning: true}}
+	c.LastInput = 36000
+	c.Workspace.Branch = "fix-add"
 	return a
 }
 
@@ -90,16 +94,17 @@ func screen2() *App {
 	c.Turns = []client.Turn{{Seq: 3, Start: now.Add(-48 * time.Second), End: now.Add(-10 * time.Second), Done: true,
 		Usage: llm.Usage{Input: 4100, Output: 182, CacheRead: 3200}}}
 	shell, _ := json.Marshal(map[string]string{"command": "go test ./..."})
-	es := c.Entries[:7]
-	es[3] = &client.Entry{Key: 9, Role: client.Tool, Text: "read_file", Detail: "README.md", CallID: "g", Done: true}
-	es[4], es[5], es[6] = c.Entries[5], c.Entries[6], &client.Entry{Key: 8, Role: client.Tool, Text: "shell", Detail: "go test ./...", CallID: "e", Done: true, Args: shell,
+	es := c.Entries[:8]
+	es[4] = &client.Entry{Key: 9, Role: client.Tool, Text: "read_file", Detail: "README.md", CallID: "g", Done: true}
+	es[5], es[6], es[7] = c.Entries[6], c.Entries[7], &client.Entry{Key: 8, Role: client.Tool, Text: "shell", Detail: "go test ./...", CallID: "e", Done: true, Args: shell,
 		Output: "=== RUN   TestAdd\n--- PASS: TestAdd (0.00s)\nok  \tcalc\t0.412s\n"}
 	c.Entries = append(es, &client.Entry{Key: 10, Role: client.Assistant, Done: true, Text: "修好了。`Add` 原来返回的是 `a - b`，改回 `a + b` 后测试全部通过：\n\n" +
 		"```输出\n=== RUN   TestAdd\n--- PASS: TestAdd (0.00s)\nok      calc    0.412s\n```\n\n另外两处顺手改了：\n\n" +
 		"- README 的示例输出从 `-1` 改为 `5`。\n- `Sub` 没有测试，我没动它；需要的话可以补一组表驱动测试。"})
 	c.Changes.Turns = []proto.ChangeTurn{{TurnSeq: 3, Files: []proto.ChangeFile{{Path: "add.go", Added: 1, Removed: 1}, {Path: "README.md", Added: 2, Removed: 2}}}}
 	a.draft = "再给 @sub.go 补一组表驱动测试"
-	a.opened["work:2"] = true
+	a.opened["work:20"] = true
+	c.LastInput = 42000
 	return a
 }
 

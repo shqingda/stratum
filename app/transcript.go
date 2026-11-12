@@ -60,6 +60,12 @@ func (a *App) bar(c *ui.Context) {
 			sym(c, "folder", 14, p.Mute)
 			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 		})
+		if b := a.C.Workspace.Branch; b != "" {
+			ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(1).MinWidth(0).Children(func() {
+				sym(c, "git-branch", 14, p.Mute)
+				ui.Text(c, b).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+			})
+		}
 		ui.Spacer(c)
 		a.reviewToggle(c)
 	})
@@ -322,7 +328,7 @@ func (a *App) thinking() bool {
 	}
 	if n := len(a.C.Entries); n > 0 {
 		e := a.C.Entries[n-1]
-		if !e.Done && (e.Role == client.Assistant || e.Role == client.Tool) {
+		if !e.Done && (e.Role == client.Assistant || e.Role == client.Tool || e.Role == client.Thinking) {
 			return false
 		}
 	}
@@ -446,6 +452,8 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 		a.card(c, e)
 	case client.Notice:
 		ui.Text(c, e.Text).FontSize(12).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
+	case client.Thinking:
+		a.thought(c, e)
 	}
 }
 

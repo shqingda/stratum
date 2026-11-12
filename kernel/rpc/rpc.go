@@ -222,6 +222,13 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 	if cmd.Method == proto.MethodSearch {
 		return s.search(ctx, cmd)
 	}
+	if cmd.Method == proto.MethodWorkspace {
+		p, err := params[proto.WorkspaceQuery](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return workspace(ctx, p.Cwd)
+	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
 }
 

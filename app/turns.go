@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
@@ -199,4 +200,92 @@ func (a *App) editLine(c *ui.Context, e *client.Entry, path, oldText, newText st
 		}
 	})
 	return open
+}
+
+// thought is the model's reasoning: "思考中" while it streams, then a
+// line, "思考了 6 秒", that opens to it.
+func (a *App) thought(c *ui.Context, e *client.Entry) {
+	p := a.p
+	if !e.Done {
+		a.running(c)
+		return
+	}
+	label := "思考过程"
+	if e.Took > 0 {
+		label = "思考了 " + span(e.Took)
+	}
+	key := fmt.Sprintf("thought:%d", e.Key)
+	open := a.opened[key]
+	row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label(label).Expanded(open)
+	if a.inWork {
+		row.Height(25).Gap(8)
+	}
+	if row.Clicked() {
+		open = !open
+		a.opened[key] = open
+	}
+	row.Children(func() {
+		if a.inWork {
+			// In a finished turn's work it is a step like the others.
+			ui.Box(c).Width(16).Center().Children(func() { sym(c, "bulb", 15, p.Mute) })
+			ui.Text(c, label).FontSize(12.5).TextColor(p.Fg2).SingleLine()
+		} else {
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+			ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		}
+		ui.Spacer(c)
+	})
+	if open {
+		ui.Text(c, strings.TrimSpace(e.Text)).FontSize(12.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
+	}
+}
+
+// rings are the context rings drawn, by percent and appearance.
+var rings = map[[2]int]*ui.SVG{}
+
+// contextRing says how much of the model's context the session fills,
+// as of the latest request this window saw.
+func (a *App) contextRing(c *ui.Context) {
+	p := a.p
+	cur := a.C.Current
+	if cur == nil || a.C.LastInput == 0 {
+		return
+	}
+	window := 0
+	for _, m := range a.C.Models {
+		if m.ID == cur.Model {
+			window = m.Context
+		}
+	}
+	if window == 0 {
+		return
+	}
+	pct := min(100, (a.C.LastInput*100+window/2)/window)
+	isDark := 0
+	if p == dark {
+		isDark = 1
+	}
+	key := [2]int{pct, isDark}
+	svg, ok := rings[key]
+	if !ok {
+		hex := func(col ui.Color) string {
+			return fmt.Sprintf("rgba(%d,%d,%d,%.3f)", col.R, col.G, col.B, float64(col.A)/255)
+		}
+		arc := p.Fg2
+		if pct >= 85 {
+			arc = p.Minus
+		}
+		// A circle of radius 6 on a 16 grid, its arc from the top, clockwise.
+		const circ = 2 * 3.14159265 * 6
+		doc := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">`+
+			`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6"/>`+
+			`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="%.2f %.2f" transform="rotate(-90 8 8)"/></svg>`,
+			hex(p.Edge2), hex(arc), circ*float64(pct)/100, circ)
+		svg = ui.MustParseSVG([]byte(doc))
+		rings[key] = svg
+	}
+	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(fmt.Sprintf("上下文已用 %s / %s", tokens(a.C.LastInput), tokens(window))).Children(func() {
+		ui.Image(c, svg).Size(14, 14)
+		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(11.5).TextColor(p.Mute).SingleLine()
+	})
 }

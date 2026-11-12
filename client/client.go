@@ -55,6 +55,7 @@ const (
 	Assistant Role = "assistant"
 	Tool      Role = "tool"
 	Notice    Role = "notice"
+	Thinking  Role = "thinking" // reasoning the model showed
 )
 
 // Entry is one row of the transcript.
@@ -70,6 +71,10 @@ type Entry struct {
 	Failed bool
 	Args   json.RawMessage // a tool call's original arguments
 	Turn   int             // index in Client.Turns of the turn it is in; -1 before any
+	// Took is how long a thinking entry streamed, 0 when it was read
+	// from the log.
+	Took time.Duration
+	at   time.Time // when a streaming thinking entry started
 }
 
 // Turn is one turn of the current session, as its log tells it.
@@ -118,8 +123,12 @@ type Client struct {
 	Answering map[string]bool
 	Usage     llm.Usage // of the current session's turns this connection saw end
 	Turns     []Turn    // of the current session, oldest first
+	// LastInput is the input tokens of the turn's latest request this
+	// connection saw: what of the context the session fills.
+	LastInput int
 
-	Changes Changes
+	Changes   Changes
+	Workspace Workspace
 
 	Accounts []proto.Account
 	Models   []proto.Model // of the account last asked about
@@ -133,6 +142,8 @@ type Client struct {
 	buffer    []proto.Event
 	overflow  bool
 	streaming *Entry
+	thinking  *Entry // the thinking entry streaming in
+	thought   *Entry // the streamed thinking entry its message has not yet sent whole
 	want      string // session to show on (re)connect
 	modelsReq string
 }
@@ -365,11 +376,13 @@ func (c *Client) bind(id string) proto.Command {
 
 func (c *Client) resetTranscript() {
 	c.Current, c.Entries, c.streaming, c.Turns = nil, nil, nil, nil
+	c.thinking, c.thought, c.LastInput = nil, nil, 0
 	c.Busy, c.Queued, c.Approvals, c.Usage = false, nil, nil, llm.Usage{}
 	clear(c.Answering)
 	c.buffer, c.overflow = nil, false
 	c.cursor = 0
 	c.resetChanges()
+	c.Workspace = Workspace{BranchStale: true}
 }
 
 // catchUp reads the current session's log after the cursor, page by page,
@@ -462,9 +475,25 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	case proto.EventTurnStart:
 		c.Busy = true
 		c.Turns = append(c.Turns, Turn{Seq: e.Seq, Start: e.At})
+	case proto.EventThinkingDelta:
+		var d proto.Delta
+		_ = json.Unmarshal(e.Data, &d)
+		if c.thinking == nil {
+			c.endStream()
+			c.thinking = c.add(&Entry{Role: Thinking, at: e.At})
+			c.thought = c.thinking
+		}
+		c.thinking.Text += d.Text
+		c.thinking.Took = e.At.Sub(c.thinking.at)
+	case proto.EventUsage:
+		var u llm.Usage
+		if json.Unmarshal(e.Data, &u) == nil {
+			c.LastInput = u.Input
+		}
 	case proto.EventTextDelta:
 		var d proto.Delta
 		_ = json.Unmarshal(e.Data, &d)
+		c.endThinking()
 		if c.streaming == nil {
 			c.streaming = c.add(&Entry{Role: Assistant})
 		}
@@ -505,6 +534,8 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		_ = json.Unmarshal(e.Data, &t)
 		c.endStream()
 		c.Busy, c.Queued, c.Approvals = false, nil, nil
+		c.thought = nil
+		c.Workspace.BranchStale = true // the turn may have switched it
 		clear(c.Answering)
 		c.Usage = c.Usage.Add(t.Usage)
 		if n := len(c.Turns); n > 0 && !c.Turns[n-1].Done {
@@ -537,6 +568,22 @@ func (c *Client) message(seq int64, m llm.Message) {
 			}
 		}
 	case llm.Assistant:
+		var thought strings.Builder
+		for _, p := range m.Parts {
+			if p.Thinking != nil {
+				thought.WriteString(p.Thinking.Text)
+			}
+		}
+		c.endThinking()
+		switch {
+		case c.thought != nil:
+			if thought.Len() > 0 {
+				c.thought.Text = thought.String()
+			}
+			c.thought = nil
+		case thought.Len() > 0:
+			c.add(&Entry{Seq: seq, Role: Thinking, Text: thought.String(), Done: true})
+		}
 		switch {
 		case c.streaming != nil:
 			c.streaming.Text, c.streaming.Done, c.streaming.Seq = text.String(), true, seq
@@ -589,7 +636,17 @@ func summarize(args map[string]any) string {
 	return ""
 }
 
+// endThinking ends the streaming thinking entry: it is done when text or
+// a tool call comes.
+func (c *Client) endThinking() {
+	if c.thinking != nil {
+		c.thinking.Done = true
+		c.thinking = nil
+	}
+}
+
 func (c *Client) endStream() {
+	c.endThinking()
 	if c.streaming != nil {
 		c.streaming.Done = true
 		c.streaming = nil

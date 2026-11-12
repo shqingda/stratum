@@ -62,6 +62,7 @@ func (a *App) box(c *ui.Context) {
 				a.modePill(c, modes[cur.Mode])
 			}
 			ui.Spacer(c)
+			a.contextRing(c)
 			a.goButton(c)
 		})
 	})
@@ -126,6 +127,9 @@ func (a *App) status(c *ui.Context) {
 			})
 		}
 		item("device-laptop", "本机")
+		if b := a.C.Workspace.Branch; b != "" {
+			item("git-branch", b)
+		}
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))
 		}

@@ -405,3 +405,67 @@ func TestTurns(t *testing.T) {
 		t.Errorf("turns of entries %v", got)
 	}
 }
+
+// TestThinking streams reasoning into an entry that ends when text comes,
+// timed by its events, and reads it back from the log untimed.
+func TestThinking(t *testing.T) {
+	at := func(f proto.Frame, s int) proto.Frame {
+		f.Event.At = time.Date(2026, 11, 12, 15, 0, s, 0, time.UTC)
+		return f
+	}
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil)), event(ev(2, proto.EventMessage, msg(llm.User, "hi")))})
+	c.Receive(at(ev(0, proto.EventThinkingDelta, proto.Delta{Text: "先看"}), 0))
+	c.Receive(at(ev(0, proto.EventThinkingDelta, proto.Delta{Text: "代码"}), 6))
+	c.Receive(at(ev(0, proto.EventTextDelta, proto.Delta{Text: "好"}), 7))
+	th := c.Entries[1]
+	if th.Role != Thinking || th.Text != "先看代码" || !th.Done || th.Took != 6*time.Second {
+		t.Fatalf("%+v", th)
+	}
+	c.Receive(ev(0, proto.EventUsage, llm.Usage{Input: 1200}))
+	if c.LastInput != 1200 {
+		t.Errorf("last input %d", c.LastInput)
+	}
+	reply := llm.Message{Role: llm.Assistant, Parts: []llm.Part{{Thinking: &llm.Thinking{Text: "先看代码。"}}, {Text: "好的"}}}
+	c.Receive(ev(3, proto.EventMessage, reply))
+	if len(c.Entries) != 3 || th.Text != "先看代码。" || c.Entries[2].Text != "好的" {
+		t.Fatalf("%v", texts(c))
+	}
+
+	c2, _ := connected(t, []proto.Event{
+		event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventMessage, msg(llm.User, "hi"))),
+		event(ev(3, proto.EventMessage, reply)),
+	})
+	if got := texts(c2); len(got) != 3 || got[1] != "thinking:先看代码。" || c2.Entries[1].Took != 0 {
+		t.Fatalf("%v", got)
+	}
+}
+
+// TestWorkspace reads the branch, keeps only the latest answer, and reads
+// it again after a turn.
+func TestWorkspace(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	if !c.Workspace.BranchStale {
+		t.Fatal("a new session's branch is not stale")
+	}
+	cmds, err := c.ReadWorkspace()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := one(t, cmds, proto.MethodWorkspace)
+	if p := params[proto.WorkspaceQuery](t, first); p.Cwd != "/w" {
+		t.Errorf("%+v", p)
+	}
+	cmds, _ = c.ReadWorkspace()
+	second := one(t, cmds, proto.MethodWorkspace)
+	c.Receive(resp(first.ID, proto.Workspace{Branch: "old"}))
+	c.Receive(resp(second.ID, proto.Workspace{Branch: "fix-add"}))
+	if c.Workspace.Branch != "fix-add" || c.Workspace.BranchStale {
+		t.Fatalf("%+v", c.Workspace)
+	}
+	c.Receive(ev(1, proto.EventTurnStart, nil))
+	c.Receive(ev(2, proto.EventTurnEnd, proto.TurnEnd{}))
+	if !c.Workspace.BranchStale {
+		t.Fatal("a turn's end did not make the branch stale")
+	}
+}

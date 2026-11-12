@@ -332,3 +332,16 @@ type SearchHit struct {
 	Snippet   string    `json:"snippet,omitempty"`
 	At        time.Time `json:"at,omitempty"`
 }
+
+// MethodWorkspace reads what a session's folder is in git.
+const MethodWorkspace = "workspace.info" // WorkspaceQuery → Workspace
+
+type WorkspaceQuery struct {
+	Cwd string `json:"cwd"`
+}
+
+// Workspace is a folder as git sees it. Branch is empty outside a
+// repository, and a short commit for a detached head.
+type Workspace struct {
+	Branch string `json:"branch,omitempty"`
+}
