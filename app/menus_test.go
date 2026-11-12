@@ -260,6 +260,23 @@ func TestTask8ModelMenuClosesOnSessionSwitch(t *testing.T) {
 	}
 }
 
+func TestTask8ModelFailureDoesNotDisconnectNewSession(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	task8Click(t, tt, "gpt-6-luna")
+	models := task8Command(t, a, proto.MethodModels, nil)
+	tt.Key(0, ui.KeyEscape)
+	tt.Key(ui.Cmd, ui.KeyN)
+	task8Command(t, a, proto.MethodSessionCreate, nil)
+	if a.C.Phase != client.Syncing {
+		t.Fatalf("new session phase = %v, want Syncing", a.C.Phase)
+	}
+	a.receive(proto.Frame{Type: proto.FrameResponse, ID: models.ID, Error: proto.Errorf("test", "旧模型列表请求失败")})
+	if a.C.Phase != client.Syncing {
+		t.Fatalf("unrelated models response changed new session phase to %v: %s", a.C.Phase, a.C.Err)
+	}
+}
+
 func TestTask8ModelStates(t *testing.T) {
 	for _, dark := range []bool{false, true} {
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
