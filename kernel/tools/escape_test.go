@@ -52,6 +52,7 @@ func TestFileToolsEscapeAccess(t *testing.T) {
 	for _, tool := range []*Tool{WriteFile, EditFile} {
 		for _, route := range []string{"file-link", "directory-link", "link-chain", "parent", "absolute"} {
 			t.Run(tool.Name+"/"+route, func(t *testing.T) {
+				tool := Set{tool}.Get(tool.Name)
 				env, outside := escapeDirs(t)
 				target := filepath.Join(outside, "file")
 				escapeFile(t, target, "before")
@@ -101,6 +102,7 @@ func TestFileToolsDanglingSymlinkAccess(t *testing.T) {
 	for _, tool := range []*Tool{WriteFile, EditFile} {
 		for _, route := range []string{"file-link", "directory-link", "link-chain"} {
 			t.Run(tool.Name+"/"+route, func(t *testing.T) {
+				tool := Set{tool}.Get(tool.Name)
 				env, outside := escapeDirs(t)
 				target := filepath.Join(outside, "missing")
 				escapeLink(t, target, filepath.Join(env.Root, "first"))
@@ -134,6 +136,7 @@ func TestFileToolsEscapeTOCTOU(t *testing.T) {
 	for _, tool := range []*Tool{WriteFile, EditFile} {
 		for _, route := range []string{"file-link", "directory-link"} {
 			t.Run(tool.Name+"/"+route, func(t *testing.T) {
+				tool := Set{tool}.Get(tool.Name)
 				env, outside := escapeDirs(t)
 				inside := filepath.Join(env.Root, "inside")
 				if err := os.Mkdir(inside, 0700); err != nil {
@@ -179,6 +182,7 @@ func TestFileToolsSensitiveAccess(t *testing.T) {
 	for _, tool := range []*Tool{ReadFile, WriteFile, EditFile} {
 		for _, path := range []string{".env", ".env.local", ".ssh/id_ed25519", ".git/config", ".aws/config", ".gnupg/config", ".talos/config", ".npmrc", ".netrc", "secrets.json", "credential.json", "api_token.txt", "password.txt", "server.pem", "server.key", "identity.p12"} {
 			t.Run(tool.Name+"/"+path, func(t *testing.T) {
+				tool := Set{tool}.Get(tool.Name)
 				req, err := tool.Access(env, escapeArgs(t, path))
 				if err != nil {
 					t.Fatal(err)

@@ -3,12 +3,12 @@ package tools
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/shqingda/talos/kernel/perm"
@@ -17,7 +17,7 @@ import (
 const maxRead = 256 << 10 // bytes read_file returns
 
 // ReadFile reads a text file, with line numbers, a window at a time.
-var ReadFile = &Tool{
+var ReadFile = fileTool(&Tool{
 	Name:        "read_file",
 	Description: "Read a text file with line numbers. Paths are relative to the workspace. Use offset and limit (lines) for large files.",
 	Schema: schema(`{"type":"object","properties":{
@@ -37,12 +37,15 @@ var ReadFile = &Tool{
 			Path          string
 			Offset, Limit int
 		}
-		decode("read_file", args, &a)
-		path, err := resolve(env, a.Path)
+		if err := decode("read_file", args, &a); err != nil {
+			return "", err
+		}
+		root, name, err := openFileParent(env, false)
 		if err != nil {
 			return "", err
 		}
-		b, err := os.ReadFile(path)
+		defer root.Close()
+		b, err := readFile(root, name)
 		if err != nil {
 			return "", err
 		}
@@ -79,10 +82,10 @@ var ReadFile = &Tool{
 		}
 		return out.String(), nil
 	},
-}
+})
 
 // WriteFile creates or replaces a file.
-var WriteFile = &Tool{
+var WriteFile = fileTool(&Tool{
 	Name:        "write_file",
 	Description: "Create a file, or replace one's whole content. Prefer edit_file to change part of a file.",
 	Schema: schema(`{"type":"object","properties":{
@@ -98,13 +101,16 @@ var WriteFile = &Tool{
 	},
 	Run: func(ctx context.Context, env Env, args json.RawMessage) (string, error) {
 		var a struct{ Path, Content string }
-		decode("write_file", args, &a)
-		path, err := resolve(env, a.Path)
+		if err := decode("write_file", args, &a); err != nil {
+			return "", err
+		}
+		root, name, err := openFileParent(env, true)
 		if err != nil {
 			return "", err
 		}
-		_, statErr := os.Stat(path)
-		if err := writeAtomic(path, []byte(a.Content)); err != nil {
+		defer root.Close()
+		_, statErr := root.Lstat(name)
+		if err := writeAtomic(root, name, []byte(a.Content)); err != nil {
 			return "", err
 		}
 		verb := "Wrote"
@@ -113,10 +119,10 @@ var WriteFile = &Tool{
 		}
 		return fmt.Sprintf("%s %s (%d lines)", verb, a.Path, strings.Count(a.Content, "\n")+1), nil
 	},
-}
+})
 
 // EditFile replaces text in a file.
-var EditFile = &Tool{
+var EditFile = fileTool(&Tool{
 	Name:        "edit_file",
 	Description: "Replace old_text with new_text in a file. old_text must match exactly, whitespace included, and occur once unless replace_all is set. Read the file first.",
 	Schema: schema(`{"type":"object","properties":{
@@ -139,18 +145,21 @@ var EditFile = &Tool{
 			NewText    string `json:"new_text"`
 			ReplaceAll bool   `json:"replace_all"`
 		}
-		decode("edit_file", args, &a)
+		if err := decode("edit_file", args, &a); err != nil {
+			return "", err
+		}
 		if a.OldText == "" {
 			return "", errors.New("old_text is empty; use write_file to create a file")
 		}
 		if a.OldText == a.NewText {
 			return "", errors.New("old_text and new_text are the same")
 		}
-		path, err := resolve(env, a.Path)
+		root, name, err := openFileParent(env, false)
 		if err != nil {
 			return "", err
 		}
-		b, err := os.ReadFile(path)
+		defer root.Close()
+		b, err := readFile(root, name)
 		if err != nil {
 			return "", err
 		}
@@ -166,15 +175,15 @@ var EditFile = &Tool{
 			n = 1
 		}
 		s = strings.Replace(s, a.OldText, a.NewText, n)
-		if err := writeAtomic(path, []byte(s)); err != nil {
+		if err := writeAtomic(root, name, []byte(s)); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("Edited %s (%d replacement%s)", a.Path, n, plural(n)), nil
 	},
-}
+})
 
 // ListDir lists a directory.
-var ListDir = &Tool{
+var ListDir = fileTool(&Tool{
 	Name:        "list_dir",
 	Description: "List a directory's entries; directories end in /. The path is relative to the workspace; \".\" is its root.",
 	Schema:      schema(`{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}`),
@@ -187,12 +196,15 @@ var ListDir = &Tool{
 	},
 	Run: func(ctx context.Context, env Env, args json.RawMessage) (string, error) {
 		var a struct{ Path string }
-		decode("list_dir", args, &a)
-		path, err := resolve(env, cmpOr(a.Path, "."))
+		if err := decode("list_dir", args, &a); err != nil {
+			return "", err
+		}
+		root, err := openDirectory(env.filePath, false)
 		if err != nil {
 			return "", err
 		}
-		entries, err := os.ReadDir(path)
+		defer root.Close()
+		entries, err := fs.ReadDir(root.FS(), ".")
 		if err != nil {
 			return "", err
 		}
@@ -213,34 +225,34 @@ var ListDir = &Tool{
 		}
 		return out.String(), nil
 	},
-}
+})
 
 // writeAtomic replaces a file through a temporary one, keeping its mode.
-func writeAtomic(path string, data []byte) error {
+func writeAtomic(root *os.Root, name string, data []byte) error {
 	mode := os.FileMode(0o644)
-	if fi, err := os.Stat(path); err == nil {
+	if fi, err := root.Lstat(name); err == nil {
+		if !fi.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular file", name)
+		}
 		mode = fi.Mode().Perm()
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), ".talos-*")
+	tmp := ".talos-" + rand.Text()
+	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
-	if _, err := f.Write(data); err != nil {
-		f.Close()
+	defer root.Remove(tmp)
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Chmod(mode)
+	}
+	err = errors.Join(err, f.Close())
+	if err != nil {
 		return err
 	}
-	if err := f.Chmod(mode); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(f.Name(), path)
+	return root.Rename(tmp, name)
 }
 
 func plural(n int) string {

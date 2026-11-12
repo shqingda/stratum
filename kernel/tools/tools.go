@@ -20,6 +20,7 @@ import (
 type Env struct {
 	Root      string // the workspace
 	Sandboxed bool   // commands run under the sandbox
+	filePath  string // canonical target bound by a file tool's Access call
 }
 
 // Tool is one tool.
@@ -31,7 +32,8 @@ type Tool struct {
 	// the arguments are malformed.
 	Access func(env Env, args json.RawMessage) (perm.Request, error)
 	// Run runs an approved call and returns what the model reads.
-	Run func(ctx context.Context, env Env, args json.RawMessage) (string, error)
+	Run     func(ctx context.Context, env Env, args json.RawMessage) (string, error)
+	newCall func() *Tool
 }
 
 // Spec is the tool as a model sees it.
@@ -47,11 +49,14 @@ func Default() Set {
 	return Set{ReadFile, WriteFile, EditFile, ListDir, Search, Shell, GitStatus, GitDiff}
 }
 
-// Get finds a tool by name.
+// Get finds a tool by name. File tools return an independent one-call instance.
 func (s Set) Get(name string) *Tool {
 	i := slices.IndexFunc(s, func(t *Tool) bool { return t.Name == name })
 	if i < 0 {
 		return nil
+	}
+	if s[i].newCall != nil {
+		return s[i].newCall()
 	}
 	return s[i]
 }
@@ -86,12 +91,6 @@ func pathAccess(name string, kind perm.Kind, env Env, path string) (perm.Request
 		return perm.Request{}, err
 	}
 	return perm.Request{Tool: name, Kind: kind, Paths: []workspace.Path{p}}, nil
-}
-
-// resolve returns the absolute path a call names.
-func resolve(env Env, path string) (string, error) {
-	p, err := workspace.Resolve(env.Root, path)
-	return p.Abs, err
 }
 
 // clip keeps output within limit bytes, keeping its head and tail, which
