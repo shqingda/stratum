@@ -23,6 +23,7 @@ const (
 // changed in files, and taking a turn's changes back.
 type review struct {
 	open  bool
+	tab   string // "", "term" or "plan"
 	all   bool   // every turn, not just the last
 	sel   string // client.DiffKey of the file shown
 	asked map[string]bool
@@ -168,15 +169,15 @@ func (a *App) reviewPanel(c *ui.Context) {
 	p := a.p
 	turns := a.shownTurns()
 	ui.Column(c).Width(reviewWidth).Shrink(0).Background(p.Pane).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge).Children(func() {
-		// Tabs: only the changes for now.
-		ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
-			ui.Row(c).Height(28).Padding(0, 10).Gap(6).Radius(7).Background(p.Sel).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, "变更").FontSize(12.5).FontWeight(500).TextColor(p.Fg)
-				if n := fileCount(turns); n > 0 {
-					ui.Text(c, fmt.Sprint(n)).FontSize(11).FontWeight(500).TextColor(p.Mute)
-				}
-			})
-		})
+		a.reviewTabs(c, fileCount(turns))
+		switch a.rv.tab {
+		case "term":
+			a.terminalPane(c)
+			return
+		case "plan":
+			a.planPane(c)
+			return
+		}
 		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 			a.scope(c)
 			ui.Spacer(c)

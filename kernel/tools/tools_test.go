@@ -113,3 +113,20 @@ func TestClip(t *testing.T) {
 		t.Error(c)
 	}
 }
+
+func TestUpdatePlan(t *testing.T) {
+	ctx := context.Background()
+	out, err := UpdatePlan.Run(ctx, Env{}, json.RawMessage(`{"steps":[{"step":"读代码","status":"done"},{"step":"改","status":"in_progress"}]}`))
+	if err != nil || out != "Plan updated: 1 of 2 steps done." {
+		t.Fatalf("%q %v", out, err)
+	}
+	for _, bad := range []string{`{"steps":[]}`, `{"steps":[{"step":"x","status":"later"}]}`, `{"steps":[{"step":" ","status":"done"}]}`} {
+		if _, err := UpdatePlan.Run(ctx, Env{}, json.RawMessage(bad)); err == nil {
+			t.Errorf("%s was taken", bad)
+		}
+	}
+	req, _ := UpdatePlan.Access(Env{}, nil)
+	if perm.Decide(perm.Ask, req, false) != perm.Allow {
+		t.Fatal("a plan asks the user")
+	}
+}

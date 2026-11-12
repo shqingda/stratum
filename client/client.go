@@ -625,7 +625,7 @@ func (c *Client) toolResult(r llm.ToolResult) {
 
 // summarize shows a tool call's most telling argument.
 func summarize(args map[string]any) string {
-	for _, k := range []string{"path", "command", "pattern", "query", "url"} {
+	for _, k := range []string{"path", "command", "pattern", "query", "url", "title"} {
 		if s, ok := args[k].(string); ok && s != "" {
 			if len(s) > 120 {
 				s = s[:117] + "…"

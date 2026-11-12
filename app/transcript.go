@@ -19,15 +19,16 @@ const columnWidth = 640
 
 // tools is how a tool call shows: its symbol and verb.
 var tools = map[string]struct{ symbol, verb string }{
-	"read_file":  {"file-text", "读取"},
-	"write_file": {"file-pencil", "写入"},
-	"edit_file":  {"pencil", "编辑"},
-	"list_dir":   {"folder", "列出"},
-	"search":     {"search", "搜索"},
-	"shell":      {"terminal-2", "运行"},
-	"git_status": {"git-branch", "git status"},
-	"git_diff":   {"plus-minus", "git diff"},
-	"skill":      {"sparkles", "技能"},
+	"read_file":   {"file-text", "读取"},
+	"write_file":  {"file-pencil", "写入"},
+	"edit_file":   {"pencil", "编辑"},
+	"list_dir":    {"folder", "列出"},
+	"search":      {"search", "搜索"},
+	"shell":       {"terminal-2", "运行"},
+	"git_status":  {"git-branch", "git status"},
+	"git_diff":    {"plus-minus", "git diff"},
+	"skill":       {"sparkles", "技能"},
+	"update_plan": {"list-check", "更新计划"},
 }
 
 var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令"}

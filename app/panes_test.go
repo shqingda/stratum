@@ -1,0 +1,46 @@
+package app
+
+import (
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
+)
+
+func TestTerminalAndPlan(t *testing.T) {
+	a := screen1()
+	a.rv.tab = "term"
+	es := a.C.Entries
+	es[len(es)-1].Output = "=== RUN   TestSub\n    sub_test.go:18: Sub(-2, 3) = 1, want -5\n--- FAIL: TestSub (0.00s)\nFAIL\tcalc\t0.391s\n"
+	plan, _ := json.Marshal(map[string]any{"title": "给 Sub 补表驱动测试", "steps": []map[string]string{
+		{"step": "读 sub.go 和现有测试", "status": "done"},
+		{"step": "写表驱动用例：正数、负数、零、溢出边界", "status": "done"},
+		{"step": "跑测试，修掉失败的用例", "status": "in_progress", "note": "负数用例失败：Sub(-2, 3) = 1，期望 -5"},
+		{"step": "更新 README 的 Sub 示例", "status": "pending"},
+	}})
+	a.C.Entries = append(es, &client.Entry{Key: 30, Role: client.Tool, Text: "update_plan", Detail: "给 Sub 补表驱动测试", CallID: "p", Args: plan, Done: true})
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.SetScale(2)
+	tt.SetDark(true)
+	tt.Frame()
+	tt.Advance(time.Second)
+	tt.Frame()
+	for _, want := range []string{"~/calc $", "go test ./... -run TestAdd -v", "--- FAIL: TestSub (0.00s)"} {
+		if !tt.HasText(want) {
+			t.Errorf("the terminal lacks %q", want)
+		}
+	}
+	snapshot(t, tt, "pane-term")
+	if err := tt.Click("计划"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	for _, want := range []string{"4 步 · 已完成 2 步", "跑测试，修掉失败的用例", "负数用例失败：Sub(-2, 3) = 1，期望 -5"} {
+		if !tt.HasText(want) {
+			t.Errorf("the plan lacks %q", want)
+		}
+	}
+	snapshot(t, tt, "pane-plan")
+}

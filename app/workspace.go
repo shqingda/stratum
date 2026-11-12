@@ -77,7 +77,7 @@ func (a *App) commitButton(c *ui.Context) {
 		}
 	})
 	if b.Clicked() {
-		a.rv.open = true
+		a.rv.open, a.rv.tab = true, ""
 		a.commitInput.Focus(c)
 	}
 }
