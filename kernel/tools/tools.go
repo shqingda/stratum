@@ -20,6 +20,9 @@ import (
 type Env struct {
 	Root      string // the workspace
 	Sandboxed bool   // commands run under the sandbox
+	// RecordChange records successful file-tool writes; shell changes are not recorded.
+	// A nil slice means a missing file; a non-nil empty slice means an empty file.
+	RecordChange func(path string, before, after []byte) error
 }
 
 // Tool is one tool.
