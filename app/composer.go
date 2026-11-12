@@ -26,14 +26,15 @@ func (a *App) dock(c *ui.Context) {
 	for i, q := range a.C.Queued {
 		ui.Row(c.Key(i)).Height(34).Padding(0, 6, 0, 12).Margin(0, 10, -1, 10).Gap(8).AlignItems(ui.Center).
 			Radius(10, 10, 0, 0).Background(p.Pane).Border(.5, p.Edge).Children(func() {
-			sym(c, "arrow.turn.down.right", 12, p.Mute)
+			sym(c, "corner-down-right", 14, p.Mute)
 			ui.Text(c, q).FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		})
 	}
 	a.box(c)
-	if a.err != "" {
+	switch {
+	case a.err != "":
 		ui.Text(c, a.err).FontSize(11.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
-	} else {
+	case !a.helloShown():
 		a.status(c)
 	}
 }
@@ -77,7 +78,7 @@ func (a *App) submit() {
 	}
 }
 
-func (a *App) pill(c *ui.Context, key, symbol, label string) ui.Element {
+func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 8).Gap(5).Radius(7).AlignItems(ui.Center).Label(label)
 	if b.Hovered() {
@@ -85,10 +86,12 @@ func (a *App) pill(c *ui.Context, key, symbol, label string) ui.Element {
 	}
 	b.Children(func() {
 		if symbol != "" {
-			sym(c, symbol, 14, p.Fg2)
+			sym(c, symbol, 15, p.Fg2)
 		}
 		ui.Text(c, label).FontSize(12.5).TextColor(p.Fg2).SingleLine()
-		sym(c, "chevron.down", 10, p.Mute)
+		if chevron {
+			sym(c, "chevron-down", 12, p.Mute)
+		}
 	})
 	return b
 }
@@ -104,9 +107,9 @@ func (a *App) goButton(c *ui.Context) {
 			a.do(a.C.Cancel())
 		}
 	case strings.TrimSpace(a.draft) == "" || !a.C.CanAct():
-		b.Label("发送").Background(p.Chip).Children(func() { sym(c, "arrow.up", 14, p.Mute).Weight(1) })
+		b.Label("发送").Background(p.Chip).Children(func() { sym(c, "arrow-up", 16, p.Mute) })
 	default:
-		b.Label("发送").Background(p.Acc).Children(func() { sym(c, "arrow.up", 14, p.OnAcc).Weight(1) })
+		b.Label("发送").Background(p.Acc).Children(func() { sym(c, "arrow-up", 16, p.OnAcc) })
 		if b.Clicked() {
 			a.submit()
 		}
@@ -118,13 +121,13 @@ func (a *App) status(c *ui.Context) {
 	ui.Row(c).Gap(14).Justify(ui.Center).Margin(8, 0, 0, 0).Children(func() {
 		item := func(symbol, label string) {
 			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-				sym(c, symbol, 11, p.Mute)
+				sym(c, symbol, 13, p.Mute)
 				ui.Text(c, label).FontSize(11.5).TextColor(p.Mute).SingleLine()
 			})
 		}
-		item("laptopcomputer", "本机")
+		item("device-laptop", "本机")
 		if a.C.Phase != client.Ready {
-			item("bolt.horizontal", phaseText(a.C.Phase))
+			item("refresh", phaseText(a.C.Phase))
 		}
 		item("lock", "沙箱开启")
 	})

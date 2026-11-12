@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +59,19 @@ func TestAgainstKernel(t *testing.T) {
 		t.Fatal(err)
 	}
 	until("the reply", func() bool { return !a.C.Busy && tt.HasText("已经") })
-	for _, want := range []string{"把 todo 标成完成", "读取", "写入", "notes.txt"} {
+	// The finished turn folds its work, and says under it what it changed.
+	until("the summary", func() bool { return tt.HasText("改了 1 个文件") })
+	work := ""
+	for _, s := range tt.Texts() {
+		if strings.HasPrefix(s, "工作了") {
+			work = s
+		}
+	}
+	if err := tt.Click(work); err != nil {
+		t.Fatalf("no work fold: %v %q", err, tt.Texts())
+	}
+	tt.Frame()
+	for _, want := range []string{"把 todo 标成完成", "读取", "写入", "notes.txt", "我先看看"} {
 		if !tt.HasText(want) {
 			t.Errorf("no %q in %q", want, tt.Texts())
 		}

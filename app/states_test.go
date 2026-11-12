@@ -105,6 +105,7 @@ func TestStateMatrix(t *testing.T) {
 			for i := range 30 {
 				a.C.Entries = append(a.C.Entries, &client.Entry{Key: i + 1, Role: client.Tool, Text: "read_file", Detail: fmt.Sprintf("src/file-%02d.go", i+1), CallID: fmt.Sprint(i), Done: true})
 			}
+			a.opened["fold:0"] = true // the run folds; this state shows it open
 		}, want: []string{"读取"}, scroll: "transcript"},
 		{name: "transcript-failed-tool", setup: func(a *App) {
 			e := stateTool()

@@ -161,6 +161,10 @@ func editReplacements(output, path string) int {
 
 func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, note string) {
 	p := a.p
+	// In a finished turn's work an edit is one line that opens to its card.
+	if a.inWork && !a.editLine(c, e, path, oldText, newText) {
+		return
+	}
 	box := ui.Column(c.Key("card:"+e.CallID)).Margin(10, 0).Radius(10).Background(p.Card).InsetShadow(0, 0, 0, .5, p.Edge2).Clip()
 	diff := ui.Local(box, "diff", func() cardDiff { return cardDiff{} })
 	if diff.lines == nil || diff.oldText != oldText || diff.newText != newText {
@@ -194,7 +198,7 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 			ui.Text(c, fmt.Sprintf("−%d", diff.removed)).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0)
 			ui.Spacer(c)
 			ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label("撤销 " + path).Disabled(true).DimDisabled(false).Tooltip("撤销尚未接入").Children(func() {
-				sym(c, "arrow.uturn.backward", 15, p.Fg2)
+				sym(c, "arrow-back-up", 15, p.Fg2)
 				ui.Text(c, "撤销").FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
 			})
 		})
@@ -209,9 +213,9 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 			for _, line := range lines[:limit] {
 				bg, signColor := ui.Transparent, p.Mute
 				if line.sign == "+" {
-					bg, signColor = p.Plus.Alpha(.08), p.Plus
+					bg, signColor = p.Plus.Alpha(.10), p.Plus
 				} else if line.sign == "−" {
-					bg, signColor = p.Minus.Alpha(.08), p.Minus
+					bg, signColor = p.Minus.Alpha(.10), p.Minus
 				}
 				ui.Row(c).Height(20).Children(func() {
 					ui.Text(c, strconv.Itoa(line.number)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(12).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End).Tooltip("参数文本中的行号")
@@ -257,7 +261,7 @@ func (a *App) cardStep(c *ui.Context, e *client.Entry, summary string, failed bo
 		}
 		ui.Text(c, summary).FontSize(11.5).TextColor(color).SingleLine().Shrink(0)
 		if row.Hovered() {
-			sym(c, map[bool]string{true: "chevron.down", false: "chevron.right"}[open], 10, p.Mute)
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
 		}
 	})
 	return open
@@ -285,7 +289,7 @@ func shellTail(output string) (lines []string, omitted int, exit string) {
 
 func (a *App) shellCard(c *ui.Context, e *client.Entry) {
 	lines, omitted, exit := shellTail(e.Output)
-	summary := ""
+	summary := "通过"
 	if exit != "" {
 		summary = "退出码 " + exit
 	}

@@ -17,7 +17,19 @@ func (a *App) keys(c *ui.Context) {
 			a.do(a.C.NewSession())
 		}
 	})
-	c.OnWindowShortcut(ui.Cmd, ui.KeyK, func() { a.searchInput.Focus(c) })
+	c.OnWindowShortcut(ui.Cmd, ui.KeyK, func() {
+		if a.noSide {
+			a.noSide = false // the search is in the sidebar; it focuses once shown
+			c.After(0)
+			return
+		}
+		a.searchInput.Focus(c)
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyBackslash, func() {
+		if !c.ShortcutRepeated() {
+			a.noSide = !a.noSide
+		}
+	})
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {
 		if i < len(a.visibleSessions) {
 			id := a.visibleSessions[i]

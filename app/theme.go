@@ -17,6 +17,7 @@ type Palette struct {
 var (
 	ink  = ui.Hex("#12131A")
 	mist = ui.Hex("#E8EAEF")
+	haze = ui.Hex("#A9B1C1") // dark lines and fills are this, faint
 
 	light = &Palette{
 		Bg: ui.Hex("#F4F5F7"), Side: ui.RGBA(234, 236, 240, .92), Pane: ui.Hex("#FBFBFC"), Card: ui.Hex("#FFFFFF"),
@@ -29,7 +30,7 @@ var (
 	dark = &Palette{
 		Bg: ui.Hex("#12131A"), Side: ui.RGBA(23, 25, 34, .94), Pane: ui.Hex("#15161E"), Card: ui.Hex("#1C1E28"),
 		Fg: mist, Fg2: ui.Hex("#A9B1C1"), Mute: ui.Hex("#6E7587"), Faint: ui.Hex("#454A58"),
-		Edge: mist.Alpha(.10), Edge2: mist.Alpha(.16), Sel: mist.Alpha(.09), Hover: mist.Alpha(.05), Chip: mist.Alpha(.08),
+		Edge: haze.Alpha(.10), Edge2: haze.Alpha(.16), Sel: haze.Alpha(.09), Hover: haze.Alpha(.05), Chip: haze.Alpha(.08),
 		Acc: mist, OnAcc: ui.Hex("#12131A"),
 		Live: ui.Hex("#7AA8EA"), LiveBg: ui.Hex("#7AA8EA").Alpha(.10),
 		Plus: ui.Hex("#7DB89A"), Minus: ui.Hex("#DD878B"),

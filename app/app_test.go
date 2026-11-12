@@ -66,7 +66,11 @@ func TestViews(t *testing.T) {
 			tt.SetDark(tc.dark)
 			tt.SetTitleBar(ui.TitleBar{Left: 78, Height: 52})
 			tt.Frame()
-			for _, want := range []string{"新会话", "定时任务", "本机"} {
+			wants := []string{"新会话", "定时任务", "本机"}
+			if tc.name == "empty-light" {
+				wants = []string{"新会话", "定时任务", "在 calc 里做点什么"} // an empty session shows no status line
+			}
+			for _, want := range wants {
 				if !tt.HasText(want) {
 					t.Errorf("no %q in %q", want, tt.Texts())
 				}
@@ -96,5 +100,27 @@ func snapshot(t *testing.T, tt *ui.Tester, name string) {
 	}
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestFoldAndAsked folds a run of browsing steps into one line that opens,
+// and shows a step waiting on an approval only as the approval.
+func TestFoldAndAsked(t *testing.T) {
+	a := working()
+	a.C.Entries[len(a.C.Entries)-1].Args = a.C.Approvals[0].Args
+	tt := ui.NewTester(a.View, 1200, 780)
+	tt.Frame()
+	if !tt.HasText("浏览了 ") || !tt.HasText("搜索 ") || tt.HasText("add_test.go") {
+		t.Fatalf("steps did not fold: %q", tt.Texts())
+	}
+	if tt.HasText("运行 go test") {
+		t.Errorf("the step waiting on the approval shows: %q", tt.Texts())
+	}
+	if err := tt.Click("展开步骤"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !tt.HasText("add_test.go") {
+		t.Errorf("fold did not open: %q", tt.Texts())
 	}
 }

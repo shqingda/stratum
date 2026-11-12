@@ -45,6 +45,9 @@ type App struct {
 	list   ui.ListState // the transcript
 	md     markdown.Options
 	opened map[string]bool // tool calls whose output shows
+	inWork bool            // building a finished turn's folded work
+	noSide bool            // the sidebar is hidden
+	stats  map[string][2]int
 	rv     review
 	seen   map[string]time.Time // when approvals first showed
 
@@ -125,6 +128,14 @@ func (a *App) do(cmds []proto.Command, err error) {
 	a.send(cmds)
 }
 
+// quiet sends what the app asked for by itself, leaving the error of the
+// user's last action as it is.
+func (a *App) quiet(cmds []proto.Command, err error) {
+	if err == nil {
+		a.send(cmds)
+	}
+}
+
 // View builds a frame of the window.
 func (a *App) View(c *ui.Context) {
 	a.syncMenus()
@@ -137,7 +148,9 @@ func (a *App) View(c *ui.Context) {
 		c.Root().Background(ui.Transparent)
 	}
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
-		a.sidebar(c, vibrant)
+		if !a.noSide {
+			a.sidebar(c, vibrant)
+		}
 		a.main(c)
 	})
 	a.keys(c)

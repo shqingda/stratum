@@ -61,7 +61,7 @@ func (a *App) modelPill(c *ui.Context, label string) {
 	if a.modelsAccount != a.modelAccount() {
 		a.modelsRequested = false
 	}
-	a.pill(c, "model", "", label).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	a.pill(c, "model", "", label, true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		if !a.modelsRequested {
 			a.modelsRequested = true
 			a.modelsAccount, a.modelsError = a.modelAccount(), ""
@@ -136,7 +136,7 @@ func (a *App) effortPill(c *ui.Context, label string) {
 		container.Tooltip("这个模型不支持思考强度")
 	}
 	container.Children(func() {
-		b := a.pill(c, "effort", "brain", label).Disabled(!a.C.CanAct() || unsupported)
+		b := a.pill(c, "effort", "brain", label, false).Disabled(!a.C.CanAct() || unsupported)
 		if unsupported {
 			b.Description("这个模型不支持思考强度")
 		}
@@ -151,7 +151,7 @@ func (a *App) effortPill(c *ui.Context, label string) {
 }
 
 func (a *App) modePill(c *ui.Context, label string) {
-	a.pill(c, "mode", "shield.lefthalf.filled", label).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	a.pill(c, "mode", "shield-half", label, false).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		for _, mode := range []struct{ id, description string }{
 			{"ask", "写文件和运行命令前问你"},
 			{"auto", "沙箱内自动允许"},

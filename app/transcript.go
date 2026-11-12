@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,14 +19,14 @@ const columnWidth = 640
 
 // tools is how a tool call shows: its symbol and verb.
 var tools = map[string]struct{ symbol, verb string }{
-	"read_file":  {"doc.text", "读取"},
-	"write_file": {"square.and.pencil", "写入"},
+	"read_file":  {"file-text", "读取"},
+	"write_file": {"file-pencil", "写入"},
 	"edit_file":  {"pencil", "编辑"},
 	"list_dir":   {"folder", "列出"},
-	"search":     {"magnifyingglass", "搜索"},
-	"shell":      {"terminal", "运行"},
-	"git_status": {"arrow.triangle.branch", "git status"},
-	"git_diff":   {"plusminus", "git diff"},
+	"search":     {"search", "搜索"},
+	"shell":      {"terminal-2", "运行"},
+	"git_status": {"git-branch", "git status"},
+	"git_diff":   {"plus-minus", "git diff"},
 	"skill":      {"sparkles", "技能"},
 }
 
@@ -35,15 +36,28 @@ var modes = map[string]string{"ask": "询问", "auto": "自动", "full": "完全
 
 func (a *App) bar(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, 20).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
+	left := float32(20)
+	if a.noSide {
+		left = c.TitleBar().Left + 18
+	}
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
+		if a.noSide {
+			if a.iconButton(c, "side", "layout-sidebar-left-expand", "显示边栏").Clicked() {
+				a.noSide = false
+			}
+			ui.Box(c).Width(4)
+		}
 		cur := a.C.Current
 		if cur == nil {
 			ui.Text(c, phaseText(a.C.Phase)).FontSize(13.5).FontWeight(600).TextColor(p.Mute)
 			return
 		}
+		if a.helloShown() {
+			return // the middle of the window says what the session is
+		}
 		ui.Text(c, title(*cur)).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
-			sym(c, "folder", 12, p.Mute)
+			sym(c, "folder", 14, p.Mute)
 			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 		})
 		ui.Spacer(c)
@@ -57,12 +71,10 @@ func (a *App) transcript(c *ui.Context) {
 		a.empty(c)
 		return
 	}
+	items := a.items()
 	a.list.Key = func(i int) any {
-		switch {
-		case i < len(a.C.Entries):
-			return a.C.Entries[i].Key
-		case i < len(a.C.Entries)+len(a.C.Approvals):
-			return "ask:" + a.C.Approvals[i-len(a.C.Entries)].ID
+		if i < len(items) {
+			return items[i].key()
 		}
 		return "running"
 	}
@@ -70,17 +82,29 @@ func (a *App) transcript(c *ui.Context) {
 	a.list.FollowAnimation = &ui.Smooth
 	a.md.Theme = mdTheme(p, c.Theme())
 	a.md.CodeBlock = a.codeBlock
-	live := a.liveFrom()
-	list := ui.List(c, &a.list, a.rows(), func(i int) {
+	n := len(items)
+	if a.thinking() {
+		n++
+	}
+	list := ui.List(c, &a.list, n, func(i int) {
 		ui.Row(c).Justify(ui.Center).Padding(0, 28).Children(func() {
 			ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() {
-				switch {
-				case i < len(a.C.Entries):
-					a.entry(c, a.C.Entries[i], live >= 0 && i >= live)
-				case i < len(a.C.Entries)+len(a.C.Approvals):
-					a.turn(c, true, func() { a.ask(c, a.C.Approvals[i-len(a.C.Entries)]) })
-				default:
+				if i >= len(items) {
 					a.turn(c, true, func() { a.running(c) })
+					return
+				}
+				it := items[i]
+				switch {
+				case it.ap != nil:
+					a.turn(c, true, func() { a.ask(c, *it.ap) })
+				case it.fold != nil:
+					a.turn(c, it.live, func() { a.fold(c, it.fold) })
+				case it.work != nil:
+					a.turn(c, false, func() { a.work(c, it.work, it.done) })
+				case it.sum:
+					a.turn(c, false, func() { a.summary(c, it.done) })
+				default:
+					a.entry(c, it.e, it.live)
 				}
 			})
 		})
@@ -92,14 +116,202 @@ func (a *App) transcript(c *ui.Context) {
 	}
 }
 
-// rows are the entries, the approvals after them, and a row saying the
-// turn is at work while nothing else shows it.
-func (a *App) rows() int {
-	n := len(a.C.Entries) + len(a.C.Approvals)
-	if a.thinking() {
-		n++
+// item is a row of the transcript: an entry, a fold of steps that only
+// looked around, or an approval.
+type item struct {
+	e    *client.Entry
+	fold []*client.Entry
+	ap   *proto.Approval
+	live bool
+	// A finished turn shows its work folded, then its last words, then
+	// what it changed: work holds the steps, done the turn's index.
+	work []*client.Entry
+	done int
+	sum  bool
+}
+
+func (it item) key() any {
+	switch {
+	case it.ap != nil:
+		return "ask:" + it.ap.ID
+	case it.fold != nil:
+		return "fold:" + it.fold[0].CallID
+	case it.work != nil:
+		return fmt.Sprintf("work:%d", it.work[0].Key)
+	case it.sum:
+		return fmt.Sprintf("sum:%d", it.done)
 	}
-	return n
+	return it.e.Key
+}
+
+// browsing are the tools that only look around: runs of them fold into
+// one line.
+var browsing = map[string]bool{"read_file": true, "list_dir": true, "search": true, "git_status": true, "git_diff": true}
+
+// items are the rows the transcript shows: a finished turn's steps fold
+// into one line, runs of two or more finished browsing steps fold, and a
+// step waiting on an approval shows only as the approval.
+func (a *App) items() []item {
+	es := a.C.Entries
+	live := a.liveFrom()
+	asked := map[*client.Entry]bool{}
+	for _, ap := range a.C.Approvals {
+		for i := len(es) - 1; i >= 0; i-- {
+			e := es[i]
+			if e.Role == client.Tool && !e.Done && e.Text == ap.Tool && !asked[e] &&
+				(len(e.Args) == 0 || compact(e.Args) == compact(ap.Args)) {
+				asked[e] = true
+				break
+			}
+		}
+	}
+	var out []item
+	for i := 0; i < len(es); {
+		e := es[i]
+		if t := e.Turn; e.Role == client.User && t >= 0 && t < len(a.C.Turns) && a.C.Turns[t].Done {
+			j := i + 1
+			for j < len(es) && es[j].Turn == t && es[j].Role != client.User {
+				j++
+			}
+			out = append(out, item{e: e})
+			out = append(out, a.finished(es[i+1:j], t)...)
+			i = j
+			continue
+		}
+		var run []item
+		run, i = a.row(es, i, live, asked)
+		out = append(out, run...)
+	}
+	for i := range a.C.Approvals {
+		out = append(out, item{ap: &a.C.Approvals[i]})
+	}
+	return out
+}
+
+// row is the row that starts at es[i], a fold of browsing steps or an
+// entry, and the index after it.
+func (a *App) row(es []*client.Entry, i, live int, asked map[*client.Entry]bool) ([]item, int) {
+	if asked[es[i]] {
+		return nil, i + 1
+	}
+	j := i
+	for j < len(es) && browse(es[j]) {
+		j++
+	}
+	if j-i >= 2 {
+		return []item{{fold: es[i:j], live: live >= 0 && i >= live}}, j
+	}
+	return []item{{e: es[i], live: live >= 0 && i >= live}}, i + 1
+}
+
+func browse(e *client.Entry) bool {
+	return e.Role == client.Tool && e.Done && !e.Failed && browsing[e.Text]
+}
+
+// finished are the rows of a finished turn after its prompt: the steps
+// folded, the last thing it said, the notes after it, and its summary.
+func (a *App) finished(body []*client.Entry, t int) []item {
+	tail := len(body)
+	for tail > 0 && body[tail-1].Role == client.Notice {
+		tail--
+	}
+	last := -1
+	if tail > 0 && body[tail-1].Role == client.Assistant {
+		last = tail - 1
+	}
+	work := body[:tail]
+	if last >= 0 {
+		work = body[:last]
+	}
+	var out []item
+	if slices.ContainsFunc(work, func(e *client.Entry) bool { return e.Role == client.Tool }) {
+		out = append(out, item{work: work, done: t})
+	} else {
+		for i := 0; i < len(work); {
+			var run []item
+			run, i = a.row(work, i, -1, nil)
+			out = append(out, run...)
+		}
+	}
+	if last >= 0 {
+		out = append(out, item{e: body[last]})
+	}
+	for _, e := range body[tail:] {
+		out = append(out, item{e: e})
+	}
+	return append(out, item{sum: true, done: t})
+}
+
+// fold is a run of browsing steps as one line, "浏览了 4 个文件，搜索 1
+// 次", that opens to the steps.
+func (a *App) fold(c *ui.Context, steps []*client.Entry) {
+	p := a.p
+	count := map[string]int{}
+	for _, e := range steps {
+		count[e.Text]++
+	}
+	type part struct{ pre, n, post string }
+	var parts []part
+	add := func(n int, pre, post string) {
+		if n > 0 {
+			parts = append(parts, part{pre, fmt.Sprint(n), post})
+		}
+	}
+	add(count["read_file"], "浏览了", "个文件")
+	add(count["list_dir"], "列出", "个目录")
+	add(count["search"], "搜索", "次")
+	add(count["git_status"]+count["git_diff"], "查看 git", "次")
+	key := "fold:" + steps[0].CallID
+	open := a.opened[key]
+	if a.inWork && len(count) == 1 && count["read_file"] > 0 {
+		// In a finished turn's work, reads are a step naming the files.
+		var names []string
+		for _, e := range steps {
+			names = append(names, e.Detail)
+		}
+		row := ui.ButtonBase(c.Key(key)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label("浏览 " + strings.Join(names, " ")).Expanded(open)
+		if row.Clicked() {
+			open = !open
+			a.opened[key] = open
+		}
+		row.Children(func() {
+			ui.Box(c).Width(16).Center().Children(func() { sym(c, "file-search", 15, p.Mute) })
+			ui.Text(c, "浏览").FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
+			ui.Spacer(c)
+			if row.Hovered() {
+				sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+			}
+		})
+	} else {
+		row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label("展开步骤").Expanded(open)
+		if row.Clicked() {
+			open = !open
+			a.opened[key] = open
+		}
+		row.Children(func() {
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+			ui.Row(c).Children(func() {
+				for i, pt := range parts {
+					pre := pt.pre + " "
+					if i > 0 {
+						pre = "，" + pre
+					}
+					ui.Text(c, pre).FontSize(12.5).TextColor(p.Mute).SingleLine().PreserveSpaces()
+					ui.Text(c, pt.n).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+					ui.Text(c, " "+pt.post).FontSize(12.5).TextColor(p.Mute).SingleLine().PreserveSpaces()
+				}
+			})
+			ui.Spacer(c)
+		})
+	}
+	if open {
+		ui.Column(c).Margin(2, 0, 8, 0).Children(func() {
+			for _, e := range steps {
+				ui.Column(c.Key(e.Key)).Children(func() { a.card(c, e) })
+			}
+		})
+	}
 }
 
 // thinking is a running turn whose last row shows nothing moving: no
@@ -163,7 +375,7 @@ func (a *App) empty(c *ui.Context) {
 	ui.Column(c).Grow(1).Center().Gap(10).Padding(0, 28, 60, 28).Children(func() {
 		switch {
 		case a.C.Phase == client.Disconnected:
-			sym(c, "bolt.horizontal.circle", 28, p.Minus)
+			sym(c, "plug-connected-x", 28, p.Minus)
 			ui.Text(c, "和内核的连接断开了").FontSize(15).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
 			if a.C.Err != "" {
 				ui.Text(c, a.C.Err).FontSize(12.5).TextColor(p.Fg2).MaxWidth(480).TextAlign(ui.Center).Selectable()
@@ -186,9 +398,9 @@ func (a *App) empty(c *ui.Context) {
 func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	ui.Image(c, mark).Size(56, 56)
-	ui.Text(c, "在 "+filepath.Base(cur.Cwd)+" 里做点什么").FontSize(22).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(12, 0, 0, 0)
-	ui.Text(c, "Talos 会先读代码，改动前按你的权限模式询问。").TextColor(p.Fg2).Margin(0, 0, 16, 0)
+	ui.Image(c, mark).Size(44, 44)
+	ui.Text(c, "在 "+filepath.Base(cur.Cwd)+" 里做点什么").FontSize(22).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
+	ui.Text(c, "Talos 会先读代码，改动前按你的权限模式询问。").TextColor(p.Fg2).Margin(0, 0, 26, 0)
 	ui.Column(c).Width(540).MaxWidthPercent(100).Children(func() { a.dock(c) })
 	var recent []proto.Session
 	for _, s := range a.C.Sessions {
@@ -197,7 +409,7 @@ func (a *App) hello(c *ui.Context) {
 		}
 	}
 	if len(recent) > 0 {
-		ui.Column(c).Width(540).MaxWidthPercent(100).Margin(12, 0, 0, 0).Children(func() {
+		ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
 			ui.Text(c, "继续").FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
 			for _, s := range recent {
 				a.sessionRow(c, s)
@@ -214,22 +426,26 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 			ui.Box(c).Width(2).Margin(3, 0, 3, 0).Background(p.Faint).Shrink(0)
 			ui.Text(c, e.Text).FontWeight(500).TextColor(p.Fg).LineHeight(1.55).Padding(0, 0, 0, 12).Selectable().Grow(1).MinWidth(0)
 		})
+	default:
+		a.turn(c, live, func() { a.body(c, e) })
+	}
+}
+
+// body is what the agent did or said, without the rail of its turn.
+func (a *App) body(c *ui.Context, e *client.Entry) {
+	switch e.Role {
 	case client.Assistant:
-		a.turn(c, live, func() {
-			ui.Column(c).Margin(4, 0, 10, 0).Children(func() {
-				if e.Done {
-					markdown.View(c, e.Text, &a.md)
-				} else {
-					markdown.Stream(c, e.Text, &a.md)
-				}
-			})
+		ui.Column(c).Margin(4, 0, 10, 0).Children(func() {
+			if e.Done {
+				markdown.View(c, e.Text, &a.md)
+			} else {
+				markdown.Stream(c, e.Text, &a.md)
+			}
 		})
 	case client.Tool:
-		a.turn(c, live, func() { a.card(c, e) })
+		a.card(c, e)
 	case client.Notice:
-		a.turn(c, live, func() {
-			ui.Text(c, e.Text).FontSize(12).TextColor(p.Mute).Margin(4, 0, 10, 0).Selectable()
-		})
+		ui.Text(c, e.Text).FontSize(12).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
 	}
 }
 
@@ -238,7 +454,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	p := a.p
 	t, ok := tools[e.Text]
 	if !ok {
-		t.symbol, t.verb = "wrench.and.screwdriver", e.Text
+		t.symbol, t.verb = "tool", e.Text
 	}
 	open := a.opened[e.CallID]
 	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
@@ -258,7 +474,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		case e.Failed:
 			ui.Box(c).Size(7, 2).Background(p.Minus)
 		case e.Output != "" && row.Hovered():
-			sym(c, map[bool]string{true: "chevron.down", false: "chevron.right"}[open], 10, p.Mute)
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
 		}
 	})
 	if open {
@@ -288,7 +504,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			ui.Text(c, "需要你允许").FontSize(12.5).TextColor(p.Fg2)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
-				sym(c, "clock", 11, p.Mute)
+				sym(c, "clock", 12, p.Mute)
 				ui.Text(c, w).FontSize(11.5).TextColor(p.Mute)
 			}
 		})
@@ -308,15 +524,15 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 		ui.Row(c).Gap(14).Children(func() {
 			why := func(symbol, s string) {
 				ui.Row(c).Gap(4).AlignItems(ui.Center).MinWidth(0).Children(func() {
-					sym(c, symbol, 11, p.Mute)
+					sym(c, symbol, 12, p.Mute)
 					ui.Text(c, s).FontSize(12).TextColor(p.Mute)
 				})
 			}
 			if ap.Reason != "" {
-				why("lock.shield", ap.Reason)
+				why("shield-lock", ap.Reason)
 			}
 			if cur := a.C.Current; cur != nil {
-				why("slider.horizontal.3", "当前模式："+modes[cur.Mode])
+				why("adjustments-horizontal", "当前模式："+modes[cur.Mode])
 			}
 		})
 		ui.Row(c).Gap(8).Justify(ui.End).Margin(12, 0, 0, 0).Children(func() {

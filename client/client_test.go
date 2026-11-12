@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/proto"
@@ -372,5 +373,35 @@ func TestModelsFailureDuringSync(t *testing.T) {
 	c.Receive(proto.Frame{Type: proto.FrameResponse, ID: cmds[0].ID, Error: proto.Errorf("test", "offline")})
 	if c.Phase != Syncing || c.Err != "" {
 		t.Fatalf("phase %v, err %q", c.Phase, c.Err)
+	}
+}
+
+// TestTurns follows each turn's start, end and usage, and which turn
+// each entry is in.
+func TestTurns(t *testing.T) {
+	at := func(f proto.Frame, s int) proto.Event {
+		e := *f.Event
+		e.At = time.Date(2026, 11, 12, 15, 0, s, 0, time.UTC)
+		return e
+	}
+	c, _ := connected(t, []proto.Event{
+		at(ev(1, proto.EventTurnStart, nil), 0),
+		at(ev(2, proto.EventMessage, msg(llm.User, "hi")), 0),
+		at(ev(3, proto.EventMessage, msg(llm.Assistant, "hello")), 30),
+		at(ev(4, proto.EventTurnEnd, proto.TurnEnd{Usage: llm.Usage{Input: 10, Output: 2}}), 38),
+		at(ev(5, proto.EventTurnStart, nil), 40),
+		at(ev(6, proto.EventMessage, msg(llm.User, "again")), 40),
+	})
+	if len(c.Turns) != 2 {
+		t.Fatalf("%+v", c.Turns)
+	}
+	if tu := c.Turns[0]; !tu.Done || tu.Seq != 1 || tu.End.Sub(tu.Start) != 38*time.Second || tu.Usage.Input != 10 {
+		t.Errorf("%+v", tu)
+	}
+	if tu := c.Turns[1]; tu.Done || tu.Seq != 5 {
+		t.Errorf("%+v", tu)
+	}
+	if got := []int{c.Entries[0].Turn, c.Entries[1].Turn, c.Entries[2].Turn}; got[0] != 0 || got[1] != 0 || got[2] != 1 {
+		t.Errorf("turns of entries %v", got)
 	}
 }

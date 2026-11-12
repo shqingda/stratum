@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/proto"
@@ -68,6 +69,15 @@ type Entry struct {
 	CallID string
 	Failed bool
 	Args   json.RawMessage // a tool call's original arguments
+	Turn   int             // index in Client.Turns of the turn it is in; -1 before any
+}
+
+// Turn is one turn of the current session, as its log tells it.
+type Turn struct {
+	Seq        int64 // of its turn.start event, as proto.ChangeTurn.TurnSeq
+	Start, End time.Time
+	Done       bool
+	Usage      llm.Usage
 }
 
 // Unknown is a mutation whose outcome a disconnect left unknown.
@@ -107,6 +117,7 @@ type Client struct {
 	// Answering holds approvals whose answer is in flight.
 	Answering map[string]bool
 	Usage     llm.Usage // of the current session's turns this connection saw end
+	Turns     []Turn    // of the current session, oldest first
 
 	Changes Changes
 
@@ -167,6 +178,7 @@ func (c *Client) mutate(method string, params any, done func(json.RawMessage) []
 func (c *Client) add(e *Entry) *Entry {
 	c.nextKey++
 	e.Key = c.nextKey
+	e.Turn = len(c.Turns) - 1
 	c.Entries = append(c.Entries, e)
 	return e
 }
@@ -352,7 +364,7 @@ func (c *Client) bind(id string) proto.Command {
 }
 
 func (c *Client) resetTranscript() {
-	c.Current, c.Entries, c.streaming = nil, nil, nil
+	c.Current, c.Entries, c.streaming, c.Turns = nil, nil, nil, nil
 	c.Busy, c.Queued, c.Approvals, c.Usage = false, nil, nil, llm.Usage{}
 	clear(c.Answering)
 	c.buffer, c.overflow = nil, false
@@ -449,6 +461,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	switch e.Type {
 	case proto.EventTurnStart:
 		c.Busy = true
+		c.Turns = append(c.Turns, Turn{Seq: e.Seq, Start: e.At})
 	case proto.EventTextDelta:
 		var d proto.Delta
 		_ = json.Unmarshal(e.Data, &d)
@@ -494,6 +507,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		c.Busy, c.Queued, c.Approvals = false, nil, nil
 		clear(c.Answering)
 		c.Usage = c.Usage.Add(t.Usage)
+		if n := len(c.Turns); n > 0 && !c.Turns[n-1].Done {
+			c.Turns[n-1].End, c.Turns[n-1].Done, c.Turns[n-1].Usage = e.At, true, t.Usage
+		}
 		switch {
 		case t.Stopped:
 			c.notice("已停止。")

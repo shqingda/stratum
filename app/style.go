@@ -37,7 +37,7 @@ func mdTheme(p *Palette, t *ui.Theme) *markdown.Theme {
 		FontSize: 13.5, LineHeight: 1.55, CodeLineHeight: 1.6,
 		Text: p.Fg, Muted: p.Mute, Link: p.Fg, Strong: p.Fg, LinkWeight: 500,
 		Code: p.Fg, CodeBackground: p.Chip, CodeSize: 12.5 / 13.5,
-		CodeBlockBackground: p.Chip, CodeBlockBorder: ui.Transparent, CodeBlockRadius: 10,
+		CodeBlockBackground: p.Chip, CodeBlockBorder: ui.Transparent, CodeBlockRadius: 10, CodeBlockPadding: 11 / 13.5,
 		CodeColors: code, QuoteBar: p.Faint, QuoteText: p.Fg2, Rule: p.Edge,
 		TableBorder: p.Edge, TableHeader: p.Chip, Checkbox: p.Fg,
 	}
@@ -66,9 +66,9 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 			}
 			btn.Children(func() {
 				if done {
-					sym(c, "checkmark", 12, p.Fg2)
+					sym(c, "check", 12, p.Fg2)
 				} else {
-					sym(c, "doc.on.doc", 12, p.Mute)
+					sym(c, "copy", 12, p.Mute)
 				}
 			})
 			if btn.Clicked() {

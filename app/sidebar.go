@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/egoist/mygo/plugins/sfsymbols"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/proto"
 )
@@ -17,17 +16,13 @@ const (
 )
 
 // sym draws an SF Symbol.
-func sym(c *ui.Context, name string, size float32, col ui.Color) sfsymbols.SymbolElement {
-	return sfsymbols.Symbol(c, name).Size(size).Color(col)
-}
-
 // iconButton is a 28-point square button holding a symbol.
 func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
-	b.Children(func() { sym(c, symbol, 15, a.p.Fg2) })
+	b.Children(func() { sym(c, symbol, 17, a.p.Fg2) })
 	return b
 }
 
@@ -41,17 +36,20 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		bar := c.TitleBar()
 		ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 12, 0, bar.Left+8).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
-			if a.iconButton(c, "new-top", "square.and.pencil", "新会话").Clicked() {
+			if a.iconButton(c, "side", "layout-sidebar-left-collapse", "隐藏边栏").Clicked() {
+				a.noSide = true
+			}
+			if a.iconButton(c, "new-top", "edit", "新会话").Clicked() {
 				a.do(a.C.NewSession())
 			}
 		})
 		a.search(c)
 		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
-			if a.navItem(c, "new", "plus.bubble", "新会话", "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
+			if a.navItem(c, "new", "message-plus", "新会话", "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
 				a.do(a.C.NewSession())
 			}
-			a.navItem(c, "cron", "clock.arrow.circlepath", "定时任务", "")
-			a.navItem(c, "skills", "puzzlepiece.extension", "技能与 MCP", "")
+			a.navItem(c, "cron", "clock-play", "定时任务", "")
+			a.navItem(c, "skills", "puzzle", "技能与 MCP", "")
 		})
 		list := ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
 		// The list fades into the footer rather than being cut at it.
@@ -66,7 +64,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 func (a *App) search(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Children(func() {
-		sym(c, "magnifyingglass", 13, p.Mute)
+		sym(c, "search", 15, p.Mute)
 		ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").KeyShortcuts(ui.Cmd, ui.KeyK).Placeholder("搜索").PlaceholderColor(p.Mute).FontSize(13).Grow(1).SingleLine()
 		ui.Text(c, "⌘K").FontSize(11).TextColor(p.Mute)
 	})
@@ -79,7 +77,7 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 		it.Background(p.Hover)
 	}
 	it.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 15, p.Fg2) })
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 16, p.Fg2) })
 		ui.Text(c, label).FontSize(13).TextColor(p.Fg).SingleLine()
 		ui.Spacer(c)
 		if kbd != "" {
@@ -129,7 +127,7 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 	p := a.p
 	ui.Row(c).Height(28).Margin(10, 0, 0, 0).Padding(0, 10).Gap(6).AlignItems(ui.Center).Children(func() {
 		if symbol != "" {
-			sym(c, symbol, 11, p.Mute)
+			sym(c, symbol, 13, p.Mute)
 		}
 		ui.Text(c, label).FontSize(11.5).FontWeight(600).TextColor(p.Mute).SingleLine()
 		if n > 0 {
@@ -225,7 +223,7 @@ func (a *App) footer(c *ui.Context) {
 				ui.Text(c, sub).FontSize(11).TextColor(p.Mute).SingleLine().Ellipsis("…")
 			}
 		})
-		a.iconButton(c, "settings", "gearshape", "设置")
+		a.iconButton(c, "settings", "settings", "设置")
 	})
 }
 

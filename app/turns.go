@@ -1,0 +1,202 @@
+package app
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/proto"
+)
+
+// work is a finished turn's steps as one line, "工作了 38 秒", that
+// opens to them.
+func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
+	p := a.p
+	key := fmt.Sprintf("work:%d", steps[0].Key)
+	open := a.opened[key]
+	label := "工作了"
+	if tu := a.C.Turns[t]; !tu.Start.IsZero() && !tu.End.IsZero() {
+		label += " " + span(tu.End.Sub(tu.Start))
+	}
+	row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label(label).Expanded(open)
+	if row.Clicked() {
+		open = !open
+		a.opened[key] = open
+	}
+	row.Children(func() {
+		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+		ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		ui.Spacer(c)
+	})
+	if !open {
+		return
+	}
+	a.inWork = true
+	defer func() { a.inWork = false }()
+	ui.Column(c).Margin(2, 0, 8, 0).Children(func() {
+		for i := 0; i < len(steps); {
+			var run []item
+			run, i = a.row(steps, i, -1, nil)
+			for _, it := range run {
+				ui.Column(c.Key(it.key())).Children(func() {
+					if it.fold != nil {
+						a.fold(c, it.fold)
+					} else {
+						a.body(c, it.e)
+					}
+				})
+			}
+		}
+	})
+}
+
+// span says how long something took: "38 秒", "2 分 5 秒".
+func span(d time.Duration) string {
+	s := int(d.Round(time.Second).Seconds())
+	switch {
+	case s < 60:
+		return fmt.Sprintf("%d 秒", max(s, 1))
+	case s < 3600 && s%60 == 0:
+		return fmt.Sprintf("%d 分", s/60)
+	case s < 3600:
+		return fmt.Sprintf("%d 分 %d 秒", s/60, s%60)
+	}
+	return fmt.Sprintf("%d 时 %d 分", s/3600, s%3600/60)
+}
+
+// tokens shortens a count of tokens: 182, 4.1k, 1.2M.
+func tokens(n int) string {
+	switch {
+	case n < 1000:
+		return fmt.Sprint(n)
+	case n < 1000000:
+		return trimZero(fmt.Sprintf("%.1f", float64(n)/1000)) + "k"
+	}
+	return trimZero(fmt.Sprintf("%.1f", float64(n)/1000000)) + "M"
+}
+
+func trimZero(s string) string {
+	if len(s) > 2 && s[len(s)-2:] == ".0" {
+		return s[:len(s)-2]
+	}
+	return s
+}
+
+// summary closes a finished turn: what it changed in files, with taking
+// it back and the review, and what it cost.
+func (a *App) summary(c *ui.Context, t int) {
+	p := a.p
+	tu := a.C.Turns[t]
+	var ch *proto.ChangeTurn
+	for i, x := range a.C.Changes.Turns {
+		if x.TurnSeq == tu.Seq && tu.Seq != 0 {
+			ch = &a.C.Changes.Turns[i]
+		}
+	}
+	if ch != nil && len(ch.Files) > 0 {
+		add, del := a.totals([]proto.ChangeTurn{*ch})
+		reverted := a.C.Changes.Reverted[ch.TurnSeq]
+		ui.Row(c).Height(40).Padding(0, 8, 0, 12).Gap(10).Radius(10).InsetShadow(0, 0, 0, .5, p.Edge2).Margin(12, 0, 6, 0).AlignItems(ui.Center).Children(func() {
+			sym(c, "files", 15, p.Fg2)
+			what := fmt.Sprintf("改了 %d 个文件", len(ch.Files))
+			if reverted {
+				what = fmt.Sprintf("已撤销 %d 个文件的改动", len(ch.Files))
+			}
+			ui.Text(c, what).FontSize(12.5).TextColor(p.Fg).SingleLine()
+			ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(12).TextColor(p.Plus).Opacity(nonzero(add))
+			ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(12).TextColor(p.Minus).Opacity(nonzero(del))
+			ui.Spacer(c)
+			label, icon := "全部撤销", "arrow-back-up"
+			if reverted {
+				label, icon = "重做", "arrow-forward-up"
+			}
+			undo := ui.ButtonBase(c.Key(fmt.Sprintf("undo:%d", ch.TurnSeq))).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label).Disabled(a.C.Busy)
+			if undo.Hovered() {
+				undo.Background(p.Hover)
+			}
+			if a.C.Busy {
+				undo.Tooltip("运行中不能恢复文件")
+			}
+			undo.Children(func() {
+				sym(c, icon, 15, p.Fg2)
+				ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+			})
+			if undo.Clicked() {
+				a.do(a.C.Revert(ch.TurnSeq, reverted))
+			}
+			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), "查看变更", "", false).Clicked() {
+				a.rv.open = true
+				if n := len(a.C.Changes.Turns); n > 0 && a.C.Changes.Turns[n-1].TurnSeq != ch.TurnSeq {
+					a.rv.all = true
+				}
+				key := client.DiffKey(ch.TurnSeq, ch.Files[0].Path)
+				a.rv.sel, a.rv.jump = key, key
+			}
+		})
+	}
+	u := tu.Usage
+	if u.Input+u.Output == 0 {
+		return
+	}
+	ui.Row(c).Gap(12).Margin(4, 0, 10, 0).AlignItems(ui.Center).Children(func() {
+		item := func(icon, s string) {
+			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				if icon != "" {
+					sym(c, icon, 13, p.Mute)
+				}
+				ui.Text(c, s).FontSize(11.5).TextColor(p.Mute).SingleLine()
+			})
+		}
+		if cur := a.C.Current; cur != nil && cur.Model != "" {
+			item("cpu", cur.Model)
+		}
+		item("", "输入 "+tokens(u.Input))
+		item("", "输出 "+tokens(u.Output))
+		if u.CacheRead > 0 {
+			item("", "缓存 "+tokens(u.CacheRead))
+		}
+	})
+}
+
+// editLine is an edit as one line, "编辑 add.go +1 −1", and reports
+// whether its card shows under it.
+func (a *App) editLine(c *ui.Context, e *client.Entry, path, oldText, newText string) bool {
+	p := a.p
+	if a.stats == nil {
+		a.stats = map[string][2]int{}
+	}
+	st, ok := a.stats[e.CallID]
+	if !ok {
+		lines, _ := lineDiff(oldText, newText)
+		for _, l := range lines {
+			switch l.sign {
+			case "+":
+				st[0]++
+			case "−":
+				st[1]++
+			}
+		}
+		a.stats[e.CallID] = st
+	}
+	t := tools[e.Text]
+	key := "card:" + e.CallID
+	open := a.opened[key]
+	row := ui.ButtonBase(c.Key("line:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + path).Expanded(open)
+	if row.Clicked() {
+		open = !open
+		a.opened[key] = open
+	}
+	row.Children(func() {
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 15, p.Mute) })
+		ui.Text(c, t.verb).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+		ui.Text(c, path).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+		ui.Text(c, fmt.Sprintf("+%d", st[0])).Font("monospace").FontSize(12).TextColor(p.Plus).Shrink(0).Opacity(nonzero(st[0]))
+		ui.Text(c, fmt.Sprintf("−%d", st[1])).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0).Opacity(nonzero(st[1]))
+		ui.Spacer(c)
+		if row.Hovered() {
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+		}
+	})
+	return open
+}

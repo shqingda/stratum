@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/proto"
 )
@@ -26,6 +27,11 @@ type review struct {
 	sel   string // client.DiffKey of the file shown
 	asked map[string]bool
 	diffs map[string]*fileDiff
+	// The diffs show one under another: jump is the file to scroll to,
+	// tops where each file's diff starts.
+	scroll ui.ScrollState
+	jump   string
+	tops   map[string]float32
 }
 
 // fileDiff is a file's change cut into hunks, computed once.
@@ -33,6 +39,7 @@ type fileDiff struct {
 	status         byte // 'A', 'D' or 'M'
 	hunks          []hunk
 	old, new       []string
+	oldTok, newTok [][]editor.Token // the lines' tokens, nil when the language is unknown
 	added, removed int
 	gaveUp         bool
 }
@@ -62,20 +69,40 @@ func newFileDiff(d proto.ChangeDiff) *fileDiff {
 		}
 	}
 	f.hunks = hunks(edits, diffContext)
+	f.oldTok, f.newTok = tokenize(d.Path, f.old), tokenize(d.Path, f.new)
 	return f
+}
+
+// tokenize highlights a file's lines as its language does.
+func tokenize(path string, lines []string) [][]editor.Token {
+	lang := editor.LanguageFor(path)
+	if lang == nil || lang.Tokenizer == nil || len(lines) > 20000 {
+		return nil
+	}
+	out := make([][]editor.Token, len(lines))
+	var state uint64
+	for i, l := range lines {
+		out[i], state = lang.Tokenizer.Tokenize(strings.TrimRight(l, "\r\n"), state, nil)
+	}
+	return out
 }
 
 // syncReview asks for what the panel shows and the client lacks.
 func (a *App) syncReview() {
 	r := &a.rv
-	if !r.open || !a.C.CanAct() {
+	if !a.C.CanAct() {
 		return
 	}
 	ch := &a.C.Changes
-	if ch.Stale && !ch.Loading {
+	// The list is read while the panel is closed too: finished turns say
+	// what they changed under them.
+	if ch.Stale && !ch.Loading && (r.open || !a.C.Busy && slices.ContainsFunc(a.C.Turns, func(t client.Turn) bool { return t.Done })) {
 		clear(r.asked)
 		clear(r.diffs)
-		a.do(a.C.ListChanges())
+		a.quiet(a.C.ListChanges())
+		return
+	}
+	if !r.open {
 		return
 	}
 	if ch.Loading {
@@ -86,7 +113,7 @@ func (a *App) syncReview() {
 			key := client.DiffKey(t.TurnSeq, f.Path)
 			if _, ok := ch.Diffs[key]; !ok && !r.asked[key] {
 				r.asked[key] = true
-				a.do(a.C.DiffChange(t.TurnSeq, f.Path))
+				a.quiet(a.C.DiffChange(t.TurnSeq, f.Path))
 			}
 		}
 	}
@@ -125,7 +152,7 @@ func (a *App) reviewToggle(c *ui.Context) {
 	if a.rv.open {
 		label = "隐藏变更"
 	}
-	b := a.iconButton(c, "review", "sidebar.right", label)
+	b := a.iconButton(c, "review", "layout-sidebar-right", label)
 	if a.rv.open {
 		b.Background(a.p.Sel)
 	}
@@ -268,7 +295,7 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 		row.Background(p.Hover)
 	}
 	if row.Clicked() {
-		a.rv.sel = key
+		a.rv.sel, a.rv.jump = key, key
 	}
 	status, col := "M", p.Mute
 	if d := a.fileDiff(key); d != nil {
@@ -318,39 +345,91 @@ func (a *App) splitPath(path string) (dir, base string) {
 	return dir, base
 }
 
+// reviewDiff shows the files' diffs one under another; picking a file
+// scrolls to it.
 func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
-	p := a.p
-	ui.Scroll(c).Grow(1).MinHeight(0).Padding(10, 0).Children(func() {
-		d := a.fileDiff(a.rv.sel)
-		if d == nil {
-			ui.Text(c, "正在读取…").FontSize(12).TextColor(p.Mute).Padding(0, 14)
-			return
-		}
-		if len(d.hunks) == 0 {
-			ui.Text(c, "内容没有变化").FontSize(12).TextColor(p.Mute).Padding(0, 14)
-			return
-		}
-		if d.gaveUp {
-			ui.Text(c, "改动太多，按整体替换显示").FontSize(12).TextColor(p.Mute).Padding(0, 14, 6, 14)
-		}
-		shown := 0
-		for i, h := range d.hunks {
-			if shown >= maxDiffLines {
-				ui.Text(c, fmt.Sprintf("还有 %d 处改动未显示", len(d.hunks)-i)).FontSize(12).TextColor(p.Mute).Padding(8, 14)
-				break
-			}
-			ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Margin(map[bool]float32{true: 0, false: 14}[i == 0], 0, 0, 0).Children(func() {
-				ui.Text(c, fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.oldStart, h.oldLen, h.newStart, h.newLen)).Font("monospace").FontSize(11.5).TextColor(p.Mute)
-			})
-			for _, e := range h.edits {
-				if shown >= maxDiffLines {
-					break
+	if a.rv.tops == nil {
+		a.rv.tops = map[string]float32{}
+	}
+	ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&a.rv.scroll).Children(func() {
+		var secs []ui.Element
+		var keys []string
+		inner := ui.Column(c).Padding(10, 0).Children(func() {
+			shown, first := 0, true
+			for _, t := range turns {
+				for _, f := range t.Files {
+					key := client.DiffKey(t.TurnSeq, f.Path)
+					name := ""
+					if !first {
+						_, name = a.splitPath(f.Path)
+					}
+					sec := ui.Column(c.Key("diff:"+key)).Margin(map[bool]float32{true: 0, false: 14}[first], 0, 0, 0).Children(func() {
+						shown = a.fileDiffView(c, key, name, shown)
+					})
+					secs, keys = append(secs, sec), append(keys, key)
+					first = false
 				}
-				a.diffRow(c, d, e)
-				shown++
+			}
+		})
+		if top := inner.Bounds().Y; inner.Bounds().H > 0 {
+			for i, sec := range secs {
+				a.rv.tops[keys[i]] = sec.Bounds().Y - top
+			}
+			if y, ok := a.rv.tops[a.rv.jump]; ok {
+				a.rv.scroll.ScrollTo(0, y, ui.Smooth)
+				a.rv.jump = ""
 			}
 		}
 	})
+}
+
+// fileDiffView is one file's hunks, named in the first hunk's header
+// when name is set, and returns how many lines show so far.
+func (a *App) fileDiffView(c *ui.Context, key, name string, shown int) int {
+	p := a.p
+	note := func(s string) {
+		head := s
+		if name != "" {
+			head = name + " · " + s
+		}
+		ui.Text(c, head).FontSize(12).TextColor(p.Mute).Padding(6, 14)
+	}
+	d := a.fileDiff(key)
+	switch {
+	case d == nil:
+		note("正在读取…")
+		return shown
+	case len(d.hunks) == 0:
+		note("内容没有变化")
+		return shown
+	case shown >= maxDiffLines:
+		note("改动太多，没有显示")
+		return shown
+	}
+	if d.gaveUp {
+		note("改动太多，按整体替换显示")
+	}
+	for i, h := range d.hunks {
+		if shown >= maxDiffLines {
+			ui.Text(c, fmt.Sprintf("还有 %d 处改动未显示", len(d.hunks)-i)).FontSize(12).TextColor(p.Mute).Padding(8, 14)
+			break
+		}
+		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Margin(map[bool]float32{true: 0, false: 14}[i == 0], 0, 0, 0).Children(func() {
+			head := fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.oldStart, h.oldLen, h.newStart, h.newLen)
+			if i == 0 && name != "" {
+				head = name + " · " + head
+			}
+			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine()
+		})
+		for _, e := range h.edits {
+			if shown >= maxDiffLines {
+				break
+			}
+			a.diffRow(c, d, e)
+			shown++
+		}
+	}
+	return shown
 }
 
 // diffRow is one line: old and new line numbers, the sign and the text.
@@ -358,13 +437,23 @@ func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
 	p := a.p
 	var bg, signCol ui.Color
 	text, sign := "", ""
+	var toks []editor.Token
 	switch e.op {
 	case '+':
-		bg, signCol, sign, text = p.Plus.Alpha(.08), p.Plus, "+", d.new[e.b]
+		bg, signCol, sign, text = p.Plus.Alpha(.10), p.Plus, "+", d.new[e.b]
+		if d.newTok != nil {
+			toks = d.newTok[e.b]
+		}
 	case '-':
-		bg, signCol, sign, text = p.Minus.Alpha(.08), p.Minus, "−", d.old[e.a]
+		bg, signCol, sign, text = p.Minus.Alpha(.10), p.Minus, "−", d.old[e.a]
+		if d.oldTok != nil {
+			toks = d.oldTok[e.a]
+		}
 	default:
 		text = d.new[e.b]
+		if d.newTok != nil {
+			toks = d.newTok[e.b]
+		}
 	}
 	num := func(i int) string {
 		if i < 0 {
@@ -381,7 +470,7 @@ func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
 			ui.Text(c, n).Font("monospace").FontSize(12).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
 		}
 		ui.Text(c, sign).Font("monospace").FontSize(12).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
-		ui.Text(c, strings.TrimRight(text, "\r\n")).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().PreserveSpaces().
+		ui.RichText(c, a.codeSpans(c, strings.TrimRight(text, "\r\n"), toks)...).SingleLine().PreserveSpaces().
 			Padding(0, 6).Grow(1).MinWidth(0).Selectable()
 	})
 }
@@ -422,4 +511,41 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 			a.do(a.C.Revert(turn, reverted))
 		}
 	})
+}
+
+// codeSpans colors a line of code by its tokens, as code blocks are.
+func (a *App) codeSpans(c *ui.Context, text string, toks []editor.Token) []ui.Span {
+	p := a.p
+	span := func(s string, st editor.TokenStyle) ui.Span {
+		sp := ui.Span{Text: s, Font: "monospace", Size: 12, Color: p.Fg, Italic: st.Italic}
+		if st.Color != (ui.Color{}) {
+			sp.Color = st.Color
+		}
+		if st.Bold {
+			sp.Weight = 600
+		}
+		return sp
+	}
+	if len(toks) == 0 {
+		return []ui.Span{span(text, editor.TokenStyle{})}
+	}
+	styles := mdTheme(p, c.Theme()).CodeColors.Tokens
+	var out []ui.Span
+	at := 0
+	for _, t := range toks {
+		end := min(t.End, len(text))
+		if end <= at {
+			continue
+		}
+		var st editor.TokenStyle
+		if int(t.Kind) < len(styles) {
+			st = styles[t.Kind]
+		}
+		out = append(out, span(text[at:end], st))
+		at = end
+	}
+	if at < len(text) {
+		out = append(out, span(text[at:], editor.TokenStyle{}))
+	}
+	return out
 }
