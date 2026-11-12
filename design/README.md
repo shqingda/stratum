@@ -24,12 +24,14 @@
 | 文件 | 说明 |
 |---|---|
 | `talos-mech.svg` | 主图标（后扫盔缨），由 `src/mech.py` 生成 |
+| `talos-mech-32.svg` | 小尺寸简化版，用于 32 px 与 16@2x，`python3 small.py 32` |
+| `talos-mech-16.svg` | 小尺寸简化版，用于 16 px，`python3 small.py 16` |
 | `talos-mech-upright.svg` | 存档：直立盔缨，`python3 mech.py upright` |
 | `talos-orbit.svg` | 备选：轨道式，`src/orbit.py` |
 | `talos-real.svg` | 备选：拟物青铜头盔，`src/real.py` |
 | `preview.html` / `compare.png` | 大图、文字组合、各尺寸、Dock 预览 |
 
-待办：32 / 16 px 下细节糊成一团，需要单独画简化版。
+小尺寸版只保留能在像素里读出来的东西：裁到头部、去掉铆钉/接缝/舷窗/光芒，盔缨改成 4 片（16 px 为 3 片）近乎平行的后扫刃，刃间用底色描边隔开，眼睛加大加亮。64 px 及以上用主图标。
 
 ## 颜色
 
