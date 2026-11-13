@@ -74,6 +74,7 @@ type App struct {
 
 	settingsOpen, addingAccount, setModelMenu bool
 	settingsPage                              string // "" for accounts, or mcp
+	subMenu, lightMenu                        bool
 	accountsSeen                              int
 
 	attached []attachment

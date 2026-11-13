@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/proto"
 )
@@ -102,12 +104,12 @@ func (a *App) accountsPage(c *ui.Context) {
 	if a.C.Settings != nil {
 		set = *a.C.Settings
 	}
-	heading("新会话默认模型", func() {})
+	heading("模型分工", func() {})
 	group(c, p, func() {
 		ui.Row(c).MinHeight(52).Padding(8, 12, 8, 14).Gap(12).AlignItems(ui.Center).Children(func() {
 			ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
 				ui.Text(c, "主 agent").FontSize(13).FontWeight(500).TextColor(p.Fg)
-				ui.Text(c, "你直接对话的那个").FontSize(12).TextColor(p.Mute)
+				ui.Text(c, "你直接对话的那个，新会话默认用它").FontSize(12).TextColor(p.Mute)
 			})
 			a.defaultModel(c, set)
 			a.picker(c, "set-effort", "", efforts[set.Effort]).PopoverMenuButton(func(m *ui.Menu) {
@@ -120,6 +122,12 @@ func (a *App) accountsPage(c *ui.Context) {
 				}
 			}, a.menuOptions(nil))
 		})
+		ui.Box(c).Height(.5).Background(p.Edge)
+		a.roleRow(c, "sub", "子 agent", "探索代码、并行的小任务", set.Sub, &a.subMenu, func(r *proto.ModelRef) { s := set; s.Sub = r; a.do(a.C.SaveSettings(s)) })
+		ui.Box(c).Height(.5).Background(p.Edge)
+		a.roleRow(c, "light", "标题与压缩", "起会话名、上下文满时写摘要", set.Light, &a.lightMenu, func(r *proto.ModelRef) { s := set; s.Light = r; a.do(a.C.SaveSettings(s)) })
+		ui.Box(c).Height(.5).Background(p.Edge)
+		a.fallbackRow(c, set)
 	})
 
 	heading("新会话默认权限", func() {})
@@ -201,7 +209,7 @@ func (a *App) defaultModel(c *ui.Context, set proto.Settings) {
 			}
 		}
 	}
-	if a.modelsAccount != account {
+	if a.modelsAccount != account && a.setModelMenu {
 		a.modelsRequested = false
 	}
 	a.picker(c, "set-model", name, model).PopoverMenuButton(func(m *ui.Menu) {
@@ -217,7 +225,7 @@ func (a *App) defaultModel(c *ui.Context, set proto.Settings) {
 			a.do(a.C.SaveSettings(s))
 		})
 	}, a.menuOptions(&a.setModelMenu))
-	if !a.setModelMenu {
+	if !a.setModelMenu && !a.subMenu && !a.lightMenu {
 		a.modelsRequested = false
 	}
 }
@@ -251,4 +259,102 @@ func providerSymbol(provider string) string {
 		return "route"
 	}
 	return "key"
+}
+
+// roleRow picks the account and model of a role, or none to leave it to
+// the session's own.
+func (a *App) roleRow(c *ui.Context, key, title, sub string, ref *proto.ModelRef, open *bool, save func(*proto.ModelRef)) {
+	p := a.p
+	ui.Row(c.Key("role:"+key)).MinHeight(52).Padding(8, 12, 8, 14).Gap(12).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
+			ui.Text(c, title).FontSize(13).FontWeight(500).TextColor(p.Fg)
+			ui.Text(c, sub).FontSize(12).TextColor(p.Mute)
+		})
+		name, model := "", "跟主 agent 一样"
+		if ref != nil {
+			name, model = a.accountName(ref.Account), ref.Model
+		}
+		a.picker(c, "role-model:"+key, name, model).PopoverMenuButton(func(m *ui.Menu) {
+			if m.Item("跟主 agent 一样").ID("role-same:" + key).Checked(ref == nil).Chosen() {
+				save(nil)
+			}
+			m.Separator()
+			for _, acc := range a.C.Accounts {
+				if m.Item(acc.Name).ID("role-account:" + key + ":" + acc.ID).Checked(ref != nil && ref.Account == acc.ID).Chosen() {
+					save(&proto.ModelRef{Account: acc.ID, Model: acc.Model})
+				}
+			}
+			if ref != nil {
+				m.Separator()
+				if a.modelsAccount != ref.Account {
+					a.modelsRequested = false
+				}
+				a.modelItems(m, ref.Account, ref.Model, func(id string) {
+					r := *ref
+					r.Model = id
+					save(&r)
+				})
+			}
+		}, a.menuOptions(open))
+		if !*open && !a.setModelMenu && !a.subMenu && !a.lightMenu {
+			a.modelsRequested = false
+		}
+		if ref != nil {
+			a.picker(c, "role-effort:"+key, "", efforts[ref.Effort]).PopoverMenuButton(func(m *ui.Menu) {
+				for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
+					if m.Item(efforts[effort]).ID("role-effort:" + key + ":" + effort).Checked(ref.Effort == effort).Chosen() {
+						r := *ref
+						r.Effort = effort
+						save(&r)
+					}
+				}
+			}, a.menuOptions(nil))
+		}
+	})
+}
+
+func (a *App) accountName(id string) string {
+	for _, acc := range a.C.Accounts {
+		if acc.ID == id && acc.Name != "" {
+			return acc.Name
+		}
+	}
+	return id
+}
+
+// fallbackRow turns moving to backup accounts on and off: the others, in
+// the order they are listed.
+func (a *App) fallbackRow(c *ui.Context, set proto.Settings) {
+	p := a.p
+	main := set.Account
+	if main == "" && len(a.C.Accounts) > 0 {
+		main = a.C.Accounts[0].ID
+	}
+	var names []string
+	for _, acc := range a.C.Accounts {
+		if acc.ID != main {
+			names = append(names, a.accountName(acc.ID))
+		}
+	}
+	sub := "只有一个账号，添加别的账号后才能换"
+	switch len(names) {
+	case 0:
+	case 1:
+		sub = "换到 " + names[0] + "；换过会在对话里提示"
+	default:
+		sub = "先 " + names[0] + "，再 " + strings.Join(names[1:], "、") + "；换过会在对话里提示"
+	}
+	on := set.Fallback
+	ui.Row(c).MinHeight(52).Padding(8, 14, 8, 14).Gap(12).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
+			ui.Text(c, "额度用尽时换备用账号").FontSize(13).FontWeight(500).TextColor(p.Fg)
+			ui.Text(c, sub).FontSize(12).TextColor(p.Mute)
+		})
+		ui.Switch(c, &on).Label("换备用账号").Disabled(len(names) == 0)
+		if on != set.Fallback {
+			s := set
+			s.Fallback = on
+			a.do(a.C.SaveSettings(s))
+		}
+	})
 }

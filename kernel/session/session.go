@@ -40,6 +40,8 @@ type Manager struct {
 	CompactAt int
 	// Defaults fills an account and model a new session leaves empty.
 	Defaults func() (account, model string)
+	// Accounts lists the signed-in accounts, for backups.
+	Accounts func() []string
 	Tools    tools.Set
 	Skills   skills.Loader
 	MCP      *mcp.Hub // nil without MCP
@@ -347,6 +349,7 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 		m.Store.UpdateSession(context.WithoutCancel(ctx), x)
 		x, _ = m.Store.GetSession(context.WithoutCancel(ctx), x.ID)
 		m.record(ctx, x.ID, proto.EventSession, toSession(x))
+		m.retitle(x.ID, x.Title, text)
 	}
 	usage, err := m.runAgent(ctx, x, r, p)
 	end := proto.TurnEnd{Usage: usage}
@@ -365,9 +368,23 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	if x.Account == "" || x.Model == "" {
 		return llm.Usage{}, errors.New("the session has no model; pick one")
 	}
-	provider, err := m.Open(x.Account)
+	opened, err := m.Open(x.Account)
 	if err != nil {
 		return llm.Usage{}, err
+	}
+	set, _ := m.Settings(ctx)
+	main := target{x.Account, x.Model, opened}
+	chain := &fallback{targets: []target{main}, moved: func(from, to target, err error) {
+		m.record(context.WithoutCancel(ctx), x.ID, proto.EventFallback, proto.Fallback{
+			From: from.account + "/" + from.model, To: to.account + "/" + to.model, Error: err.Error()})
+	}}
+	if set.Fallback {
+		chain.targets = append(chain.targets, m.backups(x.Account)...)
+	}
+	var provider llm.Provider = chain
+	subProvider, subModel, subEffort := provider, x.Model, x.Effort
+	if sub, ok := m.role(set.Sub); ok {
+		subProvider, subModel, subEffort = sub.provider, sub.model, set.Sub.Effort
 	}
 	history, err := m.history(ctx, x.ID)
 	if err != nil {
@@ -382,7 +399,11 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	var used llm.Usage
 	if at := m.compactAt(x.Account, x.Model); at > 0 && tokens(history) > at {
 		req := llm.Request{Model: x.Model, System: system, Messages: history, Tools: turnTools.Specs(), Effort: x.Effort, SessionID: x.ID}
-		short, u, err := m.compact(ctx, provider, req, x.ID)
+		compactWith := provider
+		if light, ok := m.role(set.Light); ok {
+			compactWith, req.Model, req.Effort = light.provider, light.model, set.Light.Effort
+		}
+		short, u, err := m.compact(ctx, compactWith, req, x.ID)
 		used = u
 		switch {
 		case ctx.Err() != nil:
@@ -398,12 +419,12 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	task := func(ctx context.Context, callID, taskID, prompt string) (string, error) {
 		s := &subSink{m: m, sessionID: x.ID, callID: callID, task: taskID}
 		sa := &agent.Agent{
-			Provider: provider,
+			Provider: subProvider,
 			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools.Without(tools.Task.Name, tools.RunTasks.Name, tools.AskUser.Name), env: env},
 			Sink:     s,
 			Clock:    m.Clock,
 		}
-		u, err := sa.Run(ctx, agent.Config{Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system + subPrompt}, nil, llm.Text(llm.User, prompt))
+		u, err := sa.Run(ctx, agent.Config{Model: subModel, Effort: subEffort, SessionID: x.ID, System: system + subPrompt}, nil, llm.Text(llm.User, prompt))
 		subMu.Lock()
 		used = used.Add(u)
 		subMu.Unlock()

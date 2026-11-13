@@ -421,6 +421,28 @@ type Settings struct {
 	Model   string `json:"model,omitempty"`
 	Effort  string `json:"effort,omitempty"`
 	Mode    string `json:"mode,omitempty"`
+	// Sub runs sub-agents, Light writes titles and summaries; nil means
+	// the session's own model (and, for titles, its first words).
+	Sub   *ModelRef `json:"sub,omitempty"`
+	Light *ModelRef `json:"light,omitempty"`
+	// Fallback moves a turn to the next account, at its default model,
+	// when the one in use hits a rate limit or runs out of quota.
+	Fallback bool `json:"fallback,omitempty"`
+}
+
+type ModelRef struct {
+	Account string `json:"account"`
+	Model   string `json:"model"`
+	Effort  string `json:"effort,omitempty"`
+}
+
+// EventFallback records a turn moving to a backup account.
+const EventFallback = "fallback"
+
+type Fallback struct {
+	From  string `json:"from"` // account/model
+	To    string `json:"to"`
+	Error string `json:"error"`
 }
 
 type AccountRef struct {

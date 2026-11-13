@@ -636,6 +636,12 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.endStream()
 			c.add(&Entry{Role: Notice, Text: "上下文快满了，较早的对话已写成摘要", Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
 		}
+	case proto.EventFallback:
+		var f proto.Fallback
+		if json.Unmarshal(e.Data, &f) == nil {
+			c.endStream()
+			c.notice("%s 额度用尽或被限流，换到 %s 继续", c.modelName(f.From), c.modelName(f.To))
+		}
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)
@@ -952,4 +958,19 @@ func queuedLabel(text string, images int) string {
 		return fmt.Sprintf("[%d 张图片]", images)
 	}
 	return text
+}
+
+// modelName shows "account/model" as the account's name and the model.
+func (c *Client) modelName(ref string) string {
+	i := strings.LastIndex(ref, "/")
+	if i < 0 {
+		return ref
+	}
+	account, model := ref[:i], ref[i+1:]
+	for _, a := range c.Accounts {
+		if a.ID == account && a.Name != "" {
+			account = a.Name
+		}
+	}
+	return account + " · " + model
 }
