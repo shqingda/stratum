@@ -605,3 +605,18 @@ func TestTaskSteps(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+func TestTaskGraph(t *testing.T) {
+	call := llm.Call("g", "run_tasks", map[string]any{"tasks": []map[string]any{
+		{"id": "find", "description": "找调用方", "prompt": "p"},
+		{"id": "fix", "description": "改调用方", "prompt": "p", "after": []string{"find"}},
+	}})
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventMessage, llm.Message{Role: llm.Assistant, Parts: []llm.Part{{ToolCall: &call}}}))})
+	c.Receive(ev(0, proto.EventTaskState, proto.TaskState{CallID: "g", Task: "find", State: "run"}))
+	c.Receive(ev(0, proto.EventTaskStep, proto.TaskStep{CallID: "g", Task: "find", Call: llm.Call("s", "search", map[string]any{"pattern": "Add("})}))
+	e := c.Entries[len(c.Entries)-1]
+	if len(e.Tasks) != 2 || e.Tasks[0].State != "run" || e.Tasks[0].Steps[0] != "search\tAdd(" || e.Tasks[1].After[0] != "find" || e.Tasks[1].State != "" {
+		t.Fatalf("%+v %+v", e.Tasks[0], e.Tasks[1])
+	}
+}

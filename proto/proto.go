@@ -462,5 +462,15 @@ const EventTaskStep = "task.step"
 
 type TaskStep struct {
 	CallID string       `json:"callId"`
+	Task   string       `json:"task,omitempty"` // a run_tasks task's id
 	Call   llm.ToolCall `json:"call"`
+}
+
+// EventTaskState is a run_tasks task changing state, streamed.
+const EventTaskState = "task.state"
+
+type TaskState struct {
+	CallID string `json:"callId"`
+	Task   string `json:"task"`
+	State  string `json:"state"` // run, done, fail, skip
 }

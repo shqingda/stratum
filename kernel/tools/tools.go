@@ -49,7 +49,7 @@ type Set []*Tool
 
 // Default is every built-in tool.
 func Default() Set {
-	return Set{ReadFile, WriteFile, EditFile, ListDir, Search, Shell, GitStatus, GitDiff, UpdatePlan, AskUser, Task}
+	return Set{ReadFile, WriteFile, EditFile, ListDir, Search, Shell, GitStatus, GitDiff, UpdatePlan, AskUser, Task, RunTasks}
 }
 
 // Get finds a tool by name. File tools return an independent one-call instance.

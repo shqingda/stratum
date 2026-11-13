@@ -31,6 +31,7 @@ var tools = map[string]struct{ symbol, verb string }{
 	"update_plan": {"list-check", "更新计划"},
 	"ask_user":    {"message", "提问"},
 	"task":        {"subtask", "子任务"},
+	"run_tasks":   {"hierarchy-3", "任务图"},
 }
 
 var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令"}
@@ -520,7 +521,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		ui.Text(c, t.verb).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
 		if e.Detail != "" {
 			d := ui.Text(c, e.Detail).FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
-			if e.Text != "task" {
+			if e.Text != "task" && e.Text != "run_tasks" {
 				d.Font("monospace")
 			}
 		}
@@ -537,6 +538,9 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	if !e.Done && len(e.Steps) > 0 {
 		a.taskSteps(c, e.Steps)
 	}
+	if !e.Done && len(e.Tasks) > 0 {
+		a.taskGraph(c, e.Tasks)
+	}
 	if open {
 		out := e.Output
 		if lines := strings.Split(out, "\n"); len(lines) > 40 {
@@ -544,7 +548,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		}
 		o := ui.Text(c, out).FontSize(12).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(2, 0, 8, 24).Selectable().PreserveSpaces()
-		if e.Text != "task" {
+		if e.Text != "task" && e.Text != "run_tasks" {
 			o.Font("monospace")
 		}
 	}
@@ -766,6 +770,53 @@ func (a *App) taskSteps(c *ui.Context, steps []string) {
 			ui.Row(c.Key(i)).Height(20).Gap(6).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, verb).FontSize(11.5).TextColor(p.Mute).Shrink(0)
 				ui.Text(c, detail).Font("monospace").FontSize(11.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+			})
+		}
+	})
+}
+
+// taskGraph is a running run_tasks call: each task with its state, what
+// it waits on, and the step it is at.
+func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
+	p := a.p
+	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
+		for i, t := range tasks {
+			ui.Column(c.Key(i)).Children(func() {
+				ui.Row(c).Height(22).Gap(7).AlignItems(ui.Center).Children(func() {
+					ui.Box(c).Size(12, 14).Shrink(0).Center().Children(func() {
+						switch t.State {
+						case "run":
+							ui.Box(c).Size(2, 12).Background(p.Live)
+						case "done":
+							sym(c, "check", 12, p.Fg2)
+						case "fail":
+							ui.Box(c).Size(7, 2).Background(p.Minus)
+						default:
+							ui.Box(c).Size(6, 6).Radius(3).Border(1, p.Mute)
+						}
+					})
+					color := p.Fg
+					if t.State == "" || t.State == "skip" {
+						color = p.Fg2
+					}
+					ui.Text(c, t.Description).FontSize(12).TextColor(color).SingleLine().Ellipsis("…").MinWidth(0)
+					switch {
+					case t.State == "skip":
+						ui.Text(c, "已跳过").FontSize(11.5).TextColor(p.Mute).Shrink(0)
+					case t.State == "" && len(t.After) > 0:
+						ui.Text(c, "等 "+strings.Join(t.After, "、")).FontSize(11.5).TextColor(p.Mute).SingleLine().Shrink(0)
+					}
+				})
+				if t.State == "run" && len(t.Steps) > 0 {
+					name, detail, _ := strings.Cut(t.Steps[len(t.Steps)-1], "\t")
+					if v, ok := tools[name]; ok {
+						name = v.verb
+					}
+					ui.Row(c).Height(18).Gap(6).Padding(0, 0, 0, 19).AlignItems(ui.Center).Children(func() {
+						ui.Text(c, name).FontSize(11.5).TextColor(p.Mute).Shrink(0)
+						ui.Text(c, detail).Font("monospace").FontSize(11.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+					})
+				}
 			})
 		}
 	})

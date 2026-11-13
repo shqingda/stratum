@@ -110,3 +110,31 @@ func (c *Client) Search(query string) []proto.Command {
 		return nil
 	})}
 }
+
+// GraphTask is a task of a run_tasks call.
+type GraphTask struct {
+	ID, Description string
+	After           []string
+	// State is "" while it waits, then run, done, fail or skip; it is
+	// known only for a call seen running.
+	State string
+	Steps []string // its sub-agent's tool calls, as Entry.Steps
+}
+
+func graphTasks(call llm.ToolCall) []*GraphTask {
+	if call.Name != "run_tasks" {
+		return nil
+	}
+	var a struct{ Tasks []*GraphTask }
+	json.Unmarshal(call.Args, &a)
+	return a.Tasks
+}
+
+func (e *Entry) task(id string) *GraphTask {
+	for _, t := range e.Tasks {
+		if id != "" && t.ID == id {
+			return t
+		}
+	}
+	return nil
+}

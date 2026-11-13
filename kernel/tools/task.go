@@ -26,6 +26,28 @@ var Task = &Tool{
 	},
 }
 
+// RunTasks hands a graph of tasks to sub-agents; the session runs it.
+var RunTasks = &Tool{
+	Name: "run_tasks",
+	Description: "Run up to 8 tasks with sub-agents, in the order their dependencies allow: tasks whose after-tasks are done run at the same time, " +
+		"and a task gets the reports of its after-tasks with its prompt. Use it for work that splits into parts, some needing others first. " +
+		"Each prompt must say all its sub-agent needs; it knows nothing of this conversation. You get back every report.",
+	Schema: schema(`{"type":"object","properties":{
+		"tasks":{"type":"array","items":{"type":"object","properties":{
+			"id":{"type":"string","description":"Short and unique, as a name for after."},
+			"description":{"type":"string","description":"A few words on what it does, shown to the user."},
+			"prompt":{"type":"string"},
+			"after":{"type":"array","items":{"type":"string"},"description":"Ids of tasks that must finish first."}},
+			"required":["id","description","prompt"]}}},
+		"required":["tasks"]}`),
+	Access: func(env Env, args json.RawMessage) (perm.Request, error) {
+		return perm.Request{Tool: "run_tasks", Kind: perm.Read}, nil
+	},
+	Run: func(ctx context.Context, env Env, args json.RawMessage) (string, error) {
+		return "", fmt.Errorf("run_tasks is run by the session")
+	},
+}
+
 // Without is s less the tools named.
 func (s Set) Without(names ...string) Set {
 	var out Set

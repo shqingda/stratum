@@ -68,7 +68,9 @@ type Entry struct {
 	Detail string      // a tool call's arguments, summarized
 	// Steps are the tool calls a running task's sub-agent made, as
 	// "name\tdetail"; only while it runs.
-	Steps  []string
+	Steps []string
+	// Tasks are a run_tasks call's tasks, as its arguments give them.
+	Tasks  []*GraphTask
 	Output string // a tool call's result
 	Done   bool
 	CallID string
@@ -590,7 +592,21 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			if i := slices.IndexFunc(c.Entries, func(x *Entry) bool { return x.CallID == st.CallID }); i >= 0 {
 				var args map[string]any
 				json.Unmarshal(st.Call.Args, &args)
-				c.Entries[i].Steps = append(c.Entries[i].Steps, st.Call.Name+"\t"+summarize(args))
+				step := st.Call.Name + "\t" + summarize(args)
+				if t := c.Entries[i].task(st.Task); t != nil {
+					t.Steps = append(t.Steps, step)
+				} else {
+					c.Entries[i].Steps = append(c.Entries[i].Steps, step)
+				}
+			}
+		}
+	case proto.EventTaskState:
+		var st proto.TaskState
+		if json.Unmarshal(e.Data, &st) == nil {
+			if i := slices.IndexFunc(c.Entries, func(x *Entry) bool { return x.CallID == st.CallID }); i >= 0 {
+				if t := c.Entries[i].task(st.Task); t != nil {
+					t.State = st.State
+				}
 			}
 		}
 	case proto.EventApprovalRequest:
@@ -700,7 +716,11 @@ func (c *Client) tool(call llm.ToolCall) *Entry {
 	}
 	var args map[string]any
 	_ = json.Unmarshal(call.Args, &args)
-	return c.add(&Entry{Role: Tool, Text: call.Name, Detail: summarize(args), CallID: call.ID, Args: call.Args})
+	en := &Entry{Role: Tool, Text: call.Name, Detail: summarize(args), CallID: call.ID, Args: call.Args, Tasks: graphTasks(call)}
+	if len(en.Tasks) > 0 {
+		en.Detail = fmt.Sprintf("%d 个任务", len(en.Tasks))
+	}
+	return c.add(en)
 }
 
 func (c *Client) toolResult(r llm.ToolResult) {

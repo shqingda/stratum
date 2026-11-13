@@ -21,7 +21,7 @@ type runner struct {
 	env       tools.Env
 	tools     tools.Set
 	// task runs a sub-agent for a task call; nil in a sub-agent.
-	task func(ctx context.Context, call llm.ToolCall, prompt string) (string, error)
+	task func(ctx context.Context, callID, taskID, prompt string) (string, error)
 }
 
 func (r *runner) Specs() []llm.Tool { return r.tools.Specs() }
@@ -37,12 +37,14 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	switch {
 	case tool == tools.AskUser:
 		return r.question(ctx, call)
+	case tool == tools.RunTasks && r.task != nil:
+		return r.graph(ctx, call)
 	case tool == tools.Task && r.task != nil:
 		var t struct{ Prompt string }
 		if json.Unmarshal(call.Args, &t) != nil || strings.TrimSpace(t.Prompt) == "" {
 			return fail("task: prompt is required.")
 		}
-		report, err := r.task(ctx, call, t.Prompt)
+		report, err := r.task(ctx, call.ID, "", t.Prompt)
 		if ctx.Err() != nil {
 			return llm.ToolResult{}, ctx.Err()
 		}

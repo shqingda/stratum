@@ -390,11 +390,11 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
 	}}
 	var subMu sync.Mutex
-	task := func(ctx context.Context, call llm.ToolCall, prompt string) (string, error) {
-		s := &subSink{m: m, sessionID: x.ID, callID: call.ID}
+	task := func(ctx context.Context, callID, taskID, prompt string) (string, error) {
+		s := &subSink{m: m, sessionID: x.ID, callID: callID, task: taskID}
 		sa := &agent.Agent{
 			Provider: provider,
-			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools.Without(tools.Task.Name, tools.AskUser.Name), env: env},
+			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools.Without(tools.Task.Name, tools.RunTasks.Name, tools.AskUser.Name), env: env},
 			Sink:     s,
 			Clock:    m.Clock,
 		}
@@ -409,7 +409,7 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		Tools:      &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: env, task: task},
 		Sink:       sink{m: m, ctx: ctx, sessionID: x.ID},
 		Clock:      m.Clock,
-		Concurrent: func(name string) bool { return name == tools.Task.Name },
+		Concurrent: func(name string) bool { return name == tools.Task.Name || name == tools.RunTasks.Name },
 	}
 	cfg := agent.Config{
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
@@ -438,9 +438,9 @@ You are a sub-agent: another agent gave you the task below and reads only your l
 // subSink streams a sub-agent's steps as progress of its task call, and
 // keeps its last words as the report. Its messages are not recorded.
 type subSink struct {
-	m                 *Manager
-	sessionID, callID string
-	report            string
+	m                       *Manager
+	sessionID, callID, task string
+	report                  string
 }
 
 func (s *subSink) Emit(e agent.Event) {
@@ -452,7 +452,7 @@ func (s *subSink) Emit(e agent.Event) {
 			}
 		}
 	case agent.ToolStart:
-		s.m.stream(s.sessionID, proto.EventTaskStep, proto.TaskStep{CallID: s.callID, Call: *e.Call})
+		s.m.stream(s.sessionID, proto.EventTaskStep, proto.TaskStep{CallID: s.callID, Task: s.task, Call: *e.Call})
 	}
 }
 
