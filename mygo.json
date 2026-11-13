@@ -11,9 +11,6 @@
     "minimumSystemVersion": "13.0",
     "infoPlist": {
       "LSApplicationCategoryType": "public.app-category.developer-tools"
-    },
-    "notarize": {
-      "keychainProfile": "talos-notary"
     }
   },
   "updates": {
