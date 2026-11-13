@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -22,12 +23,16 @@ const (
 // review is the state of the review panel: what the session's turns
 // changed in files, and taking a turn's changes back.
 type review struct {
-	open  bool
-	tab   string // "", "term" or "plan"
-	all   bool   // every turn, not just the last
-	sel   string // client.DiffKey of the file shown
-	asked map[string]bool
-	diffs map[string]*fileDiff
+	open bool
+	tab  string // "", "term" or "plan"
+	// uncommitted shows what git has not got, in place of a turn: turn,
+	// or the last one when 0.
+	uncommitted bool
+	turn        int64
+	wsRead      int
+	sel         string // client.DiffKey of the file shown
+	asked       map[string]bool
+	diffs       map[string]*fileDiff
 	// The diffs show one under another: jump is the file to scroll to,
 	// tops where each file's diff starts.
 	scroll ui.ScrollState
@@ -112,29 +117,46 @@ func (a *App) syncReview() {
 	if ch.Loading {
 		return
 	}
+	if r.wsRead != a.C.Workspace.Read {
+		r.wsRead = a.C.Workspace.Read
+		prefix := client.DiffKey(0, "")
+		maps.DeleteFunc(r.diffs, func(k string, _ *fileDiff) bool { return strings.HasPrefix(k, prefix) })
+		maps.DeleteFunc(r.asked, func(k string, _ bool) bool { return strings.HasPrefix(k, prefix) })
+	}
 	for _, t := range a.shownTurns() {
 		for _, f := range t.Files {
 			key := client.DiffKey(t.TurnSeq, f.Path)
-			if _, ok := ch.Diffs[key]; !ok && !r.asked[key] {
+			if !r.asked[key] && a.fileDiff(key) == nil {
 				r.asked[key] = true
-				a.quiet(a.C.DiffChange(t.TurnSeq, f.Path))
+				if t.TurnSeq == 0 {
+					a.quiet(a.C.DiffUncommitted(f.Path))
+				} else {
+					a.quiet(a.C.DiffChange(t.TurnSeq, f.Path))
+				}
 			}
 		}
 	}
 }
 
-// shownTurns are the turns the panel lists, newest first.
+// shownTurns are what the panel lists: one turn, or the uncommitted
+// files as turn 0.
 func (a *App) shownTurns() []proto.ChangeTurn {
+	if a.rv.uncommitted {
+		if len(a.C.Workspace.Files) == 0 {
+			return nil
+		}
+		return []proto.ChangeTurn{{Files: a.C.Workspace.Files}}
+	}
 	turns := a.C.Changes.Turns
+	for _, t := range turns {
+		if t.TurnSeq == a.rv.turn {
+			return []proto.ChangeTurn{t}
+		}
+	}
 	if len(turns) == 0 {
 		return nil
 	}
-	if !a.rv.all {
-		return turns[len(turns)-1:]
-	}
-	out := slices.Clone(turns)
-	slices.Reverse(out)
-	return out
+	return turns[len(turns)-1:]
 }
 
 func (a *App) fileDiff(key string) *fileDiff {
@@ -142,6 +164,9 @@ func (a *App) fileDiff(key string) *fileDiff {
 		return f
 	}
 	d, ok := a.C.Changes.Diffs[key]
+	if path, uncommitted := strings.CutPrefix(key, client.DiffKey(0, "")); uncommitted {
+		d, ok = a.C.Workspace.Diffs[path]
+	}
 	if !ok {
 		return nil
 	}
@@ -191,6 +216,13 @@ func (a *App) reviewPanel(c *ui.Context) {
 		switch {
 		case a.C.Current == nil:
 			a.reviewNote(c, "没有打开的会话")
+		case a.rv.uncommitted && a.C.Workspace.Branch == "":
+			a.reviewNote(c, "这个文件夹不在 git 仓库里")
+		case a.rv.uncommitted && len(turns) == 0:
+			a.reviewNote(c, "没有未提交的改动")
+		case a.rv.uncommitted:
+			a.reviewFiles(c, turns)
+			a.reviewDiff(c, turns)
 		case ch.Err != "" && len(ch.Turns) == 0:
 			a.reviewNote(c, "读取变更失败："+ch.Err)
 		case len(ch.Turns) == 0 && (ch.Loading || ch.Stale):
@@ -218,10 +250,10 @@ func (a *App) scope(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Padding(2).Radius(8).Background(p.Chip).Margin(0, 12).Children(func() {
 		for _, s := range []struct {
-			label string
-			all   bool
-		}{{"本轮", false}, {"全部", true}} {
-			on := a.rv.all == s.all
+			label       string
+			uncommitted bool
+		}{{"本轮", false}, {"未提交", true}} {
+			on := a.rv.uncommitted == s.uncommitted
 			b := ui.ButtonBase(c.Key("scope:"+s.label)).Height(24).Padding(0, 10).Radius(6).Center().Label(s.label).Selected(on)
 			col, weight := p.Fg2, 400
 			if on {
@@ -230,7 +262,10 @@ func (a *App) scope(c *ui.Context) {
 			}
 			b.Children(func() { ui.Text(c, s.label).FontSize(12).FontWeight(weight).TextColor(col) })
 			if b.Clicked() && !on {
-				a.rv.all, a.rv.sel = s.all, ""
+				a.rv.uncommitted, a.rv.sel, a.rv.turn = s.uncommitted, "", 0
+				if s.uncommitted {
+					a.C.Workspace.BranchStale = true // read it as it is now
+				}
 			}
 		}
 	})
@@ -273,14 +308,6 @@ func (a *App) reviewFiles(c *ui.Context, turns []proto.ChangeTurn) {
 	ui.Scroll(c).Shrink(0).MaxHeight(240).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 		ui.Column(c).Padding(6, 8).Children(func() {
 			for _, t := range turns {
-				if a.rv.all {
-					ui.Row(c).Height(26).Padding(0, 8).Gap(6).AlignItems(ui.Center).Margin(4, 0, 0, 0).Children(func() {
-						ui.Text(c, a.turnLabel(t.TurnSeq)).FontSize(11.5).FontWeight(600).TextColor(p.Mute).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-						if a.C.Changes.Reverted[t.TurnSeq] {
-							ui.Text(c, "已撤销").FontSize(11).TextColor(p.Mute)
-						}
-					})
-				}
 				for _, f := range t.Files {
 					a.fileRow(c, t.TurnSeq, f)
 				}
@@ -427,7 +454,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 				head = name + " · " + head
 			}
 			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
-			if !d.gaveUp && !a.C.Changes.FileReverted(turn, path) {
+			if turn != 0 && !a.C.Changes.FileReverted(turn, path) {
 				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", "撤销此块", func() {}).Height(24)
 				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: "运行中不能恢复文件"}[a.C.Busy])
 				if b.Clicked() {

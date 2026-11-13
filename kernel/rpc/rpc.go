@@ -237,6 +237,13 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		}
 		return workspace(ctx, p.Cwd)
 	}
+	if cmd.Method == proto.MethodWorkspaceDiff {
+		p, err := params[proto.WorkspaceQuery](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return workspaceDiff(ctx, p)
+	}
 	switch cmd.Method {
 	case proto.MethodLogin:
 		p, err := params[proto.Login](cmd)

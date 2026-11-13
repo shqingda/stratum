@@ -345,21 +345,27 @@ type SearchHit struct {
 const (
 	MethodWorkspace = "workspace.info"   // WorkspaceQuery → Workspace
 	MethodCommit    = "workspace.commit" // Commit → Workspace
+	// MethodWorkspaceDiff reads a file as HEAD has it and as it is now:
+	// WorkspaceQuery with Path → ChangeDiff.
+	MethodWorkspaceDiff = "workspace.diff"
 )
 
 type WorkspaceQuery struct {
-	Cwd string `json:"cwd"`
+	Cwd  string `json:"cwd"`
+	Path string `json:"path,omitempty"`
 }
 
 // Workspace is a folder as git sees it. Branch is empty outside a
 // repository, and a short commit for a detached head.
-// Added and Removed count the lines not yet committed; Dirty is set
-// for any change, untracked files too.
+// Added and Removed count the lines not yet committed, untracked files'
+// too; Dirty is set for any change.
 type Workspace struct {
 	Branch  string `json:"branch,omitempty"`
 	Dirty   bool   `json:"dirty,omitempty"`
 	Added   int    `json:"added,omitempty"`
 	Removed int    `json:"removed,omitempty"`
+	// Files are the files not committed, by absolute path.
+	Files []ChangeFile `json:"files,omitempty"`
 }
 
 type Commit struct {

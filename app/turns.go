@@ -127,10 +127,7 @@ func (a *App) summary(c *ui.Context, t int) {
 				a.do(a.C.Revert(ch.TurnSeq, "", reverted))
 			}
 			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), "查看变更", "", false).Clicked() {
-				a.rv.open = true
-				if n := len(a.C.Changes.Turns); n > 0 && a.C.Changes.Turns[n-1].TurnSeq != ch.TurnSeq {
-					a.rv.all = true
-				}
+				a.rv.open, a.rv.tab, a.rv.uncommitted, a.rv.turn = true, "", false, ch.TurnSeq
 				key := client.DiffKey(ch.TurnSeq, ch.Files[0].Path)
 				a.rv.sel, a.rv.jump = key, key
 			}

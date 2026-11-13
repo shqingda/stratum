@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,6 +31,15 @@ func Sub(a, b int) int { return a - b }
 func TestReviewAgainstKernel(t *testing.T) {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	os.WriteFile(filepath.Join(dir, "add.go"), []byte(addGo), 0o644)
+	t.Setenv("GIT_AUTHOR_NAME", "t")
+	t.Setenv("GIT_AUTHOR_EMAIL", "t@t")
+	t.Setenv("GIT_COMMITTER_NAME", "t")
+	t.Setenv("GIT_COMMITTER_EMAIL", "t@t")
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-A"}, {"commit", "-q", "-m", "calc"}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Skipf("git: %s %v", out, err)
+		}
+	}
 	script := &llm.Script{Turns: []llm.Turn{
 		{Calls: []llm.ToolCall{
 			llm.Call("c1", "edit_file", map[string]string{"path": "add.go", "old_text": "return a - b }\n\n// Sub", "new_text": "return a + b }\n\n// Sub"}),
@@ -117,4 +127,15 @@ func TestReviewAgainstKernel(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "internal/sub_test.go")); err != nil {
 		t.Errorf("the other file went too: %v", err)
 	}
+
+	if err := tt.Click("未提交"); err != nil {
+		t.Fatal(err)
+	}
+	until("the uncommitted files", func() bool {
+		return len(a.C.Workspace.Files) == 1 && tt.HasText("func TestSub(t *testing.T) {}")
+	})
+	if tt.HasText("撤销此块") || !tt.HasText("提交改动") {
+		t.Errorf("uncommitted view: %q", tt.Texts())
+	}
+	snapshot(t, tt, "review-uncommitted")
 }
