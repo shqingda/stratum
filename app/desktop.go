@@ -1,0 +1,82 @@
+package app
+
+import (
+	"strings"
+
+	"github.com/egoist/mygo"
+)
+
+// Desktop is what the app tells the system about its sessions: a Dock
+// badge with how many wait on the user, and a notification when one
+// starts waiting or finishes while the app is in the background.
+type Desktop interface {
+	Active() bool
+	Badge(n int)
+	Notify(id, title, body string)
+}
+
+// system is the Desktop of the running app.
+type system struct{}
+
+func (system) Active() bool { return mygo.App.IsActive() }
+func (system) Badge(n int)  { mygo.App.SetBadgeCount(n) }
+
+func (system) Notify(id, title, body string) {
+	if !mygo.NotificationsSupported() {
+		return
+	}
+	mygo.NewNotification(mygo.NotificationOptions{ID: notePrefix + id, Title: title, Body: body, Group: id}).Show()
+}
+
+const notePrefix = "session:"
+
+// UseDesktop shows the sessions' states on the Dock and in notifications;
+// clicking a notification opens its session.
+func (a *App) UseDesktop() {
+	a.desk = system{}
+	mygo.App.OnNotificationClick(func(id string) {
+		sid, ok := strings.CutPrefix(id, notePrefix)
+		if !ok || a.update == nil {
+			return
+		}
+		mygo.App.Focus()
+		a.update(func() { a.do(a.C.Open(sid)) })
+	})
+}
+
+// watch compares the sessions' states with the last ones seen, after a
+// frame from the kernel.
+func (a *App) watch() {
+	if a.desk == nil {
+		return
+	}
+	first := a.marks == nil
+	if first {
+		a.marks = map[string]string{}
+	}
+	waiting := 0
+	active := !first && a.desk.Active()
+	for _, s := range a.C.Sessions {
+		st := a.state(s)
+		if st == "wait" {
+			waiting++
+		}
+		was, known := a.marks[s.ID]
+		a.marks[s.ID] = st
+		if first || !known || active || st == was {
+			continue
+		}
+		switch {
+		case st == "wait":
+			a.desk.Notify(s.ID, title(s), "等你确认")
+		case was == "run" && st == "fail":
+			a.desk.Notify(s.ID, title(s), "这一轮出错了")
+		case was == "run" && (st == "unread" || st == ""):
+			a.desk.Notify(s.ID, title(s), "这一轮做完了")
+		}
+	}
+	if waiting != a.badge {
+		a.badge = waiting
+		a.desk.Badge(waiting)
+	}
+}

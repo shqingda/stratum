@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
+	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/app"
 	"github.com/shqingda/talos/client"
@@ -33,7 +35,9 @@ func main() {
 		cwd, _ = filepath.Abs(os.Args[1])
 	}
 	a := app.New(client.New(cwd))
+	mygo.Use(native.Plugin) // checks a day apart; builds without updates never do
 	mygo.App.WhenReady(func() {
+		mygo.App.SetMenu(menu())
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title:          "Talos",
 			Width:          1200,
@@ -47,8 +51,30 @@ func main() {
 			Content:        ui.View(a.View),
 		})
 		a.Serve(ctx, k.Server, win.Update)
+		a.UseDesktop()
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// menu is the default menu bar with "Check for Updates…" after About.
+func menu() *mygo.Menu {
+	return mygo.NewMenu([]*mygo.MenuItem{
+		{Label: "Talos", Submenu: []*mygo.MenuItem{
+			{Role: mygo.RoleAbout},
+			updater.MenuItem(),
+			mygo.Separator(),
+			{Role: mygo.RoleServices},
+			mygo.Separator(),
+			{Role: mygo.RoleHide},
+			{Role: mygo.RoleHideOthers},
+			{Role: mygo.RoleUnhide},
+			mygo.Separator(),
+			{Role: mygo.RoleQuit},
+		}},
+		{Role: mygo.RoleEditMenu},
+		{Role: mygo.RoleViewMenu},
+		{Role: mygo.RoleWindowMenu},
+	})
 }

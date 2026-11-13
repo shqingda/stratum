@@ -28,6 +28,7 @@ func (a *App) syncMenus() {
 
 func (a *App) receive(f proto.Frame) {
 	a.send(a.C.Receive(f))
+	a.watch()
 	if f.Type == proto.FrameResponse && a.modelsPending != "" && f.ID == a.modelsPending {
 		a.modelsPending = ""
 		if f.Error != nil {
