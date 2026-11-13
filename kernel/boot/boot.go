@@ -62,6 +62,11 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 		if len(names) == 0 {
 			return "", ""
 		}
+		set, _ := m.Settings(context.Background())
+		if slices.Contains(names, set.Account) {
+			provider, _, _ := strings.Cut(set.Account, "/")
+			return set.Account, cmpOr(set.Model, llm.DefaultModel(provider))
+		}
 		provider, _, _ := strings.Cut(names[0], "/")
 		return names[0], cmpOr(llm.DefaultModel(provider), "script")
 	}
@@ -102,6 +107,12 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 				return proto.Account{}, err
 			}
 			return account(q.Provider), nil
+		},
+		Logout: func(_ context.Context, id string) error {
+			if !slices.Contains(accounts(), id) {
+				return proto.Errorf("not_found", "no account %q", id)
+			}
+			return o.Creds.Delete(id)
 		},
 		Models: func(_ context.Context, account string) ([]proto.Model, error) {
 			provider, _, _ := strings.Cut(account, "/")

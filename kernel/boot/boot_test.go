@@ -44,3 +44,35 @@ func TestLogin(t *testing.T) {
 		t.Fatalf("accounts: %+v", list)
 	}
 }
+
+func TestSettings(t *testing.T) {
+	creds := &auth.Memory{}
+	creds.Set("deepseek", auth.Credential{Kind: auth.KindAPIKey, Key: "k"})
+	creds.Set("xai", auth.Credential{Kind: auth.KindAPIKey, Key: "k"})
+	k, err := Start(context.Background(), Options{DB: ":memory:", Creds: creds})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer k.Close()
+	ctx := context.Background()
+	m := k.Sessions
+	if _, err := m.SetSettings(ctx, proto.Settings{Mode: "nope"}); err == nil {
+		t.Fatal("an unknown mode was taken")
+	}
+	if _, err := m.SetSettings(ctx, proto.Settings{Account: "xai", Model: "grok-x", Effort: "low", Mode: "auto"}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := m.Create(ctx, proto.SessionCreate{Cwd: t.TempDir()})
+	if err != nil || s.Account != "xai" || s.Model != "grok-x" || s.Effort != "low" || s.Mode != "auto" {
+		t.Fatalf("new session %+v, %v", s, err)
+	}
+	if err := k.Server.Logout(ctx, "xai"); err != nil {
+		t.Fatal(err)
+	}
+	if err := k.Server.Logout(ctx, "xai"); err == nil {
+		t.Fatal("signed out twice")
+	}
+	if s, _ := m.Create(ctx, proto.SessionCreate{Cwd: t.TempDir()}); s.Account != "deepseek" {
+		t.Fatalf("after signing out of the default: %+v", s)
+	}
+}

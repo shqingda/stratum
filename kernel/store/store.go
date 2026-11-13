@@ -71,6 +71,10 @@ CREATE TABLE IF NOT EXISTS file_changes (
 	reverted INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS file_changes_turn ON file_changes(session_id, turn_seq, id);
+CREATE TABLE IF NOT EXISTS settings (
+	key   TEXT PRIMARY KEY,
+	value BLOB NOT NULL
+) WITHOUT ROWID;
 `
 
 // Open opens or creates the database at path; ":memory:" for tests.
@@ -149,6 +153,22 @@ func (s *Store) UpdateSession(ctx context.Context, x Session) error {
 			err = ErrNotFound
 		}
 	}
+	return err
+}
+
+// Setting reads the value kept under key, nil when there is none.
+func (s *Store) Setting(ctx context.Context, key string) ([]byte, error) {
+	var v []byte
+	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, key).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return v, err
+}
+
+// SetSetting keeps value under key.
+func (s *Store) SetSetting(ctx context.Context, key string, value []byte) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	return err
 }
 

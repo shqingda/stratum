@@ -28,6 +28,9 @@ type Server struct {
 	// Login signs in, telling the user what to do through progress.
 	Login func(ctx context.Context, q proto.Login, progress func(proto.LoginProgress)) (proto.Account, error)
 
+	// Logout forgets an account's credential.
+	Logout func(ctx context.Context, account string) error
+
 	loginMu     sync.Mutex
 	loginCancel context.CancelFunc
 
@@ -244,6 +247,23 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 	case proto.MethodLoginCancel:
 		s.cancelLogin(nil)
 		return struct{}{}, nil
+	case proto.MethodLogout:
+		p, err := params[proto.AccountRef](cmd)
+		if err != nil {
+			return nil, err
+		}
+		if s.Logout == nil {
+			return nil, proto.Errorf("bad_request", "sign-out is not available")
+		}
+		return struct{}{}, s.Logout(ctx, p.Account)
+	case proto.MethodSettings:
+		return s.Sessions.Settings(ctx)
+	case proto.MethodSetSettings:
+		p, err := params[proto.Settings](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.SetSettings(ctx, p)
 	}
 	if cmd.Method == proto.MethodCommit {
 		p, err := params[proto.Commit](cmd)

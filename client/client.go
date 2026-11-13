@@ -135,7 +135,8 @@ type Client struct {
 
 	Accounts []proto.Account
 	SignIn   *SignIn
-	Models   []proto.Model // of the account last asked about
+	Settings *proto.Settings // of new sessions, once read
+	Models   []proto.Model   // of the account last asked about
 	Unknown  []Unknown
 
 	launch    string

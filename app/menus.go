@@ -62,44 +62,51 @@ func (a *App) modelPill(c *ui.Context, label string) {
 		a.modelsRequested = false
 	}
 	a.pill(c, "model", "", label, true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
-		if !a.modelsRequested {
-			a.modelsRequested = true
-			a.modelsAccount, a.modelsError = a.modelAccount(), ""
-			cmds, err := a.C.ListModels(a.modelsAccount)
-			if err == nil {
-				a.modelsPending = cmds[0].ID
-			} else {
-				a.modelsError = err.Error()
-			}
-			a.do(cmds, err)
-		}
-		switch {
-		case a.modelsPending != "":
-			m.Item("加载中…").Disabled(true)
-		case a.modelsError != "":
-			m.Item("加载失败，请重新打开菜单").Subtitle(a.modelsError).Disabled(true)
-		case len(a.C.Models) == 0:
-			m.Item("这个账号没有可用模型").Disabled(true)
-		default:
-			for _, model := range a.C.Models {
-				name := model.Name
-				if name == "" {
-					name = model.ID
-				}
-				selected := model.ID == a.C.Current.Model || a.C.Current.Model == "" && model.Default
-				item := m.Item(name).ID(model.ID).Checked(selected).Trailing(contextSize(model.Context))
-				if model.Default {
-					item.Subtitle("✓ 默认模型")
-				}
-				if item.Chosen() {
-					id := model.ID
-					a.do(a.C.Update(proto.SessionUpdate{Model: &id}))
-				}
-			}
-		}
+		a.modelItems(m, a.modelAccount(), a.C.Current.Model, func(id string) {
+			a.do(a.C.Update(proto.SessionUpdate{Model: &id}))
+		})
 	}, a.menuOptions(&a.modelMenu))
 	if !a.modelMenu {
 		a.modelsRequested = false
+	}
+}
+
+// modelItems lists an account's models in a menu, asking for them once
+// per opening, with current checked.
+func (a *App) modelItems(m *ui.Menu, account, current string, choose func(id string)) {
+	if !a.modelsRequested {
+		a.modelsRequested = true
+		a.modelsAccount, a.modelsError = account, ""
+		cmds, err := a.C.ListModels(account)
+		if err == nil {
+			a.modelsPending = cmds[0].ID
+		} else {
+			a.modelsError = err.Error()
+		}
+		a.do(cmds, err)
+	}
+	switch {
+	case a.modelsPending != "":
+		m.Item("加载中…").Disabled(true)
+	case a.modelsError != "":
+		m.Item("加载失败，请重新打开菜单").Subtitle(a.modelsError).Disabled(true)
+	case len(a.C.Models) == 0:
+		m.Item("这个账号没有可用模型").Disabled(true)
+	default:
+		for _, model := range a.C.Models {
+			name := model.Name
+			if name == "" {
+				name = model.ID
+			}
+			selected := model.ID == current || current == "" && model.Default
+			item := m.Item(name).ID(model.ID).Checked(selected).Trailing(contextSize(model.Context))
+			if model.Default {
+				item.Subtitle("✓ 默认模型")
+			}
+			if item.Chosen() {
+				choose(model.ID)
+			}
+		}
 	}
 }
 

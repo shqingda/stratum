@@ -392,3 +392,24 @@ type LoginProgress struct {
 	Code    string `json:"code,omitempty"`
 	CodeURL string `json:"codeUrl,omitempty"`
 }
+
+// --- 设置 ---
+
+const (
+	MethodSettings    = "settings.get" // → Settings
+	MethodSetSettings = "settings.set" // Settings → Settings
+	MethodLogout      = "auth.logout"  // AccountRef → {}
+)
+
+// Settings are what a new session starts with; empty fields take the
+// kernel's defaults.
+type Settings struct {
+	Account string `json:"account,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Effort  string `json:"effort,omitempty"`
+	Mode    string `json:"mode,omitempty"`
+}
+
+type AccountRef struct {
+	Account string `json:"account"`
+}

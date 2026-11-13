@@ -40,3 +40,22 @@ func TestLogin(t *testing.T) {
 		t.Fatalf("after cancelling: %+v", c.SignIn)
 	}
 }
+
+func TestSettingsAndLogout(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	c.Accounts = []proto.Account{{ID: "codex"}, {ID: "xai"}}
+	cmds, _ := c.ReadSettings()
+	c.Receive(resp(cmds[0].ID, proto.Settings{Account: "xai", Mode: "auto"}))
+	if c.Settings == nil || c.Settings.Account != "xai" {
+		t.Fatalf("settings %+v", c.Settings)
+	}
+	cmds, _ = c.SaveSettings(proto.Settings{Account: "xai", Mode: "full"})
+	if c.Settings.Mode != "full" || one(t, cmds, proto.MethodSetSettings).ID == "" {
+		t.Fatal("save did not show at once")
+	}
+	cmds, _ = c.Logout("xai")
+	c.Receive(resp(one(t, cmds, proto.MethodLogout).ID, struct{}{}))
+	if len(c.Accounts) != 1 || c.Settings.Account != "" {
+		t.Fatalf("after signing out: %+v %+v", c.Accounts, c.Settings)
+	}
+}

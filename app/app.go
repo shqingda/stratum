@@ -69,6 +69,9 @@ type App struct {
 
 	keyOpen, keyMenu bool
 	keyProvider, key string
+
+	settingsOpen, addingAccount, setModelMenu bool
+	accountsSeen                              int
 }
 
 // New returns an app over c, not connected yet.
@@ -159,6 +162,11 @@ func (a *App) View(c *ui.Context) {
 	}
 	if a.needsLogin() {
 		a.onboarding(c)
+		a.keys(c)
+		return
+	}
+	if a.settingsOpen {
+		a.settingsView(c)
 		a.keys(c)
 		return
 	}

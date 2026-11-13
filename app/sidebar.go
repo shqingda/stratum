@@ -159,6 +159,7 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	p := a.p
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)
+	n := len(a.visibleSessions) // its ⌘ number
 	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(30).Padding(0, 10).Gap(9).Radius(7).AlignItems(ui.Center).Label(title(s))
 	switch {
 	case on:
@@ -176,9 +177,12 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 			fg = p.Fg
 		}
 		ui.Text(c, title(s)).FontSize(13).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		if st == "wait" {
+		switch {
+		case c.Modifiers() == ui.Cmd && n <= 9:
+			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).TextColor(p.Mute).SingleLine()
+		case st == "wait":
 			ui.Text(c, "审批").FontSize(11).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
-		} else {
+		default:
 			ui.Text(c, ago(a.now(), s.Updated)).FontSize(11.5).TextColor(p.Mute).SingleLine()
 		}
 	})
@@ -223,7 +227,9 @@ func (a *App) footer(c *ui.Context) {
 				ui.Text(c, sub).FontSize(11).TextColor(p.Mute).SingleLine().Ellipsis("…")
 			}
 		})
-		a.iconButton(c, "settings", "settings", "设置")
+		if a.iconButton(c, "settings", "settings", "设置").Clicked() {
+			a.openSettings()
+		}
 	})
 }
 

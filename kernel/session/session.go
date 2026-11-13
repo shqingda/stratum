@@ -134,7 +134,11 @@ func (m *Manager) Create(ctx context.Context, p proto.SessionCreate) (proto.Sess
 	if fi, err := os.Stat(cwd); err != nil || !fi.IsDir() {
 		return proto.Session{}, proto.Errorf("bad_request", "%s is not a directory", cwd)
 	}
-	mode := cmpOr(p.Mode, string(perm.Ask))
+	set, err := m.Settings(ctx)
+	if err != nil {
+		return proto.Session{}, err
+	}
+	mode := cmpOr(p.Mode, cmpOr(set.Mode, string(perm.Ask)))
 	if !perm.Mode(mode).Valid() {
 		return proto.Session{}, proto.Errorf("bad_request", "unknown permission mode %q", mode)
 	}
@@ -145,7 +149,7 @@ func (m *Manager) Create(ctx context.Context, p proto.SessionCreate) (proto.Sess
 			account, model = a, cmpOr(model, mo)
 		}
 	}
-	x := store.Session{ID: newID(), Title: p.Title, Cwd: cwd, Account: account, Model: model, Effort: p.Effort, Mode: mode}
+	x := store.Session{ID: newID(), Title: p.Title, Cwd: cwd, Account: account, Model: model, Effort: cmpOr(p.Effort, set.Effort), Mode: mode}
 	if err := m.Store.CreateSession(ctx, x); err != nil {
 		return proto.Session{}, err
 	}
@@ -155,6 +159,28 @@ func (m *Manager) Create(ctx context.Context, p proto.SessionCreate) (proto.Sess
 	}
 	s := toSession(x)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
+}
+
+// Settings reads what new sessions start with.
+func (m *Manager) Settings(ctx context.Context) (proto.Settings, error) {
+	var s proto.Settings
+	b, err := m.Store.Setting(ctx, "defaults")
+	if err == nil && b != nil {
+		err = json.Unmarshal(b, &s)
+	}
+	return s, err
+}
+
+// SetSettings changes what new sessions start with.
+func (m *Manager) SetSettings(ctx context.Context, s proto.Settings) (proto.Settings, error) {
+	if s.Mode != "" && !perm.Mode(s.Mode).Valid() {
+		return proto.Settings{}, proto.Errorf("bad_request", "unknown permission mode %q", s.Mode)
+	}
+	if s.Account == "" {
+		s.Model = ""
+	}
+	b, _ := json.Marshal(s)
+	return s, m.Store.SetSetting(ctx, "defaults", b)
 }
 
 // List lists sessions, most recent first.

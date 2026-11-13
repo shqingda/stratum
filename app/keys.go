@@ -24,6 +24,11 @@ func (a *App) keys(c *ui.Context) {
 			a.openPalette(c)
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyComma, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen {
+			a.openSettings()
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBackslash, func() {
 		if !c.ShortcutRepeated() {
 			a.noSide = !a.noSide
