@@ -413,3 +413,22 @@ type Settings struct {
 type AccountRef struct {
 	Account string `json:"account"`
 }
+
+// --- 按块撤销 ---
+
+const (
+	// MethodChangesRevertHunk puts back the old lines of one hunk of what
+	// a turn did to a file: HunkQuery → ChangeResult.
+	MethodChangesRevertHunk = "changes.revertHunk"
+	EventChangesPatched     = "changes.patched" // durable; ChangeResult
+)
+
+// HunkQuery names a hunk as "@@ -OldStart,OldLen +NewStart,NewLen @@" of
+// the turn's diff of Path gives it, lines counted from 1.
+type HunkQuery struct {
+	ChangeQuery
+	OldStart int `json:"oldStart"`
+	OldLen   int `json:"oldLen"`
+	NewStart int `json:"newStart"`
+	NewLen   int `json:"newLen"`
+}

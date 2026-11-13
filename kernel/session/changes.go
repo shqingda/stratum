@@ -84,6 +84,49 @@ func (m *Manager) ChangesApply(ctx context.Context, q proto.ChangeQuery, redo bo
 	return out, errors.Join(applyErr, err)
 }
 
+// ChangesRevertHunk puts back one hunk of a turn's change to a file, while
+// no turn runs.
+func (m *Manager) ChangesRevertHunk(ctx context.Context, q proto.HunkQuery) (proto.ChangeResult, error) {
+	if q.TurnSeq <= 0 || q.Path == "" {
+		return proto.ChangeResult{}, proto.Errorf("bad_request", "turnSeq and path are required")
+	}
+	m.mu.Lock()
+	unlocked := false
+	unlock := func() {
+		if !unlocked {
+			unlocked = true
+			m.mu.Unlock()
+		}
+	}
+	defer unlock()
+	if len(m.runs) != 0 {
+		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
+	}
+	x, err := m.session(ctx, q.SessionID)
+	if err != nil {
+		return proto.ChangeResult{}, err
+	}
+	path := q.Path
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(x.Cwd, path)
+	}
+	path = filepath.Clean(path)
+	result, err := m.changes.RevertHunk(ctx, q.SessionID, q.TurnSeq, path, changes.Hunk{OldStart: q.OldStart, OldLen: q.OldLen, NewStart: q.NewStart, NewLen: q.NewLen})
+	out := proto.ChangeResult{TurnSeq: q.TurnSeq, Path: path, Paths: result.Paths, Conflicts: result.Conflicts}
+	if errors.Is(err, changes.ErrBadHunk) {
+		return out, proto.Errorf("bad_request", "the hunk is not in the turn's diff")
+	}
+	if err != nil || len(out.Paths) == 0 {
+		return out, changeError(err)
+	}
+	ev, err := m.Store.Append(context.WithoutCancel(ctx), q.SessionID, proto.EventChangesPatched, out)
+	unlock() // publish takes the lock
+	if err == nil {
+		m.publish(toProto(ev))
+	}
+	return out, err
+}
+
 func changeError(err error) error {
 	if errors.Is(err, store.ErrNotFound) {
 		return proto.Errorf("not_found", "no recorded change")

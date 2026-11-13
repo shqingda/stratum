@@ -221,3 +221,31 @@ func TestChangesDiffReadsOnlyRecordedSnapshots(t *testing.T) {
 		t.Fatalf("read-only diff changed event revision: before %d, after %d, %v", rev, afterRev, err)
 	}
 }
+
+func TestChangesRevertHunk(t *testing.T) {
+	m, s := changesManager(t, &llm.Script{})
+	ctx := context.Background()
+	q := recordTestChange(t, m, s)
+	events := make(chan proto.Event, 4)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventChangesPatched {
+			events <- e
+		}
+	})()
+	if _, err := m.ChangesRevertHunk(ctx, proto.HunkQuery{ChangeQuery: q, OldStart: 1, OldLen: 1, NewStart: 1, NewLen: 2}); err == nil {
+		t.Fatal("a hunk past the end was taken")
+	}
+	q.Path = "file" // relative to the session's folder
+	r, err := m.ChangesRevertHunk(ctx, proto.HunkQuery{ChangeQuery: q, OldStart: 1, OldLen: 1, NewStart: 1, NewLen: 1})
+	if err != nil || len(r.Paths) != 1 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(s.Cwd, "file")); string(got) != "before" {
+		t.Fatalf("file holds %q", got)
+	}
+	select {
+	case <-events:
+	default:
+		t.Fatal("no changes.patched event")
+	}
+}

@@ -321,3 +321,50 @@ func TestRevertOneFile(t *testing.T) {
 	checkFile(t, a, []byte("a1"))
 	checkFile(t, b, []byte("b0"))
 }
+
+func TestRevertHunk(t *testing.T) {
+	_, l, root, _ := setup(t)
+	ctx := context.Background()
+	f := filepath.Join(root, "f")
+	before := []byte("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n")
+	after := []byte("1\ntwo\n3\n4\n5\n6\n7\n8\n9\n10\neleven\n12\n13\n")
+	record(t, l, 3, f, before, after)
+	// The second hunk: "@@ -8,5 +8,6 @@" turns 11 into eleven and adds 13.
+	if _, err := l.RevertHunk(ctx, "s", 3, f, Hunk{OldStart: 8, OldLen: 5, NewStart: 8, NewLen: 7}); !errors.Is(err, ErrBadHunk) {
+		t.Fatalf("a hunk past the end: %v", err)
+	}
+	r, err := l.RevertHunk(ctx, "s", 3, f, Hunk{OldStart: 8, OldLen: 5, NewStart: 8, NewLen: 6})
+	if err != nil || !reflect.DeepEqual(r.Paths, []string{f}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	checkFile(t, f, []byte("1\ntwo\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n"))
+	turns, _ := l.List(ctx, "s")
+	if got := turns[0].Files[0]; got.Added != 1 || got.Removed != 1 {
+		t.Fatalf("after the hunk: %+v", got)
+	}
+	// The turn still reverts and redoes whole.
+	if _, err := l.Revert(ctx, "s", 3, ""); err != nil {
+		t.Fatal(err)
+	}
+	checkFile(t, f, before)
+	if _, err := l.Redo(ctx, "s", 3, ""); err != nil {
+		t.Fatal(err)
+	}
+	checkFile(t, f, []byte("1\ntwo\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n"))
+	// A file changed since is a conflict, left alone.
+	os.WriteFile(f, []byte("mine\n"), 0o644)
+	if r, err := l.RevertHunk(ctx, "s", 3, f, Hunk{OldStart: 1, OldLen: 5, NewStart: 1, NewLen: 5}); err != nil || len(r.Conflicts) != 1 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	checkFile(t, f, []byte("mine\n"))
+
+	// A new file with its only hunk taken back is gone.
+	n := filepath.Join(root, "n")
+	record(t, l, 4, n, nil, []byte("x\ny\n"))
+	if _, err := l.RevertHunk(ctx, "s", 4, n, Hunk{NewStart: 1, NewLen: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(n); !os.IsNotExist(err) {
+		t.Fatalf("new file left: %v", err)
+	}
+}

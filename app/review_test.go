@@ -104,4 +104,17 @@ func TestReviewAgainstKernel(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(dir, "add.go")); !strings.Contains(string(b), "return a + b }\n\n// Sub") {
 		t.Errorf("add.go after redo:\n%s", b)
 	}
+
+	until("the diffs again", func() bool { return tt.HasText("撤销此块") && len(a.C.Changes.Diffs) == 2 })
+	snapshot(t, tt, "review-hunk")
+	if err := tt.Click("撤销此块"); err != nil {
+		t.Fatal(err)
+	}
+	until("the hunk taken back", func() bool { return tt.HasText("内容没有变化") })
+	if b, _ := os.ReadFile(filepath.Join(dir, "add.go")); string(b) != addGo {
+		t.Errorf("add.go after taking back its hunk:\n%s", b)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "internal/sub_test.go")); err != nil {
+		t.Errorf("the other file went too: %v", err)
+	}
 }

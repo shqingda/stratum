@@ -46,6 +46,9 @@ func (c *Client) changesEvent(e proto.Event) {
 	switch e.Type {
 	case proto.EventTurnEnd:
 		c.Changes.Stale = true
+	case proto.EventChangesPatched:
+		c.Changes.Stale = true
+		clear(c.Changes.Diffs)
 	case proto.EventChangesReverted, proto.EventChangesRedone:
 		var r proto.ChangeResult
 		if json.Unmarshal(e.Data, &r) == nil {
@@ -153,6 +156,28 @@ func (c *Client) Revert(turn int64, path string, redo bool) ([]proto.Command, er
 	if err == nil {
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
 			c.notice("恢复文件失败：%s", e.Message)
+			return nil
+		}
+	}
+	return cmds, err
+}
+
+// RevertHunk puts back the old lines of one hunk of a turn's change to
+// path (absolute). The session's log brings the outcome.
+func (c *Client) RevertHunk(turn int64, path string, oldStart, oldLen, newStart, newLen int) ([]proto.Command, error) {
+	q := proto.HunkQuery{ChangeQuery: proto.ChangeQuery{SessionID: sessionID(c.Current), TurnSeq: turn, Path: path},
+		OldStart: oldStart, OldLen: oldLen, NewStart: newStart, NewLen: newLen}
+	cmds, err := c.mutation(proto.MethodChangesRevertHunk, q, func(r json.RawMessage) []proto.Command {
+		c.Workspace.BranchStale = true
+		var res proto.ChangeResult
+		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
+			c.notice("这个文件在这之后又被改过，没有动它")
+		}
+		return nil
+	})
+	if err == nil {
+		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
+			c.notice("撤销这一块失败：%s", e.Message)
 			return nil
 		}
 	}

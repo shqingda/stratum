@@ -297,6 +297,13 @@ func (s *Server) handleChanges(ctx context.Context, cmd proto.Command) (any, err
 		}
 		result, err := s.Sessions.ChangesApply(ctx, p, cmd.Method == proto.MethodChangesRedo)
 		return result, err, true
+	case proto.MethodChangesRevertHunk:
+		p, err := params[proto.HunkQuery](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		result, err := s.Sessions.ChangesRevertHunk(ctx, p)
+		return result, err, true
 	}
 	return nil, nil, false
 }

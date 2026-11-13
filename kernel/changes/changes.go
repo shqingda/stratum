@@ -1,8 +1,10 @@
-// Package changes records file-tool snapshots and restores whole turns.
+// Package changes records file-tool snapshots and restores turns, files
+// and hunks.
 // Shell writes are not observed and can therefore cause restore conflicts.
 package changes
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -223,6 +225,93 @@ func (l *Log) apply(ctx context.Context, sessionID string, turnSeq int64, path s
 		result.Paths = append(result.Paths, first.Path)
 	}
 	return result, errors.Join(failures...)
+}
+
+// Hunk is a run of lines of a turn's diff, as "@@ -l,s +l,s @@" gives it.
+type Hunk struct{ OldStart, OldLen, NewStart, NewLen int }
+
+// ErrBadHunk means the hunk is not within the turn's diff of the file.
+var ErrBadHunk = errors.New("changes: hunk out of range")
+
+// RevertHunk puts back the old lines of one hunk of what a turn did to
+// path. It is kept as a further change of the turn, so the turn still
+// reverts and redoes whole.
+func (l *Log) RevertHunk(ctx context.Context, sessionID string, turnSeq int64, path string, h Hunk) (Result, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	result := Result{Paths: []string{}, Conflicts: []string{}}
+	rows, err := l.store.FileChanges(ctx, sessionID, turnSeq)
+	if err != nil {
+		return result, err
+	}
+	var group []store.FileChange
+	for _, g := range groupFiles(rows) {
+		if g[0].Path == path {
+			group = g
+		}
+	}
+	if group == nil {
+		return result, store.ErrNotFound
+	}
+	first, last := group[0], group[len(group)-1]
+	for i, row := range group {
+		if row.Reverted || i > 0 && !same(group[i-1].After, row.Before) {
+			result.Conflicts = append(result.Conflicts, path)
+			return result, nil
+		}
+	}
+	old, cur := splitLines(first.Before), splitLines(last.After)
+	os0, ns0 := max(h.OldStart-1, 0), max(h.NewStart-1, 0)
+	if h.OldLen < 0 || h.NewLen < 0 || os0+h.OldLen > len(old) || ns0+h.NewLen > len(cur) {
+		return result, ErrBadHunk
+	}
+	next := []byte{}
+	for _, part := range [][][]byte{cur[:ns0], old[os0 : os0+h.OldLen], cur[ns0+h.NewLen:]} {
+		for _, line := range part {
+			next = append(next, line...)
+		}
+	}
+	if len(next) == 0 && first.Before == nil {
+		next = nil // a new file with all of it taken back
+	}
+	root, err := openParent(path)
+	if err != nil {
+		result.Conflicts = append(result.Conflicts, path)
+		return result, nil
+	}
+	defer root.Close()
+	name := filepath.Base(path)
+	current, mode, err := readFile(root, name)
+	if err != nil || !same(current, last.After) {
+		result.Conflicts = append(result.Conflicts, path)
+		return result, nil
+	}
+	if current == nil {
+		mode = os.FileMode(last.Mode)
+	}
+	if err := replace(root, name, last.After, next, mode); err != nil {
+		if errors.Is(err, errConflict) {
+			result.Conflicts = append(result.Conflicts, path)
+			return result, nil
+		}
+		return result, err
+	}
+	if err := l.store.RecordFileChange(context.WithoutCancel(ctx), sessionID, turnSeq, path, last.After, next, uint32(mode)); err != nil {
+		return result, errors.Join(err, replace(root, name, next, last.After, mode))
+	}
+	result.Paths = append(result.Paths, path)
+	return result, nil
+}
+
+func splitLines(b []byte) [][]byte {
+	if len(b) == 0 {
+		return nil
+	}
+	lines := bytes.SplitAfter(b, []byte("\n"))
+	if len(lines[len(lines)-1]) == 0 {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
 }
 
 func groupFiles(rows []store.FileChange) [][]store.FileChange {

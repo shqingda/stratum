@@ -370,7 +370,7 @@ func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
 						_, name = a.splitPath(f.Path)
 					}
 					sec := ui.Column(c.Key("diff:"+key)).Margin(map[bool]float32{true: 0, false: 14}[first], 0, 0, 0).Children(func() {
-						shown = a.fileDiffView(c, key, name, shown)
+						shown = a.fileDiffView(c, t.TurnSeq, f.Path, name, shown)
 					})
 					secs, keys = append(secs, sec), append(keys, key)
 					first = false
@@ -391,8 +391,9 @@ func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
 
 // fileDiffView is one file's hunks, named in the first hunk's header
 // when name is set, and returns how many lines show so far.
-func (a *App) fileDiffView(c *ui.Context, key, name string, shown int) int {
+func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown int) int {
 	p := a.p
+	key := client.DiffKey(turn, path)
 	note := func(s string) {
 		head := s
 		if name != "" {
@@ -425,7 +426,14 @@ func (a *App) fileDiffView(c *ui.Context, key, name string, shown int) int {
 			if i == 0 && name != "" {
 				head = name + " · " + head
 			}
-			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
+			if !d.gaveUp && !a.C.Changes.FileReverted(turn, path) {
+				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", "撤销此块", func() {}).Height(24)
+				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: "运行中不能恢复文件"}[a.C.Busy])
+				if b.Clicked() {
+					a.do(a.C.RevertHunk(turn, path, h.oldStart, h.oldLen, h.newStart, h.newLen))
+				}
+			}
 		})
 		for _, e := range h.edits {
 			if shown >= maxDiffLines {
