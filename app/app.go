@@ -48,6 +48,8 @@ type App struct {
 	inWork bool            // building a finished turn's folded work
 	noSide bool            // the sidebar is hidden
 	pal    bool            // the ⌘K palette shows
+	jump   int64           // a message to scroll to, from a search
+	jumpIn string          // the session it is in
 	palSel int             // its row chosen by the arrow keys
 	stats  map[string][2]int
 	rv     review

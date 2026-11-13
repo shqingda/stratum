@@ -34,10 +34,27 @@ func task8Tester(a *App, dark bool) *ui.Tester {
 	return tt
 }
 
+// next is the next batch of commands the app sent, leaving out the ⌘K
+// palette's searches.
+func next(a *App) ([]proto.Command, bool) {
+	for {
+		select {
+		case cmds := <-a.out:
+			if len(cmds) == 1 && cmds[0].Method == proto.MethodSearch {
+				continue
+			}
+			return cmds, true
+		default:
+			return nil, false
+		}
+	}
+}
+
 func task8Command(t *testing.T, a *App, method string, params any) proto.Command {
 	t.Helper()
-	select {
-	case cmds := <-a.out:
+	cmds, ok := next(a)
+	switch {
+	case ok:
 		if len(cmds) != 1 || cmds[0].Method != method {
 			t.Fatalf("commands = %+v, want one %s", cmds, method)
 		}
@@ -55,10 +72,8 @@ func task8Command(t *testing.T, a *App, method string, params any) proto.Command
 
 func task8NoCommand(t *testing.T, a *App) {
 	t.Helper()
-	select {
-	case cmds := <-a.out:
+	if cmds, ok := next(a); ok {
 		t.Fatalf("unexpected commands: %+v", cmds)
-	default:
 	}
 }
 

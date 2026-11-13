@@ -62,7 +62,10 @@ func TestSearchTextAndSyntax(t *testing.T) {
 	searchHits(t, s, "astronomy", "", 2)
 	searchHits(t, s, "历史分页", "first", 1)
 	searchHits(t, s, "全文检索", "", 1)
-	searchHits(t, s, "中文", "", 0) // The documented trigram minimum is three characters.
+	if short := searchHits(t, s, "中文", "", 1); short[0].Snippet != "[中文]消息可以使用历史分页和全文检索。" {
+		t.Fatalf("short snippet %q", short[0].Snippet)
+	}
+	searchHits(t, s, "%", "", 0)
 	searchHits(t, s, " \t\n", "", 0)
 	searchHits(t, s, "astronomy", "missing", 0)
 	for _, query := range []string{"hello-world", "c++", "path/to/file.go", "sqlite:token", `quote"inside`, `"unterminated`} {

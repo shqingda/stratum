@@ -543,3 +543,54 @@ func TestImagePrompt(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 }
+
+func TestLoadOlder(t *testing.T) {
+	c := newClient("/w", "t")
+	init := one(t, c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version, Instance: "i1"}), proto.MethodInitialize)
+	list := one(t, c.Receive(resp(init.ID, proto.Hello{Version: proto.Version})), proto.MethodSessionList)
+	get := one(t, c.Receive(resp(list.ID, []proto.Session{sess(sid, "/w")})), proto.MethodSessionGet)
+	events := one(t, c.Receive(resp(get.ID, proto.Snapshot{Session: sess(sid, "/w"), Revision: 1000})), proto.MethodEvents)
+	if q := params[proto.EventsQuery](t, events); q.After != 1000-tailSize {
+		t.Fatalf("%+v", q)
+	}
+	c.Receive(resp(events.ID, proto.EventPage{Events: []proto.Event{
+		event(ev(601, proto.EventMessage, msg(llm.Assistant, "half a turn"))),
+		event(ev(602, proto.EventTurnStart, nil)),
+		event(ev(603, proto.EventMessage, msg(llm.User, "recent"))),
+		event(ev(604, proto.EventTurnEnd, proto.TurnEnd{})),
+	}}))
+	if got := texts(c); len(got) != 1 || got[0] != "user:recent" || !c.Older {
+		t.Fatalf("%v older=%v", got, c.Older)
+	}
+	cmds, _ := c.LoadOlder()
+	older := one(t, cmds, proto.MethodEvents)
+	if q := params[proto.EventsQuery](t, older); q.Before != 602 {
+		t.Fatalf("%+v", q)
+	}
+	c.Receive(resp(older.ID, proto.EventPage{More: true, Events: []proto.Event{
+		event(ev(500, proto.EventMessage, msg(llm.Assistant, "cut"))),
+		event(ev(501, proto.EventTurnStart, nil)),
+		event(ev(502, proto.EventMessage, msg(llm.User, "old"))),
+		event(ev(503, proto.EventTurnEnd, proto.TurnEnd{})),
+	}}))
+	if got := texts(c); len(got) != 2 || got[0] != "user:old" || got[1] != "user:recent" || len(c.Turns) != 2 || !c.Older || c.Busy {
+		t.Fatalf("%v turns=%d", got, len(c.Turns))
+	}
+	c.Receive(ev(605, proto.EventTurnStart, nil))
+	if len(c.Turns) != 3 || !c.Busy {
+		t.Fatal("live events after paging")
+	}
+}
+
+func TestSearch(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	if c.Search("报") != nil || c.Hits != nil {
+		t.Fatal("one character searched")
+	}
+	q := one(t, c.Search("报错"), proto.MethodSearch)
+	c.Search("报错啊")
+	c.Receive(resp(q.ID, []proto.SearchHit{{SessionID: "s0", Seq: 3, Snippet: "[报错]"}}))
+	if c.Hits != nil {
+		t.Fatal("a stale answer kept")
+	}
+}

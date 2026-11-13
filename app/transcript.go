@@ -82,6 +82,10 @@ func (a *App) transcript(c *ui.Context) {
 		return
 	}
 	items := a.items()
+	if a.C.Older {
+		items = append([]item{{older: true}}, items...)
+	}
+	a.seek(items)
 	a.list.Key = func(i int) any {
 		if i < len(items) {
 			return items[i].key()
@@ -105,6 +109,8 @@ func (a *App) transcript(c *ui.Context) {
 				}
 				it := items[i]
 				switch {
+				case it.older:
+					a.olderRow(c)
 				case it.ap != nil:
 					a.turn(c, true, func() { a.ask(c, *it.ap) })
 				case it.fold != nil:
@@ -135,13 +141,17 @@ type item struct {
 	live bool
 	// A finished turn shows its work folded, then its last words, then
 	// what it changed: work holds the steps, done the turn's index.
-	work []*client.Entry
-	done int
-	sum  bool
+	work    []*client.Entry
+	done    int
+	turnSeq int64 // of the turn done is, for a key that survives older turns loading
+	sum     bool
+	older   bool // the row that loads what came before
 }
 
 func (it item) key() any {
 	switch {
+	case it.older:
+		return "older"
 	case it.ap != nil:
 		return "ask:" + it.ap.ID
 	case it.fold != nil:
@@ -149,7 +159,7 @@ func (it item) key() any {
 	case it.work != nil:
 		return fmt.Sprintf("work:%d", it.work[0].Key)
 	case it.sum:
-		return fmt.Sprintf("sum:%d", it.done)
+		return fmt.Sprintf("sum:%d", it.turnSeq)
 	}
 	return it.e.Key
 }
@@ -249,7 +259,7 @@ func (a *App) finished(body []*client.Entry, t int) []item {
 	for _, e := range body[tail:] {
 		out = append(out, item{e: e})
 	}
-	return append(out, item{sum: true, done: t})
+	return append(out, item{sum: true, done: t, turnSeq: a.C.Turns[t].Seq})
 }
 
 // fold is a run of browsing steps as one line, "浏览了 4 个文件，搜索 1
@@ -693,4 +703,38 @@ func home(path string) string {
 		return "~" + path[len(h):]
 	}
 	return path
+}
+
+// olderRow loads the log before what is shown once it scrolls into view.
+func (a *App) olderRow(c *ui.Context) {
+	if !a.C.LoadingOlder {
+		a.do(a.C.LoadOlder())
+	}
+	ui.Text(c, "正在加载更早的消息…").FontSize(12).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
+}
+
+// seek scrolls to the message a search chose, loading older pages until
+// it is there.
+func (a *App) seek(items []item) {
+	cur := a.C.Current
+	if a.jump == 0 || cur == nil || cur.ID != a.jumpIn || a.C.Phase != client.Ready {
+		return
+	}
+	has := func(es []*client.Entry) bool {
+		return slices.ContainsFunc(es, func(e *client.Entry) bool { return e.Seq == a.jump })
+	}
+	for i, it := range items {
+		if it.e != nil && it.e.Seq == a.jump || has(it.work) || has(it.fold) {
+			a.list.ScrollTo(i, ui.Center)
+			a.jump = 0
+			return
+		}
+	}
+	if a.C.Older {
+		if !a.C.LoadingOlder {
+			a.do(a.C.LoadOlder())
+		}
+		return
+	}
+	a.jump = 0
 }

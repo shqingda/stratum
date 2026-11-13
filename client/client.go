@@ -119,9 +119,14 @@ type Client struct {
 	// "wait", "unread" or "fail".
 	Marks map[string]string
 
-	Entries   []*Entry
-	Busy      bool
-	Queued    []string         // prompts waiting for the running turn
+	Entries []*Entry
+	Busy    bool
+	Queued  []string // prompts waiting for the running turn
+	// Older is the log having events before the ones shown.
+	Older, LoadingOlder bool
+	// Hits are the messages matching HitsFor, nil before an answer.
+	Hits      []proto.SearchHit
+	HitsFor   string
 	Approvals []proto.Approval // waiting for the user
 	// Answering holds approvals whose answer is in flight.
 	Answering map[string]bool
@@ -144,7 +149,11 @@ type Client struct {
 	nextCmd   int
 	nextKey   int
 	pending   map[string]*pending
-	cursor    int64 // last durable event applied
+	cursor    int64         // last durable event applied
+	log       []proto.Event // durable events shown, oldest first
+	first     int64         // seq of the oldest of them
+	trim      bool          // the next read starts mid-log
+	searching string        // the query last sent
 	buffer    []proto.Event
 	overflow  bool
 	streaming *Entry
@@ -385,6 +394,9 @@ func (c *Client) bind(id string) proto.Command {
 		c.Current = &s.Session
 		c.upsertSession(s.Session)
 		c.Queued = s.Queued
+		if s.Revision > tailSize {
+			c.cursor, c.trim = s.Revision-tailSize, true
+		}
 		return []proto.Command{c.catchUp()}
 	}
 	p.failed = func(e *proto.Error) []proto.Command {
@@ -407,6 +419,7 @@ func (c *Client) resetTranscript() {
 	clear(c.Answering)
 	c.buffer, c.overflow = nil, false
 	c.cursor = 0
+	c.log, c.first, c.Older, c.LoadingOlder, c.trim = nil, 0, false, false, false
 	c.resetChanges()
 	c.Workspace = Workspace{BranchStale: true}
 }
@@ -426,7 +439,14 @@ func (c *Client) catchUp() proto.Command {
 			c.fail("读取事件失败：" + err.Error())
 			return nil
 		}
-		for _, e := range page.Events {
+		events := page.Events
+		if c.trim && len(events) > 0 {
+			c.trim, c.Older = false, true
+			c.cursor = events[0].Seq - 1
+			events = events[firstTurn(events):]
+			c.first = events[0].Seq
+		}
+		for _, e := range events {
 			c.event(e)
 		}
 		if page.More {
@@ -515,6 +535,7 @@ func (c *Client) apply(e proto.Event) []proto.Command {
 func (c *Client) event(e proto.Event) []proto.Command {
 	if e.Seq != 0 {
 		c.cursor = e.Seq
+		c.log = append(c.log, e)
 	}
 	c.changesEvent(e)
 	switch e.Type {
@@ -717,6 +738,7 @@ func (c *Client) fail(msg string) {
 // become unknown; nothing is resent.
 func (c *Client) Disconnected(err error) {
 	c.endStream()
+	c.searching, c.LoadingOlder = "", false // their answers are lost
 	for id, p := range c.pending {
 		if p.mutation {
 			c.Unknown = append(c.Unknown, Unknown{ID: id, Method: p.method})

@@ -57,6 +57,34 @@ func (a *App) palOpts() (sessions, actions []opt) {
 	return sessions, actions
 }
 
+// palHits are the messages the kernel found for the query.
+func (a *App) palHits() []opt {
+	q := strings.TrimSpace(a.query)
+	if a.C.HitsFor != q {
+		return nil
+	}
+	titles := map[string]string{}
+	for _, s := range a.C.Sessions {
+		titles[s.ID] = title(s)
+	}
+	var out []opt
+	for _, h := range a.C.Hits {
+		name, ok := titles[h.SessionID]
+		if !ok {
+			continue // deleted since
+		}
+		h := h
+		text := strings.NewReplacer("[", "", "]", "").Replace(strings.Join(strings.Fields(h.Snippet), " "))
+		out = append(out, opt{icon: "message", label: text, sub: name, run: func() {
+			a.jump, a.jumpIn = h.Seq, h.SessionID
+			if cur := a.C.Current; cur == nil || cur.ID != h.SessionID {
+				a.do(a.C.Open(h.SessionID))
+			}
+		}})
+	}
+	return out
+}
+
 // openPalette shows the palette, its query empty.
 func (a *App) openPalette(c *ui.Context) {
 	a.pal, a.query, a.palSel = true, "", 0
@@ -69,8 +97,10 @@ func (a *App) palette(c *ui.Context) {
 		return
 	}
 	p := a.p
+	a.send(a.C.Search(strings.TrimSpace(a.query)))
 	sessions, actions := a.palOpts()
-	all := append(append([]opt(nil), sessions...), actions...)
+	hits := a.palHits()
+	all := append(append(append([]opt(nil), sessions...), actions...), hits...)
 	a.palSel = max(0, min(a.palSel, len(all)-1))
 	choose := func(i int) {
 		a.pal, a.query = false, ""
@@ -91,7 +121,7 @@ func (a *App) palette(c *ui.Context) {
 		panel.Children(func() {
 			ui.Row(c).Height(50).Padding(0, 16).Gap(10).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 				sym(c, "search", 18, p.Mute)
-				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").Placeholder("搜索会话和操作").PlaceholderColor(p.Mute).
+				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").Placeholder("搜索会话、操作和消息").PlaceholderColor(p.Mute).
 					FontSize(15).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
 					a.query = k.Text()
 					switch {
@@ -128,8 +158,9 @@ func (a *App) palette(c *ui.Context) {
 				}
 				section("会话", sessions)
 				section("操作", actions)
+				section("消息", hits)
 				if len(all) == 0 {
-					ui.Text(c, "没有匹配的会话或操作").FontSize(12.5).TextColor(p.Mute).Padding(18, 16)
+					ui.Text(c, "没有匹配的会话、操作或消息").FontSize(12.5).TextColor(p.Mute).Padding(18, 16)
 				}
 				ui.Box(c).Height(6)
 			})
@@ -175,7 +206,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			text(post, 400)
 		})
 		if o.sub != "" {
-			ui.Text(c, o.sub).FontSize(12).TextColor(p.Mute).SingleLine().Shrink(0)
+			ui.Text(c, o.sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").Shrink(0).MaxWidth(160)
 		}
 		ui.Spacer(c)
 		kbd := o.kbd

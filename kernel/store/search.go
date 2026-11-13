@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/shqingda/talos/llm"
 	"modernc.org/sqlite"
@@ -83,9 +84,9 @@ type SearchHit struct {
 	At        time.Time
 }
 
-// Search returns matching message text, ordered by relevance and newest first.
-// shortcut: trigram terms shorter than three Unicode characters cannot match;
-// add a substring fallback if short-term searches become necessary.
+// Search returns matching message text, ordered by relevance and newest
+// first. Trigrams cannot match a query of fewer than three characters, as
+// a two-character Chinese word: that one is looked for as a substring.
 func (s *Store) Search(ctx context.Context, query, sessionID string, limit int) ([]SearchHit, error) {
 	if strings.TrimSpace(query) == "" {
 		return []SearchHit{}, nil
@@ -98,6 +99,9 @@ func (s *Store) Search(ctx context.Context, query, sessionID string, limit int) 
 		limit = 500
 	}
 	limit = min(limit, 2000)
+	if utf8.RuneCountInString(strings.TrimSpace(query)) < 3 {
+		return s.searchShort(ctx, strings.TrimSpace(query), sessionID, limit)
+	}
 	hits, err := s.search(ctx, query, sessionID, limit)
 	var sqlErr *sqlite.Error
 	if errors.As(err, &sqlErr) && sqlErr.Code() == 1 {
@@ -134,4 +138,55 @@ func (s *Store) search(ctx context.Context, query, sessionID string, limit int) 
 		hits = append(hits, hit)
 	}
 	return hits, rows.Err()
+}
+
+// searchShort finds query as a substring, newest first.
+func (s *Store) searchShort(ctx context.Context, query, sessionID string, limit int) ([]SearchHit, error) {
+	esc := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(query)
+	q := `SELECT f.session_id,f.seq,f.role,f.text,e.at
+		FROM message_search f JOIN events e ON e.session_id=f.session_id AND e.seq=f.seq
+		WHERE f.text LIKE ? ESCAPE '\'`
+	args := []any{"%" + esc + "%"}
+	if sessionID != "" {
+		q += ` AND f.session_id=?`
+		args = append(args, sessionID)
+	}
+	q += ` ORDER BY e.at DESC,f.session_id,f.seq DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	hits := []SearchHit{}
+	for rows.Next() {
+		var hit SearchHit
+		var text string
+		var at int64
+		if err := rows.Scan(&hit.SessionID, &hit.Seq, &hit.Role, &text, &at); err != nil {
+			return nil, err
+		}
+		hit.Snippet, hit.At = snippet(text, query, 12), time.UnixMilli(at)
+		hits = append(hits, hit)
+	}
+	return hits, rows.Err()
+}
+
+// snippet is text around the first match of query, bracketed as FTS
+// snippets are, with about n characters on each side.
+func snippet(text, query string, n int) string {
+	i := strings.Index(strings.ToLower(text), strings.ToLower(query))
+	if i < 0 || len(strings.ToLower(text)) != len(text) {
+		return text
+	}
+	pre, hit, post := []rune(text[:i]), text[i:i+len(query)], []rune(text[i+len(query):])
+	out := ""
+	if len(pre) > n {
+		out, pre = "…", pre[len(pre)-n:]
+	}
+	out += string(pre) + "[" + hit + "]"
+	if len(post) > n*2 {
+		return out + string(post[:n*2]) + "…"
+	}
+	return out + string(post)
 }
