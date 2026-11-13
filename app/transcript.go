@@ -30,6 +30,7 @@ var tools = map[string]struct{ symbol, verb string }{
 	"skill":       {"sparkles", "技能"},
 	"update_plan": {"list-check", "更新计划"},
 	"ask_user":    {"message", "提问"},
+	"task":        {"subtask", "子任务"},
 }
 
 var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令"}
@@ -518,7 +519,10 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 14, p.Mute) })
 		ui.Text(c, t.verb).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
 		if e.Detail != "" {
-			ui.Text(c, e.Detail).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+			d := ui.Text(c, e.Detail).FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+			if e.Text != "task" {
+				d.Font("monospace")
+			}
 		}
 		ui.Spacer(c)
 		switch {
@@ -530,13 +534,19 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
 		}
 	})
+	if !e.Done && len(e.Steps) > 0 {
+		a.taskSteps(c, e.Steps)
+	}
 	if open {
 		out := e.Output
 		if lines := strings.Split(out, "\n"); len(lines) > 40 {
 			out = strings.Join(lines[:40], "\n") + fmt.Sprintf("\n… 还有 %d 行", len(lines)-40)
 		}
-		ui.Text(c, out).Font("monospace").FontSize(12).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+		o := ui.Text(c, out).FontSize(12).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(2, 0, 8, 24).Selectable().PreserveSpaces()
+		if e.Text != "task" {
+			o.Font("monospace")
+		}
 	}
 }
 
@@ -737,4 +747,26 @@ func (a *App) seek(items []item) {
 		return
 	}
 	a.jump = 0
+}
+
+// taskSteps are the last few steps of a running sub-agent, under its task.
+func (a *App) taskSteps(c *ui.Context, steps []string) {
+	p := a.p
+	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
+		if n := len(steps) - 3; n > 0 {
+			ui.Text(c, fmt.Sprintf("前面还有 %d 步", n)).FontSize(11.5).TextColor(p.Mute).Height(20)
+			steps = steps[n:]
+		}
+		for i, s := range steps {
+			name, detail, _ := strings.Cut(s, "\t")
+			verb := name
+			if t, ok := tools[name]; ok {
+				verb = t.verb
+			}
+			ui.Row(c.Key(i)).Height(20).Gap(6).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, verb).FontSize(11.5).TextColor(p.Mute).Shrink(0)
+				ui.Text(c, detail).Font("monospace").FontSize(11.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+			})
+		}
+	})
 }

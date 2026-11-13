@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/shqingda/talos/llm"
@@ -77,10 +78,13 @@ type Config struct {
 
 // Agent runs turns.
 type Agent struct {
-	Provider llm.Provider
-	Tools    Tools
-	Sink     Sink
-	Clock    Clock // real time when nil
+	// Concurrent names the tools whose calls next to each other in a reply
+	// run at the same time.
+	Concurrent func(name string) bool
+	Provider   llm.Provider
+	Tools      Tools
+	Sink       Sink
+	Clock      Clock // real time when nil
 }
 
 // ErrStepLimit ends a turn that ran out of steps.
@@ -172,27 +176,47 @@ func (a *Agent) request(ctx context.Context, cfg Config, msgs []llm.Message) (ll
 	}
 }
 
-// runTools runs calls one by one. Once ctx ends, the rest get Interrupted.
+// runTools runs calls one by one, but runs of concurrent ones together.
+// Once ctx ends, the rest get Interrupted.
 func (a *Agent) runTools(ctx context.Context, calls []llm.ToolCall) llm.Message {
-	results := llm.Message{Role: llm.User}
-	for i := range calls {
-		call := calls[i]
-		var res llm.ToolResult
-		if ctx.Err() != nil {
-			res = llm.ToolResult{CallID: call.ID, Name: call.Name, Content: Interrupted, IsError: true}
-		} else {
-			a.emit(Event{Type: ToolStart, Call: &call})
-			var err error
-			res, err = a.Tools.Run(ctx, call)
-			if err != nil {
-				res = llm.ToolResult{CallID: call.ID, Name: call.Name, Content: Interrupted, IsError: true}
+	results := make([]llm.ToolResult, len(calls))
+	for i := 0; i < len(calls); {
+		j := i + 1
+		if a.Concurrent != nil && a.Concurrent(calls[i].Name) {
+			for j < len(calls) && a.Concurrent(calls[j].Name) {
+				j++
 			}
-			res.CallID, res.Name = call.ID, call.Name
-			a.emit(Event{Type: ToolEnd, Call: &call, Result: &res})
 		}
-		results.Parts = append(results.Parts, llm.Part{ToolResult: &res})
+		var wg sync.WaitGroup
+		for k := i; k < j; k++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				results[k] = a.runTool(ctx, calls[k])
+			}()
+		}
+		wg.Wait()
+		i = j
 	}
-	return results
+	msg := llm.Message{Role: llm.User}
+	for i := range results {
+		msg.Parts = append(msg.Parts, llm.Part{ToolResult: &results[i]})
+	}
+	return msg
+}
+
+func (a *Agent) runTool(ctx context.Context, call llm.ToolCall) llm.ToolResult {
+	if ctx.Err() != nil {
+		return llm.ToolResult{CallID: call.ID, Name: call.Name, Content: Interrupted, IsError: true}
+	}
+	a.emit(Event{Type: ToolStart, Call: &call})
+	res, err := a.Tools.Run(ctx, call)
+	if err != nil {
+		res = llm.ToolResult{Content: Interrupted, IsError: true}
+	}
+	res.CallID, res.Name = call.ID, call.Name
+	a.emit(Event{Type: ToolEnd, Call: &call, Result: &res})
+	return res
 }
 
 func (a *Agent) emit(e Event) {

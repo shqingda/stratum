@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/shqingda/talos/kernel/perm"
 	"github.com/shqingda/talos/kernel/tools"
@@ -21,9 +20,8 @@ type runner struct {
 	run       *run
 	env       tools.Env
 	tools     tools.Set
-
-	mu     sync.Mutex
-	always map[string]bool // tools the user allowed for the session
+	// task runs a sub-agent for a task call; nil in a sub-agent.
+	task func(ctx context.Context, call llm.ToolCall, prompt string) (string, error)
 }
 
 func (r *runner) Specs() []llm.Tool { return r.tools.Specs() }
@@ -36,8 +34,22 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	if tool == nil {
 		return fail("There is no tool %q.", call.Name)
 	}
-	if tool == tools.AskUser {
+	switch {
+	case tool == tools.AskUser:
 		return r.question(ctx, call)
+	case tool == tools.Task && r.task != nil:
+		var t struct{ Prompt string }
+		if json.Unmarshal(call.Args, &t) != nil || strings.TrimSpace(t.Prompt) == "" {
+			return fail("task: prompt is required.")
+		}
+		report, err := r.task(ctx, call, t.Prompt)
+		if ctx.Err() != nil {
+			return llm.ToolResult{}, ctx.Err()
+		}
+		if err != nil {
+			return fail("The sub-agent failed: %v", err)
+		}
+		return llm.ToolResult{Content: report}, nil
 	}
 	req, err := tool.Access(r.env, call.Args)
 	if err != nil {
@@ -49,11 +61,11 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 		return llm.ToolResult{}, err
 	}
 	decision := perm.Decide(perm.Mode(x.Mode), req, r.env.Sandboxed)
-	r.mu.Lock()
-	if decision == perm.AskUser && r.always[call.Name] {
+	r.m.mu.Lock()
+	if decision == perm.AskUser && r.run.always[call.Name] {
 		decision = perm.Allow
 	}
-	r.mu.Unlock()
+	r.m.mu.Unlock()
 	switch decision {
 	case perm.Deny:
 		return fail("Talos does not allow this call.")
@@ -107,12 +119,12 @@ func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (
 		return false, err
 	}
 	if ans.Allow && ans.Always {
-		r.mu.Lock()
-		if r.always == nil {
-			r.always = map[string]bool{}
+		r.m.mu.Lock()
+		if r.run.always == nil {
+			r.run.always = map[string]bool{}
 		}
-		r.always[call.Name] = true
-		r.mu.Unlock()
+		r.run.always[call.Name] = true
+		r.m.mu.Unlock()
 	}
 	return ans.Allow, nil
 }

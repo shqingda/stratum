@@ -594,3 +594,14 @@ func TestSearch(t *testing.T) {
 		t.Fatal("a stale answer kept")
 	}
 }
+
+func TestTaskSteps(t *testing.T) {
+	call := llm.Call("t1", "task", map[string]any{"description": "找 Add", "prompt": "where"})
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventMessage, llm.Message{Role: llm.Assistant, Parts: []llm.Part{{ToolCall: &call}}}))})
+	c.Receive(ev(0, proto.EventTaskStep, proto.TaskStep{CallID: "t1", Call: llm.Call("s1", "read_file", map[string]any{"path": "add.go"})}))
+	e := c.Entries[len(c.Entries)-1]
+	if e.Detail != "找 Add" || len(e.Steps) != 1 || e.Steps[0] != "read_file\tadd.go" {
+		t.Fatalf("%+v", e)
+	}
+}

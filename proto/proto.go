@@ -455,3 +455,12 @@ const EventCompaction = "compaction"
 type Compaction struct {
 	Summary string `json:"summary"`
 }
+
+// EventTaskStep is a sub-agent starting a tool call, streamed for the
+// task call that runs it; it is not recorded.
+const EventTaskStep = "task.step"
+
+type TaskStep struct {
+	CallID string       `json:"callId"`
+	Call   llm.ToolCall `json:"call"`
+}

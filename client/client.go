@@ -66,7 +66,10 @@ type Entry struct {
 	Text   string
 	Images []llm.Image // a user message's
 	Detail string      // a tool call's arguments, summarized
-	Output string      // a tool call's result
+	// Steps are the tool calls a running task's sub-agent made, as
+	// "name\tdetail"; only while it runs.
+	Steps  []string
+	Output string // a tool call's result
 	Done   bool
 	CallID string
 	Failed bool
@@ -581,6 +584,15 @@ func (c *Client) event(e proto.Event) []proto.Command {
 				en.Done = false
 			}
 		}
+	case proto.EventTaskStep:
+		var st proto.TaskStep
+		if json.Unmarshal(e.Data, &st) == nil {
+			if i := slices.IndexFunc(c.Entries, func(x *Entry) bool { return x.CallID == st.CallID }); i >= 0 {
+				var args map[string]any
+				json.Unmarshal(st.Call.Args, &args)
+				c.Entries[i].Steps = append(c.Entries[i].Steps, st.Call.Name+"\t"+summarize(args))
+			}
+		}
 	case proto.EventApprovalRequest:
 		var a proto.Approval
 		if json.Unmarshal(e.Data, &a) == nil && !slices.ContainsFunc(c.Approvals, func(x proto.Approval) bool { return x.ID == a.ID }) {
@@ -702,7 +714,7 @@ func (c *Client) toolResult(r llm.ToolResult) {
 
 // summarize shows a tool call's most telling argument.
 func summarize(args map[string]any) string {
-	for _, k := range []string{"path", "command", "pattern", "query", "url", "title", "question"} {
+	for _, k := range []string{"path", "command", "pattern", "query", "url", "title", "question", "description"} {
 		if s, ok := args[k].(string); ok && s != "" {
 			if len(s) > 120 {
 				s = s[:117] + "…"

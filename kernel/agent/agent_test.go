@@ -192,3 +192,37 @@ func TestSteer(t *testing.T) {
 		t.Errorf("%+v", results)
 	}
 }
+
+// TestConcurrent runs neighbouring concurrent calls together: each waits
+// for the other to start.
+func TestConcurrent(t *testing.T) {
+	s := &llm.Script{Turns: []llm.Turn{{Calls: []llm.ToolCall{llm.Call("a", "task", nil), llm.Call("b", "task", nil), llm.Call("c", "read", nil)}}, {Text: "ok"}}}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	both := make(chan struct{})
+	go func() { wg.Wait(); close(both) }()
+	tools := toolFunc(func(ctx context.Context, call llm.ToolCall) (llm.ToolResult, error) {
+		if call.Name == "task" {
+			wg.Done()
+			select {
+			case <-both:
+			case <-time.After(2 * time.Second):
+				return llm.ToolResult{Content: "alone"}, nil
+			}
+		}
+		return llm.ToolResult{Content: call.ID}, nil
+	})
+	ag := &Agent{Provider: s, Tools: tools, Concurrent: func(name string) bool { return name == "task" }}
+	ag.Run(context.Background(), Config{}, nil, llm.Text(llm.User, "hi"))
+	results := s.Requests[1].Messages[2].Parts
+	if len(results) != 3 || results[0].ToolResult.Content != "a" || results[1].ToolResult.Content != "b" || results[2].ToolResult.Content != "c" {
+		t.Fatalf("%+v", results)
+	}
+}
+
+type toolFunc func(ctx context.Context, call llm.ToolCall) (llm.ToolResult, error)
+
+func (f toolFunc) Specs() []llm.Tool { return nil }
+func (f toolFunc) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, error) {
+	return f(ctx, call)
+}

@@ -63,6 +63,7 @@ type run struct {
 	cancel    context.CancelFunc
 	queued    []proto.Prompt
 	approvals map[string]*pending
+	always    map[string]bool // tools the user allowed for the rest of the turn
 }
 
 type pending struct {
@@ -385,13 +386,30 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 			history = short
 		} // a failed summary leaves the history whole
 	}
+	env := tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
+		return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
+	}}
+	var subMu sync.Mutex
+	task := func(ctx context.Context, call llm.ToolCall, prompt string) (string, error) {
+		s := &subSink{m: m, sessionID: x.ID, callID: call.ID}
+		sa := &agent.Agent{
+			Provider: provider,
+			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools.Without(tools.Task.Name, tools.AskUser.Name), env: env},
+			Sink:     s,
+			Clock:    m.Clock,
+		}
+		u, err := sa.Run(ctx, agent.Config{Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system + subPrompt}, nil, llm.Text(llm.User, prompt))
+		subMu.Lock()
+		used = used.Add(u)
+		subMu.Unlock()
+		return s.report, err
+	}
 	ag := &agent.Agent{
-		Provider: provider,
-		Tools: &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
-			return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
-		}}},
-		Sink:  sink{m: m, ctx: ctx, sessionID: x.ID},
-		Clock: m.Clock,
+		Provider:   provider,
+		Tools:      &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: env, task: task},
+		Sink:       sink{m: m, ctx: ctx, sessionID: x.ID},
+		Clock:      m.Clock,
+		Concurrent: func(name string) bool { return name == tools.Task.Name },
 	}
 	cfg := agent.Config{
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
@@ -408,7 +426,34 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		},
 	}
 	u, err := ag.Run(ctx, cfg, history, llm.Message{Role: llm.User, Parts: promptParts(p)})
+	subMu.Lock()
+	defer subMu.Unlock()
 	return used.Add(u), err
+}
+
+const subPrompt = `
+
+You are a sub-agent: another agent gave you the task below and reads only your last reply. Do the task with your tools, then reply with a short report of what you found or did, with the paths and facts it needs. Do not ask questions; decide yourself.`
+
+// subSink streams a sub-agent's steps as progress of its task call, and
+// keeps its last words as the report. Its messages are not recorded.
+type subSink struct {
+	m                 *Manager
+	sessionID, callID string
+	report            string
+}
+
+func (s *subSink) Emit(e agent.Event) {
+	switch e.Type {
+	case agent.Message:
+		if e.Message.Role == llm.Assistant {
+			if t := e.Message.PlainText(); t != "" {
+				s.report = t
+			}
+		}
+	case agent.ToolStart:
+		s.m.stream(s.sessionID, proto.EventTaskStep, proto.TaskStep{CallID: s.callID, Call: *e.Call})
+	}
 }
 
 // sink records the agent's messages and streams the rest.
