@@ -107,6 +107,9 @@ func (m *Manager) record(ctx context.Context, sessionID, typ string, data any) e
 	return nil
 }
 
+// Broadcast publishes an event of no session, not kept.
+func (m *Manager) Broadcast(typ string, data any) { m.stream("", typ, data) }
+
 // stream publishes an event that is not kept.
 func (m *Manager) stream(sessionID, typ string, data any) {
 	b, _ := json.Marshal(data)

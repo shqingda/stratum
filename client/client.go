@@ -134,6 +134,7 @@ type Client struct {
 	Workspace Workspace
 
 	Accounts []proto.Account
+	SignIn   *SignIn
 	Models   []proto.Model // of the account last asked about
 	Unknown  []Unknown
 
@@ -210,6 +211,10 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 		return c.response(f)
 	case proto.FrameEvent:
 		if f.Event == nil {
+			return nil
+		}
+		if f.Event.Type == proto.EventLogin {
+			c.loginProgress(*f.Event)
 			return nil
 		}
 		if f.Event.Type == proto.EventSession {
@@ -707,7 +712,7 @@ func (c *Client) Disconnected(err error) {
 	}
 	clear(c.pending)
 	clear(c.Answering)
-	c.Busy = false
+	c.Busy, c.SignIn = false, nil
 	c.buffer, c.overflow = nil, false
 	c.Phase = Disconnected
 	if err != nil {

@@ -2,11 +2,13 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/shqingda/talos/kernel/session"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -53,5 +55,27 @@ func TestWorkspace(t *testing.T) {
 	}
 	if _, err := workspace(ctx, "relative"); err == nil {
 		t.Fatal("a relative cwd was taken")
+	}
+}
+
+func TestLoginCancel(t *testing.T) {
+	started := make(chan struct{})
+	s := &Server{Sessions: session.New(nil, nil), Login: func(ctx context.Context, q proto.Login, progress func(proto.LoginProgress)) (proto.Account, error) {
+		close(started)
+		<-ctx.Done()
+		return proto.Account{}, ctx.Err()
+	}}
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.handle(context.Background(), proto.Command{Method: proto.MethodLogin, Params: []byte(`{"provider":"codex","method":"codex"}`)})
+		done <- err
+	}()
+	<-started
+	if _, err := s.handle(context.Background(), proto.Command{Method: proto.MethodLoginCancel}); err != nil {
+		t.Fatal(err)
+	}
+	var pe *proto.Error
+	if err := <-done; !errors.As(err, &pe) || pe.Code != "cancelled" {
+		t.Fatalf("cancelled login: %v", err)
 	}
 }

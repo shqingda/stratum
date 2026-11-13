@@ -25,6 +25,11 @@ type Server struct {
 	// kernel: signed-in accounts and their models.
 	Accounts func(ctx context.Context) ([]proto.Account, error)
 	Models   func(ctx context.Context, account string) ([]proto.Model, error)
+	// Login signs in, telling the user what to do through progress.
+	Login func(ctx context.Context, q proto.Login, progress func(proto.LoginProgress)) (proto.Account, error)
+
+	loginMu     sync.Mutex
+	loginCancel context.CancelFunc
 
 	instance string
 	once     sync.Once
@@ -229,6 +234,17 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		}
 		return workspace(ctx, p.Cwd)
 	}
+	switch cmd.Method {
+	case proto.MethodLogin:
+		p, err := params[proto.Login](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.login(ctx, p)
+	case proto.MethodLoginCancel:
+		s.cancelLogin(nil)
+		return struct{}{}, nil
+	}
 	if cmd.Method == proto.MethodCommit {
 		p, err := params[proto.Commit](cmd)
 		if err != nil {
@@ -273,4 +289,28 @@ func (s *Server) search(ctx context.Context, cmd proto.Command) (any, error) {
 		return nil, err
 	}
 	return s.Sessions.Search(ctx, p)
+}
+
+// login runs one sign-in at a time: a new one ends the last.
+func (s *Server) login(ctx context.Context, q proto.Login) (proto.Account, error) {
+	if s.Login == nil {
+		return proto.Account{}, proto.Errorf("bad_request", "sign-in is not available")
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	s.cancelLogin(cancel)
+	a, err := s.Login(ctx, q, func(p proto.LoginProgress) { s.Sessions.Broadcast(proto.EventLogin, p) })
+	if ctx.Err() != nil {
+		return a, proto.Errorf("cancelled", "sign-in cancelled")
+	}
+	return a, err
+}
+
+func (s *Server) cancelLogin(next context.CancelFunc) {
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	if s.loginCancel != nil {
+		s.loginCancel()
+	}
+	s.loginCancel = next
 }

@@ -245,6 +245,8 @@ type Account struct {
 	Name         string `json:"name"`
 	Email        string `json:"email,omitempty"`
 	Subscription bool   `json:"subscription"`
+	// Model is the provider's default model.
+	Model string `json:"model,omitempty"`
 }
 
 // ModelsQuery lists an account's models.
@@ -363,4 +365,30 @@ type Workspace struct {
 type Commit struct {
 	Cwd     string `json:"cwd"`
 	Message string `json:"message"`
+}
+
+// --- 登录 ---
+
+const (
+	MethodLogin       = "auth.login"  // Login → Account, once signed in
+	MethodLoginCancel = "auth.cancel" // → {}; ends the sign-in under way
+	// EventLogin is a sign-in's progress, of no session; not kept.
+	EventLogin = "auth.progress" // LoginProgress
+)
+
+// Login signs in to a provider with one of its Methods, or with Key when
+// Method is empty. Device asks for a code to enter on another device.
+type Login struct {
+	Provider string `json:"provider"`
+	Method   string `json:"method,omitempty"`
+	Key      string `json:"key,omitempty"`
+	Device   bool   `json:"device,omitempty"`
+}
+
+// LoginProgress is what the user has to do: a page opened in the browser,
+// or a code to enter at CodeURL.
+type LoginProgress struct {
+	URL     string `json:"url,omitempty"`
+	Code    string `json:"code,omitempty"`
+	CodeURL string `json:"codeUrl,omitempty"`
 }

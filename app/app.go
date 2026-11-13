@@ -66,6 +66,9 @@ type App struct {
 	modelsRequested                           bool
 	modelsPending, modelsAccount, modelsError string
 	modelsLoadedAccount                       string
+
+	keyOpen, keyMenu bool
+	keyProvider, key string
 }
 
 // New returns an app over c, not connected yet.
@@ -153,6 +156,11 @@ func (a *App) View(c *ui.Context) {
 	vibrant := c.Vibrancy()
 	if vibrant {
 		c.Root().Background(ui.Transparent)
+	}
+	if a.needsLogin() {
+		a.onboarding(c)
+		a.keys(c)
+		return
 	}
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		if !a.noSide {
