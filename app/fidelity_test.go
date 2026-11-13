@@ -33,6 +33,7 @@ func screen1() *App {
 		{ID: "8", Title: "把 OG 图换成新标志", Cwd: "/Users/me/Projects/site", Updated: now.Add(-30 * 24 * time.Hour)},
 	}
 	c.Current = &c.Sessions[0]
+	c.Marks = map[string]string{"2": "run", "3": "unread", "6": "fail"}
 	edit := func(path, old, new string) json.RawMessage {
 		b, _ := json.Marshal(map[string]string{"path": path, "old_text": old, "new_text": new})
 		return b
@@ -82,6 +83,7 @@ func screen2() *App {
 	c := a.C
 	a.rv = review{}
 	c.Busy, c.Approvals, c.Queued = false, nil, nil
+	c.Marks = map[string]string{"2": "run"}
 	c.Sessions = []proto.Session{
 		{ID: "1", Title: "修复 Add 测试", Cwd: "/Users/me/Projects/calc", Model: "gpt-6-luna", Effort: "medium", Mode: "ask", Updated: now.Add(-10 * time.Second)},
 		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-2 * time.Minute)},

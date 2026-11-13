@@ -98,6 +98,9 @@ type Session struct {
 	Mode    string    `json:"mode"` // ask, auto, full
 	Created time.Time `json:"created"`
 	Updated time.Time `json:"updated"`
+	// State is set only in the list: "run" while a turn runs, "wait"
+	// while it waits for an approval.
+	State string `json:"state,omitempty"`
 }
 
 // SessionCreate makes a session. Empty fields take defaults.

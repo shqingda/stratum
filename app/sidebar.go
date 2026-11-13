@@ -138,12 +138,12 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 }
 
 // state is what the slot left of a session's title shows: "wait" for an
-// approval, "run" while a turn runs, "" otherwise. Only the session shown
-// is followed live.
+// approval, "run" while a turn runs, "unread" or "fail" for a turn that
+// ended unseen, "" otherwise.
 func (a *App) state(s proto.Session) string {
 	cur := a.C.Current
 	if cur == nil || cur.ID != s.ID {
-		return ""
+		return a.C.Marks[s.ID]
 	}
 	switch {
 	case len(a.C.Approvals) > 0:

@@ -114,6 +114,9 @@ type Client struct {
 
 	Sessions []proto.Session // all of them, newest first
 	Current  *proto.Session
+	// Marks is what the list shows by sessions other than Current: "run",
+	// "wait", "unread" or "fail".
+	Marks map[string]string
 
 	Entries   []*Entry
 	Busy      bool
@@ -158,7 +161,7 @@ func New(cwd string) *Client {
 }
 
 func newClient(cwd, launch string) *Client {
-	c := &Client{Cwd: cwd, launch: launch, pending: map[string]*pending{}, Answering: map[string]bool{}}
+	c := &Client{Cwd: cwd, launch: launch, pending: map[string]*pending{}, Answering: map[string]bool{}, Marks: map[string]string{}}
 	c.resetChanges()
 	return c
 }
@@ -213,6 +216,7 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 			c.sessionUpdated(*f.Event) // any session's: the list shows them all
 		}
 		if c.Current == nil || f.Event.SessionID != c.Current.ID {
+			c.mark(*f.Event)
 			return nil
 		}
 		switch c.Phase {
@@ -309,6 +313,12 @@ func (c *Client) listSessions(bind bool) proto.Command {
 		var list []proto.Session
 		if err := json.Unmarshal(r, &list); err == nil {
 			c.Sessions = list
+			clear(c.Marks)
+			for _, s := range list {
+				if s.State != "" {
+					c.Marks[s.ID] = s.State
+				}
+			}
 		}
 		if !bind {
 			return nil
@@ -343,6 +353,15 @@ func (c *Client) create() proto.Command {
 
 // bind shows a session: it reads the session, then its whole log.
 func (c *Client) bind(id string) proto.Command {
+	if c.Current != nil && c.Current.ID != id {
+		switch {
+		case len(c.Approvals) > 0:
+			c.Marks[c.Current.ID] = "wait"
+		case c.Busy:
+			c.Marks[c.Current.ID] = "run"
+		}
+	}
+	delete(c.Marks, id)
 	c.Phase = Syncing
 	c.resetTranscript()
 	c.want = id
@@ -429,6 +448,26 @@ func (c *Client) catchUp() proto.Command {
 		}
 		return cmds
 	})
+}
+
+// mark follows a session that is not shown.
+func (c *Client) mark(e proto.Event) {
+	if e.SessionID == c.want {
+		return // being opened
+	}
+	switch e.Type {
+	case proto.EventTurnStart, proto.EventApprovalResolved:
+		c.Marks[e.SessionID] = "run"
+	case proto.EventApprovalRequest:
+		c.Marks[e.SessionID] = "wait"
+	case proto.EventTurnEnd:
+		var end proto.TurnEnd
+		json.Unmarshal(e.Data, &end)
+		c.Marks[e.SessionID] = "unread"
+		if end.Error != "" {
+			c.Marks[e.SessionID] = "fail"
+		}
+	}
 }
 
 func (c *Client) upsertSession(s proto.Session) {

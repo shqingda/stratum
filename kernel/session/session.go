@@ -158,8 +158,16 @@ func (m *Manager) Create(ctx context.Context, p proto.SessionCreate) (proto.Sess
 func (m *Manager) List(ctx context.Context) ([]proto.Session, error) {
 	xs, err := m.Store.Sessions(ctx)
 	out := make([]proto.Session, len(xs))
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for i, x := range xs {
 		out[i] = toSession(x)
+		if r := m.runs[x.ID]; r != nil {
+			out[i].State = "run"
+			if len(r.approvals) > 0 {
+				out[i].State = "wait"
+			}
+		}
 	}
 	return out, err
 }

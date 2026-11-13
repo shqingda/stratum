@@ -485,3 +485,35 @@ func TestWorkspace(t *testing.T) {
 		t.Fatalf("%+v", c.Workspace)
 	}
 }
+
+func TestMarks(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	other := func(typ string, data any) {
+		f := ev(0, typ, data)
+		f.Event.SessionID = "s9"
+		c.Receive(f)
+	}
+	for _, step := range []struct {
+		typ  string
+		data any
+		want string
+	}{
+		{proto.EventTurnStart, proto.TurnStart{Text: "x"}, "run"},
+		{proto.EventApprovalRequest, proto.Approval{ID: "a"}, "wait"},
+		{proto.EventApprovalResolved, proto.ApprovalAnswer{ApprovalID: "a"}, "run"},
+		{proto.EventTurnEnd, proto.TurnEnd{Error: "boom"}, "fail"},
+		{proto.EventTurnEnd, proto.TurnEnd{}, "unread"},
+	} {
+		other(step.typ, step.data)
+		if got := c.Marks["s9"]; got != step.want {
+			t.Fatalf("after %s: mark %q, want %q", step.typ, got, step.want)
+		}
+	}
+	c.Busy = true
+	if _, err := c.Open("s9"); err != nil {
+		t.Fatal(err)
+	}
+	if c.Marks["s9"] != "" || c.Marks[sid] != "run" {
+		t.Fatalf("marks after opening s9: %v", c.Marks)
+	}
+}

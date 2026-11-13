@@ -112,7 +112,16 @@ func TestChangesApplyRejectsActiveTurn(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("script did not reach write approval")
 			}
-			_, err := m.ChangesApply(ctx, q, tt.redo)
+			list, err := m.List(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, x := range list {
+				if want := map[bool]string{true: "wait"}[x.ID == activeID]; x.State != want {
+					t.Fatalf("session %s state %q, want %q", x.ID, x.State, want)
+				}
+			}
+			_, err = m.ChangesApply(ctx, q, tt.redo)
 			requireChangeError(t, err, "busy")
 			if got, err := os.ReadFile(q.Path); err != nil || string(got) != want {
 				t.Fatalf("busy restore changed the file: %q, %v", got, err)
