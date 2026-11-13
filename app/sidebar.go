@@ -181,7 +181,11 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		case c.Modifiers() == ui.Cmd && n <= 9:
 			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).TextColor(p.Mute).SingleLine()
 		case st == "wait":
-			ui.Text(c, "审批").FontSize(11).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
+			badge := "审批"
+			if on && a.questionFirst() {
+				badge = "提问"
+			}
+			ui.Text(c, badge).FontSize(11).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
 		default:
 			ui.Text(c, ago(a.now(), s.Updated)).FontSize(11.5).TextColor(p.Mute).SingleLine()
 		}

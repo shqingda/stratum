@@ -2,7 +2,9 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/shqingda/talos/kernel/perm"
@@ -33,6 +35,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	tool := r.tools.Get(call.Name)
 	if tool == nil {
 		return fail("There is no tool %q.", call.Name)
+	}
+	if tool == tools.AskUser {
+		return r.question(ctx, call)
 	}
 	req, err := tool.Access(r.env, call.Args)
 	if err != nil {
@@ -71,6 +76,25 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	return llm.ToolResult{Content: out}, nil
 }
 
+// question puts the model's question to the user and returns the reply.
+func (r *runner) question(ctx context.Context, call llm.ToolCall) (llm.ToolResult, error) {
+	var q struct {
+		Question string
+		Options  []string
+	}
+	if json.Unmarshal(call.Args, &q) != nil || strings.TrimSpace(q.Question) == "" {
+		return llm.ToolResult{Content: "ask_user: question is required.", IsError: true}, nil
+	}
+	ans, err := r.wait(ctx, proto.Approval{ID: newID(), Tool: call.Name, Args: call.Args, Kind: "question", Question: q.Question, Options: q.Options})
+	if err != nil {
+		return llm.ToolResult{}, err
+	}
+	if !ans.Allow || strings.TrimSpace(ans.Text) == "" {
+		return llm.ToolResult{Content: "The user skipped the question. Decide yourself, or stop and say what you need."}, nil
+	}
+	return llm.ToolResult{Content: "The user answered: " + ans.Text}, nil
+}
+
 // ask records an approval request and waits for the answer or the end of
 // the turn.
 func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (bool, error) {
@@ -78,6 +102,24 @@ func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (
 	for _, p := range req.Paths {
 		a.Paths = append(a.Paths, p.Abs)
 	}
+	ans, err := r.wait(ctx, a)
+	if err != nil {
+		return false, err
+	}
+	if ans.Allow && ans.Always {
+		r.mu.Lock()
+		if r.always == nil {
+			r.always = map[string]bool{}
+		}
+		r.always[call.Name] = true
+		r.mu.Unlock()
+	}
+	return ans.Allow, nil
+}
+
+// wait records an approval request and waits for the answer or the end
+// of the turn.
+func (r *runner) wait(ctx context.Context, a proto.Approval) (proto.ApprovalAnswer, error) {
 	p := &pending{approval: a, answer: make(chan proto.ApprovalAnswer, 1)}
 	r.m.mu.Lock()
 	r.run.approvals[a.ID] = p
@@ -88,23 +130,15 @@ func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (
 		r.m.mu.Unlock()
 	}()
 	if err := r.m.record(ctx, r.sessionID, proto.EventApprovalRequest, a); err != nil {
-		return false, err
+		return proto.ApprovalAnswer{}, err
 	}
 	select {
 	case ans := <-p.answer:
 		r.m.record(ctx, r.sessionID, proto.EventApprovalResolved, ans)
-		if ans.Allow && ans.Always {
-			r.mu.Lock()
-			if r.always == nil {
-				r.always = map[string]bool{}
-			}
-			r.always[call.Name] = true
-			r.mu.Unlock()
-		}
-		return ans.Allow, nil
+		return ans, nil
 	case <-ctx.Done():
 		r.m.record(ctx, r.sessionID, proto.EventApprovalResolved, proto.ApprovalAnswer{SessionID: r.sessionID, ApprovalID: a.ID})
-		return false, ctx.Err()
+		return proto.ApprovalAnswer{}, ctx.Err()
 	}
 }
 

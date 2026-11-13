@@ -53,6 +53,9 @@ func (a *App) box(c *ui.Context) {
 		if a.C.Busy {
 			ph = "运行中：回车排队"
 		}
+		if a.questionFirst() {
+			ph = "回答上面的问题，回车发送"
+		}
 		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
 			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey)
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {

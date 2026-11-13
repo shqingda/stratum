@@ -670,7 +670,7 @@ func (c *Client) toolResult(r llm.ToolResult) {
 
 // summarize shows a tool call's most telling argument.
 func summarize(args map[string]any) string {
-	for _, k := range []string{"path", "command", "pattern", "query", "url", "title"} {
+	for _, k := range []string{"path", "command", "pattern", "query", "url", "title", "question"} {
 		if s, ok := args[k].(string); ok && s != "" {
 			if len(s) > 120 {
 				s = s[:117] + "…"
@@ -769,10 +769,22 @@ func (c *Client) Cancel() ([]proto.Command, error) {
 // Answer allows or denies an approval request; always allows the tool for
 // the rest of the session.
 func (c *Client) Answer(id string, allow, always bool) ([]proto.Command, error) {
+	return c.answer(proto.ApprovalAnswer{ApprovalID: id, Allow: allow, Always: always})
+}
+
+// Reply answers the model's question; an empty text skips it.
+func (c *Client) Reply(id, text string) ([]proto.Command, error) {
+	text = strings.TrimSpace(text)
+	return c.answer(proto.ApprovalAnswer{ApprovalID: id, Allow: text != "", Text: text})
+}
+
+func (c *Client) answer(ans proto.ApprovalAnswer) ([]proto.Command, error) {
+	id := ans.ApprovalID
 	if c.Answering[id] {
 		return nil, fmt.Errorf("已回答此审批")
 	}
-	cmds, err := c.mutation(proto.MethodApprovalRespond, proto.ApprovalAnswer{SessionID: sessionID(c.Current), ApprovalID: id, Allow: allow, Always: always}, nil)
+	ans.SessionID = sessionID(c.Current)
+	cmds, err := c.mutation(proto.MethodApprovalRespond, ans, nil)
 	if err == nil {
 		c.Answering[id] = true
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {

@@ -29,6 +29,7 @@ var tools = map[string]struct{ symbol, verb string }{
 	"git_diff":    {"plus-minus", "git diff"},
 	"skill":       {"sparkles", "技能"},
 	"update_plan": {"list-check", "更新计划"},
+	"ask_user":    {"message", "提问"},
 }
 
 var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令"}
@@ -501,6 +502,10 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 // ask is an approval request: what the tool would do, and the three
 // answers.
 func (a *App) ask(c *ui.Context, ap proto.Approval) {
+	if ap.Kind == "question" {
+		a.question(c, ap)
+		return
+	}
 	p := a.p
 	busy := a.C.Answering[ap.ID]
 	ui.Column(c).Margin(12, 0).Padding(14, 14, 12, 16).Radius(12).Background(p.Card).Border(.5, p.Edge2).
@@ -555,6 +560,42 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			}
 			if a.button(c, "allow:"+ap.ID, "允许", a.approvalHint(c, ap.ID, "⏎"), true).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, false))
+			}
+		})
+	})
+}
+
+// question is the model asking the user: the question, the options it
+// gave, and the composer below for any other answer.
+func (a *App) question(c *ui.Context, ap proto.Approval) {
+	p := a.p
+	busy := a.C.Answering[ap.ID]
+	ui.Column(c).Margin(12, 0).Padding(14, 14, 12, 16).Radius(12).Background(p.Card).Border(.5, p.Edge2).
+		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			slot(c, p, "wait")
+			ui.Text(c, "提问").FontSize(12.5).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, "需要你回答").FontSize(12.5).TextColor(p.Fg2)
+			ui.Spacer(c)
+			if w := a.waited(c, ap.ID); w != "" {
+				sym(c, "clock", 12, p.Mute)
+				ui.Text(c, w).FontSize(11.5).TextColor(p.Mute)
+			}
+		})
+		ui.Text(c, ap.Question).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg).Margin(10, 0, 0, 0).Selectable()
+		if len(ap.Options) > 0 {
+			ui.Row(c).Gap(8).Wrap().Margin(10, 0, 0, 0).Children(func() {
+				for i, o := range ap.Options {
+					if a.button(c, fmt.Sprintf("option:%s:%d", ap.ID, i), o, "", false).Disabled(busy).Clicked() {
+						a.do(a.C.Reply(ap.ID, o))
+					}
+				}
+			})
+		}
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
+			ui.Text(c, "也可以在下方输入框里回答").FontSize(12).TextColor(p.Mute).Grow(1).MinWidth(0)
+			if a.button(c, "skip:"+ap.ID, "跳过", a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
+				a.do(a.C.Reply(ap.ID, ""))
 			}
 		})
 	})

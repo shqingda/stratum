@@ -59,6 +59,27 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
 	}
+	if a.questionFirst() {
+		// The composer answers the model's question: Enter sends, Esc skips.
+		ap := a.C.Approvals[0]
+		switch {
+		case key == ui.KeyEnter && mods == 0 && strings.TrimSpace(a.draft) != "":
+			if !a.C.Answering[ap.ID] && !a.keyRepeat {
+				cmds, err := a.C.Reply(ap.ID, a.draft)
+				if err == nil {
+					a.draft = ""
+				}
+				a.do(cmds, err)
+			}
+			return true
+		case key == ui.KeyEscape && mods == 0:
+			if !a.C.Answering[ap.ID] && !a.keyRepeat {
+				a.do(a.C.Reply(ap.ID, ""))
+			}
+			return true
+		}
+		return key == ui.KeyEnter
+	}
 	if key == ui.KeyEnter && mods == 0 && strings.TrimSpace(a.draft) != "" {
 		if !a.keyRepeat {
 			a.submit()
@@ -109,4 +130,10 @@ func (a *App) approvalHint(c *ui.Context, id, hint string) string {
 		return ""
 	}
 	return hint
+}
+
+// questionFirst is the model's question waiting for the user before any
+// approval.
+func (a *App) questionFirst() bool {
+	return len(a.C.Approvals) > 0 && a.C.Approvals[0].Kind == "question"
 }

@@ -58,3 +58,21 @@ var UpdatePlan = &Tool{
 		return fmt.Sprintf("Plan updated: %d of %d steps done.", done, len(a.Steps)), nil
 	},
 }
+
+// AskUser asks the user a question mid-turn. The session runs it: it waits
+// for the reply as for an approval, so Run is never called.
+var AskUser = &Tool{
+	Name: "ask_user",
+	Description: "Ask the user a question when you cannot go on without their decision, such as a choice between approaches. " +
+		"Give options when the answer is one of a few. Do not ask what you can find out yourself.",
+	Schema: schema(`{"type":"object","properties":{
+		"question":{"type":"string"},
+		"options":{"type":"array","items":{"type":"string"}}},
+		"required":["question"]}`),
+	Access: func(env Env, args json.RawMessage) (perm.Request, error) {
+		return perm.Request{Tool: "ask_user", Kind: perm.Read}, nil
+	},
+	Run: func(ctx context.Context, env Env, args json.RawMessage) (string, error) {
+		return "", fmt.Errorf("ask_user is answered by the user")
+	},
+}

@@ -227,6 +227,10 @@ type Approval struct {
 	Paths   []string        `json:"paths,omitempty"`
 	Command string          `json:"command,omitempty"`
 	Reason  string          `json:"reason"`
+	// Question, for Kind "question", is what the model asks the user,
+	// with Options to pick from; the answer's Text replies.
+	Question string   `json:"question,omitempty"`
+	Options  []string `json:"options,omitempty"`
 }
 
 // ApprovalAnswer is the user's answer. Always allows the tool for the rest
@@ -236,6 +240,7 @@ type ApprovalAnswer struct {
 	ApprovalID string `json:"approvalId"`
 	Allow      bool   `json:"allow"`
 	Always     bool   `json:"always,omitempty"`
+	Text       string `json:"text,omitempty"` // the reply to a question
 }
 
 // Account is a signed-in provider account.
