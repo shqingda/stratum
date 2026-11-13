@@ -517,3 +517,11 @@ func TestMarks(t *testing.T) {
 		t.Fatalf("marks after opening s9: %v", c.Marks)
 	}
 }
+
+func TestCompaction(t *testing.T) {
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil)), event(ev(2, proto.EventCompaction, proto.Compaction{Summary: "修好了 Add"}))})
+	e := c.Entries[0]
+	if e.Role != Notice || e.Output != "修好了 Add" || e.CallID == "" {
+		t.Fatalf("%+v", e)
+	}
+}

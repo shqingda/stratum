@@ -570,6 +570,12 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.Approvals = slices.DeleteFunc(c.Approvals, func(x proto.Approval) bool { return x.ID == a.ApprovalID })
 			delete(c.Answering, a.ApprovalID)
 		}
+	case proto.EventCompaction:
+		var cp proto.Compaction
+		if json.Unmarshal(e.Data, &cp) == nil {
+			c.endStream()
+			c.add(&Entry{Role: Notice, Text: "上下文快满了，较早的对话已写成摘要", Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
+		}
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)

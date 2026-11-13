@@ -34,6 +34,9 @@ type Manager struct {
 	changes *changes.Log
 	// Open connects to an account's provider.
 	Open func(account string) (llm.Provider, error)
+	// CompactAt, when set, is how many tokens of history start a
+	// compaction, in place of three quarters of the model's context.
+	CompactAt int
 	// Defaults fills an account and model a new session leaves empty.
 	Defaults func() (account, model string)
 	Tools    tools.Set
@@ -360,12 +363,25 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 	if err != nil {
 		return llm.Usage{}, err
 	}
-	history, err := m.Store.Messages(ctx, x.ID)
+	history, err := m.history(ctx, x.ID)
 	if err != nil {
 		return llm.Usage{}, err
 	}
 	catalog := m.Skills.Load(x.Cwd)
 	turnTools := append(append(tools.Set(nil), m.Tools...), tools.Skill(catalog))
+	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt
+	var used llm.Usage
+	if at := m.compactAt(x.Account, x.Model); at > 0 && tokens(history) > at {
+		req := llm.Request{Model: x.Model, System: system, Messages: history, Tools: turnTools.Specs(), Effort: x.Effort, SessionID: x.ID}
+		short, u, err := m.compact(ctx, provider, req, x.ID)
+		used = u
+		switch {
+		case ctx.Err() != nil:
+			return used, ctx.Err()
+		case err == nil:
+			history = short
+		} // a failed summary leaves the history whole
+	}
 	ag := &agent.Agent{
 		Provider: provider,
 		Tools: &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
@@ -375,7 +391,7 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 		Clock: m.Clock,
 	}
 	cfg := agent.Config{
-		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: systemPrompt(x, m.Sandboxed) + catalog.Prompt,
+		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
 		Steer: func() []string {
 			m.mu.Lock()
 			defer m.mu.Unlock()
@@ -384,7 +400,8 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 			return q
 		},
 	}
-	return ag.Run(ctx, cfg, history, llm.Text(llm.User, text))
+	u, err := ag.Run(ctx, cfg, history, llm.Text(llm.User, text))
+	return used.Add(u), err
 }
 
 // sink records the agent's messages and streams the rest.

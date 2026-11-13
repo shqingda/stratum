@@ -455,9 +455,33 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 	case client.Tool:
 		a.card(c, e)
 	case client.Notice:
+		if e.Output != "" {
+			a.compactNote(c, e)
+			break
+		}
 		ui.Text(c, e.Text).FontSize(12).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
 	case client.Thinking:
 		a.thought(c, e)
+	}
+}
+
+// compactNote is a compaction: a line that opens to the summary the model
+// goes on from.
+func (a *App) compactNote(c *ui.Context, e *client.Entry) {
+	p := a.p
+	open := a.opened[e.CallID]
+	row := ui.ButtonBase(c.Key(e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Margin(2, 0, 6, 0).Label(e.Text)
+	if row.Clicked() {
+		a.opened[e.CallID] = !open
+	}
+	row.Children(func() {
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, "history", 14, p.Mute) })
+		ui.Text(c, e.Text).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+	})
+	if open {
+		ui.Text(c, e.Output).FontSize(12.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+			Margin(0, 0, 8, 24).Selectable()
 	}
 }
 

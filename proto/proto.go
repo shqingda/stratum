@@ -443,3 +443,13 @@ type HunkQuery struct {
 	NewStart int `json:"newStart"`
 	NewLen   int `json:"newLen"`
 }
+
+// --- 上下文压缩 ---
+
+// EventCompaction replaces the conversation before it with a summary in
+// what the model is sent; durable; Compaction.
+const EventCompaction = "compaction"
+
+type Compaction struct {
+	Summary string `json:"summary"`
+}
