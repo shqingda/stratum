@@ -48,7 +48,15 @@ func (a *App) box(c *ui.Context) {
 	} else {
 		box.Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .04)).Shadow(0, 8, 24, -12, ui.RGBA(0, 0, 0, .12))
 	}
+	if files := box.DroppedFiles(); len(files) > 0 {
+		a.attachPaths(files)
+	}
+	if box.FileDragOver() {
+		box.Border(1, p.Fg2)
+	}
+	svc := c.Services()
 	box.Children(func() {
+		a.attachments(c)
 		ph := "让 Talos 做点什么"
 		if a.C.Busy {
 			ph = "运行中：回车排队"
@@ -57,8 +65,14 @@ func (a *App) box(c *ui.Context) {
 			ph = "回答上面的问题，回车发送"
 		}
 		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
-			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey)
+			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
+		if a.noImages() {
+			ui.Text(c, "当前模型看不了图片，换一个再发").FontSize(11.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
+		}
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+			if a.iconPill(c, "attach", "plus", "添加附件").Clicked() {
+				a.choose()
+			}
 			if cur != nil {
 				a.modelPill(c, cur.Model)
 				a.effortPill(c, efforts[cur.Effort])
@@ -71,15 +85,31 @@ func (a *App) box(c *ui.Context) {
 	})
 }
 
+// ready is a draft or attachments to send.
+func (a *App) ready() bool {
+	return strings.TrimSpace(a.draft) != "" || len(a.attached) > 0
+}
+
 func (a *App) submit() {
-	if strings.TrimSpace(a.draft) == "" {
+	if !a.ready() {
 		return
 	}
-	cmds, err := a.C.Prompt(a.draft)
+	text, images := a.prompt()
+	cmds, err := a.C.Prompt(text, images...)
 	a.do(cmds, err)
 	if err == nil {
-		a.draft = ""
+		a.draft, a.attached = "", nil
 	}
+}
+
+// iconPill is a composer control that is only a symbol.
+func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
+	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
+	if b.Hovered() {
+		b.Background(a.p.Hover)
+	}
+	b.Children(func() { sym(c, symbol, 16, a.p.Fg2) })
+	return b
 }
 
 func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.Element {
@@ -105,12 +135,12 @@ func (a *App) goButton(c *ui.Context) {
 	p := a.p
 	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4)
 	switch {
-	case a.C.Busy && strings.TrimSpace(a.draft) == "":
+	case a.C.Busy && !a.ready():
 		b.Label("停止").Background(p.Fg).Children(func() { ui.Box(c).Size(10, 10).Radius(2).Background(p.Bg) })
 		if b.Clicked() {
 			a.do(a.C.Cancel())
 		}
-	case strings.TrimSpace(a.draft) == "" || !a.C.CanAct():
+	case !a.ready() || !a.C.CanAct():
 		b.Label("发送").Background(p.Chip).Children(func() { sym(c, "arrow-up", 16, p.Mute) })
 	default:
 		b.Label("发送").Background(p.Acc).Children(func() { sym(c, "arrow-up", 16, p.OnAcc) })

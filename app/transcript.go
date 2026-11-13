@@ -434,7 +434,14 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	case client.User:
 		ui.Row(c).Margin(4, 0, 18, 0).AlignItems(ui.Stretch).Children(func() {
 			ui.Box(c).Width(2).Margin(3, 0, 3, 0).Background(p.Faint).Shrink(0)
-			ui.Text(c, e.Text).FontWeight(500).TextColor(p.Fg).LineHeight(1.55).Padding(0, 0, 0, 12).Selectable().Grow(1).MinWidth(0)
+			ui.Column(c).Grow(1).MinWidth(0).Padding(0, 0, 0, 12).Gap(8).Children(func() {
+				if e.Text != "" {
+					ui.Text(c, e.Text).FontWeight(500).TextColor(p.Fg).LineHeight(1.55).Selectable()
+				}
+				if len(e.Images) > 0 {
+					a.sentImages(c, e)
+				}
+			})
 		})
 	default:
 		a.turn(c, live, func() { a.body(c, e) })

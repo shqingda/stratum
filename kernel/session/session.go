@@ -61,7 +61,7 @@ func New(st *store.Store, open func(string) (llm.Provider, error)) *Manager {
 type run struct {
 	turnSeq   int64
 	cancel    context.CancelFunc
-	queued    []string
+	queued    []proto.Prompt
 	approvals map[string]*pending
 }
 
@@ -218,7 +218,9 @@ func (m *Manager) Get(ctx context.Context, id string) (proto.Snapshot, error) {
 	m.mu.Lock()
 	if r := m.runs[id]; r != nil {
 		snap.Running = true
-		snap.Queued = append(snap.Queued, r.queued...)
+		for _, q := range r.queued {
+			snap.Queued = append(snap.Queued, q.Text)
+		}
 		for _, p := range r.approvals {
 			snap.Approvals = append(snap.Approvals, p.approval)
 		}
@@ -285,7 +287,7 @@ func (m *Manager) Cancel(id string) {
 // Prompt starts a turn with the user's text, or queues the text into the
 // running turn. receipt names the command, to record what became of it.
 func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (proto.PromptResult, error) {
-	if strings.TrimSpace(p.Text) == "" {
+	if strings.TrimSpace(p.Text) == "" && len(p.Images) == 0 {
 		return proto.PromptResult{}, proto.Errorf("bad_request", "text is empty")
 	}
 	x, err := m.session(ctx, p.SessionID)
@@ -294,7 +296,7 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 	}
 	m.mu.Lock()
 	if r := m.runs[x.ID]; r != nil {
-		r.queued = append(r.queued, p.Text)
+		r.queued = append(r.queued, p)
 		m.mu.Unlock()
 		return proto.PromptResult{Queued: true}, nil
 	}
@@ -312,7 +314,7 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 	}
 	go func() {
 		defer m.wg.Done()
-		err := m.turn(runCtx, x, r, p.Text)
+		err := m.turn(runCtx, x, r, p)
 		cancel()
 		m.mu.Lock()
 		delete(m.runs, x.ID)
@@ -329,7 +331,8 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 }
 
 // turn runs one turn to its end and records it.
-func (m *Manager) turn(ctx context.Context, x store.Session, r *run, text string) error {
+func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Prompt) error {
+	text := p.Text
 	start, err := m.Store.Append(context.WithoutCancel(ctx), x.ID, proto.EventTurnStart, proto.TurnStart{Text: text})
 	if err != nil {
 		return err
@@ -342,7 +345,7 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, text string
 		x, _ = m.Store.GetSession(context.WithoutCancel(ctx), x.ID)
 		m.record(ctx, x.ID, proto.EventSession, toSession(x))
 	}
-	usage, err := m.runAgent(ctx, x, r, text)
+	usage, err := m.runAgent(ctx, x, r, p)
 	end := proto.TurnEnd{Usage: usage}
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -355,7 +358,7 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, text string
 	return err
 }
 
-func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text string) (llm.Usage, error) {
+func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto.Prompt) (llm.Usage, error) {
 	if x.Account == "" || x.Model == "" {
 		return llm.Usage{}, errors.New("the session has no model; pick one")
 	}
@@ -392,15 +395,19 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, text st
 	}
 	cfg := agent.Config{
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
-		Steer: func() []string {
+		Steer: func() []llm.Part {
 			m.mu.Lock()
-			defer m.mu.Unlock()
 			q := r.queued
 			r.queued = nil
-			return q
+			m.mu.Unlock()
+			var parts []llm.Part
+			for _, p := range q {
+				parts = append(parts, promptParts(p)...)
+			}
+			return parts
 		},
 	}
-	u, err := ag.Run(ctx, cfg, history, llm.Text(llm.User, text))
+	u, err := ag.Run(ctx, cfg, history, llm.Message{Role: llm.User, Parts: promptParts(p)})
 	return used.Add(u), err
 }
 
@@ -524,4 +531,16 @@ func cmpOr(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// promptParts is what the user sent: the text, then the images.
+func promptParts(p proto.Prompt) []llm.Part {
+	var parts []llm.Part
+	if p.Text != "" {
+		parts = append(parts, llm.Part{Text: p.Text})
+	}
+	for i := range p.Images {
+		parts = append(parts, llm.Part{Image: &p.Images[i]})
+	}
+	return parts
 }

@@ -525,3 +525,21 @@ func TestCompaction(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+func TestImagePrompt(t *testing.T) {
+	img := llm.Image{MediaType: "image/png", Data: []byte("png")}
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventTurnStart, nil)),
+		event(ev(2, proto.EventMessage, llm.Message{Role: llm.User, Parts: []llm.Part{{Image: &img}}}))})
+	if e := c.Entries[0]; e.Role != User || len(e.Images) != 1 || e.Text != "" {
+		t.Fatalf("%+v", e)
+	}
+	cmds, err := c.Prompt("", img)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p proto.Prompt
+	json.Unmarshal(one(t, cmds, proto.MethodPrompt).Params, &p)
+	if len(p.Images) != 1 {
+		t.Fatalf("%+v", p)
+	}
+}

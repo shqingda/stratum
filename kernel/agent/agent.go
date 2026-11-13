@@ -72,7 +72,7 @@ type Config struct {
 	// Steer, when set, is asked after each round of tool calls for
 	// messages the user sent meanwhile; they join the conversation before
 	// the next request.
-	Steer func() []string
+	Steer func() []llm.Part
 }
 
 // Agent runs turns.
@@ -124,9 +124,7 @@ func (a *Agent) Run(ctx context.Context, cfg Config, history []llm.Message, inpu
 		}
 		results := a.runTools(ctx, calls)
 		if cfg.Steer != nil && ctx.Err() == nil {
-			for _, s := range cfg.Steer() {
-				results.Parts = append(results.Parts, llm.Part{Text: s})
-			}
+			results.Parts = append(results.Parts, cfg.Steer()...)
 		}
 		msgs = append(msgs, results)
 		a.emit(Event{Type: Message, Message: &results})

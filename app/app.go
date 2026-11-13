@@ -72,11 +72,16 @@ type App struct {
 
 	settingsOpen, addingAccount, setModelMenu bool
 	accountsSeen                              int
+
+	attached []attachment
+	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
+	pick     func() []string           // the open panel
+	update   func(func())              // runs on the UI thread, as Serve was given
 }
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, openIn: openIn, opened: map[string]bool{},
+	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, opened: map[string]bool{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 
@@ -87,6 +92,7 @@ func (a *App) Serve(ctx context.Context, srv *rpc.Server, update func(func())) {
 	cr, cw := io.Pipe()
 	fr, fw := io.Pipe()
 	a.out = make(chan []proto.Command, 256)
+	a.update = update
 	go func() { srv.Serve(ctx, cr, fw); fw.Close() }()
 	// Commands go out on their own goroutine, so that the UI thread never
 	// waits on a pipe the kernel is not reading yet.

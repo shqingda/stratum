@@ -64,8 +64,9 @@ type Entry struct {
 	Seq    int64 // event of a stored message; 0 for live rows
 	Role   Role
 	Text   string
-	Detail string // a tool call's arguments, summarized
-	Output string // a tool call's result
+	Images []llm.Image // a user message's
+	Detail string      // a tool call's arguments, summarized
+	Output string      // a tool call's result
 	Done   bool
 	CallID string
 	Failed bool
@@ -606,15 +607,19 @@ func (c *Client) event(e proto.Event) []proto.Command {
 // and tool calls, or tool results (which travel as a user message).
 func (c *Client) message(seq int64, m llm.Message) {
 	var text strings.Builder
+	var images []llm.Image
 	for _, p := range m.Parts {
 		text.WriteString(p.Text)
+		if p.Image != nil {
+			images = append(images, *p.Image)
+		}
 	}
 	switch m.Role {
 	case llm.User:
-		if text.Len() > 0 {
+		if text.Len() > 0 || len(images) > 0 {
 			c.endStream()
-			c.add(&Entry{Seq: seq, Role: User, Text: text.String(), Done: true})
-			if i := slices.Index(c.Queued, text.String()); i >= 0 {
+			c.add(&Entry{Seq: seq, Role: User, Text: text.String(), Images: images, Done: true})
+			if i := slices.Index(c.Queued, queuedLabel(text.String(), len(images))); i >= 0 {
 				c.Queued = slices.Delete(c.Queued, i, i+1) // the turn took it
 			}
 		}
@@ -741,17 +746,18 @@ func (c *Client) mutation(method string, params any, done func(json.RawMessage) 
 	return []proto.Command{c.mutate(method, params, done)}, nil
 }
 
-// Prompt sends text to the current session. While a turn runs, the text
-// waits in Queued until the turn takes it.
-func (c *Client) Prompt(text string) ([]proto.Command, error) {
-	if strings.TrimSpace(text) == "" {
+// Prompt sends text and images to the current session. While a turn
+// runs, the prompt waits in Queued until the turn takes it.
+func (c *Client) Prompt(text string, images ...llm.Image) ([]proto.Command, error) {
+	if strings.TrimSpace(text) == "" && len(images) == 0 {
 		return nil, fmt.Errorf("没有可发送的内容")
 	}
 	session := c.Current
-	return c.mutation(proto.MethodPrompt, proto.Prompt{SessionID: sessionID(session), Text: text}, func(r json.RawMessage) []proto.Command {
+	p := proto.Prompt{SessionID: sessionID(session), Text: text, Images: images}
+	return c.mutation(proto.MethodPrompt, p, func(r json.RawMessage) []proto.Command {
 		var res proto.PromptResult
 		if json.Unmarshal(r, &res) == nil && res.Queued && c.Current == session {
-			c.Queued = append(c.Queued, text)
+			c.Queued = append(c.Queued, queuedLabel(text, len(images)))
 		}
 		return nil
 	})
@@ -873,4 +879,13 @@ func (c *Client) ListModels(account string) ([]proto.Command, error) {
 	}
 	c.modelsReq = cmd.ID
 	return []proto.Command{cmd}, nil
+}
+
+// queuedLabel is how a queued prompt shows: its text, or what it holds
+// when it has none.
+func queuedLabel(text string, images int) string {
+	if text == "" && images > 0 {
+		return fmt.Sprintf("[%d 张图片]", images)
+	}
+	return text
 }

@@ -140,8 +140,9 @@ type Snapshot struct {
 // Prompt sends the user's message. While a turn runs, it joins that turn
 // after its current tool calls.
 type Prompt struct {
-	SessionID string `json:"sessionId"`
-	Text      string `json:"text"`
+	SessionID string      `json:"sessionId"`
+	Text      string      `json:"text"`
+	Images    []llm.Image `json:"images,omitempty"`
 }
 
 // PromptResult says what became of a prompt.
@@ -265,6 +266,7 @@ type Model struct {
 	Name      string  `json:"name"`
 	Context   int     `json:"context"`
 	Reasoning bool    `json:"reasoning"`
+	Images    bool    `json:"images,omitempty"` // takes images
 	Default   bool    `json:"default,omitempty"`
 	Input     float64 `json:"input"`  // dollars per million tokens
 	Output    float64 `json:"output"` // dollars per million tokens

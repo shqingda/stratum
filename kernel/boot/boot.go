@@ -118,7 +118,7 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 			provider, _, _ := strings.Cut(account, "/")
 			var out []proto.Model
 			for _, x := range llm.Models(provider) {
-				out = append(out, proto.Model{ID: x.ID, Name: x.Name, Context: x.Context, Reasoning: x.Reasoning,
+				out = append(out, proto.Model{ID: x.ID, Name: x.Name, Context: x.Context, Reasoning: x.Reasoning, Images: x.Images,
 					Default: x.ID == llm.DefaultModel(provider), Input: x.Price.Input, Output: x.Price.Output})
 			}
 			return out, nil

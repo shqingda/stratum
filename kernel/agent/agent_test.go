@@ -184,9 +184,9 @@ func (c *cancelAfterText) Emit(e Event) {
 
 func TestSteer(t *testing.T) {
 	s := &llm.Script{Turns: []llm.Turn{{Calls: []llm.ToolCall{llm.Call("a", "read", nil)}}, {Text: "ok"}}}
-	queued := []string{"also check tests"}
+	queued := []llm.Part{{Text: "also check tests"}}
 	ag := &Agent{Provider: s, Tools: &fakeTools{}}
-	ag.Run(context.Background(), Config{Steer: func() []string { q := queued; queued = nil; return q }}, nil, llm.Text(llm.User, "hi"))
+	ag.Run(context.Background(), Config{Steer: func() []llm.Part { q := queued; queued = nil; return q }}, nil, llm.Text(llm.User, "hi"))
 	results := s.Requests[1].Messages[2]
 	if len(results.Parts) != 2 || results.Parts[1].Text != "also check tests" {
 		t.Errorf("%+v", results)

@@ -80,7 +80,7 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return key == ui.KeyEnter
 	}
-	if key == ui.KeyEnter && mods == 0 && strings.TrimSpace(a.draft) != "" {
+	if key == ui.KeyEnter && mods == 0 && a.ready() {
 		if !a.keyRepeat {
 			a.submit()
 		}
