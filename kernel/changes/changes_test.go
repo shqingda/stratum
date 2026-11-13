@@ -84,9 +84,9 @@ func TestCreateModifyDeleteRevertRedo(t *testing.T) {
 		var r Result
 		var err error
 		if revert {
-			r, err = l.Revert(context.Background(), "s", 7)
+			r, err = l.Revert(context.Background(), "s", 7, "")
 		} else {
-			r, err = l.Redo(context.Background(), "s", 7)
+			r, err = l.Redo(context.Background(), "s", 7, "")
 		}
 		if err != nil || len(r.Paths) != len(cases) || len(r.Conflicts) != 0 {
 			t.Fatalf("restore: %+v %v", r, err)
@@ -102,9 +102,9 @@ func TestCreateModifyDeleteRevertRedo(t *testing.T) {
 			t.Fatalf("mode changed: %v %v", info, err)
 		}
 		if revert {
-			r, err = l.Revert(context.Background(), "s", 7)
+			r, err = l.Revert(context.Background(), "s", 7, "")
 		} else {
-			r, err = l.Redo(context.Background(), "s", 7)
+			r, err = l.Redo(context.Background(), "s", 7, "")
 		}
 		if err != nil || len(r.Paths) != 0 || len(r.Conflicts) != 0 {
 			t.Fatalf("repeat restore not idempotent: %+v %v", r, err)
@@ -119,17 +119,17 @@ func TestConflictRetryAndRestart(t *testing.T) {
 		record(t, l, 9, path, []byte("old"), []byte("new"))
 	}
 	put(t, a, []byte("manual"))
-	r, err := l.Revert(context.Background(), "s", 9)
+	r, err := l.Revert(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{b}) || !reflect.DeepEqual(r.Conflicts, []string{a}) {
 		t.Fatalf("partial revert: %+v %v", r, err)
 	}
 	checkFile(t, a, []byte("manual"))
 	checkFile(t, b, []byte("old"))
-	r, err = l.Redo(context.Background(), "s", 9)
+	r, err = l.Redo(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{b}) || !reflect.DeepEqual(r.Conflicts, []string{a}) {
 		t.Fatalf("redo must recheck files skipped by revert: %+v %v", r, err)
 	}
-	r, err = l.Revert(context.Background(), "s", 9)
+	r, err = l.Revert(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{b}) || !reflect.DeepEqual(r.Conflicts, []string{a}) {
 		t.Fatalf("restore partially reverted state: %+v %v", r, err)
 	}
@@ -143,19 +143,19 @@ func TestConflictRetryAndRestart(t *testing.T) {
 	defer s.Close()
 	l = New(s)
 	put(t, a, []byte("new"))
-	r, err = l.Revert(context.Background(), "s", 9)
+	r, err = l.Revert(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{a}) || len(r.Conflicts) != 0 {
 		t.Fatalf("retry: %+v %v", r, err)
 	}
 	put(t, b, []byte("manual redo"))
-	r, err = l.Redo(context.Background(), "s", 9)
+	r, err = l.Redo(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{a}) || !reflect.DeepEqual(r.Conflicts, []string{b}) {
 		t.Fatalf("partial redo: %+v %v", r, err)
 	}
 	checkFile(t, a, []byte("new"))
 	checkFile(t, b, []byte("manual redo"))
 	put(t, b, []byte("old"))
-	r, err = l.Redo(context.Background(), "s", 9)
+	r, err = l.Redo(context.Background(), "s", 9, "")
 	if err != nil || !reflect.DeepEqual(r.Paths, []string{b}) || len(r.Conflicts) != 0 {
 		t.Fatalf("redo retry: %+v %v", r, err)
 	}
@@ -170,12 +170,12 @@ func TestRepeatedFileAndBrokenChain(t *testing.T) {
 	if err != nil || len(turns) != 1 || len(turns[0].Files) != 1 || turns[0].Files[0].Added != 1 || turns[0].Files[0].Removed != 1 {
 		t.Fatalf("net changes: %+v %v", turns, err)
 	}
-	r, err := l.Revert(context.Background(), "s", 3)
+	r, err := l.Revert(context.Background(), "s", 3, "")
 	if err != nil || len(r.Paths) != 1 || len(r.Conflicts) != 0 {
 		t.Fatalf("multi-write revert: %+v %v", r, err)
 	}
 	checkFile(t, path, []byte("a\n"))
-	r, err = l.Redo(context.Background(), "s", 3)
+	r, err = l.Redo(context.Background(), "s", 3, "")
 	if err != nil || len(r.Paths) != 1 || len(r.Conflicts) != 0 {
 		t.Fatalf("multi-write redo: %+v %v", r, err)
 	}
@@ -183,7 +183,7 @@ func TestRepeatedFileAndBrokenChain(t *testing.T) {
 	other := filepath.Join(root, "broken")
 	record(t, l, 4, other, []byte("original"), []byte("first"))
 	record(t, l, 4, other, []byte("manual middle"), []byte("last"))
-	r, err = l.Revert(context.Background(), "s", 4)
+	r, err = l.Revert(context.Background(), "s", 4, "")
 	if err != nil || len(r.Paths) != 0 || !reflect.DeepEqual(r.Conflicts, []string{other}) {
 		t.Fatalf("broken chain partially restored: %+v %v", r, err)
 	}
@@ -218,7 +218,7 @@ func TestRestoreRejectsSymlinks(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			r, err := l.Revert(context.Background(), "s", 1)
+			r, err := l.Revert(context.Background(), "s", 1, "")
 			if err != nil || len(r.Paths) != 0 || !reflect.DeepEqual(r.Conflicts, []string{path}) {
 				t.Fatalf("symlink restore: %+v %v", r, err)
 			}
@@ -269,7 +269,7 @@ func TestRecordRejectsChangedTarget(t *testing.T) {
 			if err != nil || len(rows) != 0 {
 				t.Fatalf("rejected target left a change: %+v %v", rows, err)
 			}
-			if _, err := l.Revert(context.Background(), "s", 1); !errors.Is(err, store.ErrNotFound) {
+			if _, err := l.Revert(context.Background(), "s", 1, ""); !errors.Is(err, store.ErrNotFound) {
 				t.Fatalf("rejected target became restorable: %v", err)
 			}
 			checkFile(t, target, []byte("after"))
@@ -295,4 +295,29 @@ func TestLineCounts(t *testing.T) {
 	if a, r := lineCounts([]byte(large), []byte(large+"new\n")); a != 1 || r != 0 {
 		t.Fatalf("large common prefix = +%d -%d", a, r)
 	}
+}
+
+func TestRevertOneFile(t *testing.T) {
+	_, l, root, _ := setup(t)
+	a, b := filepath.Join(root, "a"), filepath.Join(root, "b")
+	record(t, l, 3, a, []byte("a0"), []byte("a1"))
+	record(t, l, 3, b, []byte("b0"), []byte("b1"))
+	r, err := l.Revert(context.Background(), "s", 3, a)
+	if err != nil || !reflect.DeepEqual(r.Paths, []string{a}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	checkFile(t, a, []byte("a0"))
+	checkFile(t, b, []byte("b1"))
+	// The whole turn then takes back only what is left.
+	if r, err = l.Revert(context.Background(), "s", 3, ""); err != nil || !reflect.DeepEqual(r.Paths, []string{b}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if _, err = l.Redo(context.Background(), "s", 3, filepath.Join(root, "c")); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a file the turn did not change: %v", err)
+	}
+	if _, err = l.Redo(context.Background(), "s", 3, a); err != nil {
+		t.Fatal(err)
+	}
+	checkFile(t, a, []byte("a1"))
+	checkFile(t, b, []byte("b0"))
 }

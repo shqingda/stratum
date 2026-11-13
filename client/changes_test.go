@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,19 +57,19 @@ func TestChangesAgainstKernel(t *testing.T) {
 		t.Errorf("%+v", d)
 	}
 
-	k.do(c.Revert(turn, false))
+	k.do(c.Revert(turn, "", false))
 	k.until("the revert", func() bool { return c.Changes.Reverted[turn] })
 	if b, _ := os.ReadFile(notes); string(b) != "todo: ship\n" || !c.Changes.Stale || len(c.Changes.Diffs) != 0 {
 		t.Errorf("after revert: %q stale %v diffs %d", b, c.Changes.Stale, len(c.Changes.Diffs))
 	}
-	k.do(c.Revert(turn, true))
+	k.do(c.Revert(turn, "", true))
 	k.until("the redo", func() bool { return !c.Changes.Reverted[turn] })
 	if b, _ := os.ReadFile(notes); string(b) != "done: ship\n" {
 		t.Errorf("after redo: %q", b)
 	}
 
 	// The log rebuilds which turns are reverted on reconnect.
-	k.do(c.Revert(turn, false))
+	k.do(c.Revert(turn, "", false))
 	k.until("the second revert", func() bool { return c.Changes.Reverted[turn] })
 	c2 := newClient(dir, "u")
 	k2 := dial(t, m, c2)
@@ -76,4 +77,29 @@ func TestChangesAgainstKernel(t *testing.T) {
 	if !c2.Changes.Reverted[turn] {
 		t.Error("reverted turn not rebuilt from the log")
 	}
+}
+
+// TestRevertedFiles follows restores of single files and whole turns.
+func TestRevertedFiles(t *testing.T) {
+	c := newClient("/w", "t")
+	c.resetChanges()
+	c.Changes.Turns = []proto.ChangeTurn{{TurnSeq: 3, Files: []proto.ChangeFile{{Path: "/w/a"}, {Path: "/w/b"}}}}
+	restore := func(typ, path string) {
+		data, _ := json.Marshal(proto.ChangeResult{TurnSeq: 3, Path: path})
+		c.changesEvent(proto.Event{Type: typ, Data: data})
+	}
+	is := func(a, b bool) {
+		t.Helper()
+		if c.Changes.FileReverted(3, "/w/a") != a || c.Changes.FileReverted(3, "/w/b") != b {
+			t.Fatalf("a %v b %v, want %v %v", c.Changes.FileReverted(3, "/w/a"), c.Changes.FileReverted(3, "/w/b"), a, b)
+		}
+	}
+	restore(proto.EventChangesReverted, "/w/a")
+	is(true, false)
+	restore(proto.EventChangesReverted, "")
+	is(true, true)
+	restore(proto.EventChangesRedone, "/w/a")
+	is(false, true)
+	restore(proto.EventChangesRedone, "")
+	is(false, false)
 }

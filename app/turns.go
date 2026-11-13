@@ -124,7 +124,7 @@ func (a *App) summary(c *ui.Context, t int) {
 				ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
 			})
 			if undo.Clicked() {
-				a.do(a.C.Revert(ch.TurnSeq, reverted))
+				a.do(a.C.Revert(ch.TurnSeq, "", reverted))
 			}
 			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), "查看变更", "", false).Clicked() {
 				a.rv.open = true

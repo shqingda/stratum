@@ -309,8 +309,10 @@ type ChangeDiff struct {
 	After  *string `json:"after,omitempty"`
 }
 
+// ChangeResult is a restore: of the whole turn, or of Path alone.
 type ChangeResult struct {
 	TurnSeq   int64    `json:"turnSeq,omitempty"`
+	Path      string   `json:"path,omitempty"`
 	Paths     []string `json:"paths,omitempty"`
 	Conflicts []string `json:"conflicts,omitempty"`
 }

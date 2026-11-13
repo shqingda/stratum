@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"path/filepath"
 
 	"github.com/shqingda/talos/kernel/changes"
 	"github.com/shqingda/talos/kernel/store"
@@ -49,20 +50,27 @@ func (m *Manager) ChangesApply(ctx context.Context, q proto.ChangeQuery, redo bo
 		m.mu.Unlock()
 		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
 	}
-	if _, err := m.session(ctx, q.SessionID); err != nil {
+	x, err := m.session(ctx, q.SessionID)
+	if err != nil {
 		m.mu.Unlock()
 		return proto.ChangeResult{}, err
 	}
+	path := q.Path
+	if path != "" && !filepath.IsAbs(path) {
+		path = filepath.Join(x.Cwd, path)
+	}
+	if path != "" {
+		path = filepath.Clean(path)
+	}
 	var result changes.Result
-	var err error
 	event := proto.EventChangesReverted
 	if redo {
-		result, err = m.changes.Redo(ctx, q.SessionID, q.TurnSeq)
+		result, err = m.changes.Redo(ctx, q.SessionID, q.TurnSeq, path)
 		event = proto.EventChangesRedone
 	} else {
-		result, err = m.changes.Revert(ctx, q.SessionID, q.TurnSeq)
+		result, err = m.changes.Revert(ctx, q.SessionID, q.TurnSeq, path)
 	}
-	out := proto.ChangeResult{TurnSeq: q.TurnSeq, Paths: result.Paths, Conflicts: result.Conflicts}
+	out := proto.ChangeResult{TurnSeq: q.TurnSeq, Path: path, Paths: result.Paths, Conflicts: result.Conflicts}
 	if err != nil && len(out.Paths) == 0 && len(out.Conflicts) == 0 {
 		m.mu.Unlock()
 		return out, changeError(err)

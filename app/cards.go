@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -197,10 +198,7 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 			ui.Text(c, fmt.Sprintf("+%d", diff.added)).Font("monospace").FontSize(12).TextColor(p.Plus).Shrink(0)
 			ui.Text(c, fmt.Sprintf("−%d", diff.removed)).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0)
 			ui.Spacer(c)
-			ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label("撤销 " + path).Disabled(true).DimDisabled(false).Tooltip("撤销尚未接入").Children(func() {
-				sym(c, "arrow-back-up", 15, p.Fg2)
-				ui.Text(c, "撤销").FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
-			})
+			a.fileUndo(c, e, path)
 		})
 		if note != "" {
 			ui.Text(c, note).FontSize(11.5).TextColor(p.Mute).Padding(0, 12, 6, 12)
@@ -353,4 +351,58 @@ func resultRows(e *client.Entry) (rows []string, count int, ok bool) {
 		}
 	}
 	return rows, count, true
+}
+
+// fileUndo takes back, or redoes, what the card's turn did to its file.
+func (a *App) fileUndo(c *ui.Context, e *client.Entry, path string) {
+	p := a.p
+	turn, abs := a.changedFile(e, path)
+	reverted := turn != 0 && a.C.Changes.FileReverted(turn, abs)
+	label, icon := "撤销", "arrow-back-up"
+	if reverted {
+		label, icon = "重做", "arrow-forward-up"
+	}
+	b := ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label + " " + path)
+	switch {
+	case turn == 0:
+		b.Disabled(true).Tooltip("这一轮的改动还没读到")
+	case a.C.Busy:
+		b.Disabled(true).Tooltip("运行中不能恢复文件")
+	default:
+		b.Tooltip(label + "这一轮对 " + path + " 的修改")
+		if b.Hovered() {
+			b.Background(p.Hover)
+		}
+	}
+	b.Children(func() {
+		sym(c, icon, 15, p.Fg2)
+		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+	})
+	if b.Clicked() {
+		a.do(a.C.Revert(turn, abs, reverted))
+	}
+}
+
+// changedFile finds the entry's file among its turn's recorded changes,
+// whose paths are absolute.
+func (a *App) changedFile(e *client.Entry, path string) (int64, string) {
+	if e.Turn < 0 || e.Turn >= len(a.C.Turns) || a.C.Current == nil {
+		return 0, ""
+	}
+	seq := a.C.Turns[e.Turn].Seq
+	want := path
+	if !filepath.IsAbs(want) {
+		want = filepath.Join(a.C.Current.Cwd, want)
+	}
+	for _, t := range a.C.Changes.Turns {
+		if t.TurnSeq != seq {
+			continue
+		}
+		for _, f := range t.Files {
+			if f.Path == want {
+				return seq, f.Path
+			}
+		}
+	}
+	return 0, ""
 }

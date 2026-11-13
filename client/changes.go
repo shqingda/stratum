@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	"github.com/shqingda/talos/proto"
 )
@@ -14,6 +15,8 @@ type Changes struct {
 	// Reverted holds the turns whose changes were taken back and not
 	// redone since, as the session's log tells.
 	Reverted map[int64]bool
+	// RevertedFiles holds files taken back alone, by DiffKey.
+	RevertedFiles map[string]bool
 	// Diffs are the before and after of files asked for, by DiffKey.
 	Diffs map[string]proto.ChangeDiff
 	// Stale is set when a turn ended or files were restored since Turns
@@ -28,8 +31,13 @@ type Changes struct {
 // DiffKey names one file of one turn in Changes.Diffs.
 func DiffKey(turn int64, path string) string { return strconv.FormatInt(turn, 10) + ":" + path }
 
+// FileReverted tells whether a file's changes in a turn are taken back.
+func (ch *Changes) FileReverted(turn int64, path string) bool {
+	return ch.Reverted[turn] || ch.RevertedFiles[DiffKey(turn, path)]
+}
+
 func (c *Client) resetChanges() {
-	c.Changes = Changes{Reverted: map[int64]bool{}, Diffs: map[string]proto.ChangeDiff{}, Stale: true}
+	c.Changes = Changes{Reverted: map[int64]bool{}, RevertedFiles: map[string]bool{}, Diffs: map[string]proto.ChangeDiff{}, Stale: true}
 }
 
 // changesEvent follows the log: a turn's end or a restore makes the list
@@ -41,10 +49,36 @@ func (c *Client) changesEvent(e proto.Event) {
 	case proto.EventChangesReverted, proto.EventChangesRedone:
 		var r proto.ChangeResult
 		if json.Unmarshal(e.Data, &r) == nil {
-			if e.Type == proto.EventChangesReverted {
+			reverted := e.Type == proto.EventChangesReverted
+			switch {
+			case r.Path != "" && reverted:
+				c.Changes.RevertedFiles[DiffKey(r.TurnSeq, r.Path)] = true
+			case r.Path != "":
+				delete(c.Changes.RevertedFiles, DiffKey(r.TurnSeq, r.Path))
+				if c.Changes.Reverted[r.TurnSeq] {
+					// The rest of the turn stays taken back.
+					delete(c.Changes.Reverted, r.TurnSeq)
+					for _, t := range c.Changes.Turns {
+						if t.TurnSeq != r.TurnSeq {
+							continue
+						}
+						for _, f := range t.Files {
+							if f.Path != r.Path {
+								c.Changes.RevertedFiles[DiffKey(r.TurnSeq, f.Path)] = true
+							}
+						}
+					}
+				}
+			case reverted:
 				c.Changes.Reverted[r.TurnSeq] = true
-			} else {
+			default:
 				delete(c.Changes.Reverted, r.TurnSeq)
+				prefix := DiffKey(r.TurnSeq, "")
+				for k := range c.Changes.RevertedFiles {
+					if strings.HasPrefix(k, prefix) {
+						delete(c.Changes.RevertedFiles, k)
+					}
+				}
 			}
 		}
 		c.Changes.Stale = true
@@ -101,14 +135,14 @@ func (c *Client) DiffChange(turn int64, path string) ([]proto.Command, error) {
 	return []proto.Command{cmd}, nil
 }
 
-// Revert takes back the files a turn changed; redo puts its changes back.
-// The session's log brings the outcome.
-func (c *Client) Revert(turn int64, redo bool) ([]proto.Command, error) {
+// Revert takes back the files a turn changed, or only path (absolute);
+// redo puts the changes back. The session's log brings the outcome.
+func (c *Client) Revert(turn int64, path string, redo bool) ([]proto.Command, error) {
 	method := proto.MethodChangesRevert
 	if redo {
 		method = proto.MethodChangesRedo
 	}
-	cmds, err := c.mutation(method, proto.ChangeQuery{SessionID: sessionID(c.Current), TurnSeq: turn}, func(r json.RawMessage) []proto.Command {
+	cmds, err := c.mutation(method, proto.ChangeQuery{SessionID: sessionID(c.Current), TurnSeq: turn, Path: path}, func(r json.RawMessage) []proto.Command {
 		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {

@@ -312,7 +312,7 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 			status, col = "D", p.Minus
 		}
 	}
-	reverted := a.C.Changes.Reverted[turn]
+	reverted := a.C.Changes.FileReverted(turn, f.Path)
 	row.Children(func() {
 		ui.Text(c, status).FontSize(10.5).FontWeight(600).TextColor(col).Width(12).TextAlign(ui.Center).Shrink(0)
 		dir, base := a.splitPath(f.Path)
@@ -521,7 +521,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				b.Tooltip("运行中不能恢复文件")
 			}
 			if b.Clicked() {
-				a.do(a.C.Revert(turn, reverted))
+				a.do(a.C.Revert(turn, "", reverted))
 			}
 		}
 		if dirty {

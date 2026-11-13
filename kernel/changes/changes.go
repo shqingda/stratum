@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -126,15 +127,17 @@ func (l *Log) Diff(ctx context.Context, sessionID string, turnSeq int64, path st
 	return Diff{}, store.ErrNotFound
 }
 
-func (l *Log) Revert(ctx context.Context, sessionID string, turnSeq int64) (Result, error) {
-	return l.apply(ctx, sessionID, turnSeq, true)
+// Revert takes back what a turn changed: every file, or only path, an
+// absolute path as List gives it.
+func (l *Log) Revert(ctx context.Context, sessionID string, turnSeq int64, path string) (Result, error) {
+	return l.apply(ctx, sessionID, turnSeq, path, true)
 }
 
-func (l *Log) Redo(ctx context.Context, sessionID string, turnSeq int64) (Result, error) {
-	return l.apply(ctx, sessionID, turnSeq, false)
+func (l *Log) Redo(ctx context.Context, sessionID string, turnSeq int64, path string) (Result, error) {
+	return l.apply(ctx, sessionID, turnSeq, path, false)
 }
 
-func (l *Log) apply(ctx context.Context, sessionID string, turnSeq int64, revert bool) (Result, error) {
+func (l *Log) apply(ctx context.Context, sessionID string, turnSeq int64, path string, revert bool) (Result, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	result := Result{Paths: []string{}, Conflicts: []string{}}
@@ -149,6 +152,12 @@ func (l *Log) apply(ctx context.Context, sessionID string, turnSeq int64, revert
 		return result, store.ErrNotFound
 	}
 	groups := groupFiles(rows)
+	if path != "" {
+		groups = slices.DeleteFunc(groups, func(g []store.FileChange) bool { return g[0].Path != path })
+		if len(groups) == 0 {
+			return result, store.ErrNotFound
+		}
+	}
 	if revert {
 		sort.Slice(groups, func(i, j int) bool { return groups[i][len(groups[i])-1].ID > groups[j][len(groups[j])-1].ID })
 	}
