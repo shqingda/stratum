@@ -474,3 +474,36 @@ type TaskState struct {
 	Task   string `json:"task"`
 	State  string `json:"state"` // run, done, fail, skip
 }
+
+// MCP servers: MethodMCPList says how each configured one is for a
+// folder; MethodMCPTrust lets a folder's .mcp.json server run, or stops
+// it. EventMCP, sent to every client, says a server connected or failed.
+const (
+	MethodMCPList  = "mcp.list"  // MCPQuery → MCPList
+	MethodMCPTrust = "mcp.trust" // MCPTrust → MCPList
+	EventMCP       = "mcp.changed"
+)
+
+type MCPQuery struct {
+	Cwd string `json:"cwd"`
+}
+
+type MCPTrust struct {
+	Cwd   string `json:"cwd"`
+	Name  string `json:"name"`
+	Trust bool   `json:"trust"`
+}
+
+type MCPList struct {
+	Servers []MCPServer `json:"servers"`
+	Error   string      `json:"error,omitempty"` // a config file that did not read
+}
+
+type MCPServer struct {
+	Name    string   `json:"name"`
+	Project bool     `json:"project,omitempty"` // from the folder's .mcp.json
+	Target  string   `json:"target"`            // the command or URL
+	State   string   `json:"state"`             // untrusted, connecting, ok, fail
+	Error   string   `json:"error,omitempty"`
+	Tools   []string `json:"tools,omitempty"`
+}

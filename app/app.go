@@ -73,6 +73,7 @@ type App struct {
 	keyProvider, key string
 
 	settingsOpen, addingAccount, setModelMenu bool
+	settingsPage                              string // "" for accounts, or mcp
 	accountsSeen                              int
 
 	attached []attachment

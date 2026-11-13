@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shqingda/talos/kernel/mcp"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,7 @@ type Manager struct {
 	Defaults func() (account, model string)
 	Tools    tools.Set
 	Skills   skills.Loader
+	MCP      *mcp.Hub // nil without MCP
 	// Sandboxed tells whether commands run in the sandbox.
 	Sandboxed bool
 	Clock     agent.Clock // real time when nil
@@ -373,6 +375,9 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	}
 	catalog := m.Skills.Load(x.Cwd)
 	turnTools := append(append(tools.Set(nil), m.Tools...), tools.Skill(catalog))
+	if m.MCP != nil {
+		turnTools = append(turnTools, m.MCP.Tools(ctx, x.Cwd)...)
+	}
 	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt
 	var used llm.Usage
 	if at := m.compactAt(x.Account, x.Model); at > 0 && tokens(history) > at {
@@ -490,6 +495,9 @@ func (m *Manager) Close() {
 	}
 	m.mu.Unlock()
 	m.wg.Wait()
+	if m.MCP != nil {
+		m.MCP.Close()
+	}
 }
 
 // Recover tidies sessions a previous kernel left mid-turn: it ends their

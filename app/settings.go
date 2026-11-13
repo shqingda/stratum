@@ -12,8 +12,14 @@ var modeCards = []struct{ id, symbol, text string }{
 }
 
 func (a *App) openSettings() {
-	a.settingsOpen, a.addingAccount = true, false
+	a.settingsOpen, a.addingAccount, a.settingsPage = true, false, ""
 	a.quiet(a.C.ReadSettings())
+}
+
+// openMCP opens the settings at the MCP servers.
+func (a *App) openMCP() {
+	a.settingsOpen, a.settingsPage = true, "mcp"
+	a.quiet(a.C.ReadMCP())
 }
 
 // settingsView is the settings window: accounts, and what new sessions
@@ -28,13 +34,32 @@ func (a *App) settingsView(c *ui.Context) {
 					a.settingsOpen = false
 				}
 			})
-			a.navItem(c, "settings-accounts", "user-circle", "账号与模型", "").Background(p.Sel)
+			for _, it := range []struct{ page, key, symbol, label string }{
+				{"", "settings-accounts", "user-circle", "账号与模型"},
+				{"mcp", "settings-mcp", "puzzle", "技能与 MCP"},
+			} {
+				b := a.navItem(c, it.key, it.symbol, it.label, "")
+				if it.page == a.settingsPage {
+					b.Background(p.Sel)
+				}
+				if b.Clicked() && it.page != a.settingsPage {
+					if it.page == "mcp" {
+						a.openMCP()
+					} else {
+						a.openSettings()
+					}
+				}
+			}
 		})
 		ui.Column(c).Grow(1).MinWidth(0).Background(p.Bg).Children(func() {
 			ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 			ui.Scroll(c).Grow(1).Children(func() {
 				ui.Column(c).Width(600).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(8, 20, 40, 20).Children(func() {
-					a.accountsPage(c)
+					if a.settingsPage == "mcp" {
+						a.mcpPage(c)
+					} else {
+						a.accountsPage(c)
+					}
 				})
 			})
 		})

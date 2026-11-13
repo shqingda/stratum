@@ -129,6 +129,10 @@ type Client struct {
 	Queued  []string // prompts waiting for the running turn
 	// Older is the log having events before the ones shown.
 	Older, LoadingOlder bool
+	// MCP is how the MCP servers are for the folder MCPFor, nil until
+	// read.
+	MCP    *proto.MCPList
+	MCPFor string
 	// Hits are the messages matching HitsFor, nil before an answer.
 	Hits      []proto.SearchHit
 	HitsFor   string
@@ -229,8 +233,14 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 		if f.Event == nil {
 			return nil
 		}
-		if f.Event.Type == proto.EventLogin {
+		switch f.Event.Type {
+		case proto.EventLogin:
 			c.loginProgress(*f.Event)
+			return nil
+		case proto.EventMCP:
+			if c.MCP != nil && c.Phase == Ready {
+				return []proto.Command{c.readMCP(c.MCPFor)}
+			}
 			return nil
 		}
 		if f.Event.Type == proto.EventSession {

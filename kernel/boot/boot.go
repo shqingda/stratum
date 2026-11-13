@@ -57,6 +57,7 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 	}
 
 	m := session.New(st, open)
+	m.UseMCP(filepath.Join(auth.Dir, "mcp.json"))
 	m.Defaults = func() (string, string) {
 		names := accounts()
 		if len(names) == 0 {

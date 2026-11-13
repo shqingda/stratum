@@ -170,6 +170,8 @@ func reason(req perm.Request, env tools.Env) string {
 		return "Commands cannot be sandboxed here."
 	case req.Kind == perm.Exec:
 		return "It runs a command."
+	case req.Kind == perm.MCP:
+		return "It calls a tool of an MCP server, outside the sandbox."
 	case req.Kind == perm.Write:
 		return "It changes files."
 	}

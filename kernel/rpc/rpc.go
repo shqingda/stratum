@@ -265,6 +265,18 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		return struct{}{}, s.Logout(ctx, p.Account)
 	case proto.MethodSettings:
 		return s.Sessions.Settings(ctx)
+	case proto.MethodMCPList:
+		p, err := params[proto.MCPQuery](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.MCPList(ctx, p)
+	case proto.MethodMCPTrust:
+		p, err := params[proto.MCPTrust](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.MCPTrust(ctx, p)
 	case proto.MethodSetSettings:
 		p, err := params[proto.Settings](cmd)
 		if err != nil {

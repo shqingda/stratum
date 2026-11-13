@@ -49,7 +49,9 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 				a.do(a.C.NewSession())
 			}
 			a.navItem(c, "cron", "clock-play", "定时任务", "")
-			a.navItem(c, "skills", "puzzle", "技能与 MCP", "")
+			if a.navItem(c, "skills", "puzzle", "技能与 MCP", "").Clicked() {
+				a.openMCP()
+			}
 		})
 		list := ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
 		// The list fades into the footer rather than being cut at it.

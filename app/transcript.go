@@ -34,7 +34,18 @@ var tools = map[string]struct{ symbol, verb string }{
 	"run_tasks":   {"hierarchy-3", "任务图"},
 }
 
-var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令"}
+var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令", "mcp": "调用 MCP 工具"}
+
+// reasons put the kernel's reasons for asking in the app's words.
+var reasons = map[string]string{
+	"It reaches outside the workspace.":                                           "会碰到工作区以外",
+	"It runs without the sandbox: with network and access outside the workspace.": "不在沙箱里运行：有网络，能访问工作区以外",
+	"Commands cannot be sandboxed here.":                                          "这台机器上命令进不了沙箱",
+	"It runs a command.":                                                          "要运行命令",
+	"It changes files.":                                                           "要改文件",
+	"It calls a tool of an MCP server, outside the sandbox.":                      "MCP 服务器不在沙箱里运行",
+	"It touches files that may hold secrets.":                                     "涉及可能存有密钥的文件",
+}
 
 var modes = map[string]string{"ask": "询问", "auto": "自动", "full": "完全"}
 
@@ -510,6 +521,9 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	t, ok := tools[e.Text]
 	if !ok {
 		t.symbol, t.verb = "tool", e.Text
+		if server, name, ok := mcpTool(e.Text); ok {
+			t.symbol, t.verb = "plug", server+" · "+name
+		}
 	}
 	open := a.opened[e.CallID]
 	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
@@ -580,6 +594,9 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			}
 		})
 		what := ap.Command
+		if ap.Kind == "mcp" {
+			what += "\n" + compact(ap.Args)
+		}
 		if what == "" && len(ap.Paths) > 0 {
 			what = strings.Join(ap.Paths, "\n")
 		}
@@ -587,7 +604,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			what = compact(ap.Args)
 		}
 		ui.Row(c).Padding(9, 11).Radius(8).Background(p.Chip).Margin(10, 0, 8, 0).Children(func() {
-			if ap.Command != "" && a.C.Current != nil {
+			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
 				ui.Text(c, home(a.C.Current.Cwd)+" $").Font("monospace").FontSize(12.5).TextColor(p.Mute).Shrink(0).Margin(0, 7.5, 0, 0).Unselectable()
 			}
 			ui.Text(c, what).Font("monospace").FontSize(12.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
@@ -600,7 +617,11 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				})
 			}
 			if ap.Reason != "" {
-				why("shield-lock", ap.Reason)
+				r := reasons[ap.Reason]
+				if r == "" {
+					r = ap.Reason
+				}
+				why("shield-lock", r)
 			}
 			if cur := a.C.Current; cur != nil {
 				why("adjustments-horizontal", "当前模式："+modes[cur.Mode])
@@ -820,4 +841,13 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 			})
 		}
 	})
+}
+
+// mcpTool splits the name of an MCP server's tool, mcp__server__tool.
+func mcpTool(name string) (server, tool string, ok bool) {
+	rest, ok := strings.CutPrefix(name, "mcp__")
+	if !ok {
+		return "", "", false
+	}
+	return strings.Cut(rest, "__")
 }

@@ -45,6 +45,9 @@ const (
 	Read  Kind = "read"
 	Write Kind = "write"
 	Exec  Kind = "exec"
+	// MCP calls a tool of an MCP server, which runs outside the sandbox:
+	// only Full mode lets it run unasked.
+	MCP Kind = "mcp"
 )
 
 // Request describes a call for the decision.
