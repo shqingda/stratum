@@ -12,6 +12,7 @@ import (
 var signIns = []struct{ provider, method, symbol, title, sub string }{
 	{"codex", "codex", "brand-openai", "Sign in with ChatGPT", "Plus、Pro、Business 订阅"},
 	{"xai", "xai", "brand-x", "X 订阅", "SuperGrok、X Premium+"},
+	{"copilot", "copilot", "brand-github", "GitHub Copilot", "Pro、Pro+、Business 订阅"},
 	{"openrouter", "openrouter", "route", "OpenRouter", "浏览器授权，换一把 key"},
 }
 

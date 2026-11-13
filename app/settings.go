@@ -257,6 +257,8 @@ func providerSymbol(provider string) string {
 		return "brand-x"
 	case "openrouter":
 		return "route"
+	case "copilot":
+		return "brand-github"
 	}
 	return "key"
 }

@@ -30,6 +30,7 @@ var Methods = map[string]*Method{
 	"codex":      {ID: "codex", Label: "Sign in with ChatGPT (Codex)", Subscription: true, Flow: &Codex{}},
 	"xai":        {ID: "xai", Label: "Sign in with SuperGrok or X Premium", Subscription: true, Flow: &XAI{}},
 	"openrouter": {ID: "openrouter", Label: "Sign in with OpenRouter", Flow: &OpenRouter{}},
+	"copilot":    {ID: "copilot", Label: "Sign in with GitHub Copilot", Subscription: true, Flow: &Copilot{}},
 }
 
 // API is a wire protocol.
@@ -68,6 +69,8 @@ var Providers = []Provider{
 	{ID: "openai", Name: "OpenAI", API: APIResponses, BaseURL: "https://api.openai.com/v1",
 		KeyURL: "https://platform.openai.com/api-keys", KeyEnv: "OPENAI_API_KEY", Logins: []string{"chatgpt"}},
 	{ID: "codex", Name: "ChatGPT (Codex)", API: APICodex, BaseURL: "https://chatgpt.com/backend-api", Logins: []string{"codex"}},
+	{ID: "copilot", Name: "GitHub Copilot", API: APIChat, BaseURL: "https://api.githubcopilot.com",
+		Logins: []string{"copilot"}, Catalog: "github-copilot"},
 	{ID: "anthropic", Name: "Anthropic", API: APIAnthropic, BaseURL: "https://api.anthropic.com",
 		KeyURL: "https://console.anthropic.com/settings/keys", KeyEnv: "ANTHROPIC_API_KEY"},
 	{ID: "google", Name: "Google Gemini", API: APIGemini, BaseURL: "https://generativelanguage.googleapis.com",
@@ -163,6 +166,9 @@ func Open(store Store, account string) (llm.Provider, error) {
 		s.Refresh = m.Flow.Refresh
 	}
 	headers := keyHeaders(api)
+	if method == "copilot" {
+		headers = CopilotHeaders
+	}
 	switch api {
 	case APIAnthropic:
 		return &llm.Anthropic{BaseURL: base, Auth: s.Auth(headers)}, nil
