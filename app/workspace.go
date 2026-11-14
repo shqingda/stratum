@@ -39,7 +39,7 @@ func (a *App) barButton(c *ui.Context, key, symbol, label string, children func(
 	}
 	b.Children(func() {
 		sym(c, symbol, 15, p.Fg2)
-		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine()
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg).SingleLine()
 		children()
 	})
 	return b
@@ -73,10 +73,10 @@ func (a *App) commitButton(c *ui.Context) {
 	p := a.p
 	b := a.barButton(c, "commit", "git-commit", locales.Commit(), func() {
 		if w.Added > 0 {
-			ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).TextColor(p.Plus)
+			ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(13).TextColor(p.Plus)
 		}
 		if w.Removed > 0 {
-			ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(12).TextColor(p.Minus)
+			ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(13).TextColor(p.Minus)
 		}
 	})
 	if b.Clicked() {
@@ -89,7 +89,7 @@ func (a *App) commitButton(c *ui.Context) {
 func (a *App) commitField(c *ui.Context) {
 	p := a.p
 	ui.TextInputBase(c, &a.commitMsg).Bind(&a.commitInput).Label(locales.CommitMessage()).Placeholder(strings.TrimSpace(a.C.Current.Title)).PlaceholderColor(p.Mute).
-		FontSize(12.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
+		FontSize(13.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
 }
 
 func (a *App) commitGo(c *ui.Context) {

@@ -143,7 +143,7 @@ func (a *App) attachments(c *ui.Context) {
 						sym(c, "file", 15, p.Fg2)
 					}
 				})
-				ui.Text(c, at.name).FontSize(12).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
+				ui.Text(c, at.name).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 				if a.iconButton(c, fmt.Sprint("unattach:", i), "x", locales.AttachRemove(at.name)).Size(22, 22).Clicked() {
 					a.attached = append(a.attached[:i:i], a.attached[i+1:]...)
 				}

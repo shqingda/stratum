@@ -38,9 +38,6 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		bar := c.TitleBar()
 		ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 12, 0, bar.Left+8).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
-			if a.iconButton(c, "side", "layout-sidebar-left-collapse", locales.HideSidebar()).Clicked() {
-				a.noSide = true
-			}
 			if a.iconButton(c, "new-top", "edit", locales.NewSession()).Clicked() {
 				a.do(a.C.NewSession())
 			}
@@ -65,6 +62,24 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	})
 }
 
+// sideToggle shows or hides the sidebar. It stays beside the window
+// controls whether the sidebar is out or not, so it is always where the
+// pointer left it.
+func (a *App) sideToggle(c *ui.Context) {
+	symbol, tip := "layout-sidebar-left-collapse", locales.HideSidebar()
+	if a.noSide {
+		symbol, tip = "layout-sidebar-left-expand", locales.ShowSidebar()
+	}
+	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-28)/2).Size(28, 28).ZIndex(10).Children(func() {
+		if a.iconButton(c, "side", symbol, tip).Clicked() {
+			a.noSide = !a.noSide
+		}
+	})
+}
+
+// toggleLeft is where the sidebar's toggle sits: past the window controls.
+func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left, 8) + 4 }
+
 func (a *App) search(c *ui.Context) {
 	p := a.p
 	b := ui.ButtonBase(c.Key("search")).Row().Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Label(locales.Search())
@@ -73,8 +88,8 @@ func (a *App) search(c *ui.Context) {
 	}
 	b.Children(func() {
 		sym(c, "search", 15, p.Mute)
-		ui.Text(c, locales.Search()).FontSize(13).TextColor(p.Mute).Grow(1)
-		ui.Text(c, "⌘K").FontSize(11).TextColor(p.Mute)
+		ui.Text(c, locales.Search()).FontSize(14).TextColor(p.Mute).Grow(1)
+		ui.Text(c, "⌘K").FontSize(12).TextColor(p.Mute)
 	})
 }
 
@@ -86,10 +101,10 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 	}
 	it.Children(func() {
 		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 16, p.Fg2) })
-		ui.Text(c, label).FontSize(13).TextColor(p.Fg).SingleLine()
+		ui.Text(c, label).FontSize(14).TextColor(p.Fg).SingleLine()
 		ui.Spacer(c)
 		if kbd != "" {
-			ui.Text(c, kbd).FontSize(11).TextColor(p.Mute)
+			ui.Text(c, kbd).FontSize(12).TextColor(p.Mute)
 		}
 	})
 	return it
@@ -133,10 +148,10 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 		if symbol != "" {
 			sym(c, symbol, 13, p.Mute)
 		}
-		ui.Text(c, label).FontSize(11.5).FontWeight(600).TextColor(p.Mute).SingleLine()
+		ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(p.Mute).SingleLine()
 		if n > 0 {
 			ui.Spacer(c)
-			ui.Text(c, fmt.Sprint(n)).FontSize(11.5).FontWeight(500).TextColor(p.Mute)
+			ui.Text(c, fmt.Sprint(n)).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
 		}
 	})
 }
@@ -180,18 +195,18 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		if on {
 			fg = p.Fg
 		}
-		ui.Text(c, title(s)).FontSize(13).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		ui.Text(c, title(s)).FontSize(14).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		switch {
 		case c.Modifiers() == ui.Cmd && n <= 9:
-			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 		case st == "wait":
 			badge := locales.BadgeApproval()
 			if on && a.questionFirst() {
 				badge = locales.BadgeQuestion()
 			}
-			ui.Text(c, badge).FontSize(11).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
+			ui.Text(c, badge).FontSize(12).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
 		default:
-			ui.Text(c, ago(a.now(), s.Updated)).FontSize(11.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, ago(a.now(), s.Updated)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 		}
 	})
 }
@@ -227,12 +242,12 @@ func (a *App) footer(c *ui.Context) {
 			}
 		}
 		ui.Box(c).Size(24, 24).Shrink(0).Radius(6).Background(p.Acc).Center().Children(func() {
-			ui.Text(c, initials(name)).TextColor(p.OnAcc).FontSize(11).FontWeight(600).SingleLine()
+			ui.Text(c, initials(name)).TextColor(p.OnAcc).FontSize(12).FontWeight(600).SingleLine()
 		})
 		ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-			ui.Text(c, name).FontSize(12.5).TextColor(p.Fg).SingleLine().Ellipsis("…")
+			ui.Text(c, name).FontSize(13.5).TextColor(p.Fg).SingleLine().Ellipsis("…")
 			if sub != "" {
-				ui.Text(c, sub).FontSize(11).TextColor(p.Mute).SingleLine().Ellipsis("…")
+				ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
 			}
 		})
 		if a.iconButton(c, "settings", "settings", locales.Settings()).Clicked() {

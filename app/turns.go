@@ -28,7 +28,7 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 	}
 	row.Children(func() {
 		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
-		ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		ui.Text(c, label).FontSize(13.5).TextColor(p.Mute).SingleLine()
 		ui.Spacer(c)
 	})
 	if !open {
@@ -105,9 +105,9 @@ func (a *App) summary(c *ui.Context, t int) {
 			if reverted {
 				what = locales.UndidFiles(len(ch.Files))
 			}
-			ui.Text(c, what).FontSize(12.5).TextColor(p.Fg).SingleLine()
-			ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(12).TextColor(p.Plus).Opacity(nonzero(add))
-			ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(12).TextColor(p.Minus).Opacity(nonzero(del))
+			ui.Text(c, what).FontSize(13.5).TextColor(p.Fg).SingleLine()
+			ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus).Opacity(nonzero(add))
+			ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(13).TextColor(p.Minus).Opacity(nonzero(del))
 			ui.Spacer(c)
 			label, icon := locales.UndoAll(), "arrow-back-up"
 			if reverted {
@@ -122,7 +122,7 @@ func (a *App) summary(c *ui.Context, t int) {
 			}
 			undo.Children(func() {
 				sym(c, icon, 15, p.Fg2)
-				ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
 			})
 			if undo.Clicked() {
 				a.do(a.C.Revert(ch.TurnSeq, "", reverted))
@@ -144,7 +144,7 @@ func (a *App) summary(c *ui.Context, t int) {
 				if icon != "" {
 					sym(c, icon, 13, p.Mute)
 				}
-				ui.Text(c, s).FontSize(11.5).TextColor(p.Mute).SingleLine()
+				ui.Text(c, s).FontSize(12.5).TextColor(p.Mute).SingleLine()
 			})
 		}
 		if cur := a.C.Current; cur != nil && cur.Model != "" {
@@ -188,10 +188,10 @@ func (a *App) editLine(c *ui.Context, e *client.Entry, path, oldText, newText st
 	}
 	row.Children(func() {
 		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 15, p.Mute) })
-		ui.Text(c, t.verb).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
-		ui.Text(c, path).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
-		ui.Text(c, fmt.Sprintf("+%d", st[0])).Font("monospace").FontSize(12).TextColor(p.Plus).Shrink(0).Opacity(nonzero(st[0]))
-		ui.Text(c, fmt.Sprintf("−%d", st[1])).Font("monospace").FontSize(12).TextColor(p.Minus).Shrink(0).Opacity(nonzero(st[1]))
+		ui.Text(c, t.verb).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+		ui.Text(c, path).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+		ui.Text(c, fmt.Sprintf("+%d", st[0])).Font("monospace").FontSize(13).TextColor(p.Plus).Shrink(0).Opacity(nonzero(st[0]))
+		ui.Text(c, fmt.Sprintf("−%d", st[1])).Font("monospace").FontSize(13).TextColor(p.Minus).Shrink(0).Opacity(nonzero(st[1]))
 		ui.Spacer(c)
 		if row.Hovered() {
 			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
@@ -226,15 +226,15 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 		if a.inWork {
 			// In a finished turn's work it is a step like the others.
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, "bulb", 15, p.Mute) })
-			ui.Text(c, label).FontSize(12.5).TextColor(p.Fg2).SingleLine()
+			ui.Text(c, label).FontSize(13.5).TextColor(p.Fg2).SingleLine()
 		} else {
 			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
-			ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, label).FontSize(13.5).TextColor(p.Mute).SingleLine()
 		}
 		ui.Spacer(c)
 	})
 	if open {
-		ui.Text(c, strings.TrimSpace(e.Text)).FontSize(12.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
+		ui.Text(c, strings.TrimSpace(e.Text)).FontSize(13.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
 	}
 }
 
@@ -284,6 +284,6 @@ func (a *App) contextRing(c *ui.Context) {
 	}
 	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(locales.ContextUsed(tokens(a.C.LastInput), tokens(window))).Children(func() {
 		ui.Image(c, svg).Size(14, 14)
-		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(11.5).TextColor(p.Mute).SingleLine()
+		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 	})
 }

@@ -27,9 +27,9 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 				b.Background(p.Hover)
 			}
 			b.Children(func() {
-				ui.Text(c, t.label).FontSize(12.5).FontWeight(500).TextColor(fg)
+				ui.Text(c, t.label).FontSize(13.5).FontWeight(500).TextColor(fg)
 				if t.id == "" && files > 0 {
-					ui.Text(c, fmt.Sprint(files)).FontSize(11).FontWeight(500).TextColor(p.Mute)
+					ui.Text(c, fmt.Sprint(files)).FontSize(12).FontWeight(500).TextColor(p.Mute)
 				}
 			})
 			if b.Clicked() {
@@ -54,7 +54,7 @@ func (a *App) terminalPane(c *ui.Context) {
 	}
 	prompt := "~/" + filepath.Base(a.C.Current.Cwd) + " $"
 	line := func(s string, col ui.Color) {
-		ui.Text(c, s).Font("monospace").FontSize(12).LineHeight(1.65).TextColor(col).SingleLine()
+		ui.Text(c, s).Font("monospace").FontSize(13).LineHeight(1.65).TextColor(col).SingleLine()
 	}
 	ui.Scroll(c).Grow(1).Padding(6, 14, 14, 14).Children(func() {
 		for i, e := range runs {
@@ -127,8 +127,8 @@ func (a *App) planPane(c *ui.Context) {
 		if title == "" {
 			title = locales.Plan()
 		}
-		ui.Text(c, title).FontSize(13).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
-		ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(12).TextColor(p.Mute).Margin(0, 0, 14, 0)
+		ui.Text(c, title).FontSize(14).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
+		ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(13).TextColor(p.Mute).Margin(0, 0, 14, 0)
 		for _, s := range pl.Steps {
 			ui.Row(c).Gap(10).Padding(7, 0).Children(func() {
 				box := ui.Box(c).Size(16, 16).Radius(5).Shrink(0).Margin(2, 0, 0, 0).Center()
@@ -143,9 +143,9 @@ func (a *App) planPane(c *ui.Context) {
 					box.Border(1.2, p.Faint)
 				}
 				ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-					ui.Text(c, s.Step).FontSize(13).LineHeight(1.45).TextColor(fg)
+					ui.Text(c, s.Step).FontSize(14).LineHeight(1.45).TextColor(fg)
 					if s.Note != "" {
-						ui.Text(c, s.Note).FontSize(12).LineHeight(1.45).TextColor(p.Mute)
+						ui.Text(c, s.Note).FontSize(13).LineHeight(1.45).TextColor(p.Mute)
 					}
 				})
 			})

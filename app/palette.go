@@ -123,7 +123,7 @@ func (a *App) palette(c *ui.Context) {
 			ui.Row(c).Height(50).Padding(0, 16).Gap(10).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 				sym(c, "search", 18, p.Mute)
 				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.Mute).
-					FontSize(15).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
+					FontSize(16).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
 					a.query = k.Text()
 					switch {
 					case k.Key == ui.KeyDown && k.Mods == 0:
@@ -150,7 +150,7 @@ func (a *App) palette(c *ui.Context) {
 						return
 					}
 					ui.Column(c).Padding(6, 6, 2, 6).Children(func() {
-						ui.Text(c, name).FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 4, 10)
+						ui.Text(c, name).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 4, 10)
 						for _, o := range opts {
 							a.palRow(c, o, i, choose)
 							i++
@@ -161,15 +161,15 @@ func (a *App) palette(c *ui.Context) {
 				section(locales.Actions(), actions)
 				section(locales.PaletteMessages(), hits)
 				if len(all) == 0 {
-					ui.Text(c, locales.PaletteNoMatches()).FontSize(12.5).TextColor(p.Mute).Padding(18, 16)
+					ui.Text(c, locales.PaletteNoMatches()).FontSize(13.5).TextColor(p.Mute).Padding(18, 16)
 				}
 				ui.Box(c).Height(6)
 			})
 			ui.Row(c).Height(36).Padding(0, 14).Gap(14).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
 				for _, h := range [][2]string{{"↑↓", locales.Select()}, {"⏎", locales.Open()}, {"esc", locales.Close()}} {
 					ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, h[0]).FontSize(11).TextColor(p.Mute).Padding(0, 4).Radius(4).Background(p.Chip)
-						ui.Text(c, h[1]).FontSize(11.5).TextColor(p.Mute)
+						ui.Text(c, h[0]).FontSize(12).TextColor(p.Mute).Padding(0, 4).Radius(4).Background(p.Chip)
+						ui.Text(c, h[1]).FontSize(12.5).TextColor(p.Mute)
 					})
 				}
 			})
@@ -199,7 +199,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			pre, hit, post := split(o.label, a.query)
 			text := func(s string, weight int) {
 				if s != "" {
-					ui.Text(c, s).FontSize(13).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
+					ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
 				}
 			}
 			text(pre, 400)
@@ -207,7 +207,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			text(post, 400)
 		})
 		if o.sub != "" {
-			ui.Text(c, o.sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").Shrink(0).MaxWidth(160)
+			ui.Text(c, o.sub).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…").Shrink(0).MaxWidth(160)
 		}
 		ui.Spacer(c)
 		kbd := o.kbd
@@ -215,7 +215,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			kbd = "⏎"
 		}
 		if kbd != "" {
-			ui.Text(c, kbd).FontSize(11).TextColor(p.Mute).Shrink(0)
+			ui.Text(c, kbd).FontSize(12).TextColor(p.Mute).Shrink(0)
 		}
 	})
 }

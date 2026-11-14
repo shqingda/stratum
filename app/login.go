@@ -41,12 +41,12 @@ func (a *App) onboarding(c *ui.Context) {
 		ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 		ui.Column(c).Grow(1).AlignItems(ui.Center).Padding(70, 20, 20, 20).Children(func() {
 			ui.Image(c, mark).Size(58, 58).Margin(-5, 0, -5, 0)
-			ui.Text(c, locales.OnboardingTitle()).FontSize(22).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
-			ui.Text(c, locales.OnboardingLead()).FontSize(13).TextColor(p.Fg2).Margin(0, 0, 26, 0)
+			ui.Text(c, locales.OnboardingTitle()).FontSize(24).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
+			ui.Text(c, locales.OnboardingLead()).FontSize(14).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 			ui.Column(c).Width(460).MaxWidthPercent(100).Children(func() { a.loginList(c) })
 			ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(18, 0, 0, 0).Children(func() {
 				sym(c, "lock", 13, p.Mute)
-				ui.Text(c, locales.OnboardingKeychain()).FontSize(11.5).TextColor(p.Mute)
+				ui.Text(c, locales.OnboardingKeychain()).FontSize(12.5).TextColor(p.Mute)
 			})
 		})
 	})
@@ -96,8 +96,8 @@ func (a *App) loginRow(c *ui.Context, i int, key, symbol, title, sub string, on 
 				sym(c, symbol, 17, p.Fg)
 			})
 			ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
-				ui.Text(c, title).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine()
-				ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+				ui.Text(c, title).FontSize(14).FontWeight(500).TextColor(p.Fg).SingleLine()
+				ui.Text(c, sub).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…")
 			})
 			switch {
 			case on && symbol != "key":
@@ -117,24 +117,24 @@ func (a *App) loginWait(c *ui.Context, provider string) {
 	ui.Column(c).Padding(4, 14, 14, 56).Gap(8).Children(func() {
 		switch {
 		case s.Err != "":
-			ui.Text(c, locales.SignInFailed(s.Err)).FontSize(12.5).TextColor(p.Minus).Selectable()
+			ui.Text(c, locales.SignInFailed(s.Err)).FontSize(13.5).TextColor(p.Minus).Selectable()
 		case s.Code != "":
-			ui.Text(c, locales.DeviceCodeVisit(strings.TrimPrefix(s.CodeURL, "https://"))).FontSize(12.5).TextColor(p.Fg2).Selectable()
+			ui.Text(c, locales.DeviceCodeVisit(strings.TrimPrefix(s.CodeURL, "https://"))).FontSize(13.5).TextColor(p.Fg2).Selectable()
 			ui.Row(c).Gap(6).Children(func() {
 				for _, r := range s.Code {
 					if r == '-' {
-						ui.Text(c, "-").FontSize(16).Font("monospace").TextColor(p.Mute).Width(10).TextAlign(ui.Center).AlignSelf(ui.Center)
+						ui.Text(c, "-").FontSize(17).Font("monospace").TextColor(p.Mute).Width(10).TextAlign(ui.Center).AlignSelf(ui.Center)
 						continue
 					}
 					ui.Box(c).Size(28, 34).Radius(6).Background(p.Chip).Center().Children(func() {
-						ui.Text(c, string(r)).FontSize(16).FontWeight(600).Font("monospace").TextColor(p.Fg)
+						ui.Text(c, string(r)).FontSize(17).FontWeight(600).Font("monospace").TextColor(p.Fg)
 					})
 				}
 			})
 		case s.URL != "":
-			ui.Text(c, locales.SignInBrowserOpened()).FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.SignInBrowserOpened()).FontSize(13.5).TextColor(p.Fg2)
 		default:
-			ui.Text(c, locales.OpeningBrowser()).FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.OpeningBrowser()).FontSize(13.5).TextColor(p.Fg2)
 		}
 		ui.Row(c).Gap(8).Children(func() {
 			if s.Code != "" && s.Err == "" {
@@ -182,10 +182,10 @@ func (a *App) keyForm(c *ui.Context) {
 				}
 			}, a.menuOptions(&a.keyMenu))
 			ui.TextInputBase(c, &a.key).Label("API key").Password().Placeholder(locales.PasteKey()).PlaceholderColor(p.Mute).
-				FontSize(12.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
+				FontSize(13.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
 		})
 		if s != nil && s.Method == "" && s.Err != "" {
-			ui.Text(c, locales.KeySaveFailed(s.Err)).FontSize(12.5).TextColor(p.Minus).Selectable()
+			ui.Text(c, locales.KeySaveFailed(s.Err)).FontSize(13.5).TextColor(p.Minus).Selectable()
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			b := a.button(c, "key-save", locales.Save(), "", true)
@@ -195,7 +195,7 @@ func (a *App) keyForm(c *ui.Context) {
 				a.key = ""
 				a.do(cmds, err)
 			}
-			ui.Text(c, locales.KeyCreateAt(keyURL(providers, a.keyProvider))).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0).Selectable()
+			ui.Text(c, locales.KeyCreateAt(keyURL(providers, a.keyProvider))).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0).Selectable()
 		})
 	})
 }
@@ -216,7 +216,7 @@ func (a *App) ghost(c *ui.Context, key, label string) ui.Element {
 		b.Background(p.Hover)
 	}
 	b.Children(func() {
-		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
 	})
 	return b
 }

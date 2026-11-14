@@ -36,28 +36,29 @@ var mark = func() ui.ImageSource {
 type App struct {
 	C *client.Client
 
-	out    chan []proto.Command
-	desk   Desktop
-	marks  map[string]string // the sessions' states desk last saw
-	badge  int
-	p      *Palette
-	now    func() time.Time
-	err    string       // the last command that could not be sent
-	draft  string       // what the composer holds
-	query  string       // the sidebar's search
-	list   ui.ListState // the transcript
-	md     markdown.Options
-	opened map[string]bool // tool calls whose output shows
-	inWork bool            // building a finished turn's folded work
-	noSide bool            // the sidebar is hidden
-	pal    bool            // the ⌘K palette shows
-	jump   int64           // a message to scroll to, from a search
-	jumpIn string          // the session it is in
-	palSel int             // its row chosen by the arrow keys
-	stats  map[string][2]int
-	rv     review
-	seen   map[string]time.Time // when approvals first showed
-	openIn func(app, dir string) error
+	out      chan []proto.Command
+	desk     Desktop
+	marks    map[string]string // the sessions' states desk last saw
+	badge    int
+	p        *Palette
+	now      func() time.Time
+	err      string       // the last command that could not be sent
+	draft    string       // what the composer holds
+	query    string       // the sidebar's search
+	list     ui.ListState // the transcript
+	md       markdown.Options
+	opened   map[string]bool // tool calls whose output shows
+	inWork   bool            // building a finished turn's folded work
+	noSide   bool            // the sidebar is hidden
+	sideOpen float32         // how far the sidebar is out, 0 to 1, on its way
+	pal      bool            // the ⌘K palette shows
+	jump     int64           // a message to scroll to, from a search
+	jumpIn   string          // the session it is in
+	palSel   int             // its row chosen by the arrow keys
+	stats    map[string][2]int
+	rv       review
+	seen     map[string]time.Time // when approvals first showed
+	openIn   func(app, dir string) error
 
 	openMenu    bool
 	commitMsg   string
@@ -186,11 +187,21 @@ func (a *App) View(c *ui.Context) {
 		a.keys(c)
 		return
 	}
-	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
-		if !a.noSide {
-			a.sidebar(c, vibrant)
+	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
+	// One spring moves the sidebar and the title bar beside it, as versta
+	// does: it can be turned around halfway, and the sidebar is clipped,
+	// not squeezed, so its rows hold still while it slides.
+	target := float32(1)
+	if a.noSide {
+		target = 0
+	}
+	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 380, Damping: 39})
+	shell.Children(func() {
+		if a.sideOpen > 0.001 {
+			ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.sidebar(c, vibrant) })
 		}
 		a.main(c)
+		a.sideToggle(c)
 	})
 	a.palette(c)
 	a.keys(c)

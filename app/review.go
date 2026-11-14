@@ -209,8 +209,8 @@ func (a *App) reviewPanel(c *ui.Context) {
 			ui.Spacer(c)
 			add, del := a.totals(turns)
 			ui.Row(c).Gap(6).Margin(0, 14, 0, 0).Children(func() {
-				ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(12).TextColor(p.Plus)
-				ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(12).TextColor(p.Minus)
+				ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus)
+				ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(13).TextColor(p.Minus)
 			})
 		})
 		ch := a.C.Changes
@@ -242,7 +242,7 @@ func (a *App) reviewPanel(c *ui.Context) {
 
 func (a *App) reviewNote(c *ui.Context, s string) {
 	ui.Column(c).Grow(1).Center().Children(func() {
-		ui.Text(c, s).FontSize(12.5).TextColor(a.p.Mute)
+		ui.Text(c, s).FontSize(13.5).TextColor(a.p.Mute)
 	})
 }
 
@@ -261,7 +261,7 @@ func (a *App) scope(c *ui.Context) {
 				b.Background(p.Card).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08)).Border(.5, p.Edge2)
 				col, weight = p.Fg, 500
 			}
-			b.Children(func() { ui.Text(c, s.label).FontSize(12).FontWeight(weight).TextColor(col) })
+			b.Children(func() { ui.Text(c, s.label).FontSize(13).FontWeight(weight).TextColor(col) })
 			if b.Clicked() && !on {
 				a.rv.uncommitted, a.rv.sel, a.rv.turn = s.uncommitted, "", 0
 				if s.uncommitted {
@@ -342,20 +342,20 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 	}
 	reverted := a.C.Changes.FileReverted(turn, f.Path)
 	row.Children(func() {
-		ui.Text(c, status).FontSize(10.5).FontWeight(600).TextColor(col).Width(12).TextAlign(ui.Center).Shrink(0)
+		ui.Text(c, status).FontSize(11.5).FontWeight(600).TextColor(col).Width(12).TextAlign(ui.Center).Shrink(0)
 		dir, base := a.splitPath(f.Path)
 		ui.Row(c).Grow(1).MinWidth(0).Children(func() {
 			if dir != "" {
-				ui.Text(c, dir).FontSize(12.5).TextColor(p.Mute).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
+				ui.Text(c, dir).FontSize(13.5).TextColor(p.Mute).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
 			}
-			name := ui.Text(c, base).FontSize(12.5).TextColor(p.Fg).SingleLine().Shrink(0)
+			name := ui.Text(c, base).FontSize(13.5).TextColor(p.Fg).SingleLine().Shrink(0)
 			if reverted {
 				name.TextColor(p.Mute).Strikethrough()
 			}
 		})
 		ui.Row(c).Gap(6).Shrink(0).Children(func() {
-			ui.Text(c, fmt.Sprintf("+%d", f.Added)).Font("monospace").FontSize(11.5).TextColor(p.Plus).Opacity(nonzero(f.Added))
-			ui.Text(c, fmt.Sprintf("−%d", f.Removed)).Font("monospace").FontSize(11.5).TextColor(p.Minus).Opacity(nonzero(f.Removed))
+			ui.Text(c, fmt.Sprintf("+%d", f.Added)).Font("monospace").FontSize(12.5).TextColor(p.Plus).Opacity(nonzero(f.Added))
+			ui.Text(c, fmt.Sprintf("−%d", f.Removed)).Font("monospace").FontSize(12.5).TextColor(p.Minus).Opacity(nonzero(f.Removed))
 		})
 	})
 }
@@ -427,7 +427,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 		if name != "" {
 			head = name + " · " + s
 		}
-		ui.Text(c, head).FontSize(12).TextColor(p.Mute).Padding(6, 14)
+		ui.Text(c, head).FontSize(13).TextColor(p.Mute).Padding(6, 14)
 	}
 	d := a.fileDiff(key)
 	switch {
@@ -446,7 +446,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 	}
 	for i, h := range d.hunks {
 		if shown >= maxDiffLines {
-			ui.Text(c, locales.MoreHunks(len(d.hunks)-i)).FontSize(12).TextColor(p.Mute).Padding(8, 14)
+			ui.Text(c, locales.MoreHunks(len(d.hunks)-i)).FontSize(13).TextColor(p.Mute).Padding(8, 14)
 			break
 		}
 		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Margin(map[bool]float32{true: 0, false: 14}[i == 0], 0, 0, 0).Children(func() {
@@ -454,7 +454,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 			if i == 0 && name != "" {
 				head = name + " · " + head
 			}
-			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
+			ui.Text(c, head).Font("monospace").FontSize(12.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
 			if turn != 0 && !a.C.Changes.FileReverted(turn, path) {
 				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
 				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
@@ -509,9 +509,9 @@ func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
 	}
 	row.Children(func() {
 		for _, n := range []string{num(e.a), num(e.b)} {
-			ui.Text(c, n).Font("monospace").FontSize(12).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
+			ui.Text(c, n).Font("monospace").FontSize(13).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
 		}
-		ui.Text(c, sign).Font("monospace").FontSize(12).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
+		ui.Text(c, sign).Font("monospace").FontSize(13).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
 		ui.RichText(c, a.codeSpans(c, strings.TrimRight(text, "\r\n"), toks)...).SingleLine().PreserveSpaces().
 			Padding(0, 6).Grow(1).MinWidth(0).Selectable()
 	})
@@ -543,7 +543,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				note = locales.Undone(note)
 			}
 			ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, note).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+				ui.Text(c, note).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
 		if turn != 0 {

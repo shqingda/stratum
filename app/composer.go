@@ -43,13 +43,13 @@ func (a *App) dock(c *ui.Context) {
 		ui.Row(c.Key(i)).Height(34).Padding(0, 6, 0, 12).Margin(0, 10, -1, 10).Gap(8).AlignItems(ui.Center).
 			Radius(10, 10, 0, 0).Background(p.Pane).Border(.5, p.Edge).Children(func() {
 			sym(c, "corner-down-right", 14, p.Mute)
-			ui.Text(c, q).FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			ui.Text(c, q).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		})
 	}
 	a.box(c)
 	switch {
 	case a.err != "":
-		ui.Text(c, a.err).FontSize(11.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
+		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
 	case !a.helloShown():
 		a.status(c)
 	}
@@ -83,7 +83,7 @@ func (a *App) box(c *ui.Context) {
 		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
 			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
 		if a.noImages() {
-			ui.Text(c, locales.NoImageSupport()).FontSize(11.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
+			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
 		}
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
@@ -138,7 +138,7 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 		if symbol != "" {
 			sym(c, symbol, 15, p.Fg2)
 		}
-		ui.Text(c, label).FontSize(12.5).TextColor(p.Fg2).SingleLine()
+		ui.Text(c, label).FontSize(13.5).TextColor(p.Fg2).SingleLine()
 		if chevron {
 			sym(c, "chevron-down", 12, p.Mute)
 		}
@@ -172,7 +172,7 @@ func (a *App) status(c *ui.Context) {
 		item := func(symbol, label string) {
 			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 				sym(c, symbol, 13, p.Mute)
-				ui.Text(c, label).FontSize(11.5).TextColor(p.Mute).SingleLine()
+				ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
 			})
 		}
 		item("device-laptop", locales.Local())

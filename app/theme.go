@@ -8,7 +8,7 @@ type Palette struct {
 	Bg, Side, Pane, Card    ui.Color
 	Fg, Fg2, Mute, Faint    ui.Color
 	Edge, Edge2, Sel, Hover ui.Color
-	Chip                    ui.Color
+	Chip, Bubble            ui.Color // Bubble holds the user's messages
 	Acc, OnAcc              ui.Color // primary buttons
 	Live, LiveBg            ui.Color // running, waiting on the user
 	Plus, Minus             ui.Color // lines added and removed
@@ -22,7 +22,7 @@ var (
 	light = &Palette{
 		Bg: ui.Hex("#F4F5F7"), Side: ui.RGBA(234, 236, 240, .92), Pane: ui.Hex("#FBFBFC"), Card: ui.Hex("#FFFFFF"),
 		Fg: ink, Fg2: ui.Hex("#5B6272"), Mute: ui.Hex("#8A91A0"), Faint: ui.Hex("#B7BCC6"),
-		Edge: ink.Alpha(.10), Edge2: ink.Alpha(.16), Sel: ink.Alpha(.055), Hover: ink.Alpha(.035), Chip: ink.Alpha(.05),
+		Edge: ink.Alpha(.10), Edge2: ink.Alpha(.16), Sel: ink.Alpha(.055), Hover: ink.Alpha(.035), Chip: ink.Alpha(.05), Bubble: ink.Alpha(.06),
 		Acc: ink, OnAcc: ui.Hex("#F4F5F7"),
 		Live: ui.Hex("#2B5FA6"), LiveBg: ui.Hex("#2B5FA6").Alpha(.08),
 		Plus: ui.Hex("#3B7356"), Minus: ui.Hex("#A8474B"),
@@ -30,7 +30,7 @@ var (
 	dark = &Palette{
 		Bg: ui.Hex("#12131A"), Side: ui.RGBA(23, 25, 34, .94), Pane: ui.Hex("#15161E"), Card: ui.Hex("#1C1E28"),
 		Fg: mist, Fg2: ui.Hex("#A9B1C1"), Mute: ui.Hex("#6E7587"), Faint: ui.Hex("#454A58"),
-		Edge: haze.Alpha(.10), Edge2: haze.Alpha(.16), Sel: haze.Alpha(.09), Hover: haze.Alpha(.05), Chip: haze.Alpha(.08),
+		Edge: haze.Alpha(.10), Edge2: haze.Alpha(.16), Sel: haze.Alpha(.09), Hover: haze.Alpha(.05), Chip: haze.Alpha(.08), Bubble: haze.Alpha(.12),
 		Acc: mist, OnAcc: ui.Hex("#12131A"),
 		Live: ui.Hex("#7AA8EA"), LiveBg: ui.Hex("#7AA8EA").Alpha(.10),
 		Plus: ui.Hex("#7DB89A"), Minus: ui.Hex("#DD878B"),
@@ -64,6 +64,6 @@ func Theme(p *Palette, isDark bool) *ui.Theme {
 	t.Selection = p.Live.Alpha(.22)
 	t.Focus = p.Live.Alpha(.5)
 	t.Radius = 7
-	t.FontSize = 13.5
+	t.FontSize = 14
 	return t
 }

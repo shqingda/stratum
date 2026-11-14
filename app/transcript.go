@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"slices"
@@ -80,34 +81,28 @@ func modeName(mode string) string {
 
 func (a *App) bar(c *ui.Context) {
 	p := a.p
-	left := float32(20)
-	if a.noSide {
-		left = c.TitleBar().Left + 18
-	}
+	// Past the sidebar the title starts at 20; with the sidebar in, past
+	// its toggle; in between, as far as the sidebar is.
+	shut := toggleLeft(c) + 28 + 12
+	left := 20*a.sideOpen + shut*(1-a.sideOpen)
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
-		if a.noSide {
-			if a.iconButton(c, "side", "layout-sidebar-left-expand", locales.ShowSidebar()).Clicked() {
-				a.noSide = false
-			}
-			ui.Box(c).Width(4)
-		}
 		cur := a.C.Current
 		if cur == nil {
-			ui.Text(c, phaseText(a.C.Phase)).FontSize(13.5).FontWeight(600).TextColor(p.Mute)
+			ui.Text(c, phaseText(a.C.Phase)).FontSize(14.5).FontWeight(600).TextColor(p.Mute)
 			return
 		}
 		if a.helloShown() {
 			return // the middle of the window says what the session is
 		}
-		ui.Text(c, title(*cur)).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+		ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
 			sym(c, "folder", 14, p.Mute)
-			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(12.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(13.5).TextColor(p.Mute).SingleLine()
 		})
 		if b := a.C.Workspace.Branch; b != "" {
 			ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(1).MinWidth(0).Children(func() {
 				sym(c, "git-branch", 14, p.Mute)
-				ui.Text(c, b).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+				ui.Text(c, b).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
 		ui.Spacer(c)
@@ -337,8 +332,8 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		}
 		row.Children(func() {
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, "file-search", 15, p.Mute) })
-			ui.Text(c, locales.Browse()).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
-			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
+			ui.Text(c, locales.Browse()).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
 			ui.Spacer(c)
 			if row.Hovered() {
 				sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
@@ -352,7 +347,7 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		}
 		row.Children(func() {
 			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
-			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(12.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(13.5).TextColor(p.Mute).SingleLine()
 			ui.Spacer(c)
 		})
 	}
@@ -417,7 +412,7 @@ func (a *App) running(c *ui.Context) {
 	ui.Row(c).Height(28).Gap(8).AlignItems(ui.Center).Children(func() {
 		dot := ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
 		dot.Opacity(.35 + .65*(1-dot.Loop("beat", 1600*time.Millisecond, ui.Bounce(ui.EaseInOut))))
-		ui.Text(c, locales.ThinkingNow()).FontSize(12.5).TextColor(p.Fg2)
+		ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
 	})
 }
 
@@ -427,17 +422,17 @@ func (a *App) empty(c *ui.Context) {
 		switch {
 		case a.C.Phase == client.Disconnected:
 			sym(c, "plug-connected-x", 28, p.Minus)
-			ui.Text(c, locales.KernelDisconnected()).FontSize(15).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
+			ui.Text(c, locales.KernelDisconnected()).FontSize(16).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
 			if a.C.Err != "" {
-				ui.Text(c, a.C.Err).FontSize(12.5).TextColor(p.Fg2).MaxWidth(480).TextAlign(ui.Center).Selectable()
+				ui.Text(c, a.C.Err).FontSize(13.5).TextColor(p.Fg2).MaxWidth(480).TextAlign(ui.Center).Selectable()
 			}
-			ui.Text(c, locales.KernelDisconnectedHint()).FontSize(12).TextColor(p.Mute)
+			ui.Text(c, locales.KernelDisconnectedHint()).FontSize(13).TextColor(p.Mute)
 		case a.C.Phase != client.Ready:
 			ui.Image(c, mark).Size(56, 56).Opacity(.5)
-			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(13).TextColor(p.Mute).Margin(12, 0, 0, 0)
+			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(12, 0, 0, 0)
 		case a.C.Current == nil:
 			ui.Image(c, mark).Size(56, 56)
-			ui.Text(c, locales.StartNewSession()).FontSize(15).FontWeight(500).TextColor(p.Fg2).Margin(12, 0, 0, 0)
+			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(12, 0, 0, 0)
 		default:
 			a.hello(c)
 		}
@@ -450,7 +445,7 @@ func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
 	ui.Image(c, mark).Size(44, 44)
-	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(22).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
+	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
 	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 	ui.Column(c).Width(540).MaxWidthPercent(100).Children(func() { a.dock(c) })
 	var recent []proto.Session
@@ -461,7 +456,7 @@ func (a *App) hello(c *ui.Context) {
 	}
 	if len(recent) > 0 {
 		ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
-			ui.Text(c, locales.Recent()).FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
+			ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
 			for _, s := range recent {
 				a.sessionRow(c, s)
 			}
@@ -473,16 +468,21 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	p := a.p
 	switch e.Role {
 	case client.User:
-		ui.Row(c).Margin(4, 0, 18, 0).AlignItems(ui.Stretch).Children(func() {
-			ui.Box(c).Width(2).Margin(3, 0, 3, 0).Background(p.Faint).Shrink(0)
-			ui.Column(c).Grow(1).MinWidth(0).Padding(0, 0, 0, 12).Gap(8).Children(func() {
+		// The user's words sit on the right in a bubble, as in every chat;
+		// the agent's work runs down the left.
+		msg := ui.Column(c).Margin(4, 0, 14, 0).AlignItems(ui.End)
+		msg.Children(func() {
+			ui.Column(c).MaxWidthPercent(80).Padding(9, 14).Radius(18).Background(p.Bubble).Gap(8).Children(func() {
 				if e.Text != "" {
-					ui.Text(c, e.Text).FontWeight(500).TextColor(p.Fg).LineHeight(1.55).Selectable()
+					ui.Text(c, e.Text).TextColor(p.Fg).LineHeight(1.55).Selectable()
 				}
 				if len(e.Images) > 0 {
 					a.sentImages(c, e)
 				}
 			})
+			if e.Text != "" {
+				a.copyButton(c, e.Text, msg.Hovered())
+			}
 		})
 	default:
 		a.turn(c, live, func() { a.body(c, e) })
@@ -493,9 +493,11 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 func (a *App) body(c *ui.Context, e *client.Entry) {
 	switch e.Role {
 	case client.Assistant:
-		ui.Column(c).Margin(4, 0, 10, 0).Children(func() {
+		msg := ui.Column(c).Margin(4, 0, 6, 0)
+		msg.Children(func() {
 			if e.Done {
 				markdown.View(c, e.Text, &a.md)
+				a.copyButton(c, e.Text, msg.Hovered())
 			} else {
 				markdown.Stream(c, e.Text, &a.md)
 			}
@@ -507,7 +509,7 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 			a.compactNote(c, e)
 			break
 		}
-		ui.Text(c, e.Text).FontSize(12).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
+		ui.Text(c, e.Text).FontSize(13).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
 	case client.Thinking:
 		a.thought(c, e)
 	}
@@ -524,11 +526,11 @@ func (a *App) compactNote(c *ui.Context, e *client.Entry) {
 	}
 	row.Children(func() {
 		ui.Box(c).Width(16).Center().Children(func() { sym(c, "history", 14, p.Mute) })
-		ui.Text(c, e.Text).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		ui.Text(c, e.Text).FontSize(13.5).TextColor(p.Mute).SingleLine()
 		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
 	})
 	if open {
-		ui.Text(c, e.Output).FontSize(12.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(0, 0, 8, 24).Selectable()
 	}
 }
@@ -550,9 +552,9 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	}
 	row.Children(func() {
 		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 14, p.Mute) })
-		ui.Text(c, t.verb).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+		ui.Text(c, t.verb).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
 		if e.Detail != "" {
-			d := ui.Text(c, e.Detail).FontSize(12).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+			d := ui.Text(c, e.Detail).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
 			if e.Text != "task" && e.Text != "run_tasks" {
 				d.Font("monospace")
 			}
@@ -578,7 +580,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		if lines := strings.Split(out, "\n"); len(lines) > 40 {
 			out = strings.Join(lines[:40], "\n") + "\n" + locales.MoreLines(len(lines)-40)
 		}
-		o := ui.Text(c, out).FontSize(12).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+		o := ui.Text(c, out).FontSize(13).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(2, 0, 8, 24).Selectable().PreserveSpaces()
 		if e.Text != "task" && e.Text != "run_tasks" {
 			o.Font("monospace")
@@ -606,12 +608,12 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			if kind == "" {
 				kind = ap.Tool
 			}
-			ui.Text(c, kind).FontSize(12.5).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.NeedsApproval()).FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, kind).FontSize(13.5).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, locales.NeedsApproval()).FontSize(13.5).TextColor(p.Fg2)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
 				sym(c, "clock", 12, p.Mute)
-				ui.Text(c, w).FontSize(11.5).TextColor(p.Mute)
+				ui.Text(c, w).FontSize(12.5).TextColor(p.Mute)
 			}
 		})
 		what := ap.Command
@@ -626,15 +628,15 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 		}
 		ui.Row(c).Padding(9, 11).Radius(8).Background(p.Chip).Margin(10, 0, 8, 0).Children(func() {
 			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
-				ui.Text(c, home(a.C.Current.Cwd)+" $").Font("monospace").FontSize(12.5).TextColor(p.Mute).Shrink(0).Margin(0, 7.5, 0, 0).Unselectable()
+				ui.Text(c, home(a.C.Current.Cwd)+" $").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Margin(0, 7.5, 0, 0).Unselectable()
 			}
-			ui.Text(c, what).Font("monospace").FontSize(12.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
+			ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
 		})
 		ui.Row(c).Gap(14).Children(func() {
 			why := func(symbol, s string) {
 				ui.Row(c).Gap(4).AlignItems(ui.Center).MinWidth(0).Children(func() {
 					sym(c, symbol, 12, p.Mute)
-					ui.Text(c, s).FontSize(12).TextColor(p.Mute)
+					ui.Text(c, s).FontSize(13).TextColor(p.Mute)
 				})
 			}
 			if ap.Reason != "" {
@@ -671,15 +673,15 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			slot(c, p, "wait")
-			ui.Text(c, locales.Question()).FontSize(12.5).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.NeedsAnswer()).FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.Question()).FontSize(13.5).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, locales.NeedsAnswer()).FontSize(13.5).TextColor(p.Fg2)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
 				sym(c, "clock", 12, p.Mute)
-				ui.Text(c, w).FontSize(11.5).TextColor(p.Mute)
+				ui.Text(c, w).FontSize(12.5).TextColor(p.Mute)
 			}
 		})
-		ui.Text(c, ap.Question).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg).Margin(10, 0, 0, 0).Selectable()
+		ui.Text(c, ap.Question).FontSize(14.5).LineHeight(1.55).TextColor(p.Fg).Margin(10, 0, 0, 0).Selectable()
 		if len(ap.Options) > 0 {
 			ui.Row(c).Gap(8).Wrap().Margin(10, 0, 0, 0).Children(func() {
 				for i, o := range ap.Options {
@@ -690,7 +692,7 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 			})
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
-			ui.Text(c, locales.AnswerBelow()).FontSize(12).TextColor(p.Mute).Grow(1).MinWidth(0)
+			ui.Text(c, locales.AnswerBelow()).FontSize(13).TextColor(p.Mute).Grow(1).MinWidth(0)
 			if a.button(c, "skip:"+ap.ID, locales.Skip(), a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Reply(ap.ID, ""))
 			}
@@ -714,9 +716,9 @@ func (a *App) button(c *ui.Context, key, label, kbd string, primary bool) ui.Ele
 		}
 	}
 	b.Children(func() {
-		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(fg).SingleLine()
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(fg).SingleLine()
 		if kbd != "" {
-			ui.Text(c, kbd).FontSize(11).TextColor(hint).SingleLine()
+			ui.Text(c, kbd).FontSize(12).TextColor(hint).SingleLine()
 		}
 	})
 	return b
@@ -766,7 +768,7 @@ func (a *App) olderRow(c *ui.Context) {
 	if !a.C.LoadingOlder {
 		a.do(a.C.LoadOlder())
 	}
-	ui.Text(c, locales.LoadingEarlier()).FontSize(12).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
+	ui.Text(c, locales.LoadingEarlier()).FontSize(13).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
 }
 
 // seek scrolls to the message a search chose, loading older pages until
@@ -800,7 +802,7 @@ func (a *App) taskSteps(c *ui.Context, steps []string) {
 	p := a.p
 	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
 		if n := len(steps) - 3; n > 0 {
-			ui.Text(c, locales.EarlierSteps(n)).FontSize(11.5).TextColor(p.Mute).Height(20)
+			ui.Text(c, locales.EarlierSteps(n)).FontSize(12.5).TextColor(p.Mute).Height(20)
 			steps = steps[n:]
 		}
 		for i, s := range steps {
@@ -810,8 +812,8 @@ func (a *App) taskSteps(c *ui.Context, steps []string) {
 				verb = t.verb
 			}
 			ui.Row(c.Key(i)).Height(20).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, verb).FontSize(11.5).TextColor(p.Mute).Shrink(0)
-				ui.Text(c, detail).Font("monospace").FontSize(11.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+				ui.Text(c, verb).FontSize(12.5).TextColor(p.Mute).Shrink(0)
+				ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
 	})
@@ -841,12 +843,12 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 					if t.State == "" || t.State == "skip" {
 						color = p.Fg2
 					}
-					ui.Text(c, t.Description).FontSize(12).TextColor(color).SingleLine().Ellipsis("…").MinWidth(0)
+					ui.Text(c, t.Description).FontSize(13).TextColor(color).SingleLine().Ellipsis("…").MinWidth(0)
 					switch {
 					case t.State == "skip":
-						ui.Text(c, locales.Skipped()).FontSize(11.5).TextColor(p.Mute).Shrink(0)
+						ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.Mute).Shrink(0)
 					case t.State == "" && len(t.After) > 0:
-						ui.Text(c, locales.WaitingFor(strings.Join(t.After, locales.ListSeparator()))).FontSize(11.5).TextColor(p.Mute).SingleLine().Shrink(0)
+						ui.Text(c, locales.WaitingFor(strings.Join(t.After, locales.ListSeparator()))).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
 					}
 				})
 				if t.State == "run" && len(t.Steps) > 0 {
@@ -855,8 +857,8 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 						name = v.verb
 					}
 					ui.Row(c).Height(18).Gap(6).Padding(0, 0, 0, 19).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, name).FontSize(11.5).TextColor(p.Mute).Shrink(0)
-						ui.Text(c, detail).Font("monospace").FontSize(11.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+						ui.Text(c, name).FontSize(12.5).TextColor(p.Mute).Shrink(0)
+						ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
 					})
 				}
 			})
@@ -871,4 +873,35 @@ func mcpTool(name string) (server, tool string, ok bool) {
 		return "", "", false
 	}
 	return strings.Cut(rest, "__")
+}
+
+// copyButton copies a message. It comes up while the pointer is over the
+// message, keeping its place so nothing moves, and says it copied.
+func (a *App) copyButton(c *ui.Context, text string, shown bool) {
+	p := a.p
+	h := fnv.New64a()
+	h.Write([]byte(text))
+	key := h.Sum64()
+	done := c.Now().Sub(copied[key]) < 2*time.Second
+	b := ui.ButtonBase(c.Key(key)).Size(26, 26).Radius(7).Center().Label(locales.Copy()).Tooltip(locales.Copy())
+	target := float32(0)
+	if shown || done || b.Focused() {
+		target = 1
+	}
+	b.Opacity(b.AnimateTo("shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() {
+		if done {
+			sym(c, "check", 14, p.Fg2)
+		} else {
+			sym(c, "copy", 14, p.Mute)
+		}
+	})
+	if b.Clicked() {
+		c.WriteClipboard(text)
+		copied[key] = c.Now()
+		c.After(2 * time.Second)
+	}
 }

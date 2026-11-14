@@ -35,7 +35,7 @@ func mdTheme(p *Palette, t *ui.Theme) *markdown.Theme {
 	set(editor.TokenDeleted, editor.TokenStyle{Color: p.Minus})
 	set(editor.TokenInvalid, editor.TokenStyle{Color: p.Minus})
 	th := &markdown.Theme{
-		FontSize: 13.5, LineHeight: 1.55, CodeLineHeight: 1.6,
+		FontSize: 15, LineHeight: 1.6, CodeLineHeight: 1.6,
 		Text: p.Fg, Muted: p.Mute, Link: p.Fg, Strong: p.Fg, LinkWeight: 500,
 		Code: p.Fg, CodeBackground: p.Chip, CodeSize: 12.5 / 13.5,
 		CodeBlockBackground: p.Chip, CodeBlockBorder: ui.Transparent, CodeBlockRadius: 10, CodeBlockPadding: 11 / 13.5,
@@ -55,7 +55,7 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 	p := a.p
 	ui.Column(c).Radius(10).Background(p.Chip).Margin(10, 0, 12, 0).Clip().Children(func() {
 		ui.Row(c).Height(30).Padding(0, 8, 0, 12).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, b.Language).FontSize(11.5).TextColor(p.Mute)
+			ui.Text(c, b.Language).FontSize(12.5).TextColor(p.Mute)
 			ui.Spacer(c)
 			h := fnv.New64a()
 			h.Write([]byte(b.Code()))
