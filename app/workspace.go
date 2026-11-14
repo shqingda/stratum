@@ -6,13 +6,16 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/locales"
 )
 
 // openers are the apps the top bar opens a session's folder in.
-var openers = []struct{ label, icon, app string }{
-	{"VS Code", "brand-vscode", "Visual Studio Code"},
-	{"访达", "folder", ""},
-	{"终端", "terminal-2", "Terminal"},
+func openers() []struct{ label, icon, app string } {
+	return []struct{ label, icon, app string }{
+		{"VS Code", "brand-vscode", "Visual Studio Code"},
+		{locales.Finder(), "folder", ""},
+		{locales.Terminal(), "terminal-2", "Terminal"},
+	}
 }
 
 func openIn(app, dir string) error {
@@ -46,14 +49,14 @@ func (a *App) barButton(c *ui.Context, key, symbol, label string, children func(
 func (a *App) openButton(c *ui.Context) {
 	p := a.p
 	dir := a.C.Current.Cwd
-	a.barButton(c, "open", "brand-vscode", "打开", func() {
+	a.barButton(c, "open", "brand-vscode", locales.Open(), func() {
 		ui.Box(c).Width(.5).AlignSelf(ui.Stretch).Margin(6, 0, 6, 4).Background(p.Edge2)
 		sym(c, "chevron-down", 13, p.Fg2)
 	}).PopoverMenuButton(func(m *ui.Menu) {
-		for _, o := range openers {
+		for _, o := range openers() {
 			if m.Item(o.label).ID("open:" + o.label).Chosen() {
 				if err := a.openIn(o.app, dir); err != nil {
-					a.err = "打不开 " + o.label + "：" + err.Error()
+					a.err = locales.CouldntOpen(o.label, err.Error())
 				}
 			}
 		}
@@ -68,7 +71,7 @@ func (a *App) commitButton(c *ui.Context) {
 		return
 	}
 	p := a.p
-	b := a.barButton(c, "commit", "git-commit", "提交", func() {
+	b := a.barButton(c, "commit", "git-commit", locales.Commit(), func() {
 		if w.Added > 0 {
 			ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).TextColor(p.Plus)
 		}
@@ -85,7 +88,7 @@ func (a *App) commitButton(c *ui.Context) {
 // commitField is the commit message; left empty, the session's title.
 func (a *App) commitField(c *ui.Context) {
 	p := a.p
-	ui.TextInputBase(c, &a.commitMsg).Bind(&a.commitInput).Label("提交说明").Placeholder(strings.TrimSpace(a.C.Current.Title)).PlaceholderColor(p.Mute).
+	ui.TextInputBase(c, &a.commitMsg).Bind(&a.commitInput).Label(locales.CommitMessage()).Placeholder(strings.TrimSpace(a.C.Current.Title)).PlaceholderColor(p.Mute).
 		FontSize(12.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
 }
 
@@ -94,7 +97,7 @@ func (a *App) commitGo(c *ui.Context) {
 	if msg == "" {
 		msg = strings.TrimSpace(a.C.Current.Title)
 	}
-	b := a.button(c, "commit-go", "提交", "", true).Label("提交改动")
+	b := a.button(c, "commit-go", locales.Commit(), "", true).Label(locales.CommitChanges())
 	b.Disabled(msg == "" || a.C.Workspace.Committing || a.C.Busy)
 	if b.Clicked() {
 		cmds, err := a.C.Commit(msg)

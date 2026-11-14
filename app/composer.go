@@ -5,9 +5,25 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 )
 
-var efforts = map[string]string{"": "默认", "minimal": "最低", "low": "低", "medium": "中", "high": "高", "xhigh": "极高"}
+// effortLabel names a reasoning effort.
+func effortLabel(effort string) string {
+	switch effort {
+	case "minimal":
+		return locales.EffortMinimal()
+	case "low":
+		return locales.EffortLow()
+	case "medium":
+		return locales.EffortMedium()
+	case "high":
+		return locales.EffortHigh()
+	case "xhigh":
+		return locales.EffortXhigh()
+	}
+	return locales.EffortDefault()
+}
 
 // composer is the box the user writes in, under the transcript: prompts
 // waiting for the running turn above it, the session's settings in it and
@@ -57,26 +73,26 @@ func (a *App) box(c *ui.Context) {
 	svc := c.Services()
 	box.Children(func() {
 		a.attachments(c)
-		ph := "让 Talos 做点什么"
+		ph := locales.ComposerPlaceholder()
 		if a.C.Busy {
-			ph = "运行中：回车排队"
+			ph = locales.ComposerQueuePlaceholder()
 		}
 		if a.questionFirst() {
-			ph = "回答上面的问题，回车发送"
+			ph = locales.ComposerAnswerPlaceholder()
 		}
 		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
 			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
 		if a.noImages() {
-			ui.Text(c, "当前模型看不了图片，换一个再发").FontSize(11.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
+			ui.Text(c, locales.NoImageSupport()).FontSize(11.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
 		}
 		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
-			if a.iconPill(c, "attach", "plus", "添加附件").Clicked() {
+			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
 			if cur != nil {
 				a.modelPill(c, cur.Model)
-				a.effortPill(c, efforts[cur.Effort])
-				a.modePill(c, modes[cur.Mode])
+				a.effortPill(c, effortLabel(cur.Effort))
+				a.modePill(c, modeName(cur.Mode))
 			}
 			ui.Spacer(c)
 			a.contextRing(c)
@@ -136,14 +152,14 @@ func (a *App) goButton(c *ui.Context) {
 	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4)
 	switch {
 	case a.C.Busy && !a.ready():
-		b.Label("停止").Background(p.Fg).Children(func() { ui.Box(c).Size(10, 10).Radius(2).Background(p.Bg) })
+		b.Label(locales.Stop()).Background(p.Fg).Children(func() { ui.Box(c).Size(10, 10).Radius(2).Background(p.Bg) })
 		if b.Clicked() {
 			a.do(a.C.Cancel())
 		}
 	case !a.ready() || !a.C.CanAct():
-		b.Label("发送").Background(p.Chip).Children(func() { sym(c, "arrow-up", 16, p.Mute) })
+		b.Label(locales.Send()).Background(p.Chip).Children(func() { sym(c, "arrow-up", 16, p.Mute) })
 	default:
-		b.Label("发送").Background(p.Acc).Children(func() { sym(c, "arrow-up", 16, p.OnAcc) })
+		b.Label(locales.Send()).Background(p.Acc).Children(func() { sym(c, "arrow-up", 16, p.OnAcc) })
 		if b.Clicked() {
 			a.submit()
 		}
@@ -159,13 +175,13 @@ func (a *App) status(c *ui.Context) {
 				ui.Text(c, label).FontSize(11.5).TextColor(p.Mute).SingleLine()
 			})
 		}
-		item("device-laptop", "本机")
+		item("device-laptop", locales.Local())
 		if b := a.C.Workspace.Branch; b != "" {
 			item("git-branch", b)
 		}
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))
 		}
-		item("lock", "沙箱开启")
+		item("lock", locales.SandboxOn())
 	})
 }

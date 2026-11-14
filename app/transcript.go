@@ -12,42 +12,71 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
 const columnWidth = 640
 
 // tools is how a tool call shows: its symbol and verb.
-var tools = map[string]struct{ symbol, verb string }{
-	"read_file":   {"file-text", "读取"},
-	"write_file":  {"file-pencil", "写入"},
-	"edit_file":   {"pencil", "编辑"},
-	"list_dir":    {"folder", "列出"},
-	"search":      {"search", "搜索"},
-	"shell":       {"terminal-2", "运行"},
-	"git_status":  {"git-branch", "git status"},
-	"git_diff":    {"plus-minus", "git diff"},
-	"skill":       {"sparkles", "技能"},
-	"update_plan": {"list-check", "更新计划"},
-	"ask_user":    {"message", "提问"},
-	"task":        {"subtask", "子任务"},
-	"run_tasks":   {"hierarchy-3", "任务图"},
+// toolInfo is how a tool shows in the transcript.
+type toolInfo struct{ symbol, verb string }
+
+// toolFor looks up a built-in tool by name.
+func toolFor(name string) (toolInfo, bool) {
+	t, ok := tools[name]
+	return toolInfo{t.symbol, func() string {
+		if ok {
+			return t.verb()
+		}
+		return ""
+	}()}, ok
 }
 
-var kinds = map[string]string{"read": "读取文件", "write": "修改文件", "exec": "运行命令", "mcp": "调用 MCP 工具"}
+var tools = map[string]struct {
+	symbol string
+	verb   func() string
+}{
+	"read_file":   {"file-text", locales.ToolRead},
+	"write_file":  {"file-pencil", locales.ToolWrite},
+	"edit_file":   {"pencil", locales.ToolEdit},
+	"list_dir":    {"folder", locales.ToolList},
+	"search":      {"search", locales.ToolSearch},
+	"shell":       {"terminal-2", locales.ToolRun},
+	"git_status":  {"git-branch", func() string { return "git status" }},
+	"git_diff":    {"plus-minus", func() string { return "git diff" }},
+	"skill":       {"sparkles", locales.ToolSkill},
+	"update_plan": {"list-check", locales.ToolPlan},
+	"ask_user":    {"message", locales.ToolAsk},
+	"task":        {"subtask", locales.ToolTask},
+	"run_tasks":   {"hierarchy-3", locales.ToolTasks},
+}
+
+var kinds = map[string]func() string{"read": locales.KindRead, "write": locales.KindWrite, "exec": locales.KindExec, "mcp": locales.KindMcp}
 
 // reasons put the kernel's reasons for asking in the app's words.
-var reasons = map[string]string{
-	"It reaches outside the workspace.":                                           "会碰到工作区以外",
-	"It runs without the sandbox: with network and access outside the workspace.": "不在沙箱里运行：有网络，能访问工作区以外",
-	"Commands cannot be sandboxed here.":                                          "这台机器上命令进不了沙箱",
-	"It runs a command.":                                                          "要运行命令",
-	"It changes files.":                                                           "要改文件",
-	"It calls a tool of an MCP server, outside the sandbox.":                      "MCP 服务器不在沙箱里运行",
-	"It touches files that may hold secrets.":                                     "涉及可能存有密钥的文件",
+var reasons = map[string]func() string{
+	"It reaches outside the workspace.":                                           locales.ReasonOutsideWorkspace,
+	"It runs without the sandbox: with network and access outside the workspace.": locales.ReasonNoSandbox,
+	"Commands cannot be sandboxed here.":                                          locales.ReasonCantSandbox,
+	"It runs a command.":                                                          locales.ReasonRunsCommand,
+	"It changes files.":                                                           locales.ReasonChangesFiles,
+	"It calls a tool of an MCP server, outside the sandbox.":                      locales.ReasonMcp,
+	"It touches files that may hold secrets.":                                     locales.ReasonSecrets,
 }
 
-var modes = map[string]string{"ask": "询问", "auto": "自动", "full": "完全"}
+// modeName names a permission mode.
+func modeName(mode string) string {
+	switch mode {
+	case "ask":
+		return locales.ModeAsk()
+	case "auto":
+		return locales.ModeAuto()
+	case "full":
+		return locales.ModeFull()
+	}
+	return mode
+}
 
 func (a *App) bar(c *ui.Context) {
 	p := a.p
@@ -57,7 +86,7 @@ func (a *App) bar(c *ui.Context) {
 	}
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		if a.noSide {
-			if a.iconButton(c, "side", "layout-sidebar-left-expand", "显示边栏").Clicked() {
+			if a.iconButton(c, "side", "layout-sidebar-left-expand", locales.ShowSidebar()).Clicked() {
 				a.noSide = false
 			}
 			ui.Box(c).Width(4)
@@ -283,17 +312,16 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 	for _, e := range steps {
 		count[e.Text]++
 	}
-	type part struct{ pre, n, post string }
-	var parts []part
-	add := func(n int, pre, post string) {
+	var parts []string
+	add := func(n int, say func(int) string) {
 		if n > 0 {
-			parts = append(parts, part{pre, fmt.Sprint(n), post})
+			parts = append(parts, say(n))
 		}
 	}
-	add(count["read_file"], "浏览了", "个文件")
-	add(count["list_dir"], "列出", "个目录")
-	add(count["search"], "搜索", "次")
-	add(count["git_status"]+count["git_diff"], "查看 git", "次")
+	add(count["read_file"], locales.BrowsedFiles)
+	add(count["list_dir"], locales.ListedDirs)
+	add(count["search"], locales.SearchedTimes)
+	add(count["git_status"]+count["git_diff"], locales.GitLooks)
 	key := "fold:" + steps[0].CallID
 	open := a.opened[key]
 	if a.inWork && len(count) == 1 && count["read_file"] > 0 {
@@ -302,14 +330,14 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		for _, e := range steps {
 			names = append(names, e.Detail)
 		}
-		row := ui.ButtonBase(c.Key(key)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label("浏览 " + strings.Join(names, " ")).Expanded(open)
+		row := ui.ButtonBase(c.Key(key)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(locales.Browse() + " " + strings.Join(names, " ")).Expanded(open)
 		if row.Clicked() {
 			open = !open
 			a.opened[key] = open
 		}
 		row.Children(func() {
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, "file-search", 15, p.Mute) })
-			ui.Text(c, "浏览").FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+			ui.Text(c, locales.Browse()).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
 			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(12).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
 			ui.Spacer(c)
 			if row.Hovered() {
@@ -317,24 +345,14 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 			}
 		})
 	} else {
-		row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label("展开步骤").Expanded(open)
+		row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label(locales.ExpandSteps()).Expanded(open)
 		if row.Clicked() {
 			open = !open
 			a.opened[key] = open
 		}
 		row.Children(func() {
 			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
-			ui.Row(c).Children(func() {
-				for i, pt := range parts {
-					pre := pt.pre + " "
-					if i > 0 {
-						pre = "，" + pre
-					}
-					ui.Text(c, pre).FontSize(12.5).TextColor(p.Mute).SingleLine().PreserveSpaces()
-					ui.Text(c, pt.n).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
-					ui.Text(c, " "+pt.post).FontSize(12.5).TextColor(p.Mute).SingleLine().PreserveSpaces()
-				}
-			})
+			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(12.5).TextColor(p.Mute).SingleLine()
 			ui.Spacer(c)
 		})
 	}
@@ -399,7 +417,7 @@ func (a *App) running(c *ui.Context) {
 	ui.Row(c).Height(28).Gap(8).AlignItems(ui.Center).Children(func() {
 		dot := ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
 		dot.Opacity(.35 + .65*(1-dot.Loop("beat", 1600*time.Millisecond, ui.Bounce(ui.EaseInOut))))
-		ui.Text(c, "思考中").FontSize(12.5).TextColor(p.Fg2)
+		ui.Text(c, locales.ThinkingNow()).FontSize(12.5).TextColor(p.Fg2)
 	})
 }
 
@@ -409,17 +427,17 @@ func (a *App) empty(c *ui.Context) {
 		switch {
 		case a.C.Phase == client.Disconnected:
 			sym(c, "plug-connected-x", 28, p.Minus)
-			ui.Text(c, "和内核的连接断开了").FontSize(15).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
+			ui.Text(c, locales.KernelDisconnected()).FontSize(15).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
 			if a.C.Err != "" {
 				ui.Text(c, a.C.Err).FontSize(12.5).TextColor(p.Fg2).MaxWidth(480).TextAlign(ui.Center).Selectable()
 			}
-			ui.Text(c, "重新打开 Talos 会重启内核，没写完的轮次会从日志里恢复。").FontSize(12).TextColor(p.Mute)
+			ui.Text(c, locales.KernelDisconnectedHint()).FontSize(12).TextColor(p.Mute)
 		case a.C.Phase != client.Ready:
 			ui.Image(c, mark).Size(56, 56).Opacity(.5)
 			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(13).TextColor(p.Mute).Margin(12, 0, 0, 0)
 		case a.C.Current == nil:
 			ui.Image(c, mark).Size(56, 56)
-			ui.Text(c, "新建一个会话开始").FontSize(15).FontWeight(500).TextColor(p.Fg2).Margin(12, 0, 0, 0)
+			ui.Text(c, locales.StartNewSession()).FontSize(15).FontWeight(500).TextColor(p.Fg2).Margin(12, 0, 0, 0)
 		default:
 			a.hello(c)
 		}
@@ -432,8 +450,8 @@ func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
 	ui.Image(c, mark).Size(44, 44)
-	ui.Text(c, "在 "+filepath.Base(cur.Cwd)+" 里做点什么").FontSize(22).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
-	ui.Text(c, "Talos 会先读代码，改动前按你的权限模式询问。").TextColor(p.Fg2).Margin(0, 0, 26, 0)
+	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(22).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
+	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 	ui.Column(c).Width(540).MaxWidthPercent(100).Children(func() { a.dock(c) })
 	var recent []proto.Session
 	for _, s := range a.C.Sessions {
@@ -443,7 +461,7 @@ func (a *App) hello(c *ui.Context) {
 	}
 	if len(recent) > 0 {
 		ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
-			ui.Text(c, "继续").FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
+			ui.Text(c, locales.Recent()).FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
 			for _, s := range recent {
 				a.sessionRow(c, s)
 			}
@@ -518,7 +536,7 @@ func (a *App) compactNote(c *ui.Context, e *client.Entry) {
 // step is a tool call: one line, its output under it once opened.
 func (a *App) step(c *ui.Context, e *client.Entry) {
 	p := a.p
-	t, ok := tools[e.Text]
+	t, ok := toolFor(e.Text)
 	if !ok {
 		t.symbol, t.verb = "tool", e.Text
 		if server, name, ok := mcpTool(e.Text); ok {
@@ -558,7 +576,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	if open {
 		out := e.Output
 		if lines := strings.Split(out, "\n"); len(lines) > 40 {
-			out = strings.Join(lines[:40], "\n") + fmt.Sprintf("\n… 还有 %d 行", len(lines)-40)
+			out = strings.Join(lines[:40], "\n") + "\n" + locales.MoreLines(len(lines)-40)
 		}
 		o := ui.Text(c, out).FontSize(12).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(2, 0, 8, 24).Selectable().PreserveSpaces()
@@ -581,12 +599,15 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			slot(c, p, "wait")
-			kind := kinds[ap.Kind]
+			kind := ap.Tool
+			if k, ok := kinds[ap.Kind]; ok {
+				kind = k()
+			}
 			if kind == "" {
 				kind = ap.Tool
 			}
 			ui.Text(c, kind).FontSize(12.5).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, "需要你允许").FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.NeedsApproval()).FontSize(12.5).TextColor(p.Fg2)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
 				sym(c, "clock", 12, p.Mute)
@@ -617,24 +638,24 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				})
 			}
 			if ap.Reason != "" {
-				r := reasons[ap.Reason]
-				if r == "" {
-					r = ap.Reason
+				r := ap.Reason
+				if say, ok := reasons[ap.Reason]; ok {
+					r = say()
 				}
 				why("shield-lock", r)
 			}
 			if cur := a.C.Current; cur != nil {
-				why("adjustments-horizontal", "当前模式："+modes[cur.Mode])
+				why("adjustments-horizontal", locales.CurrentMode(modeName(cur.Mode)))
 			}
 		})
 		ui.Row(c).Gap(8).Justify(ui.End).Margin(12, 0, 0, 0).Children(func() {
-			if a.button(c, "deny:"+ap.ID, "拒绝", a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
+			if a.button(c, "deny:"+ap.ID, locales.Deny(), a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, false, false))
 			}
-			if a.button(c, "always:"+ap.ID, "本会话都允许", a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
+			if a.button(c, "always:"+ap.ID, locales.AllowForSession(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, true))
 			}
-			if a.button(c, "allow:"+ap.ID, "允许", a.approvalHint(c, ap.ID, "⏎"), true).Disabled(busy).Clicked() {
+			if a.button(c, "allow:"+ap.ID, locales.Allow(), a.approvalHint(c, ap.ID, "⏎"), true).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, false))
 			}
 		})
@@ -650,8 +671,8 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			slot(c, p, "wait")
-			ui.Text(c, "提问").FontSize(12.5).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, "需要你回答").FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.Question()).FontSize(12.5).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, locales.NeedsAnswer()).FontSize(12.5).TextColor(p.Fg2)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
 				sym(c, "clock", 12, p.Mute)
@@ -669,8 +690,8 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 			})
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
-			ui.Text(c, "也可以在下方输入框里回答").FontSize(12).TextColor(p.Mute).Grow(1).MinWidth(0)
-			if a.button(c, "skip:"+ap.ID, "跳过", a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
+			ui.Text(c, locales.AnswerBelow()).FontSize(12).TextColor(p.Mute).Grow(1).MinWidth(0)
+			if a.button(c, "skip:"+ap.ID, locales.Skip(), a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
 				a.do(a.C.Reply(ap.ID, ""))
 			}
 		})
@@ -727,9 +748,9 @@ func (a *App) waited(c *ui.Context, id string) string {
 	case d < 5*time.Second:
 		return ""
 	case d < time.Minute:
-		return fmt.Sprintf("等了 %d 秒", int(d.Seconds()))
+		return locales.WaitedSeconds(int(d.Seconds()))
 	}
-	return fmt.Sprintf("等了 %d 分", int(d.Minutes()))
+	return locales.WaitedMinutes(int(d.Minutes()))
 }
 
 // home shortens a path in the home directory to start with ~.
@@ -745,7 +766,7 @@ func (a *App) olderRow(c *ui.Context) {
 	if !a.C.LoadingOlder {
 		a.do(a.C.LoadOlder())
 	}
-	ui.Text(c, "正在加载更早的消息…").FontSize(12).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
+	ui.Text(c, locales.LoadingEarlier()).FontSize(12).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
 }
 
 // seek scrolls to the message a search chose, loading older pages until
@@ -779,13 +800,13 @@ func (a *App) taskSteps(c *ui.Context, steps []string) {
 	p := a.p
 	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
 		if n := len(steps) - 3; n > 0 {
-			ui.Text(c, fmt.Sprintf("前面还有 %d 步", n)).FontSize(11.5).TextColor(p.Mute).Height(20)
+			ui.Text(c, locales.EarlierSteps(n)).FontSize(11.5).TextColor(p.Mute).Height(20)
 			steps = steps[n:]
 		}
 		for i, s := range steps {
 			name, detail, _ := strings.Cut(s, "\t")
 			verb := name
-			if t, ok := tools[name]; ok {
+			if t, ok := toolFor(name); ok {
 				verb = t.verb
 			}
 			ui.Row(c.Key(i)).Height(20).Gap(6).AlignItems(ui.Center).Children(func() {
@@ -823,14 +844,14 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 					ui.Text(c, t.Description).FontSize(12).TextColor(color).SingleLine().Ellipsis("…").MinWidth(0)
 					switch {
 					case t.State == "skip":
-						ui.Text(c, "已跳过").FontSize(11.5).TextColor(p.Mute).Shrink(0)
+						ui.Text(c, locales.Skipped()).FontSize(11.5).TextColor(p.Mute).Shrink(0)
 					case t.State == "" && len(t.After) > 0:
-						ui.Text(c, "等 "+strings.Join(t.After, "、")).FontSize(11.5).TextColor(p.Mute).SingleLine().Shrink(0)
+						ui.Text(c, locales.WaitingFor(strings.Join(t.After, locales.ListSeparator()))).FontSize(11.5).TextColor(p.Mute).SingleLine().Shrink(0)
 					}
 				})
 				if t.State == "run" && len(t.Steps) > 0 {
 					name, detail, _ := strings.Cut(t.Steps[len(t.Steps)-1], "\t")
-					if v, ok := tools[name]; ok {
+					if v, ok := toolFor(name); ok {
 						name = v.verb
 					}
 					ui.Row(c).Height(18).Gap(6).Padding(0, 0, 0, 19).AlignItems(ui.Center).Children(func() {

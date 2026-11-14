@@ -5,15 +5,18 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/llm/auth"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
 // signIns are the browser sign-ins the list offers, subscriptions first.
-var signIns = []struct{ provider, method, symbol, title, sub string }{
-	{"codex", "codex", "brand-openai", "Sign in with ChatGPT", "Plus、Pro、Business 订阅"},
-	{"xai", "xai", "brand-x", "X 订阅", "SuperGrok、X Premium+"},
-	{"copilot", "copilot", "brand-github", "GitHub Copilot", "Pro、Pro+、Business 订阅"},
-	{"openrouter", "openrouter", "route", "OpenRouter", "浏览器授权，换一把 key"},
+func signIns() []struct{ provider, method, symbol, title, sub string } {
+	return []struct{ provider, method, symbol, title, sub string }{
+		{"codex", "codex", "brand-openai", "Sign in with ChatGPT", locales.SignInChatGPTSub()},
+		{"xai", "xai", "brand-x", locales.SignInXTitle(), "SuperGrok、X Premium+"},
+		{"copilot", "copilot", "brand-github", "GitHub Copilot", locales.SignInCopilotSub()},
+		{"openrouter", "openrouter", "route", "OpenRouter", locales.SignInOpenRouterSub()},
+	}
 }
 
 // keyProviders are the providers that take an API key.
@@ -38,12 +41,12 @@ func (a *App) onboarding(c *ui.Context) {
 		ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 		ui.Column(c).Grow(1).AlignItems(ui.Center).Padding(70, 20, 20, 20).Children(func() {
 			ui.Image(c, mark).Size(58, 58).Margin(-5, 0, -5, 0)
-			ui.Text(c, "连接一个模型").FontSize(22).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
-			ui.Text(c, "用你已有的订阅登录最省事。之后随时可以在设置里加别的。").FontSize(13).TextColor(p.Fg2).Margin(0, 0, 26, 0)
+			ui.Text(c, locales.OnboardingTitle()).FontSize(22).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
+			ui.Text(c, locales.OnboardingLead()).FontSize(13).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 			ui.Column(c).Width(460).MaxWidthPercent(100).Children(func() { a.loginList(c) })
 			ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(18, 0, 0, 0).Children(func() {
 				sym(c, "lock", 13, p.Mute)
-				ui.Text(c, "凭据只存在本机钥匙串，Talos 没有服务器。").FontSize(11.5).TextColor(p.Mute)
+				ui.Text(c, locales.OnboardingKeychain()).FontSize(11.5).TextColor(p.Mute)
 			})
 		})
 	})
@@ -54,7 +57,7 @@ func (a *App) loginList(c *ui.Context) {
 	p := a.p
 	s := a.C.SignIn
 	ui.Column(c).Radius(10).Background(p.Card).Border(.5, p.Edge2).Clip().Children(func() {
-		for i, o := range signIns {
+		for i, o := range signIns() {
 			on := s != nil && s.Method == o.method
 			if a.loginRow(c, i, "login:"+o.method, o.symbol, o.title, o.sub, on).Clicked() && !on {
 				a.keyOpen = false
@@ -64,7 +67,7 @@ func (a *App) loginList(c *ui.Context) {
 				a.loginWait(c, o.provider)
 			}
 		}
-		if a.loginRow(c, len(signIns), "login:key", "key", "API key", "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax 等", a.keyOpen).Clicked() {
+		if a.loginRow(c, len(signIns()), "login:key", "key", "API key", locales.ApiKeySub(), a.keyOpen).Clicked() {
 			a.keyOpen = !a.keyOpen
 		}
 		if a.keyOpen {
@@ -114,9 +117,9 @@ func (a *App) loginWait(c *ui.Context, provider string) {
 	ui.Column(c).Padding(4, 14, 14, 56).Gap(8).Children(func() {
 		switch {
 		case s.Err != "":
-			ui.Text(c, "登录失败："+s.Err).FontSize(12.5).TextColor(p.Minus).Selectable()
+			ui.Text(c, locales.SignInFailed(s.Err)).FontSize(12.5).TextColor(p.Minus).Selectable()
 		case s.Code != "":
-			ui.Text(c, "访问 "+strings.TrimPrefix(s.CodeURL, "https://")+" 输入：").FontSize(12.5).TextColor(p.Fg2).Selectable()
+			ui.Text(c, locales.DeviceCodeVisit(strings.TrimPrefix(s.CodeURL, "https://"))).FontSize(12.5).TextColor(p.Fg2).Selectable()
 			ui.Row(c).Gap(6).Children(func() {
 				for _, r := range s.Code {
 					if r == '-' {
@@ -129,24 +132,24 @@ func (a *App) loginWait(c *ui.Context, provider string) {
 				}
 			})
 		case s.URL != "":
-			ui.Text(c, "已在浏览器打开登录页，完成后自动回来。").FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.SignInBrowserOpened()).FontSize(12.5).TextColor(p.Fg2)
 		default:
-			ui.Text(c, "正在打开浏览器…").FontSize(12.5).TextColor(p.Fg2)
+			ui.Text(c, locales.OpeningBrowser()).FontSize(12.5).TextColor(p.Fg2)
 		}
 		ui.Row(c).Gap(8).Children(func() {
 			if s.Code != "" && s.Err == "" {
-				if a.barButton(c, "login-copy", "copy", "复制代码", func() {}).Clicked() {
+				if a.barButton(c, "login-copy", "copy", locales.CopyCode(), func() {}).Clicked() {
 					c.WriteClipboard(s.Code)
 				}
 			}
 			if s.URL != "" && s.Code == "" && s.Err == "" && s.Method == "codex" {
-				if a.button(c, "login-device", "浏览器打不开？用设备码", "", false).Clicked() {
+				if a.button(c, "login-device", locales.UseDeviceCode(), "", false).Clicked() {
 					a.do(a.C.Login(proto.Login{Provider: provider, Method: s.Method, Device: true}))
 				}
 			}
-			label := "取消"
+			label := locales.Cancel()
 			if s.Err != "" {
-				label = "知道了"
+				label = locales.Ok()
 			}
 			if a.ghost(c, "login-cancel", label).Clicked() {
 				a.do(a.C.CancelLogin())
@@ -178,21 +181,21 @@ func (a *App) keyForm(c *ui.Context) {
 					}
 				}
 			}, a.menuOptions(&a.keyMenu))
-			ui.TextInputBase(c, &a.key).Label("API key").Password().Placeholder("粘贴 key").PlaceholderColor(p.Mute).
+			ui.TextInputBase(c, &a.key).Label("API key").Password().Placeholder(locales.PasteKey()).PlaceholderColor(p.Mute).
 				FontSize(12.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
 		})
 		if s != nil && s.Method == "" && s.Err != "" {
-			ui.Text(c, "没存上："+s.Err).FontSize(12.5).TextColor(p.Minus).Selectable()
+			ui.Text(c, locales.KeySaveFailed(s.Err)).FontSize(12.5).TextColor(p.Minus).Selectable()
 		}
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			b := a.button(c, "key-save", "保存", "", true)
+			b := a.button(c, "key-save", locales.Save(), "", true)
 			b.Disabled(strings.TrimSpace(a.key) == "" || s != nil && s.Method == "" && s.Err == "")
 			if b.Clicked() {
 				cmds, err := a.C.Login(proto.Login{Provider: a.keyProvider, Key: a.key})
 				a.key = ""
 				a.do(cmds, err)
 			}
-			ui.Text(c, "在 "+keyURL(providers, a.keyProvider)+" 创建").FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0).Selectable()
+			ui.Text(c, locales.KeyCreateAt(keyURL(providers, a.keyProvider))).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0).Selectable()
 		})
 	})
 }

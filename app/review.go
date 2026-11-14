@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -177,9 +178,9 @@ func (a *App) fileDiff(key string) *fileDiff {
 
 // reviewToggle is the button in the bar that shows and hides the panel.
 func (a *App) reviewToggle(c *ui.Context) {
-	label := "显示变更"
+	label := locales.ShowChanges()
 	if a.rv.open {
-		label = "隐藏变更"
+		label = locales.HideChanges()
 	}
 	b := a.iconButton(c, "review", "layout-sidebar-right", label)
 	if a.rv.open {
@@ -215,20 +216,20 @@ func (a *App) reviewPanel(c *ui.Context) {
 		ch := a.C.Changes
 		switch {
 		case a.C.Current == nil:
-			a.reviewNote(c, "没有打开的会话")
+			a.reviewNote(c, locales.NoOpenSession())
 		case a.rv.uncommitted && a.C.Workspace.Branch == "":
-			a.reviewNote(c, "这个文件夹不在 git 仓库里")
+			a.reviewNote(c, locales.NotGitRepo())
 		case a.rv.uncommitted && len(turns) == 0:
-			a.reviewNote(c, "没有未提交的改动")
+			a.reviewNote(c, locales.NoUncommitted())
 		case a.rv.uncommitted:
 			a.reviewFiles(c, turns)
 			a.reviewDiff(c, turns)
 		case ch.Err != "" && len(ch.Turns) == 0:
-			a.reviewNote(c, "读取变更失败："+ch.Err)
+			a.reviewNote(c, locales.ChangesLoadFailed(ch.Err))
 		case len(ch.Turns) == 0 && (ch.Loading || ch.Stale):
-			a.reviewNote(c, "正在读取…")
+			a.reviewNote(c, locales.Reading())
 		case len(ch.Turns) == 0:
-			a.reviewNote(c, "这个会话还没有改动文件")
+			a.reviewNote(c, locales.NoChangesYet())
 		default:
 			a.reviewFiles(c, turns)
 			a.reviewDiff(c, turns)
@@ -252,7 +253,7 @@ func (a *App) scope(c *ui.Context) {
 		for _, s := range []struct {
 			label       string
 			uncommitted bool
-		}{{"本轮", false}, {"未提交", true}} {
+		}{{locales.LastTurn(), false}, {locales.Uncommitted(), true}} {
 			on := a.rv.uncommitted == s.uncommitted
 			b := ui.ButtonBase(c.Key("scope:"+s.label)).Height(24).Padding(0, 10).Radius(6).Center().Label(s.label).Selected(on)
 			col, weight := p.Fg2, 400
@@ -295,7 +296,7 @@ func (a *App) turnLabel(seq int64) string {
 			return e.Text
 		}
 	}
-	return "这一轮"
+	return locales.ThisTurn()
 }
 
 func (a *App) reviewFiles(c *ui.Context, turns []proto.ChangeTurn) {
@@ -431,21 +432,21 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 	d := a.fileDiff(key)
 	switch {
 	case d == nil:
-		note("正在读取…")
+		note(locales.Reading())
 		return shown
 	case len(d.hunks) == 0:
-		note("内容没有变化")
+		note(locales.NoContentChange())
 		return shown
 	case shown >= maxDiffLines:
-		note("改动太多，没有显示")
+		note(locales.TooManyChanges())
 		return shown
 	}
 	if d.gaveUp {
-		note("改动太多，按整体替换显示")
+		note(locales.TooManyChangesWhole())
 	}
 	for i, h := range d.hunks {
 		if shown >= maxDiffLines {
-			ui.Text(c, fmt.Sprintf("还有 %d 处改动未显示", len(d.hunks)-i)).FontSize(12).TextColor(p.Mute).Padding(8, 14)
+			ui.Text(c, locales.MoreHunks(len(d.hunks)-i)).FontSize(12).TextColor(p.Mute).Padding(8, 14)
 			break
 		}
 		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Margin(map[bool]float32{true: 0, false: 14}[i == 0], 0, 0, 0).Children(func() {
@@ -455,8 +456,8 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 			}
 			ui.Text(c, head).Font("monospace").FontSize(11.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
 			if turn != 0 && !a.C.Changes.FileReverted(turn, path) {
-				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", "撤销此块", func() {}).Height(24)
-				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: "运行中不能恢复文件"}[a.C.Busy])
+				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
+				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
 				if b.Clicked() {
 					a.do(a.C.RevertHunk(turn, path, h.oldStart, h.oldLen, h.newStart, h.newLen))
 				}
@@ -539,21 +540,21 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 		} else {
 			note := a.turnLabel(turn)
 			if reverted {
-				note = "已撤销：" + note
+				note = locales.Undone(note)
 			}
 			ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, note).FontSize(12.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
 		if turn != 0 {
-			label := "撤销本轮"
+			label := locales.UndoTurn()
 			if reverted {
-				label = "重做本轮"
+				label = locales.RedoTurn()
 			}
 			b := a.button(c, "revert", label, "", !reverted && !dirty)
 			b.Disabled(a.C.Busy)
 			if a.C.Busy {
-				b.Tooltip("运行中不能恢复文件")
+				b.Tooltip(locales.CantRestoreWhileRunning())
 			}
 			if b.Clicked() {
 				a.do(a.C.Revert(turn, "", reverted))

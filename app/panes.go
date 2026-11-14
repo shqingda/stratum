@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 )
 
 // reviewTabs switches the review panel between the changes, the
@@ -15,7 +16,7 @@ import (
 func (a *App) reviewTabs(c *ui.Context, files int) {
 	p := a.p
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
-		for _, t := range []struct{ id, label string }{{"", "变更"}, {"term", "终端"}, {"plan", "计划"}} {
+		for _, t := range []struct{ id, label string }{{"", locales.Changes()}, {"term", locales.Terminal()}, {"plan", locales.Plan()}} {
 			on := a.rv.tab == t.id
 			b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(t.label)
 			fg := p.Fg2
@@ -48,7 +49,7 @@ func (a *App) terminalPane(c *ui.Context) {
 		}
 	}
 	if len(runs) == 0 {
-		a.reviewNote(c, "这个会话还没有运行过命令")
+		a.reviewNote(c, locales.NoCommandsYet())
 		return
 	}
 	prompt := "~/" + filepath.Base(a.C.Current.Cwd) + " $"
@@ -112,7 +113,7 @@ func (a *App) planPane(c *ui.Context) {
 	p := a.p
 	pl := a.latestPlan()
 	if pl == nil {
-		a.reviewNote(c, "这个会话还没有计划")
+		a.reviewNote(c, locales.NoPlanYet())
 		return
 	}
 	done := 0
@@ -124,10 +125,10 @@ func (a *App) planPane(c *ui.Context) {
 	ui.Scroll(c).Grow(1).Padding(14, 18).Children(func() {
 		title := pl.Title
 		if title == "" {
-			title = "计划"
+			title = locales.Plan()
 		}
 		ui.Text(c, title).FontSize(13).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
-		ui.Text(c, fmt.Sprintf("%d 步 · 已完成 %d 步", len(pl.Steps), done)).FontSize(12).TextColor(p.Mute).Margin(0, 0, 14, 0)
+		ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(12).TextColor(p.Mute).Margin(0, 0, 14, 0)
 		for _, s := range pl.Steps {
 			ui.Row(c).Gap(10).Padding(7, 0).Children(func() {
 				box := ui.Box(c).Size(16, 16).Radius(5).Shrink(0).Margin(2, 0, 0, 0).Center()

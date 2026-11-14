@@ -17,5 +17,9 @@
     "publicKey": "TRLJA+/611JIjHwoz9R0DWsIdhtWCqcbwCOG9ITf6Q0=",
     "github": "shqingda/talos-releases",
     "privateKey": "~/Library/Application Support/mygo/update-keys/mygo-update.key"
+  },
+  "i18n": {
+    "dir": "locales",
+    "source": "zh-Hans"
   }
 }

@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/proto"
 )
 
 func TestMain(m *testing.M) {
+	// The tests read Chinese, whatever language this machine is in.
+	i18n.SetLocaleFunc(chinese)
 	local := time.Local
 	time.Local = testZone
 	code := m.Run()
@@ -90,7 +93,7 @@ func TestStateMatrix(t *testing.T) {
 				a.C.Sessions = append(a.C.Sessions, proto.Session{ID: fmt.Sprint(i), Title: fmt.Sprintf("相对时间 %d", i), Cwd: "/workspace/calc", Model: "gpt-6-luna", Effort: "medium", Mode: "ask", Updated: now.Add(-d)})
 			}
 			a.C.Current = &a.C.Sessions[0]
-		}, want: []string{"刚刚", "2 分", "3 时", "昨天", "周一", "10 月", "2025 年"}},
+		}, want: []string{"刚刚", "2 分", "3 时", "昨天", "周一", "10月", "2025 年"}},
 		{name: "transcript-user-only", setup: func(a *App) {
 			a.C.Entries = []*client.Entry{{Key: 1, Role: client.User, Text: "请检查 README 示例和 Add 测试。", Done: true}}
 		}, want: []string{"请检查 README"}},
@@ -251,8 +254,8 @@ func TestAgo(t *testing.T) {
 		{"new-year-yesterday", date(2027, 1, 1, 1, 0), date(2026, 12, 31, 23, 0), "昨天"},
 		{"weekday", now, now.Add(-72 * time.Hour), "周一"},
 		{"before-six-days", now, now.Add(-6*24*time.Hour + time.Second), "周五"},
-		{"six-days", now, now.Add(-6 * 24 * time.Hour), "11 月"},
-		{"month", now, date(2026, 10, 1, 12, 0), "10 月"},
+		{"six-days", now, now.Add(-6 * 24 * time.Hour), "11月"},
+		{"month", now, date(2026, 10, 1, 12, 0), "10月"},
 		{"year", now, date(2025, 12, 31, 12, 0), "2025 年"},
 		{"future", now, now.Add(time.Minute), "刚刚"},
 	} {
@@ -390,3 +393,5 @@ func TestStateInteractions(t *testing.T) {
 		})
 	}
 }
+
+func chinese() string { return "zh-Hans" }

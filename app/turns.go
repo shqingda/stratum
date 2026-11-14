@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -16,7 +17,7 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 	p := a.p
 	key := fmt.Sprintf("work:%d", steps[0].Key)
 	open := a.opened[key]
-	label := "工作了"
+	label := locales.Worked()
 	if tu := a.C.Turns[t]; !tu.Start.IsZero() && !tu.End.IsZero() {
 		label += " " + span(tu.End.Sub(tu.Start))
 	}
@@ -57,13 +58,13 @@ func span(d time.Duration) string {
 	s := int(d.Round(time.Second).Seconds())
 	switch {
 	case s < 60:
-		return fmt.Sprintf("%d 秒", max(s, 1))
+		return locales.DurationSeconds(max(s, 1))
 	case s < 3600 && s%60 == 0:
-		return fmt.Sprintf("%d 分", s/60)
+		return locales.DurationMinutes(s / 60)
 	case s < 3600:
-		return fmt.Sprintf("%d 分 %d 秒", s/60, s%60)
+		return locales.DurationMinutesSeconds(s/60, s%60)
 	}
-	return fmt.Sprintf("%d 时 %d 分", s/3600, s%3600/60)
+	return locales.DurationHoursMinutes(s/3600, s%3600/60)
 }
 
 // tokens shortens a count of tokens: 182, 4.1k, 1.2M.
@@ -100,24 +101,24 @@ func (a *App) summary(c *ui.Context, t int) {
 		reverted := a.C.Changes.Reverted[ch.TurnSeq]
 		ui.Row(c).Height(40).Padding(0, 8, 0, 12).Gap(10).Radius(10).InsetShadow(0, 0, 0, .5, p.Edge2).Margin(12, 0, 6, 0).AlignItems(ui.Center).Children(func() {
 			sym(c, "files", 15, p.Fg2)
-			what := fmt.Sprintf("改了 %d 个文件", len(ch.Files))
+			what := locales.ChangedFiles(len(ch.Files))
 			if reverted {
-				what = fmt.Sprintf("已撤销 %d 个文件的改动", len(ch.Files))
+				what = locales.UndidFiles(len(ch.Files))
 			}
 			ui.Text(c, what).FontSize(12.5).TextColor(p.Fg).SingleLine()
 			ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(12).TextColor(p.Plus).Opacity(nonzero(add))
 			ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(12).TextColor(p.Minus).Opacity(nonzero(del))
 			ui.Spacer(c)
-			label, icon := "全部撤销", "arrow-back-up"
+			label, icon := locales.UndoAll(), "arrow-back-up"
 			if reverted {
-				label, icon = "重做", "arrow-forward-up"
+				label, icon = locales.Redo(), "arrow-forward-up"
 			}
 			undo := ui.ButtonBase(c.Key(fmt.Sprintf("undo:%d", ch.TurnSeq))).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label).Disabled(a.C.Busy)
 			if undo.Hovered() {
 				undo.Background(p.Hover)
 			}
 			if a.C.Busy {
-				undo.Tooltip("运行中不能恢复文件")
+				undo.Tooltip(locales.CantRestoreWhileRunning())
 			}
 			undo.Children(func() {
 				sym(c, icon, 15, p.Fg2)
@@ -126,7 +127,7 @@ func (a *App) summary(c *ui.Context, t int) {
 			if undo.Clicked() {
 				a.do(a.C.Revert(ch.TurnSeq, "", reverted))
 			}
-			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), "查看变更", "", false).Clicked() {
+			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), locales.ViewChanges(), "", false).Clicked() {
 				a.rv.open, a.rv.tab, a.rv.uncommitted, a.rv.turn = true, "", false, ch.TurnSeq
 				key := client.DiffKey(ch.TurnSeq, ch.Files[0].Path)
 				a.rv.sel, a.rv.jump = key, key
@@ -149,10 +150,10 @@ func (a *App) summary(c *ui.Context, t int) {
 		if cur := a.C.Current; cur != nil && cur.Model != "" {
 			item("cpu", cur.Model)
 		}
-		item("", "输入 "+tokens(u.Input))
-		item("", "输出 "+tokens(u.Output))
+		item("", locales.TokensIn(tokens(u.Input)))
+		item("", locales.TokensOut(tokens(u.Output)))
 		if u.CacheRead > 0 {
-			item("", "缓存 "+tokens(u.CacheRead))
+			item("", locales.TokensCached(tokens(u.CacheRead)))
 		}
 	})
 }
@@ -177,7 +178,7 @@ func (a *App) editLine(c *ui.Context, e *client.Entry, path, oldText, newText st
 		}
 		a.stats[e.CallID] = st
 	}
-	t := tools[e.Text]
+	t, _ := toolFor(e.Text)
 	key := "card:" + e.CallID
 	open := a.opened[key]
 	row := ui.ButtonBase(c.Key("line:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + path).Expanded(open)
@@ -207,9 +208,9 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 		a.running(c)
 		return
 	}
-	label := "思考过程"
+	label := locales.Thinking()
 	if e.Took > 0 {
-		label = "思考了 " + span(e.Took)
+		label = locales.ThoughtFor(span(e.Took))
 	}
 	key := fmt.Sprintf("thought:%d", e.Key)
 	open := a.opened[key]
@@ -281,7 +282,7 @@ func (a *App) contextRing(c *ui.Context) {
 		svg = ui.MustParseSVG([]byte(doc))
 		rings[key] = svg
 	}
-	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(fmt.Sprintf("上下文已用 %s / %s", tokens(a.C.LastInput), tokens(window))).Children(func() {
+	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(locales.ContextUsed(tokens(a.C.LastInput), tokens(window))).Children(func() {
 		ui.Image(c, svg).Size(14, 14)
 		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(11.5).TextColor(p.Mute).SingleLine()
 	})

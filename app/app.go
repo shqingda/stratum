@@ -76,9 +76,12 @@ type App struct {
 	keyProvider, key string
 
 	settingsOpen, addingAccount, setModelMenu bool
-	settingsPage                              string // "" for accounts, or mcp
+	settingsPage                              string // a settingsPages id
+	settingsQuery, keysQuery                  string
 	subMenu, lightMenu                        bool
 	accountsSeen                              int
+	locale                                    Locale
+	theme                                     string // the appearance last applied
 
 	attached []attachment
 	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
@@ -88,7 +91,7 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, opened: map[string]bool{},
+	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 

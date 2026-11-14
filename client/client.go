@@ -22,6 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -29,6 +30,7 @@ import (
 	"time"
 
 	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -266,12 +268,12 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 
 func (c *Client) ready(f proto.Frame) []proto.Command {
 	if f.Version != proto.Version {
-		c.fail(fmt.Sprintf("内核协议版本为 %d，应用协议版本为 %d。", f.Version, proto.Version))
+		c.fail(locales.ProtocolMismatch(f.Version, proto.Version))
 		return nil
 	}
 	c.Phase, c.Err, c.Instance = Handshaking, "", f.Instance
 	return []proto.Command{c.read(proto.MethodInitialize, nil, func(json.RawMessage) []proto.Command {
-		cmds := []proto.Command{c.listAccounts(), c.listSessions(true)}
+		cmds := []proto.Command{c.listAccounts(), c.read(proto.MethodSettings, nil, c.keepSettings), c.listSessions(true)}
 		return append(cmds, c.checkUnknown()...)
 	})}
 }
@@ -320,7 +322,7 @@ func (c *Client) response(f proto.Frame) []proto.Command {
 			c.fail(f.Error.Message)
 			return nil
 		}
-		c.notice("%s 失败：%s", p.method, f.Error.Message)
+		c.notice("%s", locales.RequestFailed(p.method, f.Error.Message))
 		return nil
 	}
 	if p.done != nil {
@@ -373,7 +375,7 @@ func (c *Client) create() proto.Command {
 	p.done = func(r json.RawMessage) []proto.Command {
 		var s proto.Session
 		if err := json.Unmarshal(r, &s); err != nil || s.ID == "" {
-			c.fail("创建会话未返回会话信息")
+			c.fail(locales.CreateSessionEmpty())
 			return nil
 		}
 		c.upsertSession(s)
@@ -403,7 +405,7 @@ func (c *Client) bind(id string) proto.Command {
 		}
 		var s proto.Snapshot
 		if err := json.Unmarshal(r, &s); err != nil || s.Session.ID == "" {
-			c.fail("读取会话未返回会话信息")
+			c.fail(locales.ReadSessionEmpty())
 			return nil
 		}
 		c.Current = &s.Session
@@ -451,7 +453,7 @@ func (c *Client) catchUp() proto.Command {
 		}
 		var page proto.EventPage
 		if err := json.Unmarshal(r, &page); err != nil {
-			c.fail("读取事件失败：" + err.Error())
+			c.fail(locales.ReadEventsFailed(err.Error()))
 			return nil
 		}
 		events := page.Events
@@ -634,18 +636,18 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		var cp proto.Compaction
 		if json.Unmarshal(e.Data, &cp) == nil {
 			c.endStream()
-			c.add(&Entry{Role: Notice, Text: "上下文快满了，较早的对话已写成摘要", Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
+			c.add(&Entry{Role: Notice, Text: locales.Compacted(), Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
 		}
 	case proto.EventFallback:
 		var f proto.Fallback
 		if json.Unmarshal(e.Data, &f) == nil {
 			c.endStream()
-			c.notice("%s 额度用尽或被限流，换到 %s 继续", c.modelName(f.From), c.modelName(f.To))
+			c.notice("%s", locales.FellBack(c.modelName(f.From), c.modelName(f.To)))
 		}
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)
-		c.notice("正在重试（第 %d 次）：%s", r.Attempt, r.Error)
+		c.notice("%s", locales.Retrying(r.Attempt, r.Error))
 	case proto.EventTurnEnd:
 		var t proto.TurnEnd
 		_ = json.Unmarshal(e.Data, &t)
@@ -660,9 +662,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		}
 		switch {
 		case t.Stopped:
-			c.notice("已停止。")
+			c.notice("%s", locales.Stopped())
 		case t.Error != "":
-			c.notice("本轮执行失败：%s", t.Error)
+			c.notice("%s", locales.TurnFailed(t.Error))
 		}
 	}
 	return nil
@@ -734,7 +736,7 @@ func (c *Client) tool(call llm.ToolCall) *Entry {
 	_ = json.Unmarshal(call.Args, &args)
 	en := &Entry{Role: Tool, Text: call.Name, Detail: summarize(args), CallID: call.ID, Args: call.Args, Tasks: graphTasks(call)}
 	if len(en.Tasks) > 0 {
-		en.Detail = fmt.Sprintf("%d 个任务", len(en.Tasks))
+		en.Detail = locales.TaskCount(len(en.Tasks))
 	}
 	return c.add(en)
 }
@@ -800,14 +802,18 @@ func (c *Client) Disconnected(err error) {
 	if err != nil {
 		c.Err = err.Error()
 	} else {
-		c.Err = "内核已退出。"
+		c.Err = locales.KernelExited()
 	}
 }
 
 // --- commands the user starts ---
 
 // ErrNotReady is returned when the connection cannot take commands now.
-var ErrNotReady = fmt.Errorf("未连接")
+var ErrNotReady error = notReady{}
+
+type notReady struct{}
+
+func (notReady) Error() string { return locales.NotConnected() }
 
 func (c *Client) mutation(method string, params any, done func(json.RawMessage) []proto.Command) ([]proto.Command, error) {
 	if !c.CanAct() {
@@ -820,7 +826,7 @@ func (c *Client) mutation(method string, params any, done func(json.RawMessage) 
 // runs, the prompt waits in Queued until the turn takes it.
 func (c *Client) Prompt(text string, images ...llm.Image) ([]proto.Command, error) {
 	if strings.TrimSpace(text) == "" && len(images) == 0 {
-		return nil, fmt.Errorf("没有可发送的内容")
+		return nil, errors.New(locales.NothingToSend())
 	}
 	session := c.Current
 	p := proto.Prompt{SessionID: sessionID(session), Text: text, Images: images}
@@ -843,7 +849,7 @@ func sessionID(s *proto.Session) string {
 // Cancel stops the current turn.
 func (c *Client) Cancel() ([]proto.Command, error) {
 	if !c.Busy {
-		return nil, fmt.Errorf("当前没有运行中的任务")
+		return nil, errors.New(locales.NothingRunning())
 	}
 	return c.mutation(proto.MethodCancel, proto.SessionRef{SessionID: sessionID(c.Current)}, nil)
 }
@@ -863,7 +869,7 @@ func (c *Client) Reply(id, text string) ([]proto.Command, error) {
 func (c *Client) answer(ans proto.ApprovalAnswer) ([]proto.Command, error) {
 	id := ans.ApprovalID
 	if c.Answering[id] {
-		return nil, fmt.Errorf("已回答此审批")
+		return nil, errors.New(locales.AlreadyAnswered())
 	}
 	ans.SessionID = sessionID(c.Current)
 	cmds, err := c.mutation(proto.MethodApprovalRespond, ans, nil)
@@ -871,7 +877,7 @@ func (c *Client) answer(ans proto.ApprovalAnswer) ([]proto.Command, error) {
 		c.Answering[id] = true
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
 			delete(c.Answering, id)
-			c.notice("审批失败：%s", e.Message)
+			c.notice("%s", locales.ApprovalFailed(e.Message))
 			return nil
 		}
 	}
@@ -915,7 +921,7 @@ func (c *Client) Delete(id string) ([]proto.Command, error) {
 // approval mode. The kernel's session.updated event brings the result.
 func (c *Client) Update(u proto.SessionUpdate) ([]proto.Command, error) {
 	if u.Mode != nil && !slices.Contains([]string{"ask", "auto", "full"}, *u.Mode) {
-		return nil, fmt.Errorf("未知权限模式 %q", *u.Mode)
+		return nil, errors.New(locales.UnknownMode(strconv.Quote(*u.Mode)))
 	}
 	u.SessionID = sessionID(c.Current)
 	return c.mutation(proto.MethodSessionUpdate, u, func(r json.RawMessage) []proto.Command {
@@ -955,7 +961,7 @@ func (c *Client) ListModels(account string) ([]proto.Command, error) {
 // when it has none.
 func queuedLabel(text string, images int) string {
 	if text == "" && images > 0 {
-		return fmt.Sprintf("[%d 张图片]", images)
+		return locales.ImagesPlaceholder(images)
 	}
 	return text
 }

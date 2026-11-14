@@ -13,8 +13,9 @@ type fakeDesk struct {
 	notes  []string
 }
 
-func (d *fakeDesk) Active() bool { return d.active }
-func (d *fakeDesk) Badge(n int)  { d.badges = append(d.badges, n) }
+func (d *fakeDesk) Active() bool      { return d.active }
+func (d *fakeDesk) Badge(n int)       { d.badges = append(d.badges, n) }
+func (d *fakeDesk) Appearance(string) {}
 func (d *fakeDesk) Notify(id, title, body string) {
 	d.notes = append(d.notes, id+" "+body)
 }

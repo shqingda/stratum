@@ -17,6 +17,7 @@
 | [opencode.md](opencode.md) | OpenCode 桌面版 | 没有桌面文档，从更新日志拼的 |
 | [t3code.md](t3code.md) | T3 Code | 中等，侧栏和权限较细 |
 | [kero.md](kero.md) | Kero | 较全（它是终端，没有对话流） |
+| [settings.md](settings.md) | 设置页（Cursor、Antigravity、Kero 实机截图） | 截图 7 张，在 shots/ |
 
 Conductor 整站拒绝抓取，只有搜索摘要，放在本页末尾，未核实。
 

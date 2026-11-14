@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -41,7 +42,7 @@ func (c *Client) Commit(message string) ([]proto.Command, error) {
 	failed := c.pending[cmd.ID].failed
 	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
 		c.Workspace.BranchStale = true // the answer carries no workspace
-		c.notice("提交失败：%s", e.Message)
+		c.notice("%s", locales.CommitFailed(e.Message))
 		return failed(e)
 	}
 	return []proto.Command{cmd}, nil

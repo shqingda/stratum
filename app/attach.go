@@ -12,6 +12,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/talos/locales"
 )
 
 // maxImage is the largest picture sent inline; a larger one goes as a
@@ -57,11 +58,11 @@ func slicesHas(list []attachment, path string) bool {
 // attachPNG adds a pasted picture.
 func (a *App) attachPNG(b []byte) {
 	if len(b) > maxImage {
-		a.err = "图片太大，存成文件再拖进来"
+		a.err = locales.ImageTooLarge()
 		return
 	}
 	thumb, _ := ui.DecodeImage(b)
-	a.attached = append(a.attached, attachment{name: "粘贴的图片", img: &llm.Image{MediaType: "image/png", Data: b}, thumb: thumb})
+	a.attached = append(a.attached, attachment{name: locales.PastedImage(), img: &llm.Image{MediaType: "image/png", Data: b}, thumb: thumb})
 }
 
 // paste takes files or a picture on the clipboard as attachments; text
@@ -89,7 +90,7 @@ func (a *App) paste(svc ui.Services) bool {
 
 // pickFiles is the system's open panel, for any number of files.
 func pickFiles() []string {
-	paths, _ := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: "添加附件", Multiple: true})
+	paths, _ := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: locales.AttachAdd(), Multiple: true})
 	return paths
 }
 
@@ -121,7 +122,7 @@ func (a *App) prompt() (string, []llm.Image) {
 		if text != "" {
 			text += "\n\n"
 		}
-		text += "附件：\n" + strings.Join(files, "\n")
+		text += locales.AttachmentsHeader() + "\n" + strings.Join(files, "\n")
 	}
 	return text, images
 }
@@ -143,7 +144,7 @@ func (a *App) attachments(c *ui.Context) {
 					}
 				})
 				ui.Text(c, at.name).FontSize(12).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
-				if a.iconButton(c, fmt.Sprint("unattach:", i), "x", "移除 "+at.name).Size(22, 22).Clicked() {
+				if a.iconButton(c, fmt.Sprint("unattach:", i), "x", locales.AttachRemove(at.name)).Size(22, 22).Clicked() {
 					a.attached = append(a.attached[:i:i], a.attached[i+1:]...)
 				}
 			})

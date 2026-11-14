@@ -242,7 +242,7 @@ func TestToolCardInteractions(t *testing.T) {
 			e := cardEntry(tool, map[string]any{"path": ".", "command": "echo a", "pattern": "a"}, "a.go:1:a\n")
 			a := cardApp(e)
 			tt := ui.NewTester(a.View, 1200, 780)
-			label := tools[tool].verb + " " + e.Detail
+			label := func() string { t, _ := toolFor(tool); return t.verb }() + " " + e.Detail
 			if err := tt.Click(label); err != nil {
 				t.Fatal(err)
 			}
@@ -264,10 +264,10 @@ func TestToolLargeDiffAndCache(t *testing.T) {
 	e := cardEntry("write_file", map[string]string{"path": "large.txt", "content": content}, "Created large.txt (2002 lines)")
 	a := cardApp(e)
 	tt := ui.NewTester(a.View, 1200, 780)
-	if !tt.HasText("新写入 · 整体替换（超过 2000 行）") || !tt.HasText("展开其余 1989 行") {
+	if !tt.HasText("新写入 · 整体替换（超过 2000 行）") || !tt.HasText("展开其余 1,989 行") {
 		t.Fatal("large diff was not bounded and labeled")
 	}
-	if err := tt.Click("展开其余 1989 行"); err != nil {
+	if err := tt.Click("展开其余 1,989 行"); err != nil {
 		t.Fatal(err)
 	}
 	if !a.opened[e.CallID] || !tt.HasText("2001") {

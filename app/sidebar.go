@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -36,20 +38,20 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		bar := c.TitleBar()
 		ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 12, 0, bar.Left+8).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
-			if a.iconButton(c, "side", "layout-sidebar-left-collapse", "隐藏边栏").Clicked() {
+			if a.iconButton(c, "side", "layout-sidebar-left-collapse", locales.HideSidebar()).Clicked() {
 				a.noSide = true
 			}
-			if a.iconButton(c, "new-top", "edit", "新会话").Clicked() {
+			if a.iconButton(c, "new-top", "edit", locales.NewSession()).Clicked() {
 				a.do(a.C.NewSession())
 			}
 		})
 		a.search(c)
 		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
-			if a.navItem(c, "new", "message-plus", "新会话", "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
+			if a.navItem(c, "new", "message-plus", locales.NewSession(), "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
 				a.do(a.C.NewSession())
 			}
-			a.navItem(c, "cron", "clock-play", "定时任务", "")
-			if a.navItem(c, "skills", "puzzle", "技能与 MCP", "").Clicked() {
+			a.navItem(c, "cron", "clock-play", locales.Scheduled(), "")
+			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
 				a.openMCP()
 			}
 		})
@@ -65,13 +67,13 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 
 func (a *App) search(c *ui.Context) {
 	p := a.p
-	b := ui.ButtonBase(c.Key("search")).Row().Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Label("搜索")
+	b := ui.ButtonBase(c.Key("search")).Row().Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Label(locales.Search())
 	if b.Clicked() {
 		a.openPalette(c)
 	}
 	b.Children(func() {
 		sym(c, "search", 15, p.Mute)
-		ui.Text(c, "搜索").FontSize(13).TextColor(p.Mute).Grow(1)
+		ui.Text(c, locales.Search()).FontSize(13).TextColor(p.Mute).Grow(1)
 		ui.Text(c, "⌘K").FontSize(11).TextColor(p.Mute)
 	})
 }
@@ -112,7 +114,7 @@ func (a *App) sessions(c *ui.Context) {
 		byFolder[f] = append(byFolder[f], s)
 	}
 	if len(waiting) > 0 {
-		a.group(c, "", "需要你", len(waiting))
+		a.group(c, "", locales.NeedsYou(), len(waiting))
 		for _, s := range waiting {
 			a.sessionRow(c, s)
 		}
@@ -183,9 +185,9 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		case c.Modifiers() == ui.Cmd && n <= 9:
 			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).TextColor(p.Mute).SingleLine()
 		case st == "wait":
-			badge := "审批"
+			badge := locales.BadgeApproval()
 			if on && a.questionFirst() {
-				badge = "提问"
+				badge = locales.BadgeQuestion()
 			}
 			ui.Text(c, badge).FontSize(11).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
 		default:
@@ -213,7 +215,7 @@ func slot(c *ui.Context, p *Palette, st string) {
 func (a *App) footer(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14).Gap(9).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-		name, sub := "未登录", "在设置里添加账号"
+		name, sub := locales.NotSignedIn(), locales.AddAccountInSettings()
 		if acc := a.account(); acc != nil {
 			name = acc.Name
 			if name == "" {
@@ -221,7 +223,7 @@ func (a *App) footer(c *ui.Context) {
 			}
 			sub = acc.Email
 			if acc.Subscription && sub == "" {
-				sub = "订阅"
+				sub = locales.Subscription()
 			}
 		}
 		ui.Box(c).Size(24, 24).Shrink(0).Radius(6).Background(p.Acc).Center().Children(func() {
@@ -233,7 +235,7 @@ func (a *App) footer(c *ui.Context) {
 				ui.Text(c, sub).FontSize(11).TextColor(p.Mute).SingleLine().Ellipsis("…")
 			}
 		})
-		if a.iconButton(c, "settings", "settings", "设置").Clicked() {
+		if a.iconButton(c, "settings", "settings", locales.Settings()).Clicked() {
 			a.openSettings()
 		}
 	})
@@ -256,7 +258,7 @@ func title(s proto.Session) string {
 	if s.Title != "" {
 		return s.Title
 	}
-	return "新会话"
+	return locales.NewSession()
 }
 
 func initials(name string) string {
@@ -284,17 +286,17 @@ func ago(now, t time.Time) string {
 	sameDay := y1 == y2 && m1 == m2 && d1 == d2
 	switch {
 	case d < time.Minute:
-		return "刚刚"
+		return locales.JustNow()
 	case d < time.Hour:
-		return fmt.Sprintf("%d 分", int(d.Minutes()))
+		return locales.AgoMinutes(int(d.Minutes()))
 	case sameDay:
-		return fmt.Sprintf("%d 时", int(d.Hours()))
+		return locales.AgoHours(int(d.Hours()))
 	case now.AddDate(0, 0, -1).Day() == d2 && d < 48*time.Hour:
-		return "昨天"
+		return locales.Yesterday()
 	case d < 6*24*time.Hour:
-		return [...]string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"}[t.Weekday()]
+		return i18n.Weekdays(i18n.Locale(), i18n.Abbreviated, true)[t.Weekday()]
 	case y1 == y2:
-		return fmt.Sprintf("%d 月", int(m2))
+		return i18n.Months(i18n.Locale(), i18n.Abbreviated, true)[m2-1]
 	}
-	return fmt.Sprintf("%d 年", y2)
+	return locales.YearOnly(y2)
 }

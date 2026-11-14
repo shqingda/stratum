@@ -428,6 +428,11 @@ type Settings struct {
 	// Fallback moves a turn to the next account, at its default model,
 	// when the one in use hits a rate limit or runs out of quota.
 	Fallback bool `json:"fallback,omitempty"`
+	// Theme is "light" or "dark", or "" to follow the system.
+	Theme string `json:"theme,omitempty"`
+	// Quiet lists what the app does not tell the user about while in the
+	// background: "wait", "done", "fail" notifications, or the "badge".
+	Quiet []string `json:"quiet,omitempty"`
 }
 
 type ModelRef struct {

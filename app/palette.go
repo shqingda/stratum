@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -39,21 +40,21 @@ func (a *App) palOpts() (sessions, actions []opt) {
 			actions = append(actions, o)
 		}
 	}
-	add(opt{icon: "message-plus", label: "新会话", kbd: "⌘N", run: func() { a.do(a.C.NewSession()) }})
+	add(opt{icon: "message-plus", label: locales.NewSession(), kbd: "⌘N", run: func() { a.do(a.C.NewSession()) }})
 	if cur := a.C.Current; cur != nil && a.C.CanAct() {
 		next := map[string]string{"ask": "auto", "auto": "full", "full": "ask"}[cur.Mode]
 		if next == "" {
 			next = "ask"
 		}
-		add(opt{icon: "shield-half", label: "切换权限模式", sub: modes[cur.Mode] + " → " + modes[next], run: func() {
+		add(opt{icon: "shield-half", label: locales.SwitchPermissionMode(), sub: modeName(cur.Mode) + " → " + modeName(next), run: func() {
 			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
 		}})
 	}
 	if a.C.Busy {
-		add(opt{icon: "player-stop", label: "停止运行", kbd: "esc", run: func() { a.do(a.C.Cancel()) }})
+		add(opt{icon: "player-stop", label: locales.StopRunning(), kbd: "esc", run: func() { a.do(a.C.Cancel()) }})
 	}
-	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: "隐藏变更", false: "显示变更"}[a.rv.open], run: func() { a.rv.open = !a.rv.open }})
-	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: "显示边栏", false: "隐藏边栏"}[a.noSide], kbd: "⌘\\", run: func() { a.noSide = !a.noSide }})
+	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], run: func() { a.rv.open = !a.rv.open }})
+	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: func() { a.noSide = !a.noSide }})
 	return sessions, actions
 }
 
@@ -112,7 +113,7 @@ func (a *App) palette(c *ui.Context) {
 			scrim = ui.RGBA(6, 7, 10, .45)
 		}
 		backdrop.Background(scrim).Justify(ui.Start).Padding(84, 16, 16, 16)
-		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label("命令面板")
+		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label(locales.CommandPalette())
 		if p == dark {
 			panel.Shadow(0, 0, 0, .5, ui.RGBA(0, 0, 0, .8)).Shadow(0, 18, 48, -8, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .08))
 		} else {
@@ -121,7 +122,7 @@ func (a *App) palette(c *ui.Context) {
 		panel.Children(func() {
 			ui.Row(c).Height(50).Padding(0, 16).Gap(10).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 				sym(c, "search", 18, p.Mute)
-				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label("搜索").Placeholder("搜索会话、操作和消息").PlaceholderColor(p.Mute).
+				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.Mute).
 					FontSize(15).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
 					a.query = k.Text()
 					switch {
@@ -156,16 +157,16 @@ func (a *App) palette(c *ui.Context) {
 						}
 					})
 				}
-				section("会话", sessions)
-				section("操作", actions)
-				section("消息", hits)
+				section(locales.Sessions(), sessions)
+				section(locales.Actions(), actions)
+				section(locales.PaletteMessages(), hits)
 				if len(all) == 0 {
-					ui.Text(c, "没有匹配的会话、操作或消息").FontSize(12.5).TextColor(p.Mute).Padding(18, 16)
+					ui.Text(c, locales.PaletteNoMatches()).FontSize(12.5).TextColor(p.Mute).Padding(18, 16)
 				}
 				ui.Box(c).Height(6)
 			})
 			ui.Row(c).Height(36).Padding(0, 14).Gap(14).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-				for _, h := range [][2]string{{"↑↓", "选择"}, {"⏎", "打开"}, {"esc", "关闭"}} {
+				for _, h := range [][2]string{{"↑↓", locales.Select()}, {"⏎", locales.Open()}, {"esc", locales.Close()}} {
 					ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, h[0]).FontSize(11).TextColor(p.Mute).Padding(0, 4).Radius(4).Background(p.Chip)
 						ui.Text(c, h[1]).FontSize(11.5).TextColor(p.Mute)

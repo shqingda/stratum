@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/egoist/mygo/ui/markdown"
+	"github.com/shqingda/talos/locales"
 )
 
 // mdThemes are the Markdown looks of the two palettes, made once.
@@ -60,7 +61,7 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 			h.Write([]byte(b.Code()))
 			key := h.Sum64()
 			done := c.Now().Sub(copied[key]) < 2*time.Second
-			btn := ui.ButtonBase(c).Size(24, 24).Radius(6).Center().Label("复制代码").Tooltip("复制").Disabled(b.Open)
+			btn := ui.ButtonBase(c).Size(24, 24).Radius(6).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
 			if btn.Hovered() {
 				btn.Background(p.Hover)
 			}

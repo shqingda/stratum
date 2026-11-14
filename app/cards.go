@@ -10,6 +10,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 )
 
 type diffLine struct {
@@ -102,7 +103,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 			if e.Text == "write_file" && args.Content != nil {
 				suffix := fmt.Sprintf(" %s (%d lines)", args.Path, strings.Count(*args.Content, "\n")+1)
 				if e.Output == "Created"+suffix || e.Output == "Wrote"+suffix {
-					a.diffCard(c, e, args.Path, "", *args.Content, "新写入")
+					a.diffCard(c, e, args.Path, "", *args.Content, locales.NewFile())
 					return
 				}
 			}
@@ -110,7 +111,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 				if n := editReplacements(e.Output, args.Path); n == 1 || (n > 1 && args.ReplaceAll) {
 					note := ""
 					if n > 1 {
-						note = fmt.Sprintf("同一片段替换 %d 处 · 下方显示一处", n)
+						note = locales.ReplacedTimes(n)
 					}
 					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note)
 					return
@@ -128,7 +129,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 			break
 		}
 		if rows, count, ok := resultRows(e); ok {
-			if a.cardStep(c, e, fmt.Sprintf("%d 个结果", count), false) {
+			if a.cardStep(c, e, locales.Results(count), false) {
 				a.cardOutput(c, func() {
 					for _, row := range rows {
 						ui.Text(c, row).Font("monospace").FontSize(12).TextColor(a.p.Fg2).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
@@ -182,14 +183,14 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 	}
 	lines := diff.lines
 	if diff.replaced {
-		note = strings.TrimSpace(note + " · 整体替换（超过 2000 行）")
+		note = strings.TrimPrefix(note+" · "+locales.ReplacedWhole(), " · ")
 		note = strings.TrimPrefix(note, "· ")
 	}
 	if diff.lineEndings {
 		if note != "" {
 			note += " · "
 		}
-		note += "换行格式已变更"
+		note += locales.LineEndingsChanged()
 	}
 	box.Children(func() {
 		ui.Row(c).Height(36).Padding(0, 8, 0, 12).Gap(8).AlignItems(ui.Center).Children(func() {
@@ -216,19 +217,19 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 					bg, signColor = p.Minus.Alpha(.10), p.Minus
 				}
 				ui.Row(c).Height(20).Children(func() {
-					ui.Text(c, strconv.Itoa(line.number)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(12).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End).Tooltip("参数文本中的行号")
+					ui.Text(c, strconv.Itoa(line.number)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(12).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End).Tooltip(locales.LineNumberInArgs())
 					ui.Text(c, line.sign).Width(14).Height(20).Shrink(0).Font("monospace").FontSize(12).FixedLineHeight(20).TextColor(signColor).Background(bg)
 					text := ui.Text(c, strings.TrimSuffix(line.text, "\n")).Grow(1).MinWidth(0).Height(20).Padding(0, 6).Font("monospace").FontSize(12).FixedLineHeight(20).TextColor(p.Fg).Background(bg).PreserveSpaces().SingleLine().Selectable()
 					if !strings.HasSuffix(line.text, "\n") {
-						text.Tooltip("文本末尾无换行")
+						text.Tooltip(locales.NoNewlineAtEnd())
 					}
 				})
 			}
 		})
 		if len(lines) > 12 {
-			label := fmt.Sprintf("展开其余 %d 行", len(lines)-12)
+			label := locales.ShowMoreLines(len(lines) - 12)
 			if a.opened[e.CallID] {
-				label = "收起"
+				label = locales.ShowLess()
 			}
 			if ui.ButtonBase(c.Key("expand")).Label(label).Height(28).Children(func() {
 				ui.Text(c, label).FontSize(11.5).TextColor(p.Mute).Padding(6, 12)
@@ -241,7 +242,8 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 
 // cardStep keeps the existing step's dimensions, with a trailing result summary.
 func (a *App) cardStep(c *ui.Context, e *client.Entry, summary string, failed bool) bool {
-	p, tool := a.p, tools[e.Text]
+	p := a.p
+	tool, _ := toolFor(e.Text)
 	open := a.opened[e.CallID]
 	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(tool.verb + " " + e.Detail).Expanded(open)
 	if row.Clicked() {
@@ -287,17 +289,17 @@ func shellTail(output string) (lines []string, omitted int, exit string) {
 
 func (a *App) shellCard(c *ui.Context, e *client.Entry) {
 	lines, omitted, exit := shellTail(e.Output)
-	summary := "通过"
+	summary := locales.Passed()
 	if exit != "" {
-		summary = "退出码 " + exit
+		summary = locales.ExitCode(exit)
 	}
 	if e.Failed && summary == "" {
-		summary = "失败"
+		summary = locales.Failed()
 	}
 	if a.cardStep(c, e, summary, exit != "" || e.Failed) {
 		a.cardOutput(c, func() {
 			if omitted > 0 {
-				ui.Text(c, fmt.Sprintf("… 已省略前 %d 行", omitted)).FontSize(11.5).TextColor(a.p.Mute)
+				ui.Text(c, locales.OmittedLines(omitted)).FontSize(11.5).TextColor(a.p.Mute)
 			}
 			for i, line := range lines {
 				color := a.p.Fg2
@@ -326,10 +328,10 @@ func resultRows(e *client.Entry) (rows []string, count int, ok bool) {
 		return nil, 0, false
 	}
 	if e.Text == "search" && e.Output == "No matches." {
-		return []string{"没有匹配结果"}, 0, true
+		return []string{locales.NoMatches()}, 0, true
 	}
 	if e.Text == "list_dir" && e.Output == "(empty directory)" {
-		return []string{"目录为空"}, 0, true
+		return []string{locales.EmptyDir()}, 0, true
 	}
 	if e.Output == "" {
 		return nil, 0, false
@@ -347,7 +349,7 @@ func resultRows(e *client.Entry) (rows []string, count int, ok bool) {
 				return nil, 0, false
 			}
 			count += n - 1
-			rows[i] = fmt.Sprintf("… 还有 %d 项", n)
+			rows[i] = locales.MoreItems(n)
 		}
 	}
 	return rows, count, true
@@ -358,18 +360,22 @@ func (a *App) fileUndo(c *ui.Context, e *client.Entry, path string) {
 	p := a.p
 	turn, abs := a.changedFile(e, path)
 	reverted := turn != 0 && a.C.Changes.FileReverted(turn, abs)
-	label, icon := "撤销", "arrow-back-up"
+	label, icon := locales.Undo(), "arrow-back-up"
 	if reverted {
-		label, icon = "重做", "arrow-forward-up"
+		label, icon = locales.Redo(), "arrow-forward-up"
 	}
 	b := ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label + " " + path)
 	switch {
 	case turn == 0:
-		b.Disabled(true).Tooltip("这一轮的改动还没读到")
+		b.Disabled(true).Tooltip(locales.TurnChangesLoading())
 	case a.C.Busy:
-		b.Disabled(true).Tooltip("运行中不能恢复文件")
+		b.Disabled(true).Tooltip(locales.CantRestoreWhileRunning())
 	default:
-		b.Tooltip(label + "这一轮对 " + path + " 的修改")
+		tip := locales.UndoFileTip(path)
+		if reverted {
+			tip = locales.RedoFileTip(path)
+		}
+		b.Tooltip(tip)
 		if b.Hovered() {
 			b.Background(p.Hover)
 		}

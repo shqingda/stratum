@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -149,13 +150,13 @@ func (c *Client) Revert(turn int64, path string, redo bool) ([]proto.Command, er
 		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
-			c.notice("%d 个文件在这之后又被改过，没有动它们：%v", len(res.Conflicts), res.Conflicts)
+			c.notice("%s", locales.FilesChangedSince(len(res.Conflicts), strings.Join(res.Conflicts, locales.ListSeparator())))
 		}
 		return nil
 	})
 	if err == nil {
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
-			c.notice("恢复文件失败：%s", e.Message)
+			c.notice("%s", locales.RestoreFailed(e.Message))
 			return nil
 		}
 	}
@@ -171,13 +172,13 @@ func (c *Client) RevertHunk(turn int64, path string, oldStart, oldLen, newStart,
 		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
-			c.notice("这个文件在这之后又被改过，没有动它")
+			c.notice("%s", locales.FileChangedSince())
 		}
 		return nil
 	})
 	if err == nil {
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
-			c.notice("撤销这一块失败：%s", e.Message)
+			c.notice("%s", locales.UndoHunkFailed(e.Message))
 			return nil
 		}
 	}

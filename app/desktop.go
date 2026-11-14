@@ -1,9 +1,11 @@
 package app
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/egoist/mygo"
+	"github.com/shqingda/talos/locales"
 )
 
 // Desktop is what the app tells the system about its sessions: a Dock
@@ -13,13 +15,45 @@ type Desktop interface {
 	Active() bool
 	Badge(n int)
 	Notify(id, title, body string)
+	// Appearance shows the app light, dark, or as the system is ("").
+	Appearance(theme string)
 }
+
+// Locale is the language the app shows: the one chosen, or "" to follow
+// the system.
+type Locale interface {
+	Chosen() string
+	Set(tag string)
+}
+
+// memLocale keeps the choice for an app with no system behind it.
+type memLocale struct{ tag string }
+
+func (l *memLocale) Chosen() string { return l.tag }
+func (l *memLocale) Set(tag string) { l.tag = tag }
+
+// systemLocale is mygo's, which keeps the choice for the next launches.
+type systemLocale struct{}
+
+func (systemLocale) Chosen() string { return mygo.App.ChosenLocale() }
+func (systemLocale) Set(tag string) { mygo.App.SetLocale(tag) }
 
 // system is the Desktop of the running app.
 type system struct{}
 
 func (system) Active() bool { return mygo.App.IsActive() }
 func (system) Badge(n int)  { mygo.App.SetBadgeCount(n) }
+
+func (system) Appearance(theme string) {
+	src := mygo.ThemeSystem
+	switch theme {
+	case "light":
+		src = mygo.ThemeLight
+	case "dark":
+		src = mygo.ThemeDark
+	}
+	mygo.Theme.SetSource(src)
+}
 
 func (system) Notify(id, title, body string) {
 	if !mygo.NotificationsSupported() {
@@ -33,7 +67,7 @@ const notePrefix = "session:"
 // UseDesktop shows the sessions' states on the Dock and in notifications;
 // clicking a notification opens its session.
 func (a *App) UseDesktop() {
-	a.desk = system{}
+	a.desk, a.locale = system{}, systemLocale{}
 	mygo.App.OnNotificationClick(func(id string) {
 		sid, ok := strings.CutPrefix(id, notePrefix)
 		if !ok || a.update == nil {
@@ -54,6 +88,12 @@ func (a *App) watch() {
 	if first {
 		a.marks = map[string]string{}
 	}
+	set := a.settings()
+	if set.Theme != a.theme {
+		a.theme = set.Theme
+		a.desk.Appearance(set.Theme)
+	}
+	quiet := func(kind string) bool { return slices.Contains(set.Quiet, kind) }
 	waiting := 0
 	active := !first && a.desk.Active()
 	for _, s := range a.C.Sessions {
@@ -67,13 +107,16 @@ func (a *App) watch() {
 			continue
 		}
 		switch {
-		case st == "wait":
-			a.desk.Notify(s.ID, title(s), "等你确认")
-		case was == "run" && st == "fail":
-			a.desk.Notify(s.ID, title(s), "这一轮出错了")
-		case was == "run" && (st == "unread" || st == ""):
-			a.desk.Notify(s.ID, title(s), "这一轮做完了")
+		case st == "wait" && !quiet("wait"):
+			a.desk.Notify(s.ID, title(s), locales.NotifyWait())
+		case was == "run" && st == "fail" && !quiet("fail"):
+			a.desk.Notify(s.ID, title(s), locales.NotifyFail())
+		case was == "run" && (st == "unread" || st == "") && !quiet("done"):
+			a.desk.Notify(s.ID, title(s), locales.NotifyDone())
 		}
+	}
+	if quiet("badge") {
+		waiting = 0
 	}
 	if waiting != a.badge {
 		a.badge = waiting

@@ -1,0 +1,522 @@
+{
+  "@@locale": "zh-Hans",
+  "cancel": "取消",
+  "ok": "知道了",
+  "save": "保存",
+  "open": "打开",
+  "close": "关闭",
+  "select": "选择",
+  "copy": "复制",
+  "copyCode": "复制代码",
+  "search": "搜索",
+  "stop": "停止",
+  "send": "发送",
+  "undo": "撤销",
+  "redo": "重做",
+  "allow": "允许",
+  "allowForSession": "本会话都允许",
+  "deny": "拒绝",
+  "skip": "跳过",
+  "enable": "启用",
+  "disable": "停用",
+  "loading": "加载中…",
+  "reading": "正在读取…",
+  "connecting": "连接中",
+  "listSeparator": "、",
+  "clauseSeparator": "，",
+  "settings": "设置",
+  "newSession": "新会话",
+  "sessions": "会话",
+  "actions": "操作",
+  "paletteMessages": "消息",
+  "subscription": "订阅",
+  "apiKey": "API 密钥",
+  "itemActions": "{name} 的操作",
+  "project": "项目",
+  "global": "全局",
+  "finder": "访达",
+  "terminal": "终端",
+  "plan": "计划",
+  "changes": "变更",
+  "imageTooLarge": "图片太大，存成文件再拖进来",
+  "pastedImage": "粘贴的图片",
+  "attachAdd": "添加附件",
+  "attachmentsHeader": "附件：",
+  "attachRemove": "移除 {name}",
+  "effortDefault": "默认",
+  "effortMinimal": "最低",
+  "effortLow": "低",
+  "effortMedium": "中",
+  "effortHigh": "高",
+  "effortXhigh": "极高",
+  "composerPlaceholder": "让 Talos 做点什么",
+  "composerQueuePlaceholder": "运行中：回车排队",
+  "composerAnswerPlaceholder": "回答上面的问题，回车发送",
+  "noImageSupport": "当前模型看不了图片，换一个再发",
+  "local": "本机",
+  "sandboxOn": "沙箱开启",
+  "modeAsk": "询问",
+  "modeAuto": "自动",
+  "modeFull": "完全",
+  "modeAskShort": "写文件和运行命令前问你",
+  "modeAutoShort": "沙箱内自动允许",
+  "modeFullShort": "不再询问，慎用",
+  "noEffortSupport": "这个模型不支持思考强度",
+  "modelsLoadFailed": "加载失败，请重新打开菜单",
+  "noModels": "这个账号没有可用模型",
+  "defaultModelMark": "✓ 默认模型",
+  "phaseStarting": "正在启动",
+  "phaseConnecting": "正在连接",
+  "phaseSyncing": "正在同步",
+  "phaseReady": "已连接",
+  "phaseDisconnected": "已断开连接",
+  "phaseUnknown": "连接状态未知",
+  "kernelDisconnected": "和内核的连接断开了",
+  "kernelDisconnectedHint": "重新打开 Talos 会重启内核，没写完的轮次会从日志里恢复。",
+  "newFile": "新写入",
+  "replacedTimes": "同一片段替换 {count} 处 · 下方显示一处",
+  "@replacedTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "results": "{count} 个结果",
+  "@results": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "replacedWhole": "整体替换（超过 2000 行）",
+  "lineEndingsChanged": "换行格式已变更",
+  "lineNumberInArgs": "参数文本中的行号",
+  "noNewlineAtEnd": "文本末尾无换行",
+  "showMoreLines": "展开其余 {count} 行",
+  "@showMoreLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showLess": "收起",
+  "passed": "通过",
+  "exitCode": "退出码 {code}",
+  "failed": "失败",
+  "omittedLines": "… 已省略前 {count} 行",
+  "@omittedLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noMatches": "没有匹配结果",
+  "emptyDir": "目录为空",
+  "moreItems": "… 还有 {count} 项",
+  "@moreItems": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moreLines": "… 还有 {count} 行",
+  "@moreLines": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "turnChangesLoading": "这一轮的改动还没读到",
+  "cantRestoreWhileRunning": "运行中不能恢复文件",
+  "undoFileTip": "撤销这一轮对 {path} 的修改",
+  "redoFileTip": "重做这一轮对 {path} 的修改",
+  "notifyWait": "等你确认",
+  "notifyFail": "这一轮出错了",
+  "notifyDone": "这一轮做完了",
+  "signInChatGPTSub": "Plus、Pro、Business 订阅",
+  "signInXTitle": "X 订阅",
+  "signInCopilotSub": "Pro、Pro+、Business 订阅",
+  "signInOpenRouterSub": "浏览器授权，换一把 key",
+  "apiKeySub": "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax 等",
+  "onboardingTitle": "连接一个模型",
+  "onboardingLead": "用你已有的订阅登录最省事。之后随时可以在设置里加别的。",
+  "onboardingKeychain": "凭据只存在本机钥匙串，Talos 没有服务器。",
+  "signInFailed": "登录失败：{error}",
+  "deviceCodeVisit": "访问 {url} 输入：",
+  "signInBrowserOpened": "已在浏览器打开登录页，完成后自动回来。",
+  "openingBrowser": "正在打开浏览器…",
+  "useDeviceCode": "浏览器打不开？用设备码",
+  "pasteKey": "粘贴 key",
+  "keySaveFailed": "没存上：{error}",
+  "keyCreateAt": "在 {url} 创建",
+  "settingsGeneral": "通用",
+  "settingsAccounts": "账号",
+  "settingsModels": "模型",
+  "settingsPermissions": "权限",
+  "settingsShortcuts": "快捷键",
+  "settingsMcp": "技能与 MCP",
+  "settingsGeneralWords": "语言 外观 浅色 深色 通知 确认 完成 出错 程序坞 数字",
+  "settingsAccountsWords": "登录 退出 订阅 密钥",
+  "settingsModelsWords": "默认模型 推理强度 后台任务 子任务 标题 摘要 额度 切换账号",
+  "settingsPermissionsWords": "询问 自动 完全访问 沙盒",
+  "settingsShortcutsWords": "按键 键盘 快捷键",
+  "settingsMcpWords": "服务器 mcp.json 技能",
+  "closeSettings": "关闭设置",
+  "searchSettings": "搜索设置",
+  "languageSystem": "跟随系统",
+  "language": "语言",
+  "appearance": "外观",
+  "themeAuto": "自动",
+  "themeLight": "浅色",
+  "themeDark": "深色",
+  "notifications": "通知",
+  "notifyWaitSetting": "需要确认",
+  "notifyDoneSetting": "完成",
+  "notifyFailSetting": "出错",
+  "dockBadge": "在程序坞图标上显示数字",
+  "notifyNote": "仅在 Talos 不在前台时通知。",
+  "addAccount": "添加账号…",
+  "accountOptions": "{name} 选项",
+  "signOut": "退出登录",
+  "newSessions": "新会话",
+  "defaultModel": "默认模型",
+  "reasoningEffort": "推理强度",
+  "backgroundTasks": "后台任务",
+  "subtasks": "子任务",
+  "titlesAndSummaries": "标题和摘要",
+  "whenQuotaRunsOut": "额度用尽时",
+  "switchAccount": "切换到其他账号",
+  "fallbackNeedsAccount": "添加其他账号后才能切换。",
+  "fallbackTo": "切换到 {name}。",
+  "fallbackOrder": "按 {names} 的顺序切换。",
+  "sameAsDefault": "与默认模型相同",
+  "modeFullAccess": "完全访问",
+  "modeAskSub": "读取文件无需确认，其他操作需要确认",
+  "modeAutoSub": "在项目内编辑文件、在沙盒中运行命令无需确认",
+  "modeFullSub": "所有操作均无需确认",
+  "newSessionPermissions": "新会话的权限",
+  "sessionsOneToNine": "第 1–9 个会话",
+  "commandPalette": "命令面板",
+  "toggleSidebar": "显示或隐藏边栏",
+  "approvals": "审批",
+  "whileWorking": "工作时",
+  "searchShortcuts": "搜索快捷键",
+  "noShortcutMatches": "没有匹配的快捷键。",
+  "worked": "工作了",
+  "durationSeconds": "{n} 秒",
+  "@durationSeconds": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutes": "{n} 分",
+  "@durationMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutesSeconds": "{m} 分 {s} 秒",
+  "@durationMinutesSeconds": {
+    "placeholders": {
+      "m": {
+        "type": "int"
+      },
+      "s": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHoursMinutes": "{h} 时 {m} 分",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "h": {
+        "type": "int"
+      },
+      "m": {
+        "type": "int"
+      }
+    }
+  },
+  "changedFiles": "改了 {count} 个文件",
+  "@changedFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "undidFiles": "已撤销 {count} 个文件的改动",
+  "@undidFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "undoAll": "全部撤销",
+  "viewChanges": "查看变更",
+  "tokensIn": "输入 {n}",
+  "tokensOut": "输出 {n}",
+  "tokensCached": "缓存 {n}",
+  "thinking": "思考过程",
+  "thoughtFor": "思考了 {duration}",
+  "contextUsed": "上下文已用 {used} / {window}",
+  "mcpServers": "MCP 服务器",
+  "mcpConfigError": "配置没读成：{error}",
+  "mcpEmpty": "还没有 MCP 服务器。配置文件这样写：",
+  "mcpNote": "全局的服务器写在 ~/.talos/mcp.json，项目的写在项目的 .mcp.json。项目里的需要你启用后才会运行。",
+  "mcpConnectFailed": "连接失败：{error}",
+  "toolCount": "{count} 个工具",
+  "@toolCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "switchPermissionMode": "切换权限模式",
+  "stopRunning": "停止运行",
+  "hideChanges": "隐藏变更",
+  "showChanges": "显示变更",
+  "showSidebar": "显示边栏",
+  "hideSidebar": "隐藏边栏",
+  "palettePlaceholder": "搜索会话、操作和消息",
+  "paletteNoMatches": "没有匹配的会话、操作或消息",
+  "noOpenSession": "没有打开的会话",
+  "notGitRepo": "这个文件夹不在 git 仓库里",
+  "noUncommitted": "没有未提交的改动",
+  "changesLoadFailed": "读取变更失败：{error}",
+  "noChangesYet": "这个会话还没有改动文件",
+  "lastTurn": "本轮",
+  "uncommitted": "未提交",
+  "thisTurn": "这一轮",
+  "noContentChange": "内容没有变化",
+  "tooManyChanges": "改动太多，没有显示",
+  "tooManyChangesWhole": "改动太多，按整体替换显示",
+  "moreHunks": "还有 {count} 处改动未显示",
+  "@moreHunks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "undoHunk": "撤销此块",
+  "undone": "已撤销：{note}",
+  "undoTurn": "撤销本轮",
+  "redoTurn": "重做本轮",
+  "noCommandsYet": "这个会话还没有运行过命令",
+  "noPlanYet": "这个会话还没有计划",
+  "planProgress": "{total} 步 · 已完成 {done} 步",
+  "@planProgress": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "toolRead": "读取",
+  "toolWrite": "写入",
+  "toolEdit": "编辑",
+  "toolList": "列出",
+  "toolSearch": "搜索",
+  "toolRun": "运行",
+  "toolSkill": "技能",
+  "toolPlan": "更新计划",
+  "toolAsk": "提问",
+  "toolTask": "子任务",
+  "toolTasks": "任务图",
+  "kindRead": "读取文件",
+  "kindWrite": "修改文件",
+  "kindExec": "运行命令",
+  "kindMcp": "调用 MCP 工具",
+  "reasonOutsideWorkspace": "会碰到工作区以外",
+  "reasonNoSandbox": "不在沙箱里运行：有网络，能访问工作区以外",
+  "reasonCantSandbox": "这台机器上命令进不了沙箱",
+  "reasonRunsCommand": "要运行命令",
+  "reasonChangesFiles": "要改文件",
+  "reasonMcp": "MCP 服务器不在沙箱里运行",
+  "reasonSecrets": "涉及可能存有密钥的文件",
+  "browsedFiles": "浏览了 {count} 个文件",
+  "@browsedFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "listedDirs": "列出 {count} 个目录",
+  "@listedDirs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchedTimes": "搜索 {count} 次",
+  "@searchedTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gitLooks": "查看 git {count} 次",
+  "@gitLooks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browse": "浏览",
+  "expandSteps": "展开步骤",
+  "thinkingNow": "思考中",
+  "startNewSession": "新建一个会话开始",
+  "helloTitle": "在 {folder} 里做点什么",
+  "helloLead": "Talos 会先读代码，改动前按你的权限模式询问。",
+  "recent": "继续",
+  "needsApproval": "需要你允许",
+  "currentMode": "当前模式：{mode}",
+  "question": "提问",
+  "needsAnswer": "需要你回答",
+  "answerBelow": "也可以在下方输入框里回答",
+  "waitedSeconds": "等了 {n} 秒",
+  "@waitedSeconds": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "waitedMinutes": "等了 {n} 分",
+  "@waitedMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingEarlier": "正在加载更早的消息…",
+  "earlierSteps": "前面还有 {count} 步",
+  "@earlierSteps": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skipped": "已跳过",
+  "waitingFor": "等 {names}",
+  "scheduled": "定时任务",
+  "needsYou": "需要你",
+  "badgeApproval": "审批",
+  "badgeQuestion": "提问",
+  "notSignedIn": "未登录",
+  "addAccountInSettings": "在设置里添加账号",
+  "justNow": "刚刚",
+  "agoMinutes": "{n} 分",
+  "@agoMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agoHours": "{n} 时",
+  "@agoHours": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "yesterday": "昨天",
+  "yearOnly": "{y, number, ::group-off} 年",
+  "@yearOnly": {
+    "placeholders": {
+      "y": {
+        "type": "int"
+      }
+    }
+  },
+  "couldntOpen": "打不开 {app}：{error}",
+  "commit": "提交",
+  "commitMessage": "提交说明",
+  "commitChanges": "提交改动",
+  "filesChangedSince": "{count} 个文件在这之后又被改过，没有动它们：{files}",
+  "@filesChangedSince": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "restoreFailed": "恢复文件失败：{error}",
+  "fileChangedSince": "这个文件在这之后又被改过，没有动它",
+  "undoHunkFailed": "撤销这一块失败：{error}",
+  "protocolMismatch": "内核协议版本为 {kernel}，应用协议版本为 {app}。",
+  "@protocolMismatch": {
+    "placeholders": {
+      "kernel": {
+        "type": "int"
+      },
+      "app": {
+        "type": "int"
+      }
+    }
+  },
+  "requestFailed": "{method} 失败：{error}",
+  "createSessionEmpty": "创建会话未返回会话信息",
+  "readSessionEmpty": "读取会话未返回会话信息",
+  "readEventsFailed": "读取事件失败：{error}",
+  "compacted": "上下文快满了，较早的对话已写成摘要",
+  "fellBack": "{from} 额度用尽或被限流，换到 {to} 继续",
+  "retrying": "正在重试（第 {attempt} 次）：{error}",
+  "@retrying": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      }
+    }
+  },
+  "stopped": "已停止。",
+  "turnFailed": "本轮执行失败：{error}",
+  "taskCount": "{count} 个任务",
+  "@taskCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "kernelExited": "内核已退出。",
+  "notConnected": "未连接",
+  "nothingToSend": "没有可发送的内容",
+  "nothingRunning": "当前没有运行中的任务",
+  "alreadyAnswered": "已回答此审批",
+  "approvalFailed": "审批失败：{error}",
+  "unknownMode": "未知权限模式 {mode}",
+  "imagesPlaceholder": "[{count} 张图片]",
+  "@imagesPlaceholder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commitFailed": "提交失败：{error}"
+}

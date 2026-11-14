@@ -5,6 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -88,11 +89,11 @@ func (a *App) modelItems(m *ui.Menu, account, current string, choose func(id str
 	}
 	switch {
 	case a.modelsPending != "":
-		m.Item("加载中…").Disabled(true)
+		m.Item(locales.Loading()).Disabled(true)
 	case a.modelsError != "":
-		m.Item("加载失败，请重新打开菜单").Subtitle(a.modelsError).Disabled(true)
+		m.Item(locales.ModelsLoadFailed()).Subtitle(a.modelsError).Disabled(true)
 	case len(a.C.Models) == 0:
-		m.Item("这个账号没有可用模型").Disabled(true)
+		m.Item(locales.NoModels()).Disabled(true)
 	default:
 		for _, model := range a.C.Models {
 			name := model.Name
@@ -102,7 +103,7 @@ func (a *App) modelItems(m *ui.Menu, account, current string, choose func(id str
 			selected := model.ID == current || current == "" && model.Default
 			item := m.Item(name).ID(model.ID).Checked(selected).Trailing(contextSize(model.Context))
 			if model.Default {
-				item.Subtitle("✓ 默认模型")
+				item.Subtitle(locales.DefaultModelMark())
 			}
 			if item.Chosen() {
 				choose(model.ID)
@@ -141,16 +142,16 @@ func (a *App) effortPill(c *ui.Context, label string) {
 	container := ui.Box(c)
 	if unsupported {
 		// Disabled controls do not show tooltips in mygo; their container can.
-		container.Tooltip("这个模型不支持思考强度")
+		container.Tooltip(locales.NoEffortSupport())
 	}
 	container.Children(func() {
 		b := a.pill(c, "effort", "brain", label, false).Disabled(!a.C.CanAct() || unsupported)
 		if unsupported {
-			b.Description("这个模型不支持思考强度")
+			b.Description(locales.NoEffortSupport())
 		}
 		b.PopoverMenuButton(func(m *ui.Menu) {
 			for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
-				if m.Item(efforts[effort]).ID("effort:" + effort).Checked(a.C.Current.Effort == effort).Chosen() {
+				if m.Item(effortLabel(effort)).ID("effort:" + effort).Checked(a.C.Current.Effort == effort).Chosen() {
 					a.do(a.C.Update(proto.SessionUpdate{Effort: &effort}))
 				}
 			}
@@ -161,11 +162,11 @@ func (a *App) effortPill(c *ui.Context, label string) {
 func (a *App) modePill(c *ui.Context, label string) {
 	a.pill(c, "mode", "shield-half", label, false).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		for _, mode := range []struct{ id, description string }{
-			{"ask", "写文件和运行命令前问你"},
-			{"auto", "沙箱内自动允许"},
-			{"full", "不再询问，慎用"},
+			{"ask", locales.ModeAskShort()},
+			{"auto", locales.ModeAutoShort()},
+			{"full", locales.ModeFullShort()},
 		} {
-			if m.Item(modes[mode.id]).ID(mode.id).Subtitle(mode.description).Checked(a.C.Current.Mode == mode.id).Chosen() {
+			if m.Item(modeName(mode.id)).ID(mode.id).Subtitle(mode.description).Checked(a.C.Current.Mode == mode.id).Chosen() {
 				a.do(a.C.Update(proto.SessionUpdate{Mode: &mode.id}))
 			}
 		}
@@ -175,16 +176,16 @@ func (a *App) modePill(c *ui.Context, label string) {
 func phaseText(phase client.Phase) string {
 	switch phase {
 	case client.Starting:
-		return "正在启动"
+		return locales.PhaseStarting()
 	case client.Handshaking:
-		return "正在连接"
+		return locales.PhaseConnecting()
 	case client.Syncing:
-		return "正在同步"
+		return locales.PhaseSyncing()
 	case client.Ready:
-		return "已连接"
+		return locales.PhaseReady()
 	case client.Disconnected:
-		return "已断开连接"
+		return locales.PhaseDisconnected()
 	default:
-		return "连接状态未知"
+		return locales.PhaseUnknown()
 	}
 }
