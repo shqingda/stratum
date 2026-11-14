@@ -76,3 +76,21 @@ func TestSettings(t *testing.T) {
 		t.Fatalf("after signing out of the default: %+v", s)
 	}
 }
+
+func TestDemo(t *testing.T) {
+	k, err := Start(context.Background(), Options{DB: ":memory:", Creds: &auth.Memory{}, Demo: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer k.Close()
+	ctx := context.Background()
+	if list, _ := k.Server.Accounts(ctx); len(list) != 1 || list[0].ID != "demo" || list[0].Model != "demo" {
+		t.Fatalf("accounts: %+v", list)
+	}
+	if models, _ := k.Server.Models(ctx, "demo"); len(models) != 1 || !models[0].Default {
+		t.Fatalf("models: %+v", models)
+	}
+	if account, model := k.Sessions.Defaults(); account != "demo" || model != "demo" {
+		t.Fatalf("defaults %q %q", account, model)
+	}
+}

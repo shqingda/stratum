@@ -26,6 +26,9 @@ type Options struct {
 	// Script, when set, answers every account in place of real providers
 	// (tests and demos).
 	Script *llm.Script
+	// Demo, when set, offers one account, "demo", that acts out scenes
+	// (llm.Play) in place of every real provider.
+	Demo bool
 	// OpenURL shows a sign-in page; the default browser when nil.
 	OpenURL func(u string) error
 }
@@ -55,6 +58,10 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 		open = func(string) (llm.Provider, error) { return o.Script, nil }
 		accounts = func() []string { return []string{"script"} }
 	}
+	if o.Demo {
+		open = func(string) (llm.Provider, error) { return llm.Play{Delay: 25 * time.Millisecond}, nil }
+		accounts = func() []string { return []string{"demo"} }
+	}
 
 	m := session.New(st, open)
 	m.UseMCP(filepath.Join(auth.Dir, "mcp.json"))
@@ -70,6 +77,9 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 			return set.Account, cmpOr(set.Model, llm.DefaultModel(provider))
 		}
 		provider, _, _ := strings.Cut(names[0], "/")
+		if o.Demo {
+			return "demo", "demo"
+		}
 		return names[0], cmpOr(llm.DefaultModel(provider), "script")
 	}
 	if err := m.Recover(ctx); err != nil {
@@ -83,6 +93,9 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 	}
 	account := func(id string) proto.Account {
 		a := proto.Account{ID: id}
+		if o.Demo {
+			return proto.Account{ID: id, Provider: "demo", Name: "Demo", Model: "demo"}
+		}
 		if p, ok := auth.Lookup(id); ok {
 			a.Provider, a.Name, a.Model = p.ID, p.Name, llm.DefaultModel(p.ID)
 		}
@@ -117,6 +130,9 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 			return o.Creds.Delete(id)
 		},
 		Models: func(_ context.Context, account string) ([]proto.Model, error) {
+			if o.Demo {
+				return []proto.Model{{ID: "demo", Name: "Demo", Context: 200000, Reasoning: true, Images: true, Default: true}}, nil
+			}
 			provider, _, _ := strings.Cut(account, "/")
 			var out []proto.Model
 			for _, x := range llm.Models(provider) {
