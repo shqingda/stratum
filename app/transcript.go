@@ -488,8 +488,13 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	case client.User:
 		// The user's words sit on the right in a bubble, as in every chat;
 		// the agent's work runs down the left.
-		msg := ui.Column(c).Margin(4, 0, 14, 0).AlignItems(ui.End)
+		// Its copy button comes up beside the bubble, on its left, so it
+		// takes no line of its own.
+		msg := ui.Row(c).Margin(4, 0, 18, 0).Justify(ui.End).AlignItems(ui.End).Gap(4)
 		msg.Children(func() {
+			if e.Text != "" {
+				a.copyButton(c, e.Text, msg.Hovered())
+			}
 			ui.Column(c).MaxWidthPercent(80).Padding(9, 14).Radius(18).Background(p.Bubble).Gap(8).Children(func() {
 				if e.Text != "" {
 					ui.Text(c, e.Text).TextColor(p.Fg).LineHeight(1.55).Selectable()
@@ -498,9 +503,6 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 					a.sentImages(c, e)
 				}
 			})
-			if e.Text != "" {
-				a.copyButton(c, e.Text, msg.Hovered())
-			}
 		})
 	default:
 		a.turn(c, live, func() { a.body(c, e) })
@@ -515,7 +517,8 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 		msg.Children(func() {
 			if e.Done {
 				markdown.View(c, e.Text, &a.md)
-				a.copyButton(c, e.Text, msg.Hovered())
+				// The icon lines up with the text above it.
+				ui.Row(c).Margin(0, 0, 0, -6).Children(func() { a.copyButton(c, e.Text, msg.Hovered()) })
 			} else {
 				markdown.Stream(c, e.Text, &a.md)
 			}
