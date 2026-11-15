@@ -72,6 +72,7 @@ const (
 	MethodSessionGet      = "session.get"      // SessionRef → Snapshot
 	MethodSessionUpdate   = "session.update"   // SessionUpdate → Session
 	MethodSessionDelete   = "session.delete"   // SessionRef → {}
+	MethodSessionFlag     = "session.flag"     // SessionFlag → Session
 	MethodPrompt          = "prompt"           // Prompt → PromptResult
 	MethodCancel          = "cancel"           // SessionRef → {}
 	MethodEvents          = "events"           // EventsQuery → EventPage
@@ -101,6 +102,20 @@ type Session struct {
 	// State is set only in the list: "run" while a turn runs, "wait"
 	// while it waits for an approval.
 	State string `json:"state,omitempty"`
+	// Pinned and Archived place it in the sidebar; Mark is "unread" or
+	// "fail" for a turn that ended unseen.
+	Pinned   bool   `json:"pinned,omitempty"`
+	Archived bool   `json:"archived,omitempty"`
+	Mark     string `json:"mark,omitempty"`
+}
+
+// SessionFlag changes how the sidebar shows a session; nil leaves a
+// field as it is.
+type SessionFlag struct {
+	SessionID string  `json:"sessionId"`
+	Pinned    *bool   `json:"pinned,omitempty"`
+	Archived  *bool   `json:"archived,omitempty"`
+	Mark      *string `json:"mark,omitempty"`
 }
 
 // SessionCreate makes a session. Empty fields take defaults.

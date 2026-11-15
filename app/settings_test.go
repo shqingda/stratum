@@ -41,7 +41,7 @@ func TestSettings(t *testing.T) {
 	sent(proto.MethodSettings)
 	a.C.Settings = &proto.Settings{Mode: "auto"}
 	tt.Frame()
-	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || tt.HasText("定时任务") {
+	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || tt.HasText("修复 Add 测试") {
 		t.Fatalf("not the general page: %q", tt.Texts())
 	}
 	snapshot(t, tt, "settings")
@@ -129,7 +129,7 @@ func TestSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if !tt.HasText("定时任务") {
+	if !tt.HasText("修复 Add 测试") {
 		t.Fatal("closing settings did not go back")
 	}
 }

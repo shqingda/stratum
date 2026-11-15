@@ -30,6 +30,11 @@ func (a *App) keys(c *ui.Context) {
 			a.openFind(c)
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyJ, func() {
+		if !c.ShortcutRepeated() {
+			a.nextWaiting()
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyComma, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen {
 			a.openSettings()
@@ -64,6 +69,10 @@ func (a *App) keys(c *ui.Context) {
 func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
+	}
+	if key == ui.KeyEscape && mods == 0 && (a.renaming != "" || a.deleting != "") {
+		a.renaming, a.deleting = "", ""
+		return true
 	}
 	if a.editing != "" {
 		// The command being changed has Enter; Esc puts it back.

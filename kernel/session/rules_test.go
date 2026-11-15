@@ -131,3 +131,31 @@ func TestChangedCommand(t *testing.T) {
 		t.Fatalf("results %+v", res)
 	}
 }
+
+// A session's pin and mark stay with it, and keep its place by time.
+func TestFlag(t *testing.T) {
+	m, _, _ := approvals(t, nil, nil) // one turn that only answers
+	ctx := context.Background()
+	var s proto.Session
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		list, _ := m.List(ctx)
+		if s = list[0]; s.State == "" && s.Mark != "" {
+			break
+		}
+	}
+	if s.Mark != "unread" {
+		t.Fatalf("after a turn: %+v", s)
+	}
+	on, none := true, ""
+	if _, err := m.Flag(ctx, proto.SessionFlag{SessionID: s.ID, Pinned: &on, Mark: &none}); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := m.List(ctx)
+	if got := list[0]; !got.Pinned || got.Mark != "" {
+		t.Fatalf("flagged %+v, was %+v", got, s)
+	}
+	bad := "starred"
+	if _, err := m.Flag(ctx, proto.SessionFlag{SessionID: s.ID, Mark: &bad}); err == nil {
+		t.Fatal("an unknown mark was kept")
+	}
+}

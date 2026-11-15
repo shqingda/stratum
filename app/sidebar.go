@@ -46,7 +46,6 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		})
 		a.search(c)
 		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
-			a.navItem(c, "cron", "clock-play", locales.Scheduled(), "")
 			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
 				a.openMCP()
 			}
@@ -57,8 +56,10 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 			black := ui.RGBA(0, 0, 0, 1)
 			list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: 1 - 36/h}, {Color: ui.Transparent, At: 1}}})
 		}
+		a.archivedToast(c)
 		a.footer(c)
 	})
+	a.deleteDialog(c)
 }
 
 // sideToggle shows or hides the sidebar. It stays beside the window
@@ -113,12 +114,19 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 // the rest by workspace, each newest first.
 func (a *App) sessions(c *ui.Context) {
 	a.visibleSessions = a.visibleSessions[:0]
-	var waiting []proto.Session
+	var waiting, pinned, archived []proto.Session
 	var folders []string
 	byFolder := map[string][]proto.Session{}
 	for _, s := range a.C.Sessions {
-		if a.state(s) == "wait" {
+		switch {
+		case a.state(s) == "wait":
 			waiting = append(waiting, s)
+			continue
+		case s.Archived:
+			archived = append(archived, s)
+			continue
+		case s.Pinned:
+			pinned = append(pinned, s)
 			continue
 		}
 		f := filepath.Base(s.Cwd)
@@ -133,10 +141,36 @@ func (a *App) sessions(c *ui.Context) {
 			a.sessionRow(c, s)
 		}
 	}
+	if len(pinned) > 0 {
+		a.group(c, "pin", locales.Pinned(), 0)
+		for _, s := range pinned {
+			a.sessionRow(c, s)
+		}
+	}
 	for _, f := range folders {
 		a.group(c, "folder", f, 0)
 		for _, s := range byFolder[f] {
 			a.sessionRow(c, s)
+		}
+	}
+	if len(archived) > 0 {
+		p := a.p
+		b := ui.ButtonBase(c.Key("archived")).Row().Height(24).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).
+			Label(locales.Archived()).Expanded(a.showArchived)
+		if b.Clicked() {
+			a.showArchived = !a.showArchived
+		}
+		b.Children(func() {
+			sym(c, "archive", 13, p.Mute)
+			ui.Text(c, locales.Archived()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).SingleLine()
+			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[a.showArchived], 11, p.Mute)
+			ui.Spacer(c)
+			ui.Text(c, fmt.Sprint(len(archived))).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
+		})
+		if a.showArchived {
+			for _, s := range archived {
+				a.sessionRow(c, s)
+			}
 		}
 	}
 }
@@ -191,6 +225,14 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	}
 	if row.Clicked() {
 		a.do(a.C.Open(s.ID))
+	}
+	row.ContextMenu(func(m *ui.Menu) { a.sessionMenu(m, s) })
+	if a.renaming == s.ID && a.renameIn == "side" {
+		row.Children(func() {
+			slot(c, p, st)
+			a.renameInput(c, s).FontSize(14)
+		})
+		return
 	}
 	row.Children(func() {
 		slot(c, p, st)

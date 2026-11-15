@@ -101,10 +101,40 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: search migration: %w", err)
 	}
+	if err := migrateFlags(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: flags migration: %w", err)
+	}
 	return &Store{db: db}, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+// migrateFlags adds the sidebar's columns to a sessions table made
+// before them.
+func migrateFlags(db *sql.DB) error {
+	has := map[string]bool{}
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('sessions')`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var name string
+		rows.Scan(&name)
+		has[name] = true
+	}
+	rows.Close()
+	for _, col := range []struct{ name, def string }{
+		{"pinned", "INTEGER NOT NULL DEFAULT 0"}, {"archived", "INTEGER NOT NULL DEFAULT 0"}, {"mark", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		if !has[col.name] {
+			if _, err := db.Exec(`ALTER TABLE sessions ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // Session is a conversation in a workspace.
 type Session struct {
@@ -118,14 +148,19 @@ type Session struct {
 	ParentID string    `json:"parentId,omitempty"`
 	Created  time.Time `json:"created"`
 	Updated  time.Time `json:"updated"`
+	// Pinned, Archived and Mark are the user's, as the sidebar keeps
+	// them: Mark is "unread" or "fail" for a turn that ended unseen.
+	Pinned   bool   `json:"pinned,omitempty"`
+	Archived bool   `json:"archived,omitempty"`
+	Mark     string `json:"mark,omitempty"`
 }
 
-const sessionCols = `id, title, cwd, account, model, effort, mode, parent_id, created_at, updated_at`
+const sessionCols = `id, title, cwd, account, model, effort, mode, parent_id, created_at, updated_at, pinned, archived, mark`
 
 func scanSession(row interface{ Scan(...any) error }) (Session, error) {
 	var x Session
 	var c, u int64
-	err := row.Scan(&x.ID, &x.Title, &x.Cwd, &x.Account, &x.Model, &x.Effort, &x.Mode, &x.ParentID, &c, &u)
+	err := row.Scan(&x.ID, &x.Title, &x.Cwd, &x.Account, &x.Model, &x.Effort, &x.Mode, &x.ParentID, &c, &u, &x.Pinned, &x.Archived, &x.Mark)
 	if errors.Is(err, sql.ErrNoRows) {
 		return x, ErrNotFound
 	}
@@ -139,8 +174,8 @@ func (s *Store) CreateSession(ctx context.Context, x Session) error {
 	if x.Created.IsZero() {
 		x.Created = now
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		x.ID, x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, x.ParentID, x.Created.UnixMilli(), now.UnixMilli())
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		x.ID, x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, x.ParentID, x.Created.UnixMilli(), now.UnixMilli(), x.Pinned, x.Archived, x.Mark)
 	return err
 }
 
@@ -148,6 +183,18 @@ func (s *Store) CreateSession(ctx context.Context, x Session) error {
 func (s *Store) UpdateSession(ctx context.Context, x Session) error {
 	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET title=?, account=?, model=?, effort=?, mode=?, updated_at=? WHERE id=?`,
 		x.Title, x.Account, x.Model, x.Effort, x.Mode, time.Now().UnixMilli(), x.ID)
+	if err == nil {
+		if n, _ := r.RowsAffected(); n == 0 {
+			err = ErrNotFound
+		}
+	}
+	return err
+}
+
+// SetFlags keeps a session's pin, archive and mark, leaving when it was
+// updated as it was.
+func (s *Store) SetFlags(ctx context.Context, x Session) error {
+	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET pinned=?, archived=?, mark=? WHERE id=?`, x.Pinned, x.Archived, x.Mark, x.ID)
 	if err == nil {
 		if n, _ := r.RowsAffected(); n == 0 {
 			err = ErrNotFound

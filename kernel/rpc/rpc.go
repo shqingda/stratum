@@ -144,6 +144,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Update(ctx, p)
+	case proto.MethodSessionFlag:
+		p, err := params[proto.SessionFlag](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return m.Flag(ctx, p)
 	case proto.MethodSessionDelete:
 		p, err := params[proto.SessionRef](cmd)
 		if err != nil {

@@ -95,7 +95,18 @@ func (a *App) bar(c *ui.Context) {
 		if a.helloShown() {
 			return // the middle of the window says what the session is
 		}
-		ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+		if a.renaming == cur.ID && a.renameIn == "bar" {
+			a.renameInput(c, *cur).FontSize(14.5).FontWeight(600).MaxWidth(360)
+		} else {
+			// Clicked, the title can be changed where it is.
+			t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Label(locales.Rename()).Tooltip(locales.Rename())
+			if t.Clicked() {
+				a.rename(*cur, "bar")
+			}
+			t.Children(func() {
+				ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+			})
+		}
 		ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
 			sym(c, "folder", 14, p.Mute)
 			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(13.5).TextColor(p.Mute).SingleLine()

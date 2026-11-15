@@ -153,7 +153,7 @@ func toProto(e store.Event) proto.Event {
 
 func toSession(x store.Session) proto.Session {
 	return proto.Session{ID: x.ID, Title: x.Title, Cwd: x.Cwd, Account: x.Account, Model: x.Model,
-		Effort: x.Effort, Mode: x.Mode, Created: x.Created, Updated: x.Updated}
+		Effort: x.Effort, Mode: x.Mode, Created: x.Created, Updated: x.Updated, Pinned: x.Pinned, Archived: x.Archived, Mark: x.Mark}
 }
 
 // Create makes a session.
@@ -303,6 +303,31 @@ func (m *Manager) Update(ctx context.Context, u proto.SessionUpdate) (proto.Sess
 		return proto.Session{}, err
 	}
 	x, _ = m.Store.GetSession(ctx, x.ID)
+	s := toSession(x)
+	return s, m.record(ctx, s.ID, proto.EventSession, s)
+}
+
+// Flag pins, archives or marks a session, as the sidebar shows it.
+func (m *Manager) Flag(ctx context.Context, f proto.SessionFlag) (proto.Session, error) {
+	x, err := m.session(ctx, f.SessionID)
+	if err != nil {
+		return proto.Session{}, err
+	}
+	if f.Pinned != nil {
+		x.Pinned = *f.Pinned
+	}
+	if f.Archived != nil {
+		x.Archived = *f.Archived
+	}
+	if f.Mark != nil {
+		if *f.Mark != "" && *f.Mark != "unread" && *f.Mark != "fail" {
+			return proto.Session{}, proto.Errorf("bad_request", "unknown mark %q", *f.Mark)
+		}
+		x.Mark = *f.Mark
+	}
+	if err := m.Store.SetFlags(ctx, x); err != nil {
+		return proto.Session{}, err
+	}
 	s := toSession(x)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
 }
@@ -534,6 +559,14 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 		}
 	}
 	m.record(ctx, x.ID, proto.EventTurnEnd, end)
+	// It is unseen until the user looks: the app clears the mark then.
+	if !end.Stopped {
+		mark := "unread"
+		if end.Error != "" {
+			mark = "fail"
+		}
+		m.Flag(context.WithoutCancel(ctx), proto.SessionFlag{SessionID: x.ID, Mark: &mark})
+	}
 	return err
 }
 

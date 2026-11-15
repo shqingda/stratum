@@ -368,8 +368,11 @@ func (c *Client) listSessions(bind bool) proto.Command {
 			c.Sessions = list
 			clear(c.Marks)
 			for _, s := range list {
-				if s.State != "" {
+				switch {
+				case s.State != "":
 					c.Marks[s.ID] = s.State
+				case s.Mark != "":
+					c.Marks[s.ID] = s.Mark
 				}
 			}
 		}
@@ -554,6 +557,57 @@ func (c *Client) sessionUpdated(e proto.Event) {
 	if c.Current != nil && c.Current.ID == s.ID {
 		*c.Current = s
 	}
+	if m := c.Marks[s.ID]; m != "run" && m != "wait" {
+		if s.Mark != "" {
+			c.Marks[s.ID] = s.Mark
+		} else {
+			delete(c.Marks, s.ID)
+		}
+	}
+}
+
+// Flag pins, archives or marks a session.
+func (c *Client) Flag(f proto.SessionFlag) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	return []proto.Command{c.mutate(proto.MethodSessionFlag, f, func(r json.RawMessage) []proto.Command {
+		c.sessionUpdated(proto.Event{Data: r})
+		return nil
+	})}, nil
+}
+
+// Rename gives a session a title.
+func (c *Client) Rename(id, title string) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	return []proto.Command{c.mutate(proto.MethodSessionUpdate, proto.SessionUpdate{SessionID: id, Title: &title}, func(r json.RawMessage) []proto.Command {
+		c.sessionUpdated(proto.Event{Data: r})
+		return nil
+	})}, nil
+}
+
+// Seen clears the mark of a session whose ended turn the user has now
+// seen.
+func (c *Client) Seen(id string) []proto.Command {
+	marked := c.Marks[id] == "unread" || c.Marks[id] == "fail"
+	for i := range c.Sessions {
+		if c.Sessions[i].ID == id && c.Sessions[i].Mark != "" {
+			c.Sessions[i].Mark, marked = "", true
+		}
+	}
+	if !marked || c.Phase != Ready {
+		return nil
+	}
+	if c.Current != nil && c.Current.ID == id {
+		c.Current.Mark = ""
+	}
+	if m := c.Marks[id]; m == "unread" || m == "fail" {
+		delete(c.Marks, id)
+	}
+	none := ""
+	return []proto.Command{c.mutate(proto.MethodSessionFlag, proto.SessionFlag{SessionID: id, Mark: &none}, nil)}
 }
 
 // apply applies one live event of the current session while in step.

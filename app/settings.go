@@ -507,7 +507,7 @@ func shortcuts() []struct {
 		keys  []struct{ label, key string }
 	}{
 		{locales.Sessions(), []key{
-			{locales.NewSession(), "⌘N"}, {locales.SessionsOneToNine(), "⌘1 – ⌘9"}, {locales.CommandPalette(), "⌘K"}, {locales.ToggleSidebar(), "⌘\\"}, {locales.Settings(), "⌘,"},
+			{locales.NewSession(), "⌘N"}, {locales.SessionsOneToNine(), "⌘1 – ⌘9"}, {locales.NextWaiting(), "⌘J"}, {locales.CommandPalette(), "⌘K"}, {locales.ToggleSidebar(), "⌘\\"}, {locales.Settings(), "⌘,"},
 		}},
 		{locales.Approvals(), []key{
 			{locales.Allow(), "↩"}, {locales.AllowForSession(), "⌘↩"}, {locales.Deny(), "esc"},

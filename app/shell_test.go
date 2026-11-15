@@ -20,7 +20,7 @@ func TestSidebarToggle(t *testing.T) {
 		t.Fatalf("the sidebar did not slide: %v", a.sideOpen)
 	}
 	tt.Advance(time.Second)
-	if a.sideOpen > 0.001 || tt.HasText("定时任务") {
+	if a.sideOpen > 0.001 || tt.HasText("技能与 MCP") {
 		t.Fatalf("the sidebar stayed: %v", a.sideOpen)
 	}
 	snapshot(t, tt, "sidebar-hidden")
@@ -29,7 +29,7 @@ func TestSidebarToggle(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Advance(time.Second)
-	if a.sideOpen < .999 || !tt.HasText("定时任务") {
+	if a.sideOpen < .999 || !tt.HasText("技能与 MCP") {
 		t.Fatalf("the sidebar did not come back: %v", a.sideOpen)
 	}
 }

@@ -51,23 +51,32 @@ type App struct {
 	editing  string // the approval whose command is being changed
 	cmdDraft string // the command as changed
 	cmdInput ui.Handle
-	drafts   drafts       // keeps each session's draft in the kernel
-	query    string       // the sidebar's search
-	list     ui.ListState // the transcript
-	md       markdown.Options
-	opened   map[string]bool // tool calls whose output shows
-	inWork   bool            // building a finished turn's folded work
-	noSide   bool            // the sidebar is hidden
-	sideOpen float32         // how far the sidebar is out, 0 to 1, on its way
-	dockH    float32         // how tall the composer floating on the transcript was
-	pal      bool            // the ⌘K palette shows
-	jump     int64           // a message to scroll to, from a search
-	jumpIn   string          // the session it is in
-	palSel   int             // its row chosen by the arrow keys
-	stats    map[string][2]int
-	rv       review
-	seen     map[string]time.Time // when approvals first showed
-	openIn   func(app, dir string) error
+
+	renaming, renameIn string // the session being renamed, in "side" or "bar"
+	renameDraft        string
+	renameField        ui.Handle
+	renameFocus        bool
+	deleting           string // the session asked about deleting
+	undone             undo   // the archiving that can be undone
+	keptUnread         string // marked unread while shown
+	showArchived       bool
+	drafts             drafts       // keeps each session's draft in the kernel
+	query              string       // the sidebar's search
+	list               ui.ListState // the transcript
+	md                 markdown.Options
+	opened             map[string]bool // tool calls whose output shows
+	inWork             bool            // building a finished turn's folded work
+	noSide             bool            // the sidebar is hidden
+	sideOpen           float32         // how far the sidebar is out, 0 to 1, on its way
+	dockH              float32         // how tall the composer floating on the transcript was
+	pal                bool            // the ⌘K palette shows
+	jump               int64           // a message to scroll to, from a search
+	jumpIn             string          // the session it is in
+	palSel             int             // its row chosen by the arrow keys
+	stats              map[string][2]int
+	rv                 review
+	seen               map[string]time.Time // when approvals first showed
+	openIn             func(app, dir string) error
 
 	openMenu    bool
 	commitMsg   string
@@ -192,6 +201,7 @@ func (a *App) View(c *ui.Context) {
 		return
 	}
 	a.syncDraft(c)
+	a.markSeen(c)
 	if a.settingsOpen {
 		a.settingsView(c)
 		a.keys(c)

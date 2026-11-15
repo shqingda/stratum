@@ -66,9 +66,9 @@ func TestViews(t *testing.T) {
 			tt.SetDark(tc.dark)
 			tt.SetTitleBar(ui.TitleBar{Left: 78, Height: 52})
 			tt.Frame()
-			wants := []string{"新会话", "定时任务", "本机"}
+			wants := []string{"新会话", "本机"}
 			if tc.name == "empty-light" {
-				wants = []string{"新会话", "定时任务", "在 calc 里做点什么"} // an empty session shows no status line
+				wants = []string{"新会话", "在 calc 里做点什么"} // an empty session shows no status line
 			}
 			for _, want := range wants {
 				if !tt.HasText(want) {

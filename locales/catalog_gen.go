@@ -214,6 +214,156 @@ func (msgs Messages) Undo() string {
 	return Catalog.Format(msgs.locale, "undo", nil)
 }
 
+// Rename says "改名"
+// in the language the app shows.
+func Rename() string { return In(i18n.Locale()).Rename() }
+
+// Rename says "改名"
+// in the language of msgs.
+func (msgs Messages) Rename() string {
+	return Catalog.Format(msgs.locale, "rename", nil)
+}
+
+// MarkUnread says "标为未读"
+// in the language the app shows.
+func MarkUnread() string { return In(i18n.Locale()).MarkUnread() }
+
+// MarkUnread says "标为未读"
+// in the language of msgs.
+func (msgs Messages) MarkUnread() string {
+	return Catalog.Format(msgs.locale, "markUnread", nil)
+}
+
+// MarkRead says "标为已读"
+// in the language the app shows.
+func MarkRead() string { return In(i18n.Locale()).MarkRead() }
+
+// MarkRead says "标为已读"
+// in the language of msgs.
+func (msgs Messages) MarkRead() string {
+	return Catalog.Format(msgs.locale, "markRead", nil)
+}
+
+// Pin says "置顶"
+// in the language the app shows.
+func Pin() string { return In(i18n.Locale()).Pin() }
+
+// Pin says "置顶"
+// in the language of msgs.
+func (msgs Messages) Pin() string {
+	return Catalog.Format(msgs.locale, "pin", nil)
+}
+
+// Unpin says "取消置顶"
+// in the language the app shows.
+func Unpin() string { return In(i18n.Locale()).Unpin() }
+
+// Unpin says "取消置顶"
+// in the language of msgs.
+func (msgs Messages) Unpin() string {
+	return Catalog.Format(msgs.locale, "unpin", nil)
+}
+
+// Pinned says "置顶"
+// in the language the app shows.
+func Pinned() string { return In(i18n.Locale()).Pinned() }
+
+// Pinned says "置顶"
+// in the language of msgs.
+func (msgs Messages) Pinned() string {
+	return Catalog.Format(msgs.locale, "pinned", nil)
+}
+
+// Archive says "归档"
+// in the language the app shows.
+func Archive() string { return In(i18n.Locale()).Archive() }
+
+// Archive says "归档"
+// in the language of msgs.
+func (msgs Messages) Archive() string {
+	return Catalog.Format(msgs.locale, "archive", nil)
+}
+
+// Unarchive says "取消归档"
+// in the language the app shows.
+func Unarchive() string { return In(i18n.Locale()).Unarchive() }
+
+// Unarchive says "取消归档"
+// in the language of msgs.
+func (msgs Messages) Unarchive() string {
+	return Catalog.Format(msgs.locale, "unarchive", nil)
+}
+
+// Archived says "已归档"
+// in the language the app shows.
+func Archived() string { return In(i18n.Locale()).Archived() }
+
+// Archived says "已归档"
+// in the language of msgs.
+func (msgs Messages) Archived() string {
+	return Catalog.Format(msgs.locale, "archived", nil)
+}
+
+// ArchivedSession says "已归档「{title}」"
+// in the language the app shows.
+func ArchivedSession(title string) string { return In(i18n.Locale()).ArchivedSession(title) }
+
+// ArchivedSession says "已归档「{title}」"
+// in the language of msgs.
+func (msgs Messages) ArchivedSession(title string) string {
+	return Catalog.Format(msgs.locale, "archivedSession", map[string]any{"title": title})
+}
+
+// DeleteSession says "删除…"
+// in the language the app shows.
+func DeleteSession() string { return In(i18n.Locale()).DeleteSession() }
+
+// DeleteSession says "删除…"
+// in the language of msgs.
+func (msgs Messages) DeleteSession() string {
+	return Catalog.Format(msgs.locale, "deleteSession", nil)
+}
+
+// Delete says "删除"
+// in the language the app shows.
+func Delete() string { return In(i18n.Locale()).Delete() }
+
+// Delete says "删除"
+// in the language of msgs.
+func (msgs Messages) Delete() string {
+	return Catalog.Format(msgs.locale, "delete", nil)
+}
+
+// DeleteTitle says "删除「{title}」？"
+// in the language the app shows.
+func DeleteTitle(title string) string { return In(i18n.Locale()).DeleteTitle(title) }
+
+// DeleteTitle says "删除「{title}」？"
+// in the language of msgs.
+func (msgs Messages) DeleteTitle(title string) string {
+	return Catalog.Format(msgs.locale, "deleteTitle", map[string]any{"title": title})
+}
+
+// DeleteBody says "这个会话的记录和改动历史会一起删掉，不能撤销。只想收起来的话，用归档。"
+// in the language the app shows.
+func DeleteBody() string { return In(i18n.Locale()).DeleteBody() }
+
+// DeleteBody says "这个会话的记录和改动历史会一起删掉，不能撤销。只想收起来的话，用归档。"
+// in the language of msgs.
+func (msgs Messages) DeleteBody() string {
+	return Catalog.Format(msgs.locale, "deleteBody", nil)
+}
+
+// NextWaiting says "下一个等你的会话"
+// in the language the app shows.
+func NextWaiting() string { return In(i18n.Locale()).NextWaiting() }
+
+// NextWaiting says "下一个等你的会话"
+// in the language of msgs.
+func (msgs Messages) NextWaiting() string {
+	return Catalog.Format(msgs.locale, "nextWaiting", nil)
+}
+
 // Redo says "重做"
 // in the language the app shows.
 func Redo() string { return In(i18n.Locale()).Redo() }
@@ -2916,16 +3066,6 @@ func WaitingFor(names string) string { return In(i18n.Locale()).WaitingFor(names
 // in the language of msgs.
 func (msgs Messages) WaitingFor(names string) string {
 	return Catalog.Format(msgs.locale, "waitingFor", map[string]any{"names": names})
-}
-
-// Scheduled says "定时任务"
-// in the language the app shows.
-func Scheduled() string { return In(i18n.Locale()).Scheduled() }
-
-// Scheduled says "定时任务"
-// in the language of msgs.
-func (msgs Messages) Scheduled() string {
-	return Catalog.Format(msgs.locale, "scheduled", nil)
 }
 
 // NeedsYou says "需要你"
