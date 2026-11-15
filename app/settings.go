@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"runtime/debug"
 	"slices"
 	"strings"
 
@@ -21,8 +22,10 @@ var settingsPages = []struct {
 	{"accounts", "user-circle", locales.Messages.SettingsAccounts, locales.Messages.SettingsAccountsWords},
 	{"models", "sparkles", locales.Messages.SettingsModels, locales.Messages.SettingsModelsWords},
 	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords},
+	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords},
 	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords},
 	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords},
+	{"about", "info-circle", locales.Messages.SettingsAbout, locales.Messages.SettingsAboutWords},
 }
 
 // finds says whether a settings page answers a search, in any language
@@ -109,8 +112,12 @@ func (a *App) settingsView(c *ui.Context) {
 						a.modelsPage(c)
 					case "permissions":
 						a.permissionsPage(c)
+					case "appearance":
+						a.appearancePage(c)
 					case "shortcuts":
 						a.shortcutsPage(c)
+					case "about":
+						a.aboutPage(c)
 					case "mcp":
 						a.mcpPage(c)
 					default:
@@ -215,16 +222,21 @@ func (a *App) generalPage(c *ui.Context) {
 				}
 			}, a.menuOptions(nil))
 		})
-		r.row("set-theme", locales.Appearance(), "", func() {
-			themes := []string{"", "light", "dark"}
-			i := max(slices.Index(themes, set.Theme), 0)
-			if ui.Segmented(c, &i, locales.ThemeAuto(), locales.ThemeLight(), locales.ThemeDark()).Label(locales.Appearance()).Changed() {
+	})
+
+	section(c, p, locales.WhileWorking(), false)
+	group(c, p, func() {
+		r := rows{c: c, p: p}
+		r.row("set-enter", locales.ReturnKey(), "", func() {
+			i := map[bool]int{false: 0, true: 1}[set.EnterSteers]
+			if ui.Segmented(c, &i, locales.QueueIt(), locales.SendRightAway()).Label(locales.ReturnKey()).Changed() {
 				s := set
-				s.Theme = themes[i]
+				s.EnterSteers = i == 1
 				a.do(a.C.SaveSettings(s))
 			}
 		})
 	})
+	note(c, p, map[bool]string{false: locales.CmdReturnSteers(), true: locales.CmdReturnQueues()}[set.EnterSteers])
 
 	section(c, p, locales.Notifications(), false)
 	group(c, p, func() {
@@ -241,8 +253,82 @@ func (a *App) generalPage(c *ui.Context) {
 				a.do(a.C.SaveSettings(s))
 			})
 		}
+		r.row("set-notify-when", locales.NotifyWhen(), "", func() {
+			whens := []string{"", "always", "never"}
+			i := max(slices.Index(whens, set.NotifyWhen), 0)
+			if ui.Segmented(c, &i, locales.NotifyInBackground(), locales.NotifyAlways(), locales.NotifyNever()).Label(locales.NotifyWhen()).Changed() {
+				s := set
+				s.NotifyWhen = whens[i]
+				a.do(a.C.SaveSettings(s))
+			}
+		})
 	})
-	note(c, p, locales.NotifyNote())
+}
+
+func (a *App) appearancePage(c *ui.Context) {
+	p := a.p
+	set := a.settings()
+	pick := func(r *rows, key, label string, values []string, current string, names []string, save func(*proto.Settings, string)) {
+		r.row(key, label, "", func() {
+			i := max(slices.Index(values, current), 0)
+			if ui.Segmented(c, &i, names...).Label(label).Changed() {
+				s := set
+				save(&s, values[i])
+				a.do(a.C.SaveSettings(s))
+			}
+		})
+	}
+	group(c, p, func() {
+		r := &rows{c: c, p: p}
+		pick(r, "set-theme", locales.Appearance(), []string{"", "light", "dark"}, set.Theme,
+			[]string{locales.ThemeAuto(), locales.ThemeLight(), locales.ThemeDark()}, func(s *proto.Settings, v string) { s.Theme = v })
+		pick(r, "set-size", locales.TextSize(), []string{"small", "", "large"}, set.TextSize,
+			[]string{locales.TextSmall(), locales.TextDefault(), locales.TextLarge()}, func(s *proto.Settings, v string) { s.TextSize = v })
+	})
+	section(c, p, locales.Conversation(), false)
+	group(c, p, func() {
+		pick(&rows{c: c, p: p}, "set-detail", locales.FinishedTurns(), []string{"", "thinking", "all"}, set.Detail,
+			[]string{locales.DetailPlain(), locales.DetailThinking(), locales.DetailAll()}, func(s *proto.Settings, v string) { s.Detail = v })
+	})
+	note(c, p, locales.DetailNote())
+}
+
+// aboutPage says which build this is, as Go recorded it.
+func (a *App) aboutPage(c *ui.Context) {
+	p := a.p
+	version, commit, built := "devel", "", ""
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if v := bi.Main.Version; v != "" && v != "(devel)" {
+			version = v
+		}
+		for _, kv := range bi.Settings {
+			switch kv.Key {
+			case "vcs.revision":
+				commit = kv.Value[:min(7, len(kv.Value))]
+			case "vcs.time":
+				built = kv.Value
+			case "vcs.modified":
+				if kv.Value == "true" && commit != "" {
+					commit += "+"
+				}
+			}
+		}
+	}
+	ui.Column(c).AlignItems(ui.Center).Gap(6).Padding(24, 0, 18, 0).Children(func() {
+		ui.Text(c, "Talos").FontSize(20).FontWeight(600).TextColor(p.Fg)
+		ui.Text(c, version).FontSize(13).TextColor(p.Mute).Selectable()
+	})
+	group(c, p, func() {
+		r := rows{c: c, p: p}
+		for _, kv := range [][2]string{{locales.Version(), version}, {locales.BuildCommit(), commit}, {locales.BuildTime(), built}} {
+			if kv[1] == "" {
+				continue
+			}
+			r.row("about:"+kv[0], kv[0], "", func() {
+				ui.Text(c, kv[1]).Font("monospace").FontSize(12.5).TextColor(p.Fg2).Selectable()
+			})
+		}
+	})
 }
 
 func (a *App) accountsPage(c *ui.Context) {
@@ -497,23 +583,27 @@ func (a *App) radioDot(c *ui.Context, on bool) {
 }
 
 // shortcuts are the app's keys, as keys.go binds them.
-func shortcuts() []struct {
+func shortcuts(steers bool) []struct {
 	group string
 	keys  []struct{ label, key string }
 } {
 	type key = struct{ label, key string }
+	now, queue := "⌘↩", "↩"
+	if steers {
+		now, queue = queue, now
+	}
 	return []struct {
 		group string
 		keys  []struct{ label, key string }
 	}{
 		{locales.Sessions(), []key{
-			{locales.NewSession(), "⌘N"}, {locales.SessionsOneToNine(), "⌘1 – ⌘9"}, {locales.NextWaiting(), "⌘J"}, {locales.CommandPalette(), "⌘K"}, {locales.ToggleSidebar(), "⌘\\"}, {locales.Settings(), "⌘,"},
+			{locales.NewSession(), "⌘N"}, {locales.FindInSession(), "⌘F"}, {locales.SessionsOneToNine(), "⌘1 – ⌘9"}, {locales.NextWaiting(), "⌘J"}, {locales.CommandPalette(), "⌘K"}, {locales.ToggleSidebar(), "⌘\\"}, {locales.Settings(), "⌘,"},
 		}},
 		{locales.Approvals(), []key{
 			{locales.Allow(), "↩"}, {locales.AllowForSession(), "⌘↩"}, {locales.Deny(), "esc"},
 		}},
 		{locales.WhileWorking(), []key{
-			{locales.Stop(), "esc"},
+			{locales.Stop(), "esc"}, {locales.SendRightAway(), now}, {locales.QueueIt(), queue},
 		}},
 	}
 }
@@ -523,7 +613,7 @@ func (a *App) shortcutsPage(c *ui.Context) {
 	ui.SearchField(c, &a.keysQuery).Label(locales.SearchShortcuts()).Placeholder(locales.Search()).Margin(6, 0, 4, 0)
 	q := strings.ToLower(strings.TrimSpace(a.keysQuery))
 	found := false
-	for _, g := range shortcuts() {
+	for _, g := range shortcuts(a.settings().EnterSteers) {
 		var keys []struct{ label, key string }
 		for _, k := range g.keys {
 			if q == "" || strings.Contains(strings.ToLower(k.label+" "+k.key), q) {

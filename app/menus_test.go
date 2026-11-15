@@ -35,12 +35,12 @@ func task8Tester(a *App, dark bool) *ui.Tester {
 }
 
 // next is the next batch of commands the app sent, leaving out the ⌘K
-// palette's searches.
+// palette's searches of messages and files.
 func next(a *App) ([]proto.Command, bool) {
 	for {
 		select {
 		case cmds := <-a.out:
-			if len(cmds) == 1 && cmds[0].Method == proto.MethodSearch {
+			if len(cmds) == 1 && (cmds[0].Method == proto.MethodSearch || cmds[0].Method == proto.MethodFilesFind) {
 				continue
 			}
 			return cmds, true

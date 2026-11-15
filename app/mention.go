@@ -47,7 +47,7 @@ func (a *App) files(c *ui.Context) {
 		m.shut = 0
 	}
 	m.at, m.query, m.open = at, q, false
-	if at < 0 || m.shut == at+1 || a.C.Current == nil {
+	if at < 0 || m.shut == at+1 || a.C.Current == nil || a.pal {
 		return
 	}
 	if a.C.FilesFor != q {

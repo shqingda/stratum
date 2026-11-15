@@ -5,6 +5,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,11 @@ func TestViews(t *testing.T) {
 			a.C.Entries, a.C.Approvals, a.C.Queued, a.C.Busy = nil, nil, nil, false
 			return a
 		}(), false},
+		{"empty-dark", func() *App {
+			a := working()
+			a.C.Entries, a.C.Approvals, a.C.Queued, a.C.Busy = nil, nil, nil, false
+			return a
+		}(), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tt := ui.NewTester(tc.app.View, 1200, 780)
@@ -67,7 +73,7 @@ func TestViews(t *testing.T) {
 			tt.SetTitleBar(ui.TitleBar{Left: 78, Height: 52})
 			tt.Frame()
 			wants := []string{"新会话", "本机"}
-			if tc.name == "empty-light" {
+			if strings.HasPrefix(tc.name, "empty") {
 				wants = []string{"新会话", "在 calc 里做点什么"} // an empty session shows no status line
 			}
 			for _, want := range wants {

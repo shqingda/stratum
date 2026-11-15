@@ -124,17 +124,23 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return true
 	}
-	if key == ui.KeyEnter && mods == 0 && a.ready() {
-		if !a.keyRepeat {
-			a.submit()
+	// Return sends the draft, queued while a turn runs; ⌘Return steers the
+	// running turn: the words join it after its current tool calls. The
+	// setting swaps the two while a turn runs.
+	if key == ui.KeyEnter && a.ready() && (mods == 0 || mods == ui.Cmd && len(a.C.Approvals) == 0) {
+		steer := mods == ui.Cmd
+		if a.C.Busy && a.settings().EnterSteers && len(a.C.Approvals) == 0 {
+			steer = !steer
 		}
-		return true
-	}
-	// ⌘Enter steers the running turn: the words join it after its
-	// current tool calls rather than waiting for it to end.
-	if key == ui.KeyEnter && mods == ui.Cmd && a.ready() && len(a.C.Approvals) == 0 {
+		if _, cmd := a.command(); cmd {
+			steer = false
+		}
 		if !a.keyRepeat {
-			a.steer()
+			if steer {
+				a.steer()
+			} else {
+				a.submit()
+			}
 		}
 		return true
 	}

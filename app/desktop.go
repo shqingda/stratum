@@ -95,7 +95,7 @@ func (a *App) watch() {
 	}
 	quiet := func(kind string) bool { return slices.Contains(set.Quiet, kind) }
 	waiting := 0
-	active := !first && a.desk.Active()
+	active := !first && a.desk.Active() && set.NotifyWhen != "always"
 	for _, s := range a.C.Sessions {
 		st := a.state(s)
 		if st == "wait" {
@@ -103,7 +103,7 @@ func (a *App) watch() {
 		}
 		was, known := a.marks[s.ID]
 		a.marks[s.ID] = st
-		if first || !known || active || st == was {
+		if first || !known || active || st == was || set.NotifyWhen == "never" {
 			continue
 		}
 		switch {

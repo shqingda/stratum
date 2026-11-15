@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -372,13 +373,14 @@ func TestMention(t *testing.T) {
 	tt.Type("看看 @comp")
 	tt.Frame()
 	var q proto.FilesQuery
-	for {
-		cmds, ok := next(a)
-		if !ok {
-			break
-		}
-		if len(cmds) == 1 && cmds[0].Method == proto.MethodFilesFind {
-			json.Unmarshal(cmds[0].Params, &q)
+	for done := false; !done; {
+		select {
+		case cmds := <-a.out:
+			if len(cmds) == 1 && cmds[0].Method == proto.MethodFilesFind {
+				json.Unmarshal(cmds[0].Params, &q)
+			}
+		default:
+			done = true
 		}
 	}
 	if q.Query != "comp" {
@@ -414,3 +416,89 @@ func TestMention(t *testing.T) {
 }
 
 var goTest = &proto.Rule{Tool: "shell", Prefix: "go test"}
+
+// With the setting, ⏎ steers while a turn runs and ⌘⏎ queues; when idle
+// ⏎ sends as always.
+func TestEnterSteersSetting(t *testing.T) {
+	a := task8App()
+	a.C.Busy = true
+	a.C.Settings = &proto.Settings{EnterSteers: true}
+	tt := task8Tester(a, false)
+	var p proto.Prompt
+	for _, k := range []struct {
+		text  string
+		mods  ui.Modifiers
+		steer bool
+	}{{"插话", 0, true}, {"排队", ui.Cmd, false}} {
+		tt.Type(k.text)
+		tt.Key(k.mods, ui.KeyEnter)
+		p = proto.Prompt{}
+		task8Command(t, a, proto.MethodPrompt, &p)
+		if p.Text != k.text || p.Steer != k.steer {
+			t.Fatalf("sent %+v", p)
+		}
+	}
+	a.C.Busy = false
+	tt.Frame()
+	tt.Type("新的一轮")
+	tt.Key(0, ui.KeyEnter)
+	p = proto.Prompt{}
+	task8Command(t, a, proto.MethodPrompt, &p)
+	if p.Steer {
+		t.Fatalf("idle ⏎ sent %+v", p)
+	}
+}
+
+// The palette's actions reach what the session's menus and the settings
+// do: here, find and pinning the session.
+func TestPaletteActions(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Type("查找")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.pal || !a.find.on {
+		t.Fatalf("palette open %v, find on %v", a.pal, a.find.on)
+	}
+	a.closeFind()
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Type("置顶")
+	tt.Key(0, ui.KeyEnter)
+	var f proto.SessionFlag
+	task8Command(t, a, proto.MethodSessionFlag, &f)
+	if f.Pinned == nil || !*f.Pinned {
+		t.Fatalf("flag %+v", f)
+	}
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Frame()
+	for _, want := range []string{"切换模型…", "打开终端面板", "用 VS Code 打开", "改名", "归档", "外观：深色"} {
+		if !tt.HasText(want) {
+			t.Errorf("no %q in the palette", want)
+		}
+	}
+}
+
+// The palette finds the workspace's files; one chosen opens in the editor.
+func TestPaletteFiles(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		a := task8App()
+		var opened string
+		a.openIn = func(app, path string) error { opened = path; return nil }
+		tt := task8Tester(a, dark)
+		tt.Key(ui.Cmd, ui.KeyK)
+		tt.Type("sandbox")
+		a.C.FilesFor, a.C.Files = "sandbox", []string{"kernel/sandbox/sandbox.go", "kernel/sandbox/profile.sb"}
+		tt.Frame()
+		if !tt.HasText("文件") || !tt.HasText("kernel/sandbox/sandbox.go") {
+			t.Fatalf("no files: %q", tt.Texts())
+		}
+		snapshot(t, tt, "palette-files-"+map[bool]string{false: "light", true: "dark"}[dark])
+		if err := tt.Click("kernel/sandbox/sandbox.go"); err != nil {
+			t.Fatal(err)
+		}
+		if want := filepath.Join(a.C.Current.Cwd, "kernel/sandbox/sandbox.go"); opened != want {
+			t.Errorf("opened %q, want %q", opened, want)
+		}
+	}
+}

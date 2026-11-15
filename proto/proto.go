@@ -553,6 +553,14 @@ type Settings struct {
 	// steps folded into a line, "thinking" its steps and reasoning, "all"
 	// every step on its own row.
 	Detail string `json:"detail,omitempty"`
+	// EnterSteers makes Return, while a turn runs, send into the turn
+	// right away, and ⌘Return queue; by default it is the other way.
+	EnterSteers bool `json:"enterSteers,omitempty"`
+	// NotifyWhen is when notifications show: "" while the app is in the
+	// background, "always", or "never".
+	NotifyWhen string `json:"notifyWhen,omitempty"`
+	// TextSize zooms the window: "" for its size, "small" or "large".
+	TextSize string `json:"textSize,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }

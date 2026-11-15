@@ -52,11 +52,22 @@ func TestSettings(t *testing.T) {
 	if len(s.Quiet) != 1 || s.Quiet[0] != "fail" {
 		t.Fatalf("saved %+v", s)
 	}
-	if err := tt.Click("深色"); err != nil {
+	if err := tt.Click("立即发送"); err != nil {
 		t.Fatal(err)
 	}
 	json.Unmarshal(sent(proto.MethodSetSettings), &s)
-	if s.Theme != "dark" || len(s.Quiet) != 1 {
+	if !s.EnterSteers || len(s.Quiet) != 1 {
+		t.Fatalf("saved %+v", s)
+	}
+	tt.Frame()
+	if !tt.HasText("⌘回车 加入队列。") {
+		t.Errorf("the note does not follow the setting: %q", tt.Texts())
+	}
+	if err := tt.Click("从不"); err != nil {
+		t.Fatal(err)
+	}
+	json.Unmarshal(sent(proto.MethodSetSettings), &s)
+	if s.NotifyWhen != "never" || !s.EnterSteers {
 		t.Fatalf("saved %+v", s)
 	}
 	if err := tt.Click("语言"); err == nil {
@@ -187,5 +198,54 @@ func TestSettingsEnglish(t *testing.T) {
 	tt.Frame()
 	if !tt.HasText("Permissions") || tt.HasText("Keyboard") {
 		t.Fatalf("a Chinese search in English: %q", tt.Texts())
+	}
+}
+
+// TestAppearanceAndAbout sets the theme, the text size and the detail on
+// their own page, and shows the build.
+func TestAppearanceAndAbout(t *testing.T) {
+	a := working()
+	a.C.Busy, a.C.Approvals = false, nil
+	a.C.Settings = &proto.Settings{}
+	a.out = make(chan []proto.Command, 16)
+	tt := ui.NewTester(a.View, 1120, 800)
+	a.openSettings()
+	a.C.Settings = &proto.Settings{}
+	tt.Frame()
+	if err := tt.Click("外观"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	for _, label := range []string{"深色", "大", "全部"} {
+		if err := tt.Click(label); err != nil {
+			t.Fatal(err)
+		}
+		tt.Frame()
+	}
+	var s proto.Settings
+	for done := false; !done; {
+		select {
+		case cmds := <-a.out:
+			for _, cmd := range cmds {
+				if cmd.Method == proto.MethodSetSettings {
+					json.Unmarshal(cmd.Params, &s)
+				}
+			}
+		default:
+			done = true
+		}
+	}
+	if s.Theme != "dark" || s.TextSize != "large" || s.Detail != "all" {
+		t.Fatalf("saved %+v", s)
+	}
+	if z := textZoom(a.C.Settings.TextSize); z != 1.15 {
+		t.Errorf("zoom %v for %q", z, a.C.Settings.TextSize)
+	}
+	if err := tt.Click("关于"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !tt.HasText("Talos") || !tt.HasText("版本") {
+		t.Fatalf("about: %q", tt.Texts())
 	}
 }

@@ -191,6 +191,9 @@ func (a *App) View(c *ui.Context) {
 	isDark := c.Theme().Dark
 	a.p = PaletteFor(isDark)
 	c.SetTheme(Theme(a.p, isDark))
+	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
+		c.SetZoom(z)
+	}
 	vibrant := c.Vibrancy()
 	if vibrant {
 		c.Root().Background(ui.Transparent)
@@ -254,3 +257,14 @@ func (a *App) main(c *ui.Context) {
 
 // sheetGap is the window showing round the sheets.
 const sheetGap = 8
+
+// textZoom is how much the window's content is zoomed for a text size.
+func textZoom(size string) float32 {
+	switch size {
+	case "small":
+		return .9
+	case "large":
+		return 1.15
+	}
+	return 1
+}

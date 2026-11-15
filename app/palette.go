@@ -18,7 +18,7 @@ type opt struct {
 }
 
 // palOpts are the palette's rows for the query, by section.
-func (a *App) palOpts() (sessions, actions []opt) {
+func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	q := strings.ToLower(strings.TrimSpace(a.query))
 	match := func(s string) bool { return q == "" || strings.Contains(strings.ToLower(s), q) }
 	now := a.now()
@@ -41,7 +41,14 @@ func (a *App) palOpts() (sessions, actions []opt) {
 		}
 	}
 	add(opt{icon: "message-plus", label: locales.NewSession(), kbd: "⌘N", run: func() { a.do(a.C.NewSession()) }})
-	if cur := a.C.Current; cur != nil && a.C.CanAct() {
+	if len(a.visibleSessions) > 0 {
+		add(opt{icon: "arrow-right", label: locales.NextWaiting(), kbd: "⌘J", run: a.nextWaiting})
+	}
+	cur := a.C.Current
+	if cur != nil {
+		add(opt{icon: "search", label: locales.FindInSession(), kbd: "⌘F", run: func() { a.openFind(c) }})
+	}
+	if cur != nil && a.C.CanAct() {
 		next := map[string]string{"ask": "auto", "auto": "full", "full": "ask"}[cur.Mode]
 		if next == "" {
 			next = "ask"
@@ -49,13 +56,98 @@ func (a *App) palOpts() (sessions, actions []opt) {
 		add(opt{icon: "shield-half", label: locales.SwitchPermissionMode(), sub: modeName(cur.Mode) + " → " + modeName(next), run: func() {
 			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
 		}})
+		add(opt{icon: "sparkles", label: locales.SwitchModel(), sub: cur.Model, run: func() { a.modelMenu = true }})
+		add(opt{icon: "brain", label: locales.SwitchEffort(), run: func() { a.effortMenu = true }})
 	}
 	if a.C.Busy {
 		add(opt{icon: "player-stop", label: locales.StopRunning(), kbd: "esc", run: func() { a.do(a.C.Cancel()) }})
 	}
+	set := a.settings()
+	for _, d := range []struct {
+		id   string
+		name func() string
+	}{{"", locales.DetailPlain}, {"thinking", locales.DetailThinking}, {"all", locales.DetailAll}} {
+		if d.id != set.Detail {
+			add(opt{icon: "list-details", label: locales.DetailTo(d.name()), run: func() {
+				s := set
+				s.Detail = d.id
+				a.do(a.C.SaveSettings(s))
+			}})
+		}
+	}
 	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], run: func() { a.rv.open = !a.rv.open }})
+	if cur != nil {
+		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: func() { a.rv.open, a.rv.tab = true, "term" }})
+		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
+		if a.C.Workspace.Dirty {
+			add(opt{icon: "git-commit", label: locales.CommitChanges(), run: func() {
+				a.rv.open, a.rv.tab = true, ""
+				a.commitInput.Focus(c)
+			}})
+		}
+		for _, o := range openers() {
+			add(opt{icon: o.icon, label: locales.OpenWith(o.label), run: func() {
+				if err := a.openIn(o.app, cur.Cwd); err != nil {
+					a.err = locales.CouldntOpen(o.label, err.Error())
+				}
+			}})
+		}
+		s := *cur
+		add(opt{icon: "pencil", label: locales.Rename(), sub: title(s), run: func() { a.rename(s, "bar") }})
+		pin := locales.Pin()
+		if s.Pinned {
+			pin = locales.Unpin()
+		}
+		add(opt{icon: "pin", label: pin, sub: title(s), run: func() {
+			on := !s.Pinned
+			a.do(a.C.Flag(proto.SessionFlag{SessionID: s.ID, Pinned: &on}))
+		}})
+		add(opt{icon: "eye", label: locales.MarkUnread(), sub: title(s), run: func() { a.markUnread(s.ID) }})
+		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), run: func() { a.archive(s, !s.Archived) }})
+		add(opt{icon: "trash", label: locales.DeleteSession(), sub: title(s), run: func() { a.deleting = s.ID }})
+	}
 	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: func() { a.noSide = !a.noSide }})
+	themes := []struct{ id, name string }{{"", locales.ThemeAuto()}, {"light", locales.ThemeLight()}, {"dark", locales.ThemeDark()}}
+	for _, t := range themes {
+		if t.id != set.Theme {
+			add(opt{icon: "palette", label: locales.ThemeTo(t.name), run: func() {
+				s := set
+				s.Theme = t.id
+				a.do(a.C.SaveSettings(s))
+			}})
+		}
+	}
+	add(opt{icon: "settings", label: locales.Settings(), kbd: "⌘,", run: a.openSettings})
+	add(opt{icon: "user-circle", label: locales.AddAccount(), run: func() {
+		a.openSettings()
+		a.settingsPage, a.addingAccount = "accounts", true
+	}})
+	add(opt{icon: "puzzle", label: locales.SettingsMcp(), run: a.openMCP})
 	return sessions, actions
+}
+
+// palFiles are the workspace's files the query names; chosen, one opens
+// in the editor.
+func (a *App) palFiles() []opt {
+	q := strings.TrimSpace(a.query)
+	cur := a.C.Current
+	if q == "" || cur == nil {
+		return nil
+	}
+	if a.C.FilesFor != q {
+		a.quiet(a.C.FindFiles(q), nil)
+		return nil
+	}
+	var out []opt
+	for _, f := range a.C.Files[:min(5, len(a.C.Files))] {
+		path := filepath.Join(cur.Cwd, f)
+		out = append(out, opt{icon: "file-code", label: f, sub: filepath.Base(cur.Cwd), mono: true, run: func() {
+			if err := a.openIn("Visual Studio Code", path); err != nil {
+				a.err = locales.CouldntOpen("VS Code", err.Error())
+			}
+		}})
+	}
+	return out
 }
 
 // palHits are the messages the kernel found for the query.
@@ -99,9 +191,9 @@ func (a *App) palette(c *ui.Context) {
 	}
 	p := a.p
 	a.send(a.C.Search(strings.TrimSpace(a.query)))
-	sessions, actions := a.palOpts()
-	hits := a.palHits()
-	all := append(append(append([]opt(nil), sessions...), actions...), hits...)
+	sessions, actions := a.palOpts(c)
+	files, hits := a.palFiles(), a.palHits()
+	all := append(append(append(append([]opt(nil), sessions...), actions...), files...), hits...)
 	a.palSel = max(0, min(a.palSel, len(all)-1))
 	choose := func(i int) {
 		a.pal, a.query = false, ""
@@ -159,6 +251,7 @@ func (a *App) palette(c *ui.Context) {
 				}
 				section(locales.Sessions(), sessions)
 				section(locales.Actions(), actions)
+				section(locales.Files(), files)
 				section(locales.PaletteMessages(), hits)
 				if len(all) == 0 {
 					ui.Text(c, locales.PaletteNoMatches()).FontSize(13.5).TextColor(p.Mute).Padding(18, 16)
@@ -199,7 +292,10 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			pre, hit, post := split(o.label, a.query)
 			text := func(s string, weight int) {
 				if s != "" {
-					ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
+					t := ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
+					if o.mono {
+						t.Font("monospace").FontSize(13)
+					}
 				}
 			}
 			text(pre, 400)

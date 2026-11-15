@@ -1554,11 +1554,11 @@ func (msgs Messages) SettingsMcp() string {
 	return Catalog.Format(msgs.locale, "settingsMcp", nil)
 }
 
-// SettingsGeneralWords says "语言 外观 浅色 深色 通知 确认 完成 出错 程序坞 数字"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
 // in the language the app shows.
 func SettingsGeneralWords() string { return In(i18n.Locale()).SettingsGeneralWords() }
 
-// SettingsGeneralWords says "语言 外观 浅色 深色 通知 确认 完成 出错 程序坞 数字"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
 // in the language of msgs.
 func (msgs Messages) SettingsGeneralWords() string {
 	return Catalog.Format(msgs.locale, "settingsGeneralWords", nil)
@@ -1742,16 +1742,6 @@ func DockBadge() string { return In(i18n.Locale()).DockBadge() }
 // in the language of msgs.
 func (msgs Messages) DockBadge() string {
 	return Catalog.Format(msgs.locale, "dockBadge", nil)
-}
-
-// NotifyNote says "仅在 Talos 不在前台时通知。"
-// in the language the app shows.
-func NotifyNote() string { return In(i18n.Locale()).NotifyNote() }
-
-// NotifyNote says "仅在 Talos 不在前台时通知。"
-// in the language of msgs.
-func (msgs Messages) NotifyNote() string {
-	return Catalog.Format(msgs.locale, "notifyNote", nil)
 }
 
 // AddAccount says "添加账号…"
@@ -2496,6 +2486,306 @@ func OpenInEditor() string { return In(i18n.Locale()).OpenInEditor() }
 // in the language of msgs.
 func (msgs Messages) OpenInEditor() string {
 	return Catalog.Format(msgs.locale, "openInEditor", nil)
+}
+
+// SwitchModel says "切换模型…"
+// in the language the app shows.
+func SwitchModel() string { return In(i18n.Locale()).SwitchModel() }
+
+// SwitchModel says "切换模型…"
+// in the language of msgs.
+func (msgs Messages) SwitchModel() string {
+	return Catalog.Format(msgs.locale, "switchModel", nil)
+}
+
+// SwitchEffort says "调整推理强度…"
+// in the language the app shows.
+func SwitchEffort() string { return In(i18n.Locale()).SwitchEffort() }
+
+// SwitchEffort says "调整推理强度…"
+// in the language of msgs.
+func (msgs Messages) SwitchEffort() string {
+	return Catalog.Format(msgs.locale, "switchEffort", nil)
+}
+
+// DetailTo says "详略：{level}"
+// in the language the app shows.
+func DetailTo(level string) string { return In(i18n.Locale()).DetailTo(level) }
+
+// DetailTo says "详略：{level}"
+// in the language of msgs.
+func (msgs Messages) DetailTo(level string) string {
+	return Catalog.Format(msgs.locale, "detailTo", map[string]any{"level": level})
+}
+
+// ThemeTo says "外观：{theme}"
+// in the language the app shows.
+func ThemeTo(theme string) string { return In(i18n.Locale()).ThemeTo(theme) }
+
+// ThemeTo says "外观：{theme}"
+// in the language of msgs.
+func (msgs Messages) ThemeTo(theme string) string {
+	return Catalog.Format(msgs.locale, "themeTo", map[string]any{"theme": theme})
+}
+
+// ShowTerminal says "打开终端面板"
+// in the language the app shows.
+func ShowTerminal() string { return In(i18n.Locale()).ShowTerminal() }
+
+// ShowTerminal says "打开终端面板"
+// in the language of msgs.
+func (msgs Messages) ShowTerminal() string {
+	return Catalog.Format(msgs.locale, "showTerminal", nil)
+}
+
+// ShowPlan says "打开计划面板"
+// in the language the app shows.
+func ShowPlan() string { return In(i18n.Locale()).ShowPlan() }
+
+// ShowPlan says "打开计划面板"
+// in the language of msgs.
+func (msgs Messages) ShowPlan() string {
+	return Catalog.Format(msgs.locale, "showPlan", nil)
+}
+
+// OpenWith says "用 {app} 打开"
+// in the language the app shows.
+func OpenWith(app string) string { return In(i18n.Locale()).OpenWith(app) }
+
+// OpenWith says "用 {app} 打开"
+// in the language of msgs.
+func (msgs Messages) OpenWith(app string) string {
+	return Catalog.Format(msgs.locale, "openWith", map[string]any{"app": app})
+}
+
+// Files says "文件"
+// in the language the app shows.
+func Files() string { return In(i18n.Locale()).Files() }
+
+// Files says "文件"
+// in the language of msgs.
+func (msgs Messages) Files() string {
+	return Catalog.Format(msgs.locale, "files", nil)
+}
+
+// SettingsAppearanceWords says "外观 主题 浅色 深色 字号 文字大小 缩放 详略 工具调用 思考"
+// in the language the app shows.
+func SettingsAppearanceWords() string { return In(i18n.Locale()).SettingsAppearanceWords() }
+
+// SettingsAppearanceWords says "外观 主题 浅色 深色 字号 文字大小 缩放 详略 工具调用 思考"
+// in the language of msgs.
+func (msgs Messages) SettingsAppearanceWords() string {
+	return Catalog.Format(msgs.locale, "settingsAppearanceWords", nil)
+}
+
+// SettingsAbout says "关于"
+// in the language the app shows.
+func SettingsAbout() string { return In(i18n.Locale()).SettingsAbout() }
+
+// SettingsAbout says "关于"
+// in the language of msgs.
+func (msgs Messages) SettingsAbout() string {
+	return Catalog.Format(msgs.locale, "settingsAbout", nil)
+}
+
+// SettingsAboutWords says "关于 版本 构建 提交"
+// in the language the app shows.
+func SettingsAboutWords() string { return In(i18n.Locale()).SettingsAboutWords() }
+
+// SettingsAboutWords says "关于 版本 构建 提交"
+// in the language of msgs.
+func (msgs Messages) SettingsAboutWords() string {
+	return Catalog.Format(msgs.locale, "settingsAboutWords", nil)
+}
+
+// ReturnKey says "按回车"
+// in the language the app shows.
+func ReturnKey() string { return In(i18n.Locale()).ReturnKey() }
+
+// ReturnKey says "按回车"
+// in the language of msgs.
+func (msgs Messages) ReturnKey() string {
+	return Catalog.Format(msgs.locale, "returnKey", nil)
+}
+
+// QueueIt says "加入队列"
+// in the language the app shows.
+func QueueIt() string { return In(i18n.Locale()).QueueIt() }
+
+// QueueIt says "加入队列"
+// in the language of msgs.
+func (msgs Messages) QueueIt() string {
+	return Catalog.Format(msgs.locale, "queueIt", nil)
+}
+
+// SendRightAway says "立即发送"
+// in the language the app shows.
+func SendRightAway() string { return In(i18n.Locale()).SendRightAway() }
+
+// SendRightAway says "立即发送"
+// in the language of msgs.
+func (msgs Messages) SendRightAway() string {
+	return Catalog.Format(msgs.locale, "sendRightAway", nil)
+}
+
+// CmdReturnSteers says "⌘回车 立即发送。"
+// in the language the app shows.
+func CmdReturnSteers() string { return In(i18n.Locale()).CmdReturnSteers() }
+
+// CmdReturnSteers says "⌘回车 立即发送。"
+// in the language of msgs.
+func (msgs Messages) CmdReturnSteers() string {
+	return Catalog.Format(msgs.locale, "cmdReturnSteers", nil)
+}
+
+// CmdReturnQueues says "⌘回车 加入队列。"
+// in the language the app shows.
+func CmdReturnQueues() string { return In(i18n.Locale()).CmdReturnQueues() }
+
+// CmdReturnQueues says "⌘回车 加入队列。"
+// in the language of msgs.
+func (msgs Messages) CmdReturnQueues() string {
+	return Catalog.Format(msgs.locale, "cmdReturnQueues", nil)
+}
+
+// NotifyWhen says "什么时候通知"
+// in the language the app shows.
+func NotifyWhen() string { return In(i18n.Locale()).NotifyWhen() }
+
+// NotifyWhen says "什么时候通知"
+// in the language of msgs.
+func (msgs Messages) NotifyWhen() string {
+	return Catalog.Format(msgs.locale, "notifyWhen", nil)
+}
+
+// NotifyInBackground says "后台时"
+// in the language the app shows.
+func NotifyInBackground() string { return In(i18n.Locale()).NotifyInBackground() }
+
+// NotifyInBackground says "后台时"
+// in the language of msgs.
+func (msgs Messages) NotifyInBackground() string {
+	return Catalog.Format(msgs.locale, "notifyInBackground", nil)
+}
+
+// NotifyAlways says "总是"
+// in the language the app shows.
+func NotifyAlways() string { return In(i18n.Locale()).NotifyAlways() }
+
+// NotifyAlways says "总是"
+// in the language of msgs.
+func (msgs Messages) NotifyAlways() string {
+	return Catalog.Format(msgs.locale, "notifyAlways", nil)
+}
+
+// NotifyNever says "从不"
+// in the language the app shows.
+func NotifyNever() string { return In(i18n.Locale()).NotifyNever() }
+
+// NotifyNever says "从不"
+// in the language of msgs.
+func (msgs Messages) NotifyNever() string {
+	return Catalog.Format(msgs.locale, "notifyNever", nil)
+}
+
+// TextSize says "文字大小"
+// in the language the app shows.
+func TextSize() string { return In(i18n.Locale()).TextSize() }
+
+// TextSize says "文字大小"
+// in the language of msgs.
+func (msgs Messages) TextSize() string {
+	return Catalog.Format(msgs.locale, "textSize", nil)
+}
+
+// TextSmall says "小"
+// in the language the app shows.
+func TextSmall() string { return In(i18n.Locale()).TextSmall() }
+
+// TextSmall says "小"
+// in the language of msgs.
+func (msgs Messages) TextSmall() string {
+	return Catalog.Format(msgs.locale, "textSmall", nil)
+}
+
+// TextDefault says "默认"
+// in the language the app shows.
+func TextDefault() string { return In(i18n.Locale()).TextDefault() }
+
+// TextDefault says "默认"
+// in the language of msgs.
+func (msgs Messages) TextDefault() string {
+	return Catalog.Format(msgs.locale, "textDefault", nil)
+}
+
+// TextLarge says "大"
+// in the language the app shows.
+func TextLarge() string { return In(i18n.Locale()).TextLarge() }
+
+// TextLarge says "大"
+// in the language of msgs.
+func (msgs Messages) TextLarge() string {
+	return Catalog.Format(msgs.locale, "textLarge", nil)
+}
+
+// Conversation says "对话"
+// in the language the app shows.
+func Conversation() string { return In(i18n.Locale()).Conversation() }
+
+// Conversation says "对话"
+// in the language of msgs.
+func (msgs Messages) Conversation() string {
+	return Catalog.Format(msgs.locale, "conversation", nil)
+}
+
+// FinishedTurns says "做完的一轮"
+// in the language the app shows.
+func FinishedTurns() string { return In(i18n.Locale()).FinishedTurns() }
+
+// FinishedTurns says "做完的一轮"
+// in the language of msgs.
+func (msgs Messages) FinishedTurns() string {
+	return Catalog.Format(msgs.locale, "finishedTurns", nil)
+}
+
+// DetailNote says "…"
+// in the language the app shows.
+func DetailNote() string { return In(i18n.Locale()).DetailNote() }
+
+// DetailNote says "…"
+// in the language of msgs.
+func (msgs Messages) DetailNote() string {
+	return Catalog.Format(msgs.locale, "detailNote", nil)
+}
+
+// Version says "版本"
+// in the language the app shows.
+func Version() string { return In(i18n.Locale()).Version() }
+
+// Version says "版本"
+// in the language of msgs.
+func (msgs Messages) Version() string {
+	return Catalog.Format(msgs.locale, "version", nil)
+}
+
+// BuildCommit says "提交"
+// in the language the app shows.
+func BuildCommit() string { return In(i18n.Locale()).BuildCommit() }
+
+// BuildCommit says "提交"
+// in the language of msgs.
+func (msgs Messages) BuildCommit() string {
+	return Catalog.Format(msgs.locale, "buildCommit", nil)
+}
+
+// BuildTime says "构建时间"
+// in the language the app shows.
+func BuildTime() string { return In(i18n.Locale()).BuildTime() }
+
+// BuildTime says "构建时间"
+// in the language of msgs.
+func (msgs Messages) BuildTime() string {
+	return Catalog.Format(msgs.locale, "buildTime", nil)
 }
 
 // AddRemark says "批注这一行"
