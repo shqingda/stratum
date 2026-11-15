@@ -2438,6 +2438,36 @@ func (msgs Messages) GitLooks(count int) string {
 	return Catalog.Format(msgs.locale, "gitLooks", map[string]any{"count": count})
 }
 
+// RunsInTerminal says "在终端运行"
+// in the language the app shows.
+func RunsInTerminal() string { return In(i18n.Locale()).RunsInTerminal() }
+
+// RunsInTerminal says "在终端运行"
+// in the language of msgs.
+func (msgs Messages) RunsInTerminal() string {
+	return Catalog.Format(msgs.locale, "runsInTerminal", nil)
+}
+
+// ShellWhileBusy says "这一轮结束后才能运行命令"
+// in the language the app shows.
+func ShellWhileBusy() string { return In(i18n.Locale()).ShellWhileBusy() }
+
+// ShellWhileBusy says "这一轮结束后才能运行命令"
+// in the language of msgs.
+func (msgs Messages) ShellWhileBusy() string {
+	return Catalog.Format(msgs.locale, "shellWhileBusy", nil)
+}
+
+// EditQueued says "改一改再发"
+// in the language the app shows.
+func EditQueued() string { return In(i18n.Locale()).EditQueued() }
+
+// EditQueued says "改一改再发"
+// in the language of msgs.
+func (msgs Messages) EditQueued() string {
+	return Catalog.Format(msgs.locale, "editQueued", nil)
+}
+
 // SendNow says "立即发送"
 // in the language the app shows.
 func SendNow() string { return In(i18n.Locale()).SendNow() }

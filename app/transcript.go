@@ -505,6 +505,11 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 			})
 		})
 	default:
+		if e.Typed {
+			// A command the user ran is theirs, in no turn: no rail.
+			ui.Column(c).Margin(2, 0, 10, 0).Children(func() { a.card(c, e) })
+			return
+		}
 		a.turn(c, live, func() { a.body(c, e) })
 	}
 }

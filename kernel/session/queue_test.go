@@ -200,3 +200,64 @@ func TestEditQueue(t *testing.T) {
 		t.Fatalf("second turn said %q", got)
 	}
 }
+
+func TestDraft(t *testing.T) {
+	m, s := changesManager(t, &llm.Script{})
+	ctx := context.Background()
+	if err := m.SetDraft(ctx, proto.DraftSet{SessionID: s.ID, Text: "写了一半"}); err != nil {
+		t.Fatal(err)
+	}
+	snap, _ := m.Get(ctx, s.ID)
+	if snap.Draft != "写了一半" || !snap.Session.Updated.Equal(s.Updated) {
+		t.Fatalf("draft %q, updated %v → %v", snap.Draft, s.Updated, snap.Session.Updated)
+	}
+	m.SetDraft(ctx, proto.DraftSet{SessionID: s.ID})
+	if snap, _ := m.Get(ctx, s.ID); snap.Draft != "" {
+		t.Fatalf("draft %q after clearing", snap.Draft)
+	}
+	m.SetDraft(ctx, proto.DraftSet{SessionID: s.ID, Text: "x"})
+	if err := m.Delete(ctx, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := m.Store.Setting(ctx, "draft:"+s.ID); v != nil {
+		t.Fatal("the draft outlived its session")
+	}
+}
+
+// A command the user types runs in the session's folder, holds the
+// session as a turn does, and the model reads what it printed.
+func TestShell(t *testing.T) {
+	q := newQueueTest(t, llm.Turn{Text: "看到了"})
+	close(q.h.go_)
+	shells := make(chan proto.Shell, 1)
+	t.Cleanup(q.m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventShell {
+			var sh proto.Shell
+			json.Unmarshal(e.Data, &sh)
+			shells <- sh
+		}
+	}))
+	ctx := context.Background()
+	if err := q.m.Shell(ctx, proto.ShellRun{SessionID: q.s.ID, Command: "sleep 0.3; echo hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.m.Shell(ctx, proto.ShellRun{SessionID: q.s.ID, Command: "echo again"}); err == nil {
+		t.Fatal("a second command ran beside the first")
+	}
+	if res := q.prompt(t, "看看输出", false); !res.Queued {
+		t.Fatal("a prompt did not wait for the command")
+	}
+	select {
+	case sh := <-shells:
+		if sh.Output != "hi\n" || sh.Stopped {
+			t.Fatalf("shell %+v", sh)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the command did not end")
+	}
+	q.end(t)
+	got := said(q.h.Requests[0])
+	if len(got) != 2 || got[0] != "I ran this command myself in the workspace:\n\n$ sleep 0.3; echo hi\nhi\n" || got[1] != "看看输出" {
+		t.Fatalf("the model read %q", got)
+	}
+}

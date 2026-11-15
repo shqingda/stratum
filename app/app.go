@@ -42,9 +42,12 @@ type App struct {
 	badge    int
 	p        *Palette
 	now      func() time.Time
-	err      string       // the last command that could not be sent
-	draft    string       // what the composer holds
-	recall   string       // a sent message ↑ brings back, for the next frame
+	err      string // the last command that could not be sent
+	draft    string // what the composer holds
+	recall   string // a sent message ↑ brings back, for the next frame
+	toEnd    bool   // put the composer's caret at the end of its draft
+	mention  mention
+	drafts   drafts       // keeps each session's draft in the kernel
 	query    string       // the sidebar's search
 	list     ui.ListState // the transcript
 	md       markdown.Options
@@ -184,6 +187,7 @@ func (a *App) View(c *ui.Context) {
 		a.keys(c)
 		return
 	}
+	a.syncDraft(c)
 	if a.settingsOpen {
 		a.settingsView(c)
 		a.keys(c)

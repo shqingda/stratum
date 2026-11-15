@@ -382,6 +382,9 @@
       }
     }
   },
+  "runsInTerminal": "在终端运行",
+  "shellWhileBusy": "这一轮结束后才能运行命令",
+  "editQueued": "改一改再发",
   "sendNow": "立即发送",
   "unqueue": "不发了",
   "steerSoon": "下一步插入",

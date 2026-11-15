@@ -46,6 +46,7 @@ func (a *App) composer(c *ui.Context) {
 func (a *App) dock(c *ui.Context) {
 	p := a.p
 	a.takeBack()
+	a.files(c)
 	if len(a.C.Queued) > 0 {
 		// The waiting prompts are a tray tucked under the composer's top.
 		ui.Column(c).Margin(0, 20, -1, 20).Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).Clip().
@@ -76,7 +77,25 @@ func (a *App) queue(c *ui.Context) {
 			} else {
 				sym(c, "corner-down-right", 14, p.Mute)
 			}
-			ui.Text(c, client.QueuedLabel(q)).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			// Its words, clicked, come back to the composer to change.
+			words := ui.ButtonBase(c.Key("edit:" + q.ID)).Row().Grow(1).MinWidth(0).Height(26).AlignItems(ui.Center).
+				Label(client.QueuedLabel(q)).Disabled(q.Images > 0)
+			if q.Images == 0 {
+				words.Tooltip(locales.EditQueued())
+			}
+			words.Children(func() {
+				col := p.Fg2
+				if words.Hovered() && q.Images == 0 {
+					col = p.Fg
+				}
+				ui.Text(c, client.QueuedLabel(q)).FontSize(13.5).TextColor(col).SingleLine().Ellipsis("…").MinWidth(0)
+			})
+			if words.Clicked() {
+				cmds, err := a.C.Unqueue(q.ID)
+				if a.do(cmds, err); err == nil {
+					a.putBack(q.Text)
+				}
+			}
 			if q.Steer {
 				ui.Text(c, locales.SteerSoon()).FontSize(12.5).TextColor(p.Live).SingleLine().Shrink(0)
 			} else if a.textButton(c, "now:"+q.ID, locales.SendNow()).Clicked() {
@@ -110,14 +129,24 @@ func (a *App) box(c *ui.Context) {
 		if a.questionFirst() {
 			ph = locales.ComposerAnswerPlaceholder()
 		}
-		recalled := a.recall != ""
-		if recalled {
-			a.draft, a.recall = a.recall, ""
+		if a.recall != "" {
+			a.draft, a.recall, a.toEnd = a.recall, "", true
 		}
 		area := ui.TextAreaBase(c, &a.draft)
-		if recalled {
+		if a.toEnd {
+			// A draft put in whole is written on from its end.
 			n := len([]rune(a.draft))
-			area.SetTextSelection(n, n) // go on writing at its end
+			area.SetTextSelection(n, n)
+			a.toEnd = false
+		}
+		if pl := a.mention.place; pl > 0 {
+			area.SetTextSelection(pl-1, pl-1)
+			a.mention.place = 0
+		}
+		if _, caret := area.TextSelection(); caret != a.mention.caret {
+			// The @ word is found before the composer is built.
+			a.mention.caret = caret
+			c.Invalidate()
 		}
 		area.Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
 			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
@@ -134,7 +163,15 @@ func (a *App) box(c *ui.Context) {
 				a.modePill(c, modeName(cur.Mode))
 			}
 			ui.Spacer(c)
-			a.contextRing(c)
+			if _, ok := a.command(); ok {
+				// A draft that starts with ! runs in the terminal.
+				ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(0, 6, 0, 0).Children(func() {
+					sym(c, "terminal-2", 14, p.Live)
+					ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
+				})
+			} else {
+				a.contextRing(c)
+			}
 			a.goButton(c)
 		})
 	})
@@ -145,7 +182,26 @@ func (a *App) ready() bool {
 	return strings.TrimSpace(a.draft) != "" || len(a.attached) > 0
 }
 
-func (a *App) submit() { a.send1(a.C.Prompt) }
+func (a *App) submit() {
+	if cmd, ok := a.command(); ok {
+		if a.C.Busy {
+			a.err = locales.ShellWhileBusy()
+			return
+		}
+		cmds, err := a.C.Shell(cmd)
+		if a.do(cmds, err); err == nil {
+			a.draft = ""
+		}
+		return
+	}
+	a.send1(a.C.Prompt)
+}
+
+// command is the command line a draft that starts with ! runs.
+func (a *App) command() (string, bool) {
+	cmd, ok := strings.CutPrefix(strings.TrimSpace(a.draft), "!")
+	return strings.TrimSpace(cmd), ok && len(a.attached) == 0
+}
 
 // steer sends the draft into the running turn.
 func (a *App) steer() { a.send1(a.C.Steer) }
@@ -171,10 +227,15 @@ func (a *App) takeBack() {
 	}
 	back := strings.Join(a.C.Returned[cur.ID], "\n\n")
 	delete(a.C.Returned, cur.ID)
+	a.putBack(back)
+}
+
+// putBack puts words into the composer before what it holds.
+func (a *App) putBack(text string) {
 	if strings.TrimSpace(a.draft) != "" {
-		back += "\n\n" + a.draft
+		text += "\n\n" + a.draft
 	}
-	a.draft = back
+	a.draft, a.toEnd = text, true
 }
 
 // iconPill is a composer control that is only a symbol.

@@ -1,9 +1,11 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
@@ -285,6 +287,15 @@ func TestQueueKeys(t *testing.T) {
 	if edit.ID != "q1" || edit.Action != "steer" {
 		t.Fatalf("⏎ on empty %+v", edit)
 	}
+	if err := tt.Click("排队"); err != nil { // its words: back to change
+		t.Fatal(err)
+	}
+	task8Command(t, a, proto.MethodQueueEdit, &edit)
+	if edit.Action != "remove" || a.draft != "排队" {
+		t.Fatalf("edit %+v, draft %q", edit, a.draft)
+	}
+	a.draft = ""
+	tt.Frame()
 	if err := tt.Click("不发了"); err != nil {
 		t.Fatal(err)
 	}
@@ -298,5 +309,105 @@ func TestQueueKeys(t *testing.T) {
 	tt.Frame()
 	if a.draft != "没发出去的" || len(a.C.Returned) != 0 {
 		t.Fatalf("taken back %q %v", a.draft, a.C.Returned)
+	}
+}
+
+// Each session keeps its own draft: leaving one keeps it in the kernel,
+// and the one opened shows what the kernel kept for it.
+func TestDraftPerSession(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Type("写给 1 的")
+	tt.Frame()
+	a.C.Current, a.C.Draft = nil, "" // on the way to session 2
+	tt.Frame()
+	var d proto.DraftSet
+	task8Command(t, a, proto.MethodDraftSet, &d)
+	if d.SessionID != "1" || d.Text != "写给 1 的" || a.draft != "" {
+		t.Fatalf("kept %+v, draft %q", d, a.draft)
+	}
+	a.C.Current, a.C.Draft = &a.C.Sessions[1], "2 的旧稿"
+	tt.Frame()
+	if a.draft != "2 的旧稿" {
+		t.Fatalf("draft %q", a.draft)
+	}
+	// A pause in typing keeps it.
+	tt.Type("，接着写")
+	tt.Advance(2 * time.Second)
+	tt.Frame()
+	task8Command(t, a, proto.MethodDraftSet, &d)
+	if d.SessionID != "2" || d.Text != "2 的旧稿，接着写" {
+		t.Fatalf("kept %+v", d)
+	}
+}
+
+// A draft that starts with ! runs as a command, once no turn runs.
+func TestBangCommand(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Type("!go test ./...")
+	if !tt.HasText("在终端运行") {
+		t.Fatal("no terminal hint")
+	}
+	tt.Key(0, ui.KeyEnter)
+	var sh proto.ShellRun
+	task8Command(t, a, proto.MethodShell, &sh)
+	if sh.Command != "go test ./..." || a.draft != "" {
+		t.Fatalf("ran %+v, draft %q", sh, a.draft)
+	}
+	a.C.Busy = true
+	tt.Type("!ls")
+	tt.Key(0, ui.KeyEnter)
+	task8NoCommand(t, a)
+	if a.err == "" || a.draft != "!ls" {
+		t.Fatalf("err %q draft %q", a.err, a.draft)
+	}
+}
+
+// @ and a few letters list the workspace's files; ↓ and ⏎ put one in.
+func TestMention(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Type("看看 @comp")
+	tt.Frame()
+	var q proto.FilesQuery
+	for {
+		cmds, ok := next(a)
+		if !ok {
+			break
+		}
+		if len(cmds) == 1 && cmds[0].Method == proto.MethodFilesFind {
+			json.Unmarshal(cmds[0].Params, &q)
+		}
+	}
+	if q.Query != "comp" {
+		t.Fatalf("asked for %+v", q)
+	}
+	a.C.Files, a.C.FilesFor = []string{"app/composer.go", "app/compact.go"}, "comp"
+	tt.Frame()
+	if !tt.HasText("composer.go") {
+		t.Fatal("no list")
+	}
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyEnter)
+	task8NoCommand(t, a)
+	tt.Frame()
+	tt.Type("里")
+	tt.Frame()
+	if a.draft != "看看 @app/compact.go 里" {
+		t.Fatalf("draft %q", a.draft)
+	}
+
+	a.C.Busy = true
+	tt.Type(" @c")
+	a.C.FilesFor = "c"
+	tt.Frame()
+	for _, ok := next(a); ok; _, ok = next(a) {
+	}
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	task8NoCommand(t, a) // Escape put the list away and stopped nothing
+	if tt.HasText("composer.go") {
+		t.Fatal("the list stayed")
 	}
 }

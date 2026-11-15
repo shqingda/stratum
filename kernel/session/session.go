@@ -252,7 +252,21 @@ func (m *Manager) Get(ctx context.Context, id string) (proto.Snapshot, error) {
 		}
 	}
 	m.mu.Unlock()
+	if d, err := m.Store.Setting(ctx, store.DraftKey(id)); err == nil {
+		snap.Draft = string(d)
+	}
 	return snap, nil
+}
+
+// SetDraft keeps what the user is writing to a session.
+func (m *Manager) SetDraft(ctx context.Context, d proto.DraftSet) error {
+	if _, err := m.session(ctx, d.SessionID); err != nil {
+		return err
+	}
+	if d.Text == "" {
+		return m.Store.DeleteSetting(ctx, store.DraftKey(d.SessionID))
+	}
+	return m.Store.SetSetting(ctx, store.DraftKey(d.SessionID), []byte(d.Text))
 }
 
 func (m *Manager) session(ctx context.Context, id string) (store.Session, error) {
@@ -399,9 +413,8 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 	if receipt != "" {
 		m.Store.PutReceipt(ctx, store.Receipt{ID: receipt, SessionID: x.ID, Method: proto.MethodPrompt, Status: "accepted"})
 	}
-	go func() {
-		defer m.wg.Done()
-		err := m.turn(runCtx, x, r, p)
+	go m.drive(runCtx, x, r, func(ctx context.Context) error {
+		err := m.turn(ctx, x, r, p)
 		if receipt != "" {
 			rc := store.Receipt{ID: receipt, SessionID: x.ID, Method: proto.MethodPrompt, Status: "completed"}
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -409,36 +422,85 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 			}
 			m.Store.PutReceipt(context.Background(), rc)
 		}
-		// A turn that ended well takes the next prompt waiting: those
-		// that meant to join it and came too late first, all together,
-		// else the oldest one.
-		for err == nil {
-			m.mu.Lock()
-			next, ok := r.next()
-			q := items(r.queued)
-			m.mu.Unlock()
-			if !ok {
-				break
-			}
-			m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
-			if x2, e := m.Store.GetSession(context.WithoutCancel(runCtx), x.ID); e == nil {
-				x = x2 // its model or mode may have changed meanwhile
-			}
-			err = m.turn(runCtx, x, r, next)
-		}
-		cancel()
-		m.mu.Lock()
-		delete(m.runs, x.ID)
-		back := items(r.queued)
-		r.queued = nil
-		m.mu.Unlock()
-		// Stopped or failed, the turns go no further: what still waits
-		// goes back to the user rather than running unasked.
-		if len(back) > 0 {
-			m.stream(x.ID, proto.EventQueue, proto.Queue{Returned: back})
-		}
-	}()
+		return err
+	})
 	return proto.PromptResult{}, nil
+}
+
+// Shell runs a command the user typed.
+func (m *Manager) Shell(ctx context.Context, sh proto.ShellRun) error {
+	if strings.TrimSpace(sh.Command) == "" {
+		return proto.Errorf("bad_request", "command is empty")
+	}
+	x, err := m.session(ctx, sh.SessionID)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	if m.runs[x.ID] != nil {
+		m.mu.Unlock()
+		return proto.Errorf("busy", "a turn is running")
+	}
+	if m.runs == nil {
+		m.runs = map[string]*run{}
+	}
+	runCtx, cancel := context.WithCancel(context.Background())
+	r := &run{cancel: cancel, approvals: map[string]*pending{}}
+	m.runs[x.ID] = r
+	m.wg.Add(1)
+	m.mu.Unlock()
+	m.stream(x.ID, proto.EventShellStart, sh)
+	go m.drive(runCtx, x, r, func(ctx context.Context) error {
+		// The user typed it, so it asks nothing; outside full access it
+		// stays in the sandbox all the same.
+		args, _ := json.Marshal(map[string]any{"command": sh.Command, "unrestricted": x.Mode == "full"})
+		out, err := tools.Shell.Run(ctx, tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed}, args)
+		rec := proto.Shell{Command: sh.Command, Output: out}
+		switch {
+		case ctx.Err() != nil:
+			rec.Stopped, err = true, ctx.Err()
+		case err != nil:
+			rec.Output = err.Error()
+		}
+		m.record(ctx, x.ID, proto.EventShell, rec)
+		return err
+	})
+	return nil
+}
+
+// drive runs first, a turn or a command of the user's, then the turns
+// the prompts waiting meanwhile start, until none waits or one ends badly;
+// then the session is free again.
+func (m *Manager) drive(ctx context.Context, x store.Session, r *run, first func(context.Context) error) {
+	defer m.wg.Done()
+	err := first(ctx)
+	// What ended well takes the next prompt waiting: those that meant to
+	// join it and came too late first, all together, else the oldest one.
+	for err == nil {
+		m.mu.Lock()
+		next, ok := r.next()
+		q := items(r.queued)
+		m.mu.Unlock()
+		if !ok {
+			break
+		}
+		m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
+		if x2, e := m.Store.GetSession(context.WithoutCancel(ctx), x.ID); e == nil {
+			x = x2 // its model or mode may have changed meanwhile
+		}
+		err = m.turn(ctx, x, r, next)
+	}
+	r.cancel()
+	m.mu.Lock()
+	delete(m.runs, x.ID)
+	back := items(r.queued)
+	r.queued = nil
+	m.mu.Unlock()
+	// Stopped or failed, the turns go no further: what still waits goes
+	// back to the user rather than running unasked.
+	if len(back) > 0 {
+		m.stream(x.ID, proto.EventQueue, proto.Queue{Returned: back})
+	}
 }
 
 // turn runs one turn to its end and records it.

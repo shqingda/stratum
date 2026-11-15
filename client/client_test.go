@@ -638,3 +638,22 @@ func TestTaskGraph(t *testing.T) {
 		t.Fatalf("%+v %+v", e.Tasks[0], e.Tasks[1])
 	}
 }
+
+func TestShellCommand(t *testing.T) {
+	c, _ := connected(t, []proto.Event{})
+	cmds, err := c.Shell("go test ./...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := params[proto.ShellRun](t, cmds[0]); p.Command != "go test ./..." || p.SessionID != sid {
+		t.Error(p)
+	}
+	c.Receive(ev(0, proto.EventShellStart, proto.ShellRun{SessionID: sid, Command: "go test ./..."}))
+	if !c.Busy || len(c.Entries) != 1 || !c.Entries[0].Typed || c.Entries[0].Done {
+		t.Fatalf("busy %v %+v", c.Busy, c.Entries)
+	}
+	c.Receive(ev(1, proto.EventShell, proto.Shell{Command: "go test ./...", Output: "ok"}))
+	if e := c.Entries[0]; c.Busy || len(c.Entries) != 1 || !e.Done || e.Output != "ok" || e.Turn != -1 {
+		t.Fatalf("busy %v %+v", c.Busy, c.Entries)
+	}
+}

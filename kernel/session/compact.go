@@ -20,12 +20,20 @@ const compactPrompt = "The conversation is about to outgrow the context window. 
 // history is what the model is sent of a session: its messages, from the
 // last compaction's summary on.
 func (m *Manager) history(ctx context.Context, sessionID string) ([]llm.Message, error) {
-	events, err := m.Store.Events(ctx, sessionID, 0, 0, store.MessageEvent, proto.EventCompaction)
+	events, err := m.Store.Events(ctx, sessionID, 0, 0, store.MessageEvent, proto.EventCompaction, proto.EventShell)
 	if err != nil {
 		return nil, err
 	}
 	var out []llm.Message
 	for _, e := range events {
+		if e.Type == proto.EventShell {
+			// A command of the user's is something they tell the model.
+			var sh proto.Shell
+			if json.Unmarshal(e.Data, &sh) == nil {
+				out = append(out, llm.Text(llm.User, shellNote(sh)))
+			}
+			continue
+		}
 		if e.Type == proto.EventCompaction {
 			var c proto.Compaction
 			if json.Unmarshal(e.Data, &c) == nil {
@@ -85,4 +93,13 @@ func (m *Manager) compact(ctx context.Context, provider llm.Provider, req llm.Re
 		return nil, reply.Usage, err
 	}
 	return summarized(summary), reply.Usage, nil
+}
+
+// shellNote is how the model reads a command the user ran.
+func shellNote(sh proto.Shell) string {
+	note := "I ran this command myself in the workspace:\n\n$ " + sh.Command + "\n" + sh.Output
+	if sh.Stopped {
+		note += "\n[stopped before it finished]"
+	}
+	return note
 }

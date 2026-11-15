@@ -172,6 +172,15 @@ func (s *Store) SetSetting(ctx context.Context, key string, value []byte) error 
 	return err
 }
 
+// DraftKey is the setting a session's draft is kept under.
+func DraftKey(id string) string { return "draft:" + id }
+
+// DeleteSetting forgets what is kept under key.
+func (s *Store) DeleteSetting(ctx context.Context, key string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM settings WHERE key=?`, key)
+	return err
+}
+
 // GetSession loads a session.
 func (s *Store) GetSession(ctx context.Context, id string) (Session, error) {
 	return scanSession(s.db.QueryRowContext(ctx, `SELECT `+sessionCols+` FROM sessions WHERE id=?`, id))
@@ -206,6 +215,9 @@ func (s *Store) DeleteSession(ctx context.Context, id string) error {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE id=?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM settings WHERE key=?`, DraftKey(id)); err != nil {
 		return err
 	}
 	return tx.Commit()

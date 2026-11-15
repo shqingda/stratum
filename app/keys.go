@@ -60,6 +60,10 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
 	}
+	if m := &a.mention; m.open && key == ui.KeyEscape && mods == 0 {
+		m.shut, m.open = m.at+1, false
+		return true
+	}
 	if a.questionFirst() {
 		// The composer answers the model's question: Enter sends, Esc skips.
 		ap := a.C.Approvals[0]
@@ -135,6 +139,9 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 func (a *App) composerKey(k ui.TextKey) bool {
 	text := k.Text()
 	a.draft = text
+	if a.mentionKey(k) {
+		return true
+	}
 	// ↑ in an empty composer brings back the last thing sent, to send
 	// again or change.
 	if k.Key == ui.KeyUp && k.Mods == 0 && strings.TrimSpace(text) == "" {

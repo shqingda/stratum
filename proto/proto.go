@@ -135,6 +135,51 @@ type Snapshot struct {
 	Running   bool       `json:"running"`
 	Queued    []Queued   `json:"queued,omitempty"`    // prompts waiting for the turn to take them
 	Approvals []Approval `json:"approvals,omitempty"` // waiting for the user
+	Draft     string     `json:"draft,omitempty"`     // what the user was writing to it
+}
+
+// MethodShell runs a command the user typed (!command) in the session's
+// folder, sandboxed as its mode says: ShellRun → {}. It holds the session
+// as a turn does; prompts sent meanwhile wait for it. What it printed goes
+// into the conversation for the model to read.
+const MethodShell = "shell.run"
+
+// ShellRun is a command line of the user's.
+type ShellRun struct {
+	SessionID string `json:"sessionId"`
+	Command   string `json:"command"`
+}
+
+const (
+	EventShellStart = "shell.start" // ShellRun, as it starts
+	EventShell      = "shell"       // durable; Shell, once it ended
+)
+
+// Shell is a command of the user's and what it printed.
+type Shell struct {
+	Command string `json:"command"`
+	Output  string `json:"output"`
+	Stopped bool   `json:"stopped,omitempty"`
+}
+
+// MethodFilesFind finds the files of a workspace a query names, for the
+// composer's @: FilesQuery → []string, paths relative to Cwd, best first.
+const MethodFilesFind = "files.find"
+
+type FilesQuery struct {
+	Cwd   string `json:"cwd"`
+	Query string `json:"query"`
+	Limit int    `json:"limit,omitempty"` // 20 when zero
+}
+
+// MethodDraftSet keeps what the user is writing to a session, so that it
+// is there when they come back to it, after a crash too: DraftSet → {}.
+const MethodDraftSet = "draft.set"
+
+// DraftSet is a session's draft; empty forgets it.
+type DraftSet struct {
+	SessionID string `json:"sessionId"`
+	Text      string `json:"text"`
 }
 
 // Prompt sends the user's message. While a turn runs, it waits in the

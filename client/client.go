@@ -79,6 +79,8 @@ type Entry struct {
 	Failed bool
 	Args   json.RawMessage // a tool call's original arguments
 	Turn   int             // index in Client.Turns of the turn it is in; -1 before any
+	// Typed is a command the user ran themselves (!command), in no turn.
+	Typed bool
 	// Took is how long a thinking entry streamed, 0 when it was read
 	// from the log.
 	Took time.Duration
@@ -132,6 +134,12 @@ type Client struct {
 	// Returned are prompts that were still waiting when a session's turns
 	// stopped, by session, for the composer to take back.
 	Returned map[string][]string
+	// Draft is what the user was writing to the current session when it
+	// was last left, as the kernel kept it.
+	Draft string
+	// Files are the workspace's files FindFiles last found, for FilesFor.
+	Files    []string
+	FilesFor string
 	// Older is the log having events before the ones shown.
 	Older, LoadingOlder bool
 	// MCP is how the MCP servers are for the folder MCPFor, nil until
@@ -417,6 +425,7 @@ func (c *Client) bind(id string) proto.Command {
 		c.Current = &s.Session
 		c.upsertSession(s.Session)
 		c.Queued = s.Queued
+		c.Draft = s.Draft
 		if s.Revision > tailSize {
 			c.cursor, c.trim = s.Revision-tailSize, true
 		}
@@ -650,6 +659,23 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.endStream()
 			c.notice("%s", locales.FellBack(c.modelName(f.From), c.modelName(f.To)))
 		}
+	case proto.EventShellStart:
+		var sh proto.ShellRun
+		if json.Unmarshal(e.Data, &sh) == nil {
+			c.endStream()
+			c.Busy = true
+			c.typed(sh.Command)
+		}
+	case proto.EventShell:
+		var sh proto.Shell
+		if json.Unmarshal(e.Data, &sh) == nil {
+			c.Busy = false
+			en := c.typedRunning(sh.Command)
+			if en == nil {
+				en = c.typed(sh.Command)
+			}
+			en.Seq, en.Output, en.Done, en.Failed = e.Seq, sh.Output, true, sh.Stopped
+		}
 	case proto.EventQueue:
 		var q proto.Queue
 		if json.Unmarshal(e.Data, &q) == nil {
@@ -848,6 +874,57 @@ func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Co
 	}
 	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
 	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
+}
+
+// Shell runs a command line of the user's in the current session.
+func (c *Client) Shell(command string) ([]proto.Command, error) {
+	if strings.TrimSpace(command) == "" {
+		return nil, errors.New(locales.NothingToSend())
+	}
+	return c.mutation(proto.MethodShell, proto.ShellRun{SessionID: sessionID(c.Current), Command: command}, nil)
+}
+
+// typed adds a command the user runs as a shell step of no turn.
+func (c *Client) typed(command string) *Entry {
+	args, _ := json.Marshal(map[string]string{"command": command})
+	e := c.add(&Entry{Role: Tool, Text: "shell", Detail: command, Args: args, Typed: true})
+	e.Turn = -1
+	return e
+}
+
+// typedRunning is the command of the user's that runs, if it is command.
+func (c *Client) typedRunning(command string) *Entry {
+	if n := len(c.Entries); n > 0 {
+		if e := c.Entries[n-1]; e.Typed && !e.Done && e.Detail == command {
+			return e
+		}
+	}
+	return nil
+}
+
+// FindFiles asks for the current session's files that query names; the
+// answer lands in Files, unless another query was asked for meanwhile.
+func (c *Client) FindFiles(query string) []proto.Command {
+	if c.Phase != Ready || c.Current == nil {
+		return nil
+	}
+	c.FilesFor = query
+	return []proto.Command{c.read(proto.MethodFilesFind, proto.FilesQuery{Cwd: c.Current.Cwd, Query: query, Limit: 8}, func(r json.RawMessage) []proto.Command {
+		if c.FilesFor == query {
+			c.Files = nil
+			json.Unmarshal(r, &c.Files)
+		}
+		return nil
+	})}
+}
+
+// SetDraft keeps what the user is writing to a session.
+// It needs no session open: it is sent as the user leaves one.
+func (c *Client) SetDraft(sessionID, text string) ([]proto.Command, error) {
+	if c.Phase != Syncing && c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	return []proto.Command{c.mutate(proto.MethodDraftSet, proto.DraftSet{SessionID: sessionID, Text: text}, nil)}, nil
 }
 
 // Unqueue takes back a waiting prompt; SendNow makes it join the running

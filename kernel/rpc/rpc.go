@@ -15,6 +15,7 @@ import (
 
 	"github.com/shqingda/talos/kernel/session"
 	"github.com/shqingda/talos/kernel/store"
+	ws "github.com/shqingda/talos/kernel/workspace"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -155,6 +156,18 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Prompt(ctx, p, cmd.ID)
+	case proto.MethodShell:
+		p, err := params[proto.ShellRun](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return nil, m.Shell(ctx, p)
+	case proto.MethodDraftSet:
+		p, err := params[proto.DraftSet](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return nil, m.SetDraft(ctx, p)
 	case proto.MethodQueueEdit:
 		p, err := params[proto.QueueEdit](cmd)
 		if err != nil {
@@ -235,6 +248,16 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 	// --- 任务4 ---
 	if cmd.Method == proto.MethodSearch {
 		return s.search(ctx, cmd)
+	}
+	if cmd.Method == proto.MethodFilesFind {
+		p, err := params[proto.FilesQuery](cmd)
+		if err != nil {
+			return nil, err
+		}
+		if p.Limit <= 0 {
+			p.Limit = 20
+		}
+		return ws.Match(listed(ctx, p.Cwd), p.Query, p.Limit), nil
 	}
 	if cmd.Method == proto.MethodWorkspace {
 		p, err := params[proto.WorkspaceQuery](cmd)
