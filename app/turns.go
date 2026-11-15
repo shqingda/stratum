@@ -26,9 +26,31 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 		open = !open
 		a.opened[key] = open
 	}
+	// After how long it took, what it came to: the files it changed and
+	// the commands it ran, the steps worth knowing without opening it.
+	files, runs := map[string]bool{}, 0
+	for _, e := range steps {
+		switch {
+		case e.Role != client.Tool || e.Failed:
+		case e.Text == "edit_file" || e.Text == "write_file":
+			files[e.Detail] = true
+		case e.Text == "shell":
+			runs++
+		}
+	}
+	var did []string
+	if len(files) > 0 {
+		did = append(did, locales.EditedFiles(len(files)))
+	}
+	if runs > 0 {
+		did = append(did, locales.RanCommands(runs))
+	}
 	row.Children(func() {
 		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
-		ui.Text(c, label).FontSize(13.5).TextColor(p.Mute).SingleLine()
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).SingleLine().Shrink(0)
+		if len(did) > 0 {
+			ui.Text(c, "· "+strings.Join(did, locales.ClauseSeparator())).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+		}
 		ui.Spacer(c)
 	})
 	if !open {

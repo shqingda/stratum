@@ -14,13 +14,15 @@ import (
 
 const (
 	barHeight    = 52
-	sidebarWidth = 252
+	sheetBar     = 48 // the title bar on a sheet, under the gap above it
+	sidebarWidth = 264
 )
 
 // sym draws an SF Symbol.
 // iconButton is a 28-point square button holding a symbol.
 func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
+	press(b)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
@@ -30,7 +32,7 @@ func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 
 func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	p := a.p
-	side := ui.Column(c).Width(sidebarWidth).Shrink(0).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
+	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 	if !vibrant {
 		side.Background(p.Side)
 	}
@@ -38,15 +40,12 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		bar := c.TitleBar()
 		ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 12, 0, bar.Left+8).Gap(2).DragWindow().Children(func() {
 			ui.Spacer(c)
-			if a.iconButton(c, "new-top", "edit", locales.NewSession()).Clicked() {
+			if a.iconButton(c, "new-top", "edit", locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
 				a.do(a.C.NewSession())
 			}
 		})
 		a.search(c)
 		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
-			if a.navItem(c, "new", "message-plus", locales.NewSession(), "⌘N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
-				a.do(a.C.NewSession())
-			}
 			a.navItem(c, "cron", "clock-play", locales.Scheduled(), "")
 			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
 				a.openMCP()
@@ -144,7 +143,7 @@ func (a *App) sessions(c *ui.Context) {
 
 func (a *App) group(c *ui.Context, symbol, label string, n int) {
 	p := a.p
-	ui.Row(c).Height(28).Margin(10, 0, 0, 0).Padding(0, 10).Gap(6).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Height(24).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).Children(func() {
 		if symbol != "" {
 			sym(c, symbol, 13, p.Mute)
 		}
@@ -179,10 +178,14 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)
 	n := len(a.visibleSessions) // its ⌘ number
-	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(30).Padding(0, 10).Gap(9).Radius(7).AlignItems(ui.Center).Label(title(s))
+	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(30).Padding(0, 10).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
+	row.Transition(ui.ElementTransition{Position: true, Colors: true, Shadows: true, Duration: 180 * time.Millisecond})
 	switch {
-	case on:
+	case on && p == dark:
 		row.Background(p.Sel)
+	case on:
+		// The open session is a pill of paper raised off the sidebar.
+		row.Background(p.Card).Shadow(0, 0, 0, .5, p.Edge).Shadow(0, 1, 2, 0, ink.Alpha(.06))
 	case row.Hovered():
 		row.Background(p.Hover)
 	}
@@ -218,13 +221,26 @@ func slot(c *ui.Context, p *Palette, st string) {
 		case "wait":
 			ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
 		case "run":
-			ui.Box(c).Size(2, 12).Background(p.Live)
+			spinner(c, p, 12)
 		case "unread":
 			ui.Box(c).Size(6, 6).Radius(3).Background(p.Fg2)
 		case "fail":
-			ui.Box(c).Size(7, 2).Background(p.Minus)
+			ui.Box(c).Size(7, 7).Radius(2).Background(p.Minus)
 		}
 	})
+}
+
+// spinner is a faint ring with a quarter of it lit, going round: work
+// under way.
+func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
+	ring := ui.Box(c).Size(size, size).Radius(size/2).Border(1.6, p.LiveBg.Alpha(.2))
+	turn := ring.Loop("spin", 900*time.Millisecond, ui.Linear)
+	black := ui.RGBA(0, 0, 0, 1)
+	ring.Children(func() {
+		ui.Box(c).Absolute().Fill().Radius(size/2).Border(1.6, p.Live).
+			MaskConicGradient(ui.ConicGradient{Angle: turn * 360, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: .28}, {Color: ui.Transparent, At: .3}, {Color: ui.Transparent, At: 1}}})
+	})
+	return ring
 }
 
 func (a *App) footer(c *ui.Context) {

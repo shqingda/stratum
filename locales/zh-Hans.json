@@ -382,6 +382,22 @@
       }
     }
   },
+  "editedFiles": "改了 {count} 个文件",
+  "@editedFiles": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ranCommands": "运行 {count} 次",
+  "@ranCommands": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "browse": "浏览",
   "expandSteps": "展开步骤",
   "thinkingNow": "思考中",

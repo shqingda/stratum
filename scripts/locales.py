@@ -281,6 +281,8 @@ m("browsedFiles", "浏览了 {count} 个文件", "Read " + P("# file", "# files"
 m("listedDirs", "列出 {count} 个目录", "Listed " + P("# folder", "# folders"))
 m("searchedTimes", "搜索 {count} 次", "Searched " + P("once", "# times"))
 m("gitLooks", "查看 git {count} 次", "Checked git " + P("once", "# times"))
+m("editedFiles", "改了 {count} 个文件", "Changed " + P("# file", "# files"))
+m("ranCommands", "运行 {count} 次", "Ran " + P("# command", "# commands"))
 m("browse", "浏览", "Browsed")
 m("expandSteps", "展开步骤", "Show Steps")
 m("thinkingNow", "思考中", "Thinking")

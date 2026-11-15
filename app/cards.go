@@ -167,7 +167,8 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 	if a.inWork && !a.editLine(c, e, path, oldText, newText) {
 		return
 	}
-	box := ui.Column(c.Key("card:"+e.CallID)).Margin(10, 0).Radius(10).Background(p.Card).InsetShadow(0, 0, 0, .5, p.Edge2).Clip()
+	box := ui.Column(c.Key("card:"+e.CallID)).Margin(8, 0, 14, 0).Radius(12).Background(p.Card).Clip()
+	raise(box, p)
 	diff := ui.Local(box, "diff", func() cardDiff { return cardDiff{} })
 	if diff.lines == nil || diff.oldText != oldText || diff.newText != newText {
 		*diff = cardDiff{oldText: oldText, newText: newText}

@@ -240,6 +240,8 @@
   "listedDirs": "Listed {count, plural, one {# folder} other {# folders}}",
   "searchedTimes": "Searched {count, plural, one {once} other {# times}}",
   "gitLooks": "Checked git {count, plural, one {once} other {# times}}",
+  "editedFiles": "Changed {count, plural, one {# file} other {# files}}",
+  "ranCommands": "Ran {count, plural, one {# command} other {# commands}}",
   "browse": "Browsed",
   "expandSteps": "Show Steps",
   "thinkingNow": "Thinking",

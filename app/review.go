@@ -194,7 +194,8 @@ func (a *App) reviewToggle(c *ui.Context) {
 func (a *App) reviewPanel(c *ui.Context) {
 	p := a.p
 	turns := a.shownTurns()
-	ui.Column(c).Width(reviewWidth).Shrink(0).Background(p.Pane).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge).Children(func() {
+	panel := ui.Column(c).Width(reviewWidth).Shrink(0).Margin(sheetGap, sheetGap, sheetGap, 0).Radius(12).Background(p.Sheet).Clip()
+	raise(panel, p).Children(func() {
 		a.reviewTabs(c, fileCount(turns))
 		switch a.rv.tab {
 		case "term":

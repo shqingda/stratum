@@ -17,7 +17,7 @@ import (
 	"github.com/shqingda/talos/proto"
 )
 
-const columnWidth = 640
+const columnWidth = 680
 
 // tools is how a tool call shows: its symbol and verb.
 // toolInfo is how a tool shows in the transcript.
@@ -83,9 +83,9 @@ func (a *App) bar(c *ui.Context) {
 	p := a.p
 	// Past the sidebar the title starts at 20; with the sidebar in, past
 	// its toggle; in between, as far as the sidebar is.
-	shut := toggleLeft(c) + 28 + 12
-	left := 20*a.sideOpen + shut*(1-a.sideOpen)
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
+	shut := toggleLeft(c) + 28 + 12 - sheetGap
+	left := 22*a.sideOpen + shut*(1-a.sideOpen)
+	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 10, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		cur := a.C.Current
 		if cur == nil {
 			ui.Text(c, phaseText(a.C.Phase)).FontSize(14.5).FontWeight(600).TextColor(p.Mute)
@@ -138,7 +138,13 @@ func (a *App) transcript(c *ui.Context) {
 		n++
 	}
 	list := ui.List(c, &a.list, n, func(i int) {
-		ui.Row(c).Justify(ui.Center).Padding(0, 28).Children(func() {
+		row := ui.Row(c).Justify(ui.Center).Padding(0, 28)
+		// What the running turn adds rises into place; rows already there
+		// when a session opens just show.
+		if i >= len(items) || items[i].live || i == len(items)-1 && items[i].e != nil && items[i].e.Role == client.User {
+			row.Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Duration: 220 * time.Millisecond})
+		}
+		row.Children(func() {
 			ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() {
 				if i >= len(items) {
 					a.turn(c, true, func() { a.running(c) })
@@ -161,11 +167,15 @@ func (a *App) transcript(c *ui.Context) {
 				}
 			})
 		})
-	}).Grow(1).Padding(18, 0, 24, 0)
-	// Rows fade out under the bar rather than being cut at its edge.
+	}).Grow(1).Padding(18, 0, a.dockH+28, 0)
+	// Rows fade out under the bar, and above the composer floating at the
+	// foot, rather than being cut at an edge.
 	if h := list.Bounds().H; h > 0 {
 		black := ui.RGBA(0, 0, 0, 1)
-		list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h}, {Color: black, At: 1}}})
+		foot := max(0, h-a.dockH)
+		list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+			{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h},
+			{Color: black, At: max(28, foot-56) / h}, {Color: ui.Transparent, At: foot / h}}})
 	}
 }
 
@@ -410,9 +420,17 @@ func (a *App) turn(c *ui.Context, live bool, content func()) {
 func (a *App) running(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Height(28).Gap(8).AlignItems(ui.Center).Children(func() {
-		dot := ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
-		dot.Opacity(.35 + .65*(1-dot.Loop("beat", 1600*time.Millisecond, ui.Bounce(ui.EaseInOut))))
-		ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
+		spinner(c, p, 12)
+		// A faint blue light passes over the words, left to right.
+		words := ui.Box(c)
+		at := words.Loop("shine", 1800*time.Millisecond, ui.EaseInOut)*1.6 - .3
+		black := ui.RGBA(0, 0, 0, 1)
+		words.Children(func() {
+			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
+			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Live).Absolute().Left(0).Top(0).AccessHidden(true).
+				MaskLinearGradient(ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+					{Color: ui.Transparent, At: at - .25}, {Color: black, At: at}, {Color: ui.Transparent, At: at + .25}}})
+		})
 	})
 }
 
@@ -597,8 +615,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 	}
 	p := a.p
 	busy := a.C.Answering[ap.ID]
-	ui.Column(c).Margin(12, 0).Padding(14, 14, 12, 16).Radius(12).Background(p.Card).Border(.5, p.Edge2).
-		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
+	a.waiting(c).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			slot(c, p, "wait")
 			kind := ap.Tool
@@ -626,9 +643,13 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 		if what == "" {
 			what = compact(ap.Args)
 		}
-		ui.Row(c).Padding(9, 11).Radius(8).Background(p.Chip).Margin(10, 0, 8, 0).Children(func() {
+		ui.Row(c).Padding(9, 12).Radius(9).Background(p.Chip).Margin(11, 0, 9, 0).Children(func() {
 			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
-				ui.Text(c, home(a.C.Current.Cwd)+" $").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Margin(0, 7.5, 0, 0).Unselectable()
+				// A long folder gives way to the command, cut short in
+				// the middle so both ends still say where it is.
+				cwd := home(a.C.Current.Cwd)
+				ui.Text(c, cwd).Font("monospace").FontSize(13.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MaxWidth(160).Shrink(0).Unselectable().Tooltip(cwd)
+				ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Margin(0, 8, 0, 6).Unselectable()
 			}
 			ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
 		})
@@ -664,13 +685,21 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 	})
 }
 
+// waiting is the card of what waits on the user: the top layer of the
+// sheet, edged in blue, rising into place as it comes.
+func (a *App) waiting(c *ui.Context) ui.Element {
+	p := a.p
+	card := ui.Column(c).Margin(6, 0, 18, 0).Padding(14, 14, 14, 16).Radius(14).Background(p.Card).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 10, Scale: .98, Opacity: 0}})
+	return lift(card, p).InsetShadow(0, 0, 0, 1, p.Live)
+}
+
 // question is the model asking the user: the question, the options it
 // gave, and the composer below for any other answer.
 func (a *App) question(c *ui.Context, ap proto.Approval) {
 	p := a.p
 	busy := a.C.Answering[ap.ID]
-	ui.Column(c).Margin(12, 0).Padding(14, 14, 12, 16).Radius(12).Background(p.Card).Border(.5, p.Edge2).
-		Shadow(0, 0, 0, 4, p.LiveBg).Children(func() {
+	a.waiting(c).Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			slot(c, p, "wait")
 			ui.Text(c, locales.Question()).FontSize(13.5).FontWeight(600).TextColor(p.Fg)
@@ -704,7 +733,8 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 // ink on paper turned over.
 func (a *App) button(c *ui.Context, key, label, kbd string, primary bool) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label)
+	b := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 12).Gap(8).Radius(8).AlignItems(ui.Center).Label(label)
+	press(b)
 	fg, hint := p.Fg, p.Mute
 	if primary {
 		b.Background(p.Acc)

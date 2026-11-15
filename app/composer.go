@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
@@ -28,10 +29,13 @@ func effortLabel(effort string) string {
 // composer is the box the user writes in, under the transcript: prompts
 // waiting for the running turn above it, the session's settings in it and
 // a status line under it.
+// It floats over the foot of the transcript, which fades out above it.
 func (a *App) composer(c *ui.Context) {
-	ui.Row(c).Justify(ui.Center).Padding(0, 28, 12, 28).Shrink(0).Children(func() {
+	dock := ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Justify(ui.Center).Padding(0, 28, 10, 28)
+	dock.Children(func() {
 		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() { a.dock(c) })
 	})
+	a.dockH = dock.Bounds().H
 }
 
 // dock is the composer with the prompts queued above it and the status
@@ -39,9 +43,15 @@ func (a *App) composer(c *ui.Context) {
 // of an empty session.
 func (a *App) dock(c *ui.Context) {
 	p := a.p
-	for i, q := range a.C.Queued {
-		ui.Row(c.Key(i)).Height(34).Padding(0, 6, 0, 12).Margin(0, 10, -1, 10).Gap(8).AlignItems(ui.Center).
-			Radius(10, 10, 0, 0).Background(p.Pane).Border(.5, p.Edge).Children(func() {
+	seen := map[string]int{}
+	for _, q := range a.C.Queued {
+		seen[q]++ // the same words queued twice are two rows
+		ui.Row(c.Key(struct {
+			q string
+			n int
+		}{q, seen[q]})).Height(34).Padding(0, 6, 0, 12).Margin(0, 20, -1, 20).Gap(8).AlignItems(ui.Center).
+			Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 12, Opacity: 0}, Exit: &ui.Motion{Y: -24, Opacity: 0}}).Children(func() {
 			sym(c, "corner-down-right", 14, p.Mute)
 			ui.Text(c, q).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		})
@@ -58,12 +68,8 @@ func (a *App) dock(c *ui.Context) {
 func (a *App) box(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(12, 10, 8, 14)
-	if p == dark {
-		box.Shadow(0, 12, 32, -12, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .05))
-	} else {
-		box.Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .04)).Shadow(0, 8, 24, -12, ui.RGBA(0, 0, 0, .12))
-	}
+	box := ui.Column(c).Radius(18).Background(p.Card).Padding(12, 10, 8, 16)
+	lift(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {
 		a.attachPaths(files)
 	}
@@ -149,17 +155,35 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 // goButton sends, or stops the running turn.
 func (a *App) goButton(c *ui.Context) {
 	p := a.p
-	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4)
+	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4).
+		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond})
+	press(b)
+	// The arrow and the stop square cross-fade where they are, so the
+	// button turns into the other rather than being swapped.
+	glyph := func(stop bool, fg ui.Color) {
+		ui.Box(c).Absolute().Fill().Center().Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .6, Opacity: 0}, Exit: &ui.Motion{Scale: .6, Opacity: 0}}).
+			Key(stop).Children(func() {
+			if stop {
+				ui.Box(c).Size(10, 10).Radius(2).Background(fg)
+			} else {
+				sym(c, "arrow-up", 16, fg)
+			}
+		})
+	}
 	switch {
 	case a.C.Busy && !a.ready():
-		b.Label(locales.Stop()).Background(p.Fg).Children(func() { ui.Box(c).Size(10, 10).Radius(2).Background(p.Bg) })
+		b.Label(locales.Stop()).Background(p.Acc).Children(func() {
+			glyph(true, p.OnAcc)
+			// A ring round it goes while the turn runs.
+			ui.Box(c).Absolute().Left(-3).Top(-3).Size(36, 36).Children(func() { spinner(c, p, 36) })
+		})
 		if b.Clicked() {
 			a.do(a.C.Cancel())
 		}
 	case !a.ready() || !a.C.CanAct():
-		b.Label(locales.Send()).Background(p.Chip).Children(func() { sym(c, "arrow-up", 16, p.Mute) })
+		b.Label(locales.Send()).Background(p.Chip).Children(func() { glyph(false, p.Mute) })
 	default:
-		b.Label(locales.Send()).Background(p.Acc).Children(func() { sym(c, "arrow-up", 16, p.OnAcc) })
+		b.Label(locales.Send()).Background(p.Acc).Children(func() { glyph(false, p.OnAcc) })
 		if b.Clicked() {
 			a.submit()
 		}

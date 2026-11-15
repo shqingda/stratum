@@ -51,6 +51,7 @@ type App struct {
 	inWork   bool            // building a finished turn's folded work
 	noSide   bool            // the sidebar is hidden
 	sideOpen float32         // how far the sidebar is out, 0 to 1, on its way
+	dockH    float32         // how tall the composer floating on the transcript was
 	pal      bool            // the ⌘K palette shows
 	jump     int64           // a message to scroll to, from a search
 	jumpIn   string          // the session it is in
@@ -212,9 +213,14 @@ func (a *App) helloShown() bool {
 	return a.C.CanAct() && len(a.C.Entries) == 0 && len(a.C.Approvals) == 0
 }
 
+// main is the sheet the session is on, raised off the window with a
+// gap round it; the sidebar takes the gap's place on the left as it comes
+// out. The review panel is a second sheet beside it.
 func (a *App) main(c *ui.Context) {
 	p := a.p
-	ui.Column(c).Grow(1).MinWidth(0).Background(p.Bg).Children(func() {
+	sheet := ui.Column(c).Grow(1).MinWidth(0).Margin(sheetGap, sheetGap, sheetGap, sheetGap*(1-a.sideOpen)).
+		Radius(12).Background(p.Sheet).Clip()
+	raise(sheet, p).Children(func() {
 		a.bar(c)
 		a.transcript(c)
 		if !a.helloShown() {
@@ -225,3 +231,6 @@ func (a *App) main(c *ui.Context) {
 		a.reviewPanel(c)
 	}
 }
+
+// sheetGap is the window showing round the sheets.
+const sheetGap = 8

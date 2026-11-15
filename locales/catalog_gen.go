@@ -2438,6 +2438,26 @@ func (msgs Messages) GitLooks(count int) string {
 	return Catalog.Format(msgs.locale, "gitLooks", map[string]any{"count": count})
 }
 
+// EditedFiles says "改了 {count} 个文件"
+// in the language the app shows.
+func EditedFiles(count int) string { return In(i18n.Locale()).EditedFiles(count) }
+
+// EditedFiles says "改了 {count} 个文件"
+// in the language of msgs.
+func (msgs Messages) EditedFiles(count int) string {
+	return Catalog.Format(msgs.locale, "editedFiles", map[string]any{"count": count})
+}
+
+// RanCommands says "运行 {count} 次"
+// in the language the app shows.
+func RanCommands(count int) string { return In(i18n.Locale()).RanCommands(count) }
+
+// RanCommands says "运行 {count} 次"
+// in the language of msgs.
+func (msgs Messages) RanCommands(count int) string {
+	return Catalog.Format(msgs.locale, "ranCommands", map[string]any{"count": count})
+}
+
 // Browse says "浏览"
 // in the language the app shows.
 func Browse() string { return In(i18n.Locale()).Browse() }
