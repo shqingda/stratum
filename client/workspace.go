@@ -16,8 +16,11 @@ type Workspace struct {
 	// Diffs are the uncommitted files asked for, HEAD against disk, by
 	// path; a new reading of the workspace drops them.
 	Diffs map[string]proto.ChangeDiff
-	Read  int // readings so far, to tell a new one
-	req   string
+	// BaseDiffs are the files of the branch asked for, its base against
+	// disk.
+	BaseDiffs map[string]proto.ChangeDiff
+	Read      int // readings so far, to tell a new one
+	req       string
 }
 
 // ReadWorkspace reads the current session's folder again; only the
@@ -56,6 +59,7 @@ func (c *Client) keepWorkspace(id string) {
 		if c.Workspace.req == id && c.Current != nil && c.Current.ID == session {
 			c.Workspace.Workspace, c.Workspace.Committing = w, false
 			c.Workspace.Diffs = map[string]proto.ChangeDiff{}
+			c.Workspace.BaseDiffs = map[string]proto.ChangeDiff{}
 			c.Workspace.Read++
 		}
 	}
@@ -84,6 +88,22 @@ func (c *Client) DiffUncommitted(path string) ([]proto.Command, error) {
 		var d proto.ChangeDiff
 		if c.Current != nil && c.Current.ID == session && c.Workspace.req == req && c.Workspace.Diffs != nil && json.Unmarshal(r, &d) == nil {
 			c.Workspace.Diffs[path] = d
+		}
+		return nil
+	})}, nil
+}
+
+// DiffBase reads a file of the branch as its base has it and as it is
+// now into Workspace.BaseDiffs.
+func (c *Client) DiffBase(path string) ([]proto.Command, error) {
+	if !c.CanAct() {
+		return nil, ErrNotReady
+	}
+	session, req := c.Current.ID, c.Workspace.req
+	return []proto.Command{c.read(proto.MethodWorkspaceDiff, proto.WorkspaceQuery{Cwd: c.Current.Cwd, Path: path, Base: true}, func(r json.RawMessage) []proto.Command {
+		var d proto.ChangeDiff
+		if c.Current != nil && c.Current.ID == session && c.Workspace.req == req && c.Workspace.BaseDiffs != nil && json.Unmarshal(r, &d) == nil {
+			c.Workspace.BaseDiffs[path] = d
 		}
 		return nil
 	})}, nil

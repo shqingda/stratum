@@ -151,7 +151,7 @@ func (a *App) summary(c *ui.Context, t int) {
 				a.do(a.C.Revert(ch.TurnSeq, "", reverted))
 			}
 			if a.button(c, fmt.Sprintf("review:%d", ch.TurnSeq), locales.ViewChanges(), "", false).Clicked() {
-				a.rv.open, a.rv.tab, a.rv.uncommitted, a.rv.turn = true, "", false, ch.TurnSeq
+				a.rv.open, a.rv.tab, a.rv.uncommitted, a.rv.branch, a.rv.turn = true, "", false, false, ch.TurnSeq
 				key := client.DiffKey(ch.TurnSeq, ch.Files[0].Path)
 				a.rv.sel, a.rv.jump = key, key
 			}

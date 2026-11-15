@@ -470,6 +470,8 @@ const (
 type WorkspaceQuery struct {
 	Cwd  string `json:"cwd"`
 	Path string `json:"path,omitempty"`
+	// Base reads the file as the branch's base has it, not HEAD.
+	Base bool `json:"base,omitempty"`
 }
 
 // Workspace is a folder as git sees it. Branch is empty outside a
@@ -483,6 +485,10 @@ type Workspace struct {
 	Removed int    `json:"removed,omitempty"`
 	// Files are the files not committed, by absolute path.
 	Files []ChangeFile `json:"files,omitempty"`
+	// Base names what the branch came from, "main" say, and BaseFiles
+	// are the files changed since, committed or not.
+	Base      string       `json:"base,omitempty"`
+	BaseFiles []ChangeFile `json:"baseFiles,omitempty"`
 }
 
 type Commit struct {

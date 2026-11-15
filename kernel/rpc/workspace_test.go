@@ -89,3 +89,36 @@ func TestLoginCancel(t *testing.T) {
 		t.Fatalf("cancelled login: %v", err)
 	}
 }
+
+// Against its branch, a folder's changes are those since it left main,
+// committed or not.
+func TestBranchBase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir, ctx := t.TempDir(), context.Background()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v", out, err)
+		}
+	}
+	a := filepath.Join(dir, "a.txt")
+	run("init", "-q", "-b", "main")
+	os.WriteFile(a, []byte("1\n"), 0o644)
+	run("add", "a.txt")
+	run("commit", "-q", "-m", "a")
+	run("checkout", "-q", "-b", "feature")
+	os.WriteFile(a, []byte("1\n2\n"), 0o644)
+	run("commit", "-q", "-am", "two")
+	os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
+	w, err := workspace(ctx, dir)
+	if err != nil || w.Base != "main" || len(w.Files) != 1 || len(w.BaseFiles) != 2 || w.BaseFiles[0].Added != 1 {
+		t.Fatalf("workspace %+v %v", w, err)
+	}
+	d, err := workspaceDiff(ctx, proto.WorkspaceQuery{Cwd: dir, Path: a, Base: true})
+	if err != nil || d.Before == nil || *d.Before != "1\n" || *d.After != "1\n2\n" {
+		t.Fatalf("diff %+v %v", d, err)
+	}
+}

@@ -138,4 +138,61 @@ func TestReviewAgainstKernel(t *testing.T) {
 		t.Errorf("uncommitted view: %q", tt.Texts())
 	}
 	snapshot(t, tt, "review-uncommitted")
+
+	// Against the branch's base, the new file is still a change.
+	if err := tt.Click("对 main"); err != nil {
+		t.Fatal(err)
+	}
+	until("the branch's files", func() bool { return a.C.Workspace.Base == "main" && tt.HasText("func TestSub(t *testing.T) {}") })
+
+	var opened string
+	a.openIn = func(app, path string) error { opened = path; return nil }
+	if err := tt.Click("在编辑器里打开"); err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(dir, "internal/sub_test.go"); opened != want {
+		t.Errorf("opened %q, want %q", opened, want)
+	}
+	if err := tt.Click("internal/sub_test.go"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if tt.HasText("func TestSub(t *testing.T) {}") {
+		t.Error("the folded file still shows its diff")
+	}
+	tt.Click("internal/sub_test.go")
+	tt.Frame()
+
+	// A remark on a line, sent with the others as one prompt.
+	r, ok := tt.Find("func TestSub(t *testing.T) {}")
+	if !ok {
+		t.Fatalf("no line to remark on: %q", tt.Texts())
+	}
+	tt.Move(r.X, r.Y+r.H/2)
+	tt.Frame()
+	if err := tt.Click("批注这一行"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Type("测试名改成 TestSubtract")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if !tt.HasText("测试名改成 TestSubtract") || !tt.HasText("1 条批注") {
+		t.Fatalf("the remark is not kept: %q", tt.Texts())
+	}
+	snapshot(t, tt, "review-remark")
+	if err := tt.Click("发给 agent"); err != nil {
+		t.Fatal(err)
+	}
+	until("the remarks sent", func() bool {
+		for _, e := range a.C.Entries {
+			if e.Role == client.User && strings.Contains(e.Text, "`internal/sub_test.go:3`") && strings.Contains(e.Text, "测试名改成 TestSubtract") {
+				return true
+			}
+		}
+		return false
+	})
+	if len(a.rv.remarks) != 0 {
+		t.Errorf("remarks left after sending: %v", a.rv.remarks)
+	}
 }

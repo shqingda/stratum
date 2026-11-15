@@ -29,16 +29,26 @@ type review struct {
 	// uncommitted shows what git has not got, in place of a turn: turn,
 	// or the last one when 0.
 	uncommitted bool
-	turn        int64
-	wsRead      int
-	sel         string // client.DiffKey of the file shown
-	asked       map[string]bool
-	diffs       map[string]*fileDiff
+	// branch shows what the branch changed since its base, as turn -1.
+	branch bool
+	turn   int64
+	wsRead int
+	sel    string // client.DiffKey of the file shown
+	asked  map[string]bool
+	diffs  map[string]*fileDiff
 	// The diffs show one under another: jump is the file to scroll to,
 	// tops where each file's diff starts.
 	scroll ui.ScrollState
 	jump   string
 	tops   map[string]float32
+	lastY  float32 // where the diffs were scrolled to last frame
+	folded map[string]bool
+	// remarks are the comments on lines waiting to go to the agent
+	// together; writing is the line one is being written at.
+	remarks     []remark
+	writing     string
+	remarkDraft string
+	remarkInput ui.Handle
 }
 
 // fileDiff is a file's change cut into hunks, computed once.
@@ -120,18 +130,22 @@ func (a *App) syncReview() {
 	}
 	if r.wsRead != a.C.Workspace.Read {
 		r.wsRead = a.C.Workspace.Read
-		prefix := client.DiffKey(0, "")
-		maps.DeleteFunc(r.diffs, func(k string, _ *fileDiff) bool { return strings.HasPrefix(k, prefix) })
-		maps.DeleteFunc(r.asked, func(k string, _ bool) bool { return strings.HasPrefix(k, prefix) })
+		for _, prefix := range []string{client.DiffKey(0, ""), client.DiffKey(-1, "")} {
+			maps.DeleteFunc(r.diffs, func(k string, _ *fileDiff) bool { return strings.HasPrefix(k, prefix) })
+			maps.DeleteFunc(r.asked, func(k string, _ bool) bool { return strings.HasPrefix(k, prefix) })
+		}
 	}
 	for _, t := range a.shownTurns() {
 		for _, f := range t.Files {
 			key := client.DiffKey(t.TurnSeq, f.Path)
 			if !r.asked[key] && a.fileDiff(key) == nil {
 				r.asked[key] = true
-				if t.TurnSeq == 0 {
+				switch t.TurnSeq {
+				case 0:
 					a.quiet(a.C.DiffUncommitted(f.Path))
-				} else {
+				case -1:
+					a.quiet(a.C.DiffBase(f.Path))
+				default:
 					a.quiet(a.C.DiffChange(t.TurnSeq, f.Path))
 				}
 			}
@@ -142,6 +156,12 @@ func (a *App) syncReview() {
 // shownTurns are what the panel lists: one turn, or the uncommitted
 // files as turn 0.
 func (a *App) shownTurns() []proto.ChangeTurn {
+	if a.rv.branch {
+		if len(a.C.Workspace.BaseFiles) == 0 {
+			return nil
+		}
+		return []proto.ChangeTurn{{TurnSeq: -1, Files: a.C.Workspace.BaseFiles}}
+	}
 	if a.rv.uncommitted {
 		if len(a.C.Workspace.Files) == 0 {
 			return nil
@@ -167,6 +187,9 @@ func (a *App) fileDiff(key string) *fileDiff {
 	d, ok := a.C.Changes.Diffs[key]
 	if path, uncommitted := strings.CutPrefix(key, client.DiffKey(0, "")); uncommitted {
 		d, ok = a.C.Workspace.Diffs[path]
+	}
+	if path, branch := strings.CutPrefix(key, client.DiffKey(-1, "")); branch {
+		d, ok = a.C.Workspace.BaseDiffs[path]
 	}
 	if !ok {
 		return nil
@@ -208,6 +231,9 @@ func (a *App) reviewPanel(c *ui.Context) {
 		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 			a.scope(c)
 			ui.Spacer(c)
+			if fileCount(turns) > 1 {
+				a.foldAll(c, turns)
+			}
 			add, del := a.totals(turns)
 			ui.Row(c).Gap(6).Margin(0, 14, 0, 0).Children(func() {
 				ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus)
@@ -218,11 +244,15 @@ func (a *App) reviewPanel(c *ui.Context) {
 		switch {
 		case a.C.Current == nil:
 			a.reviewNote(c, locales.NoOpenSession())
-		case a.rv.uncommitted && a.C.Workspace.Branch == "":
+		case (a.rv.uncommitted || a.rv.branch) && a.C.Workspace.Branch == "":
 			a.reviewNote(c, locales.NotGitRepo())
 		case a.rv.uncommitted && len(turns) == 0:
 			a.reviewNote(c, locales.NoUncommitted())
-		case a.rv.uncommitted:
+		case a.rv.branch && a.C.Workspace.Base == "":
+			a.reviewNote(c, locales.NoBranchBase())
+		case a.rv.branch && len(turns) == 0:
+			a.reviewNote(c, locales.NoBranchChanges(a.C.Workspace.Base))
+		case a.rv.uncommitted || a.rv.branch:
 			a.reviewFiles(c, turns)
 			a.reviewDiff(c, turns)
 		case ch.Err != "" && len(ch.Turns) == 0:
@@ -236,6 +266,7 @@ func (a *App) reviewPanel(c *ui.Context) {
 			a.reviewDiff(c, turns)
 		}
 		if a.C.Current != nil {
+			a.remarksBar(c)
 			a.reviewFoot(c, turns)
 		}
 	})
@@ -251,12 +282,16 @@ func (a *App) reviewNote(c *ui.Context, s string) {
 func (a *App) scope(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Padding(2).Radius(8).Background(p.Chip).Margin(0, 12).Children(func() {
+		base := locales.AgainstBranch()
+		if b := a.C.Workspace.Base; b != "" {
+			base = locales.AgainstBase(b)
+		}
 		for _, s := range []struct {
-			label       string
-			uncommitted bool
-		}{{locales.LastTurn(), false}, {locales.Uncommitted(), true}} {
-			on := a.rv.uncommitted == s.uncommitted
-			b := ui.ButtonBase(c.Key("scope:"+s.label)).Height(24).Padding(0, 10).Radius(6).Center().Label(s.label).Selected(on)
+			label               string
+			uncommitted, branch bool
+		}{{locales.LastTurn(), false, false}, {locales.Uncommitted(), true, false}, {base, false, true}} {
+			on := a.rv.uncommitted == s.uncommitted && a.rv.branch == s.branch
+			b := ui.ButtonBase(c.Key(fmt.Sprintf("scope:%v:%v", s.uncommitted, s.branch))).Height(24).Padding(0, 10).Radius(6).Center().Label(s.label).Selected(on)
 			col, weight := p.Fg2, 400
 			if on {
 				b.Background(p.Card).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08)).Border(.5, p.Edge2)
@@ -264,8 +299,8 @@ func (a *App) scope(c *ui.Context) {
 			}
 			b.Children(func() { ui.Text(c, s.label).FontSize(13).FontWeight(weight).TextColor(col) })
 			if b.Clicked() && !on {
-				a.rv.uncommitted, a.rv.sel, a.rv.turn = s.uncommitted, "", 0
-				if s.uncommitted {
+				a.rv.uncommitted, a.rv.branch, a.rv.sel, a.rv.turn = s.uncommitted, s.branch, "", 0
+				if s.uncommitted || s.branch {
 					a.C.Workspace.BranchStale = true // read it as it is now
 				}
 			}
@@ -381,28 +416,26 @@ func (a *App) splitPath(path string) (dir, base string) {
 }
 
 // reviewDiff shows the files' diffs one under another; picking a file
-// scrolls to it.
+// scrolls to it, and scrolling picks the file at the top.
 func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
 	if a.rv.tops == nil {
-		a.rv.tops = map[string]float32{}
+		a.rv.tops, a.rv.folded = map[string]float32{}, map[string]bool{}
 	}
 	ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&a.rv.scroll).Children(func() {
 		var secs []ui.Element
 		var keys []string
-		inner := ui.Column(c).Padding(10, 0).Children(func() {
-			shown, first := 0, true
+		inner := ui.Column(c).Padding(6, 0, 10, 0).Children(func() {
+			shown := 0
 			for _, t := range turns {
 				for _, f := range t.Files {
 					key := client.DiffKey(t.TurnSeq, f.Path)
-					name := ""
-					if !first {
-						_, name = a.splitPath(f.Path)
-					}
-					sec := ui.Column(c.Key("diff:"+key)).Margin(map[bool]float32{true: 0, false: 14}[first], 0, 0, 0).Children(func() {
-						shown = a.fileDiffView(c, t.TurnSeq, f.Path, name, shown)
+					sec := ui.Column(c.Key("diff:" + key)).Children(func() {
+						a.fileHead(c, key, f)
+						if !a.rv.folded[key] {
+							shown = a.fileDiffView(c, t.TurnSeq, f.Path, shown)
+						}
 					})
 					secs, keys = append(secs, sec), append(keys, key)
-					first = false
 				}
 			}
 		})
@@ -410,25 +443,95 @@ func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
 			for i, sec := range secs {
 				a.rv.tops[keys[i]] = sec.Bounds().Y - top
 			}
-			if y, ok := a.rv.tops[a.rv.jump]; ok {
-				a.rv.scroll.ScrollTo(0, y, ui.Smooth)
+			y := a.rv.scroll.Y
+			if to, ok := a.rv.tops[a.rv.jump]; ok {
+				a.rv.scroll.ScrollTo(0, to, ui.Smooth)
 				a.rv.jump = ""
+			} else if y != a.rv.lastY && !a.rv.scroll.Scrolling() {
+				for _, k := range keys {
+					if a.rv.tops[k] <= y+8 {
+						a.rv.sel = k
+					}
+				}
 			}
+			a.rv.lastY = y
 		}
 	})
 }
 
-// fileDiffView is one file's hunks, named in the first hunk's header
-// when name is set, and returns how many lines show so far.
-func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown int) int {
+// foldAll folds every file's diff, or opens them all when all are.
+func (a *App) foldAll(c *ui.Context, turns []proto.ChangeTurn) {
+	all := fileCount(turns) > 0
+	for _, t := range turns {
+		for _, f := range t.Files {
+			all = all && a.rv.folded[client.DiffKey(t.TurnSeq, f.Path)]
+		}
+	}
+	label, symbol := locales.CollapseAll(), "fold"
+	if all {
+		label, symbol = locales.ExpandAll(), "fold-down"
+	}
+	if a.iconPill(c, "fold-all", symbol, label).Clicked() {
+		if a.rv.folded == nil {
+			a.rv.folded = map[string]bool{}
+		}
+		for _, t := range turns {
+			for _, f := range t.Files {
+				a.rv.folded[client.DiffKey(t.TurnSeq, f.Path)] = !all
+			}
+		}
+	}
+}
+
+// fileHead names a file over its diff: clicked, it folds the diff, and
+// its name opens the file in the editor.
+func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
+	p := a.p
+	folded := a.rv.folded[key]
+	dir, base := a.splitPath(f.Path)
+	head := ui.ButtonBase(c.Key("head:"+key)).Row().Height(32).Padding(0, 12, 0, 8).Gap(6).AlignItems(ui.Center).
+		Label(dir+base).Expanded(!folded).Background(p.Sheet).BorderWidth(.5, 0).BorderColor(p.Edge)
+	if head.Hovered() {
+		head.Background(p.Hover)
+	}
+	head.Children(func() {
+		sym(c, map[bool]string{true: "chevron-right", false: "chevron-down"}[folded], 14, p.Mute)
+		gone := false
+		if d := a.fileDiff(key); d != nil && d.status == 'D' {
+			gone = true
+		}
+		name := ui.ButtonBase(c.Key("name:" + key)).Row().MinWidth(0).Shrink(1).Label(locales.OpenInEditor()).Tooltip(locales.OpenInEditor()).Disabled(gone)
+		hover := name.Hovered() && !gone
+		name.Children(func() {
+			if dir != "" {
+				ui.Text(c, dir).FontSize(13).TextColor(p.Mute).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
+			}
+			t := ui.Text(c, base).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine().Shrink(0)
+			if hover {
+				t.Underline()
+			}
+		})
+		if name.Clicked() {
+			if err := a.openIn("Visual Studio Code", f.Path); err != nil {
+				a.err = locales.CouldntOpen("VS Code", err.Error())
+			}
+		}
+		ui.Spacer(c)
+		ui.Text(c, fmt.Sprintf("+%d", f.Added)).Font("monospace").FontSize(12.5).TextColor(p.Plus).Opacity(nonzero(f.Added))
+		ui.Text(c, fmt.Sprintf("−%d", f.Removed)).Font("monospace").FontSize(12.5).TextColor(p.Minus).Opacity(nonzero(f.Removed))
+	})
+	if head.Clicked() {
+		a.rv.folded[key] = !folded
+	}
+}
+
+// fileDiffView is one file's hunks, and returns how many lines show so
+// far.
+func (a *App) fileDiffView(c *ui.Context, turn int64, path string, shown int) int {
 	p := a.p
 	key := client.DiffKey(turn, path)
 	note := func(s string) {
-		head := s
-		if name != "" {
-			head = name + " · " + s
-		}
-		ui.Text(c, head).FontSize(13).TextColor(p.Mute).Padding(6, 14)
+		ui.Text(c, s).FontSize(13).TextColor(p.Mute).Padding(6, 14)
 	}
 	d := a.fileDiff(key)
 	switch {
@@ -450,13 +553,10 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 			ui.Text(c, locales.MoreHunks(len(d.hunks)-i)).FontSize(13).TextColor(p.Mute).Padding(8, 14)
 			break
 		}
-		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Margin(map[bool]float32{true: 0, false: 14}[i == 0], 0, 0, 0).Children(func() {
+		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Children(func() {
 			head := fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.oldStart, h.oldLen, h.newStart, h.newLen)
-			if i == 0 && name != "" {
-				head = name + " · " + head
-			}
 			ui.Text(c, head).Font("monospace").FontSize(12.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
-			if turn != 0 && !a.C.Changes.FileReverted(turn, path) {
+			if turn > 0 && !a.C.Changes.FileReverted(turn, path) {
 				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
 				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
 				if b.Clicked() {
@@ -468,7 +568,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 			if shown >= maxDiffLines {
 				break
 			}
-			a.diffRow(c, d, e)
+			a.diffRow(c, path, d, e)
 			shown++
 		}
 	}
@@ -476,7 +576,7 @@ func (a *App) fileDiffView(c *ui.Context, turn int64, path, name string, shown i
 }
 
 // diffRow is one line: old and new line numbers, the sign and the text.
-func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
+func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 	p := a.p
 	var bg, signCol ui.Color
 	text, sign := "", ""
@@ -504,18 +604,32 @@ func (a *App) diffRow(c *ui.Context, d *fileDiff, e edit) {
 		}
 		return fmt.Sprint(i + 1)
 	}
-	row := ui.Row(c).Height(diffRowHeight).AlignItems(ui.Center)
+	at := lineRemark(path, d, e)
+	row := ui.Row(c.Key(fmt.Sprintf("line:%d:%d", e.a, e.b))).Height(diffRowHeight).AlignItems(ui.Center)
 	if e.op != ' ' {
 		row.Background(bg)
 	}
+	hover := row.Hovered()
 	row.Children(func() {
-		for _, n := range []string{num(e.a), num(e.b)} {
+		for i, n := range []string{num(e.a), num(e.b)} {
+			if i == 1 && (hover || a.rv.writing == at.at()) {
+				// The new line's number gives way to a + that comments on it.
+				b := ui.ButtonBase(c.Key("remark")).Size(38, diffRowHeight).Shrink(0).Center().Label(locales.AddRemark()).Tooltip(locales.AddRemark())
+				b.Children(func() {
+					ui.Box(c).Size(18, 18).Radius(5).Background(p.Acc).Center().Children(func() { sym(c, "plus", 12, p.OnAcc) })
+				})
+				if b.Clicked() {
+					a.writeRemark(c, at)
+				}
+				continue
+			}
 			ui.Text(c, n).Font("monospace").FontSize(13).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
 		}
 		ui.Text(c, sign).Font("monospace").FontSize(13).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
 		ui.RichText(c, a.codeSpans(c, strings.TrimRight(text, "\r\n"), toks)...).SingleLine().PreserveSpaces().
 			Padding(0, 6).Grow(1).MinWidth(0).Selectable()
 	})
+	a.remarksAt(c, at)
 }
 
 // reviewFoot commits the folder, and takes back or redoes the turn of
@@ -531,7 +645,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 		}
 	}
 	dirty := a.C.Workspace.Dirty
-	if turn == 0 && !dirty {
+	if turn <= 0 && !dirty {
 		return
 	}
 	reverted := a.C.Changes.Reverted[turn]
@@ -547,7 +661,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				ui.Text(c, note).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
-		if turn != 0 {
+		if turn > 0 {
 			label := locales.UndoTurn()
 			if reverted {
 				label = locales.RedoTurn()

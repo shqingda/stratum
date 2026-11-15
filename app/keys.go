@@ -81,6 +81,13 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return key == ui.KeyEscape || key == ui.KeyEnter
 	}
+	if a.rv.writing != "" && (key == ui.KeyEscape || key == ui.KeyEnter) {
+		// The remark being written has Enter; Esc drops it.
+		if key == ui.KeyEscape && mods == 0 {
+			a.rv.writing = ""
+		}
+		return true
+	}
 	if a.find.on && key == ui.KeyEscape && mods == 0 {
 		a.closeFind()
 		return true

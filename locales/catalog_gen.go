@@ -2428,6 +2428,166 @@ func (msgs Messages) Uncommitted() string {
 	return Catalog.Format(msgs.locale, "uncommitted", nil)
 }
 
+// AgainstBranch says "对分支"
+// in the language the app shows.
+func AgainstBranch() string { return In(i18n.Locale()).AgainstBranch() }
+
+// AgainstBranch says "对分支"
+// in the language of msgs.
+func (msgs Messages) AgainstBranch() string {
+	return Catalog.Format(msgs.locale, "againstBranch", nil)
+}
+
+// AgainstBase says "对 {base}"
+// in the language the app shows.
+func AgainstBase(base string) string { return In(i18n.Locale()).AgainstBase(base) }
+
+// AgainstBase says "对 {base}"
+// in the language of msgs.
+func (msgs Messages) AgainstBase(base string) string {
+	return Catalog.Format(msgs.locale, "againstBase", map[string]any{"base": base})
+}
+
+// NoBranchBase says "找不到这个分支从哪里分出来：仓库里没有 main 或 master。"
+// in the language the app shows.
+func NoBranchBase() string { return In(i18n.Locale()).NoBranchBase() }
+
+// NoBranchBase says "找不到这个分支从哪里分出来：仓库里没有 main 或 master。"
+// in the language of msgs.
+func (msgs Messages) NoBranchBase() string {
+	return Catalog.Format(msgs.locale, "noBranchBase", nil)
+}
+
+// NoBranchChanges says "和 {base} 比没有改动"
+// in the language the app shows.
+func NoBranchChanges(base string) string { return In(i18n.Locale()).NoBranchChanges(base) }
+
+// NoBranchChanges says "和 {base} 比没有改动"
+// in the language of msgs.
+func (msgs Messages) NoBranchChanges(base string) string {
+	return Catalog.Format(msgs.locale, "noBranchChanges", map[string]any{"base": base})
+}
+
+// CollapseAll says "全部折叠"
+// in the language the app shows.
+func CollapseAll() string { return In(i18n.Locale()).CollapseAll() }
+
+// CollapseAll says "全部折叠"
+// in the language of msgs.
+func (msgs Messages) CollapseAll() string {
+	return Catalog.Format(msgs.locale, "collapseAll", nil)
+}
+
+// ExpandAll says "全部展开"
+// in the language the app shows.
+func ExpandAll() string { return In(i18n.Locale()).ExpandAll() }
+
+// ExpandAll says "全部展开"
+// in the language of msgs.
+func (msgs Messages) ExpandAll() string {
+	return Catalog.Format(msgs.locale, "expandAll", nil)
+}
+
+// OpenInEditor says "在编辑器里打开"
+// in the language the app shows.
+func OpenInEditor() string { return In(i18n.Locale()).OpenInEditor() }
+
+// OpenInEditor says "在编辑器里打开"
+// in the language of msgs.
+func (msgs Messages) OpenInEditor() string {
+	return Catalog.Format(msgs.locale, "openInEditor", nil)
+}
+
+// AddRemark says "批注这一行"
+// in the language the app shows.
+func AddRemark() string { return In(i18n.Locale()).AddRemark() }
+
+// AddRemark says "批注这一行"
+// in the language of msgs.
+func (msgs Messages) AddRemark() string {
+	return Catalog.Format(msgs.locale, "addRemark", nil)
+}
+
+// RemarkPlaceholder says "写下对这一行的意见，回车添加"
+// in the language the app shows.
+func RemarkPlaceholder() string { return In(i18n.Locale()).RemarkPlaceholder() }
+
+// RemarkPlaceholder says "写下对这一行的意见，回车添加"
+// in the language of msgs.
+func (msgs Messages) RemarkPlaceholder() string {
+	return Catalog.Format(msgs.locale, "remarkPlaceholder", nil)
+}
+
+// AddIt says "添加"
+// in the language the app shows.
+func AddIt() string { return In(i18n.Locale()).AddIt() }
+
+// AddIt says "添加"
+// in the language of msgs.
+func (msgs Messages) AddIt() string {
+	return Catalog.Format(msgs.locale, "addIt", nil)
+}
+
+// RemoveRemark says "删掉这条批注"
+// in the language the app shows.
+func RemoveRemark() string { return In(i18n.Locale()).RemoveRemark() }
+
+// RemoveRemark says "删掉这条批注"
+// in the language of msgs.
+func (msgs Messages) RemoveRemark() string {
+	return Catalog.Format(msgs.locale, "removeRemark", nil)
+}
+
+// RemarkCount says "{n} 条批注"
+// in the language the app shows.
+func RemarkCount(n string) string { return In(i18n.Locale()).RemarkCount(n) }
+
+// RemarkCount says "{n} 条批注"
+// in the language of msgs.
+func (msgs Messages) RemarkCount(n string) string {
+	return Catalog.Format(msgs.locale, "remarkCount", map[string]any{"n": n})
+}
+
+// SendRemarks says "发给 agent"
+// in the language the app shows.
+func SendRemarks() string { return In(i18n.Locale()).SendRemarks() }
+
+// SendRemarks says "发给 agent"
+// in the language of msgs.
+func (msgs Messages) SendRemarks() string {
+	return Catalog.Format(msgs.locale, "sendRemarks", nil)
+}
+
+// ClearRemarks says "清空"
+// in the language the app shows.
+func ClearRemarks() string { return In(i18n.Locale()).ClearRemarks() }
+
+// ClearRemarks says "清空"
+// in the language of msgs.
+func (msgs Messages) ClearRemarks() string {
+	return Catalog.Format(msgs.locale, "clearRemarks", nil)
+}
+
+// RemarksIntro says "我在改动上留了几条批注，请按批注改："
+// in the language the app shows.
+func RemarksIntro() string { return In(i18n.Locale()).RemarksIntro() }
+
+// RemarksIntro says "我在改动上留了几条批注，请按批注改："
+// in the language of msgs.
+func (msgs Messages) RemarksIntro() string {
+	return Catalog.Format(msgs.locale, "remarksIntro", nil)
+}
+
+// RemovedLine says "删掉的行"
+// in the language the app shows.
+func RemovedLine() string { return In(i18n.Locale()).RemovedLine() }
+
+// RemovedLine says "删掉的行"
+// in the language of msgs.
+func (msgs Messages) RemovedLine() string {
+	return Catalog.Format(msgs.locale, "removedLine", nil)
+}
+
 // ThisTurn says "这一轮"
 // in the language the app shows.
 func ThisTurn() string { return In(i18n.Locale()).ThisTurn() }

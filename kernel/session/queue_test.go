@@ -204,12 +204,13 @@ func TestEditQueue(t *testing.T) {
 func TestDraft(t *testing.T) {
 	m, s := changesManager(t, &llm.Script{})
 	ctx := context.Background()
+	before, _ := m.Get(ctx, s.ID) // Create's event may have moved updated_at on
 	if err := m.SetDraft(ctx, proto.DraftSet{SessionID: s.ID, Text: "写了一半"}); err != nil {
 		t.Fatal(err)
 	}
 	snap, _ := m.Get(ctx, s.ID)
-	if snap.Draft != "写了一半" || !snap.Session.Updated.Equal(s.Updated) {
-		t.Fatalf("draft %q, updated %v → %v", snap.Draft, s.Updated, snap.Session.Updated)
+	if snap.Draft != "写了一半" || !snap.Session.Updated.Equal(before.Session.Updated) {
+		t.Fatalf("draft %q, updated %v → %v", snap.Draft, before.Session.Updated, snap.Session.Updated)
 	}
 	m.SetDraft(ctx, proto.DraftSet{SessionID: s.ID})
 	if snap, _ := m.Get(ctx, s.ID); snap.Draft != "" {

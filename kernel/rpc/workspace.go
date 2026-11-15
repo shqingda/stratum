@@ -45,17 +45,8 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 	if err != nil {
 		return w, nil
 	}
-	counts := map[string][2]int{}
-	stat := gitOut(ctx, cwd, "diff", "HEAD", "--numstat", "--no-renames", "-z")
-	for _, rec := range strings.Split(stat, "\x00") {
-		f := strings.SplitN(rec, "\t", 3)
-		if len(f) < 3 {
-			continue
-		}
-		add, _ := strconv.Atoi(f[0]) // "-" for a binary file
-		del, _ := strconv.Atoi(f[1])
-		counts[f[2]] = [2]int{add, del}
-	}
+	counts := numstat(ctx, cwd, "HEAD")
+	var untracked []string
 	status := gitOut(ctx, cwd, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all")
 	for _, rec := range strings.Split(status, "\x00") {
 		if len(rec) < 4 {
@@ -64,12 +55,8 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 		rel := rec[3:]
 		f := proto.ChangeFile{Path: filepath.Join(top, rel)}
 		if rec[:2] == "??" {
-			if b, err := os.ReadFile(f.Path); err == nil && len(b) > 0 {
-				f.Added = bytes.Count(b, []byte("\n"))
-				if b[len(b)-1] != '\n' {
-					f.Added++
-				}
-			}
+			f.Added = lineCount(f.Path)
+			untracked = append(untracked, rel)
 		} else {
 			f.Added, f.Removed = counts[rel][0], counts[rel][1]
 		}
@@ -79,7 +66,65 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 	}
 	w.Dirty = len(w.Files) > 0
 	sort.Slice(w.Files, func(i, j int) bool { return w.Files[i].Path < w.Files[j].Path })
+	if commit, name := branchBase(ctx, cwd); commit != "" {
+		w.Base = name
+		for rel, n := range numstat(ctx, cwd, commit) {
+			w.BaseFiles = append(w.BaseFiles, proto.ChangeFile{Path: filepath.Join(top, rel), Added: n[0], Removed: n[1]})
+		}
+		for _, rel := range untracked {
+			p := filepath.Join(top, rel)
+			w.BaseFiles = append(w.BaseFiles, proto.ChangeFile{Path: p, Added: lineCount(p)})
+		}
+		sort.Slice(w.BaseFiles, func(i, j int) bool { return w.BaseFiles[i].Path < w.BaseFiles[j].Path })
+	}
 	return w, nil
+}
+
+// numstat counts the lines each tracked file gained and lost since a
+// commit, on disk, by its path in the repository.
+func numstat(ctx context.Context, cwd, since string) map[string][2]int {
+	counts := map[string][2]int{}
+	stat := gitOut(ctx, cwd, "diff", since, "--numstat", "--no-renames", "-z")
+	for _, rec := range strings.Split(stat, "\x00") {
+		f := strings.SplitN(rec, "\t", 3)
+		if len(f) < 3 {
+			continue
+		}
+		add, _ := strconv.Atoi(f[0]) // "-" for a binary file
+		del, _ := strconv.Atoi(f[1])
+		counts[f[2]] = [2]int{add, del}
+	}
+	return counts
+}
+
+func lineCount(path string) int {
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 {
+		return 0
+	}
+	n := bytes.Count(b, []byte("\n"))
+	if b[len(b)-1] != '\n' {
+		n++
+	}
+	return n
+}
+
+// branchBase is where the branch left the repository's main line, and
+// that line's name: the remote's default branch, else main or master.
+func branchBase(ctx context.Context, cwd string) (commit, name string) {
+	refs := []string{"origin/main", "origin/master", "main", "master"}
+	if def, err := git(ctx, cwd, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"); err == nil && def != "" {
+		refs = append([]string{def}, refs...)
+	}
+	for _, ref := range refs {
+		if _, err := git(ctx, cwd, "rev-parse", "--verify", "-q", ref+"^{commit}"); err != nil {
+			continue
+		}
+		if mb, err := git(ctx, cwd, "merge-base", "HEAD", ref); err == nil && mb != "" {
+			return mb, strings.TrimPrefix(ref, "origin/")
+		}
+	}
+	return "", ""
 }
 
 // repoTop is the repository's top folder spelled as cwd is, so that paths
@@ -115,7 +160,13 @@ func workspaceDiff(ctx context.Context, q proto.WorkspaceQuery) (proto.ChangeDif
 		return proto.ChangeDiff{}, proto.Errorf("bad_request", "%s is outside the repository", q.Path)
 	}
 	d := proto.ChangeDiff{Path: q.Path}
-	if b, err := exec.CommandContext(ctx, "git", "-C", top, "--no-optional-locks", "show", "HEAD:./"+filepath.ToSlash(rel)).Output(); err == nil {
+	from := "HEAD"
+	if q.Base {
+		if from, _ = branchBase(ctx, q.Cwd); from == "" {
+			return proto.ChangeDiff{}, proto.Errorf("not_found", "the branch has no base")
+		}
+	}
+	if b, err := exec.CommandContext(ctx, "git", "-C", top, "--no-optional-locks", "show", from+":./"+filepath.ToSlash(rel)).Output(); err == nil {
 		s := string(b)
 		d.Before = &s
 	}
