@@ -25,6 +25,11 @@ func (a *App) keys(c *ui.Context) {
 			a.openPalette(c)
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyF, func() {
+		if a.C.Current != nil && len(a.C.Entries) > 0 {
+			a.openFind(c)
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyComma, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen {
 			a.openSettings()
@@ -59,6 +64,10 @@ func (a *App) keys(c *ui.Context) {
 func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
+	}
+	if a.find.on && key == ui.KeyEscape && mods == 0 {
+		a.closeFind()
+		return true
 	}
 	if m := &a.mention; m.open && key == ui.KeyEscape && mods == 0 {
 		m.shut, m.open = m.at+1, false

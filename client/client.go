@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -77,8 +78,13 @@ type Entry struct {
 	Done   bool
 	CallID string
 	Failed bool
-	Args   json.RawMessage // a tool call's original arguments
-	Turn   int             // index in Client.Turns of the turn it is in; -1 before any
+	// Skipped is a call the user declined, which did not run.
+	Skipped bool
+	// Note is what a notice is about: "fail", "fallback", "retry",
+	// "stop", "limit" (the turn ran out of steps) or "compact".
+	Note string
+	Args json.RawMessage // a tool call's original arguments
+	Turn int             // index in Client.Turns of the turn it is in; -1 before any
 	// Typed is a command the user ran themselves (!command), in no turn.
 	Typed bool
 	// Took is how long a thinking entry streamed, 0 when it was read
@@ -231,8 +237,8 @@ func (c *Client) add(e *Entry) *Entry {
 	return e
 }
 
-func (c *Client) notice(format string, args ...any) {
-	c.add(&Entry{Role: Notice, Text: fmt.Sprintf(format, args...), Done: true})
+func (c *Client) notice(note, format string, args ...any) {
+	c.add(&Entry{Role: Notice, Note: note, Text: fmt.Sprintf(format, args...), Done: true})
 }
 
 // Receive applies one frame in wire order and returns the commands to send next.
@@ -336,7 +342,7 @@ func (c *Client) response(f proto.Frame) []proto.Command {
 			c.fail(f.Error.Message)
 			return nil
 		}
-		c.notice("%s", locales.RequestFailed(p.method, f.Error.Message))
+		c.notice("fail", "%s", locales.RequestFailed(p.method, f.Error.Message))
 		return nil
 	}
 	if p.done != nil {
@@ -651,13 +657,13 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		var cp proto.Compaction
 		if json.Unmarshal(e.Data, &cp) == nil {
 			c.endStream()
-			c.add(&Entry{Role: Notice, Text: locales.Compacted(), Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
+			c.add(&Entry{Role: Notice, Note: "compact", Text: locales.Compacted(), Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
 		}
 	case proto.EventFallback:
 		var f proto.Fallback
 		if json.Unmarshal(e.Data, &f) == nil {
 			c.endStream()
-			c.notice("%s", locales.FellBack(c.modelName(f.From), c.modelName(f.To)))
+			c.notice("fallback", "%s", locales.FellBack(c.modelName(f.From), c.modelName(f.To)))
 		}
 	case proto.EventShellStart:
 		var sh proto.ShellRun
@@ -684,7 +690,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)
-		c.notice("%s", locales.Retrying(r.Attempt, r.Error))
+		c.notice("retry", "%s", locales.Retrying(r.Attempt, r.Error))
 	case proto.EventTurnEnd:
 		var t proto.TurnEnd
 		_ = json.Unmarshal(e.Data, &t)
@@ -699,9 +705,11 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		}
 		switch {
 		case t.Stopped:
-			c.notice("%s", locales.Stopped())
+			c.notice("stop", "%s", locales.Stopped())
+		case t.Limit:
+			c.notice("limit", "%s", locales.StepLimit())
 		case t.Error != "":
-			c.notice("%s", locales.TurnFailed(t.Error))
+			c.notice("fail", "%s", locales.TurnFailed(t.Error))
 		}
 	}
 	return nil
@@ -778,7 +786,7 @@ func (c *Client) tool(call llm.ToolCall) *Entry {
 func (c *Client) toolResult(r llm.ToolResult) {
 	for i := len(c.Entries) - 1; i >= 0; i-- {
 		if en := c.Entries[i]; en.Role == Tool && en.CallID == r.CallID {
-			en.Done, en.Failed, en.Output = true, r.IsError, r.Content
+			en.Done, en.Failed, en.Skipped, en.Output = true, r.IsError && !r.Skipped, r.Skipped, r.Content
 			return
 		}
 	}
@@ -788,6 +796,9 @@ func (c *Client) toolResult(r llm.ToolResult) {
 func summarize(args map[string]any) string {
 	for _, k := range []string{"path", "command", "pattern", "query", "url", "title", "question", "description"} {
 		if s, ok := args[k].(string); ok && s != "" {
+			if k == "command" {
+				s = unwrap(s)
+			}
 			if len(s) > 120 {
 				s = s[:117] + "…"
 			}
@@ -795,6 +806,20 @@ func summarize(args map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// wrapped is a command handed to a shell of its own, as models write
+// them: bash -lc '…', and a cd into the workspace before it.
+var wrapped = regexp.MustCompile(`^(?:/bin/)?(?:ba|z)?sh\s+-l?c\s+(?:'([^']*)'|"((?:[^"\\]|\\.)*)")$`)
+var cdFirst = regexp.MustCompile(`^cd\s+(?:'[^']*'|"[^"]*"|\S+)\s*&&\s*`)
+
+// unwrap is the command a line runs, without the shell around it.
+func unwrap(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	if m := wrapped.FindStringSubmatch(cmd); m != nil {
+		cmd = m[1] + m[2]
+	}
+	return cdFirst.ReplaceAllString(strings.TrimSpace(cmd), "")
 }
 
 // endThinking ends the streaming thinking entry: it is done when text or
@@ -990,7 +1015,7 @@ func (c *Client) answer(ans proto.ApprovalAnswer) ([]proto.Command, error) {
 		c.Answering[id] = true
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
 			delete(c.Answering, id)
-			c.notice("%s", locales.ApprovalFailed(e.Message))
+			c.notice("fail", "%s", locales.ApprovalFailed(e.Message))
 			return nil
 		}
 	}

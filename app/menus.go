@@ -21,7 +21,7 @@ func (a *App) syncMenus() {
 		a.modelsPending = ""
 	}
 	if id != a.menuSession || !a.C.CanAct() {
-		a.modelMenu, a.effortMenu, a.modeMenu = false, false, false
+		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu = false, false, false, false
 		a.modelsRequested = false
 		a.menuSession = id
 	}

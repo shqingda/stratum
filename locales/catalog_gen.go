@@ -124,6 +124,66 @@ func (msgs Messages) Search() string {
 	return Catalog.Format(msgs.locale, "search", nil)
 }
 
+// FindInSession says "在会话中查找"
+// in the language the app shows.
+func FindInSession() string { return In(i18n.Locale()).FindInSession() }
+
+// FindInSession says "在会话中查找"
+// in the language of msgs.
+func (msgs Messages) FindInSession() string {
+	return Catalog.Format(msgs.locale, "findInSession", nil)
+}
+
+// FindPrevious says "上一个"
+// in the language the app shows.
+func FindPrevious() string { return In(i18n.Locale()).FindPrevious() }
+
+// FindPrevious says "上一个"
+// in the language of msgs.
+func (msgs Messages) FindPrevious() string {
+	return Catalog.Format(msgs.locale, "findPrevious", nil)
+}
+
+// FindNext says "下一个"
+// in the language the app shows.
+func FindNext() string { return In(i18n.Locale()).FindNext() }
+
+// FindNext says "下一个"
+// in the language of msgs.
+func (msgs Messages) FindNext() string {
+	return Catalog.Format(msgs.locale, "findNext", nil)
+}
+
+// CloseFind says "关闭查找"
+// in the language the app shows.
+func CloseFind() string { return In(i18n.Locale()).CloseFind() }
+
+// CloseFind says "关闭查找"
+// in the language of msgs.
+func (msgs Messages) CloseFind() string {
+	return Catalog.Format(msgs.locale, "closeFind", nil)
+}
+
+// CopyReply says "复制"
+// in the language the app shows.
+func CopyReply() string { return In(i18n.Locale()).CopyReply() }
+
+// CopyReply says "复制"
+// in the language of msgs.
+func (msgs Messages) CopyReply() string {
+	return Catalog.Format(msgs.locale, "copyReply", nil)
+}
+
+// CopyMarkdown says "复制为 Markdown"
+// in the language the app shows.
+func CopyMarkdown() string { return In(i18n.Locale()).CopyMarkdown() }
+
+// CopyMarkdown says "复制为 Markdown"
+// in the language of msgs.
+func (msgs Messages) CopyMarkdown() string {
+	return Catalog.Format(msgs.locale, "copyMarkdown", nil)
+}
+
 // Stop says "停止"
 // in the language the app shows.
 func Stop() string { return In(i18n.Locale()).Stop() }
@@ -1836,6 +1896,46 @@ func (msgs Messages) ThoughtFor(duration string) string {
 	return Catalog.Format(msgs.locale, "thoughtFor", map[string]any{"duration": duration})
 }
 
+// Detail says "详略"
+// in the language the app shows.
+func Detail() string { return In(i18n.Locale()).Detail() }
+
+// Detail says "详略"
+// in the language of msgs.
+func (msgs Messages) Detail() string {
+	return Catalog.Format(msgs.locale, "detail", nil)
+}
+
+// DetailPlain says "普通"
+// in the language the app shows.
+func DetailPlain() string { return In(i18n.Locale()).DetailPlain() }
+
+// DetailPlain says "普通"
+// in the language of msgs.
+func (msgs Messages) DetailPlain() string {
+	return Catalog.Format(msgs.locale, "detailPlain", nil)
+}
+
+// DetailThinking says "含思考"
+// in the language the app shows.
+func DetailThinking() string { return In(i18n.Locale()).DetailThinking() }
+
+// DetailThinking says "含思考"
+// in the language of msgs.
+func (msgs Messages) DetailThinking() string {
+	return Catalog.Format(msgs.locale, "detailThinking", nil)
+}
+
+// DetailAll says "全部"
+// in the language the app shows.
+func DetailAll() string { return In(i18n.Locale()).DetailAll() }
+
+// DetailAll says "全部"
+// in the language of msgs.
+func (msgs Messages) DetailAll() string {
+	return Catalog.Format(msgs.locale, "detailAll", nil)
+}
+
 // ContextUsed says "上下文已用 {used} / {window}"
 // in the language the app shows.
 func ContextUsed(used string, window string) string {
@@ -2982,6 +3082,26 @@ func Stopped() string { return In(i18n.Locale()).Stopped() }
 // in the language of msgs.
 func (msgs Messages) Stopped() string {
 	return Catalog.Format(msgs.locale, "stopped", nil)
+}
+
+// StepLimit says "步数用完了，先停在这里。"
+// in the language the app shows.
+func StepLimit() string { return In(i18n.Locale()).StepLimit() }
+
+// StepLimit says "步数用完了，先停在这里。"
+// in the language of msgs.
+func (msgs Messages) StepLimit() string {
+	return Catalog.Format(msgs.locale, "stepLimit", nil)
+}
+
+// ContinueTurn says "继续"
+// in the language the app shows.
+func ContinueTurn() string { return In(i18n.Locale()).ContinueTurn() }
+
+// ContinueTurn says "继续"
+// in the language of msgs.
+func (msgs Messages) ContinueTurn() string {
+	return Catalog.Format(msgs.locale, "continueTurn", nil)
 }
 
 // TurnFailed says "本轮执行失败：{error}"

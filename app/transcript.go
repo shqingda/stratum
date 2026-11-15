@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -106,6 +107,7 @@ func (a *App) bar(c *ui.Context) {
 			})
 		}
 		ui.Spacer(c)
+		a.detailButton(c)
 		a.openButton(c)
 		a.commitButton(c)
 		a.reviewToggle(c)
@@ -123,6 +125,8 @@ func (a *App) transcript(c *ui.Context) {
 		items = append([]item{{older: true}}, items...)
 	}
 	a.seek(items)
+	a.findIn(items)
+	hit := a.hit()
 	a.list.Key = func(i int) any {
 		if i < len(items) {
 			return items[i].key()
@@ -145,7 +149,12 @@ func (a *App) transcript(c *ui.Context) {
 			row.Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Duration: 220 * time.Millisecond})
 		}
 		row.Children(func() {
-			ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() {
+			col := ui.Column(c).Grow(1).MaxWidth(columnWidth)
+			if i == hit {
+				// The row ⌘F found, marked without moving what is in it.
+				col.Margin(-4, -10, -4, -10).Padding(4, 10, 4, 10).Radius(10).Background(p.Sel)
+			}
+			col.Children(func() {
 				if i >= len(items) {
 					a.turn(c, true, func() { a.running(c) })
 					return
@@ -265,7 +274,7 @@ func (a *App) row(es []*client.Entry, i, live int, asked map[*client.Entry]bool)
 	for j < len(es) && browse(es[j]) {
 		j++
 	}
-	if j-i >= 2 {
+	if j-i >= 2 && a.settings().Detail != "all" {
 		return []item{{fold: es[i:j], live: live >= 0 && i >= live}}, j
 	}
 	return []item{{e: es[i], live: live >= 0 && i >= live}}, i + 1
@@ -291,7 +300,7 @@ func (a *App) finished(body []*client.Entry, t int) []item {
 		work = body[:last]
 	}
 	var out []item
-	if slices.ContainsFunc(work, func(e *client.Entry) bool { return e.Role == client.Tool }) {
+	if a.settings().Detail == "" && slices.ContainsFunc(work, func(e *client.Entry) bool { return e.Role == client.Tool }) {
 		out = append(out, item{work: work, done: t})
 	} else {
 		for i := 0; i < len(work); {
@@ -521,7 +530,16 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 		msg := ui.Column(c).Margin(4, 0, 6, 0)
 		msg.Children(func() {
 			if e.Done {
-				markdown.View(c, e.Text, &a.md)
+				markdown.View(c, e.Text, &a.md).ContextMenu(func(m *ui.Menu) {
+					if m.Item(locales.CopyReply()).Chosen() {
+						c.WriteClipboard(plain(e.Text))
+					}
+					if m.Item(locales.CopyMarkdown()).Chosen() {
+						c.WriteClipboard(e.Text)
+					}
+					m.Separator()
+					m.EditItems()
+				})
 				// The icon lines up with the text above it.
 				ui.Row(c).Margin(0, 0, 0, -6).Children(func() { a.copyButton(c, e.Text, msg.Hovered()) })
 			} else {
@@ -531,34 +549,57 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 	case client.Tool:
 		a.card(c, e)
 	case client.Notice:
-		if e.Output != "" {
-			a.compactNote(c, e)
-			break
-		}
-		ui.Text(c, e.Text).FontSize(13).TextColor(a.p.Mute).Margin(4, 0, 10, 0).Selectable()
+		a.note(c, e)
 	case client.Thinking:
 		a.thought(c, e)
 	}
 }
 
-// compactNote is a compaction: a line that opens to the summary the model
-// goes on from.
-func (a *App) compactNote(c *ui.Context, e *client.Entry) {
+// noteIcons are the symbols of the notices, by what they are about.
+var noteIcons = map[string]string{"fail": "alert-circle", "fallback": "arrows-exchange", "retry": "refresh",
+	"stop": "player-stop", "limit": "player-pause", "compact": "history"}
+
+// note is a notice as one line among the steps: a turn stopped or
+// failed, moved to another account, retried, compacted. A compaction
+// opens to the summary the model goes on from; a turn out of steps can
+// go on.
+func (a *App) note(c *ui.Context, e *client.Entry) {
 	p := a.p
-	open := a.opened[e.CallID]
-	row := ui.ButtonBase(c.Key(e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Margin(2, 0, 6, 0).Label(e.Text)
-	if row.Clicked() {
-		a.opened[e.CallID] = !open
+	icon, col := noteIcons[e.Note], p.Mute
+	if icon == "" {
+		icon = "info-circle"
 	}
-	row.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, "history", 14, p.Mute) })
-		ui.Text(c, e.Text).FontSize(13.5).TextColor(p.Mute).SingleLine()
-		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+	if e.Note == "fail" {
+		col = p.Minus
+	}
+	key := "note:" + strconv.Itoa(e.Key)
+	open := a.opened[key]
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(2, 0, 6, 0).Children(func() {
+		row := ui.ButtonBase(c.Key(key)).Row().MinHeight(25).Gap(8).AlignItems(ui.Center).MinWidth(0).Label(e.Text).Disabled(e.Output == "")
+		if row.Clicked() {
+			a.opened[key] = !open
+		}
+		row.Children(func() {
+			ui.Box(c).Width(16).Center().Children(func() { sym(c, icon, 14, col) })
+			ui.Text(c, e.Text).FontSize(13.5).TextColor(p.Mute).MinWidth(0)
+			if e.Output != "" {
+				sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+			}
+		})
+		if e.Note == "limit" && a.last(e) && !a.C.Busy && a.textButton(c, "go-on", locales.ContinueTurn()).Clicked() {
+			a.do(a.C.Prompt(locales.ContinueTurn()))
+		}
 	})
 	if open {
 		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
 			Margin(0, 0, 8, 24).Selectable()
 	}
+}
+
+// last reports whether e is the session's last entry.
+func (a *App) last(e *client.Entry) bool {
+	n := len(a.C.Entries)
+	return n > 0 && a.C.Entries[n-1] == e
 }
 
 // step is a tool call: one line, its output under it once opened.
@@ -573,7 +614,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	}
 	open := a.opened[e.CallID]
 	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
-	if row.Clicked() && e.Output != "" {
+	if row.Clicked() && e.Output != "" && !e.Skipped {
 		a.opened[e.CallID] = !open
 	}
 	row.Children(func() {
@@ -589,6 +630,8 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		switch {
 		case !e.Done:
 			ui.Box(c).Size(2, 12).Background(p.Live)
+		case e.Skipped:
+			ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
 		case e.Failed:
 			ui.Box(c).Size(7, 2).Background(p.Minus)
 		case e.Output != "" && row.Hovered():

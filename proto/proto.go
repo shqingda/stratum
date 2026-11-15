@@ -277,6 +277,7 @@ type TurnStart struct {
 type TurnEnd struct {
 	Usage   llm.Usage `json:"usage"`
 	Stopped bool      `json:"stopped,omitempty"` // the user cancelled
+	Limit   bool      `json:"limit,omitempty"`   // it ran out of steps
 	Error   string    `json:"error,omitempty"`
 }
 
@@ -511,6 +512,10 @@ type Settings struct {
 	// Quiet lists what the app does not tell the user about while in the
 	// background: "wait", "done", "fail" notifications, or the "badge".
 	Quiet []string `json:"quiet,omitempty"`
+	// Detail is how much of a finished turn the transcript shows: "" its
+	// steps folded into a line, "thinking" its steps and reasoning, "all"
+	// every step on its own row.
+	Detail string `json:"detail,omitempty"`
 }
 
 type ModelRef struct {

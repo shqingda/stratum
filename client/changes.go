@@ -150,13 +150,13 @@ func (c *Client) Revert(turn int64, path string, redo bool) ([]proto.Command, er
 		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
-			c.notice("%s", locales.FilesChangedSince(len(res.Conflicts), strings.Join(res.Conflicts, locales.ListSeparator())))
+			c.notice("", "%s", locales.FilesChangedSince(len(res.Conflicts), strings.Join(res.Conflicts, locales.ListSeparator())))
 		}
 		return nil
 	})
 	if err == nil {
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
-			c.notice("%s", locales.RestoreFailed(e.Message))
+			c.notice("fail", "%s", locales.RestoreFailed(e.Message))
 			return nil
 		}
 	}
@@ -172,13 +172,13 @@ func (c *Client) RevertHunk(turn int64, path string, oldStart, oldLen, newStart,
 		c.Workspace.BranchStale = true
 		var res proto.ChangeResult
 		if json.Unmarshal(r, &res) == nil && len(res.Conflicts) > 0 {
-			c.notice("%s", locales.FileChangedSince())
+			c.notice("", "%s", locales.FileChangedSince())
 		}
 		return nil
 	})
 	if err == nil {
 		c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
-			c.notice("%s", locales.UndoHunkFailed(e.Message))
+			c.notice("fail", "%s", locales.UndoHunkFailed(e.Message))
 			return nil
 		}
 	}

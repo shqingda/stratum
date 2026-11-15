@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -235,7 +236,10 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 		label = locales.ThoughtFor(span(e.Took))
 	}
 	key := fmt.Sprintf("thought:%d", e.Key)
-	open := a.opened[key]
+	open, set := a.opened[key]
+	if !set {
+		open = a.settings().Detail != ""
+	}
 	row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label(label).Expanded(open)
 	if a.inWork {
 		row.Height(25).Gap(8)
@@ -308,4 +312,26 @@ func (a *App) contextRing(c *ui.Context) {
 		ui.Image(c, svg).Size(14, 14)
 		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 	})
+}
+
+// detailButton chooses how much of a finished turn shows. Reasoning is
+// offered only once the session has some.
+func (a *App) detailButton(c *ui.Context) {
+	thought := slices.ContainsFunc(a.C.Entries, func(e *client.Entry) bool { return e.Role == client.Thinking })
+	set := a.settings()
+	a.iconButton(c, "detail", "list-details", locales.Detail()).PopoverMenuButton(func(m *ui.Menu) {
+		for _, d := range []struct {
+			id   string
+			name func() string
+		}{{"", locales.DetailPlain}, {"thinking", locales.DetailThinking}, {"all", locales.DetailAll}} {
+			if d.id == "thinking" && !thought && set.Detail != "thinking" {
+				continue
+			}
+			if m.Item(d.name()).ID("detail:" + d.id).Checked(set.Detail == d.id).Chosen() {
+				s := a.settings()
+				s.Detail = d.id
+				a.do(a.C.SaveSettings(s))
+			}
+		}
+	}, a.menuOptions(&a.detailMenu))
 }

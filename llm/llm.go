@@ -93,6 +93,8 @@ type ToolResult struct {
 	Content string  `json:"content"`
 	Images  []Image `json:"images,omitempty"`
 	IsError bool    `json:"isError,omitempty"`
+	// Skipped is a call the user declined: it did not run.
+	Skipped bool `json:"skipped,omitempty"`
 }
 
 // Tool is a tool offered to the model.

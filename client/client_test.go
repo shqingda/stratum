@@ -657,3 +657,17 @@ func TestShellCommand(t *testing.T) {
 		t.Fatalf("busy %v %+v", c.Busy, c.Entries)
 	}
 }
+
+func TestUnwrap(t *testing.T) {
+	for in, want := range map[string]string{
+		`bash -lc 'go test ./...'`:          "go test ./...",
+		`/bin/zsh -c "echo \"hi\""`:         `echo \"hi\"`,
+		`cd /Users/me/calc && go vet ./...`: "go vet ./...",
+		`sh -c 'cd "a b" && ls'`:            "ls",
+		`ls -la`:                            "ls -la",
+	} {
+		if got := unwrap(in); got != want {
+			t.Errorf("unwrap(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

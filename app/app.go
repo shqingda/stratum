@@ -47,6 +47,7 @@ type App struct {
 	recall   string // a sent message ↑ brings back, for the next frame
 	toEnd    bool   // put the composer's caret at the end of its draft
 	mention  mention
+	find     find
 	drafts   drafts       // keeps each session's draft in the kernel
 	query    string       // the sidebar's search
 	list     ui.ListState // the transcript
@@ -69,14 +70,14 @@ type App struct {
 	commitMsg   string
 	commitInput ui.Handle
 
-	searchInput                               ui.Handle
-	keyRepeat                                 bool
-	visibleSessions                           []string
-	menuSession                               string
-	modelMenu, effortMenu, modeMenu           bool
-	modelsRequested                           bool
-	modelsPending, modelsAccount, modelsError string
-	modelsLoadedAccount                       string
+	searchInput                                 ui.Handle
+	keyRepeat                                   bool
+	visibleSessions                             []string
+	menuSession                                 string
+	modelMenu, effortMenu, modeMenu, detailMenu bool
+	modelsRequested                             bool
+	modelsPending, modelsAccount, modelsError   string
+	modelsLoadedAccount                         string
 
 	keyOpen, keyMenu bool
 	keyProvider, key string
@@ -231,6 +232,7 @@ func (a *App) main(c *ui.Context) {
 		if !a.helloShown() {
 			a.composer(c)
 		}
+		a.findBar(c)
 	})
 	if a.rv.open {
 		a.reviewPanel(c)

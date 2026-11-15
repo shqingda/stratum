@@ -83,7 +83,7 @@ func lineDiff(oldText, newText string) (lines []diffLine, replaced bool) {
 }
 
 func (a *App) card(c *ui.Context, e *client.Entry) {
-	if !e.Done || e.Output == "" || !strings.HasPrefix(strings.TrimSpace(string(e.Args)), "{") {
+	if !e.Done || e.Skipped || e.Output == "" || !strings.HasPrefix(strings.TrimSpace(string(e.Args)), "{") {
 		a.step(c, e)
 		return
 	}

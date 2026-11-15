@@ -77,7 +77,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 			return llm.ToolResult{}, err
 		}
 		if !allowed {
-			return fail("The user declined this call. Ask them how to proceed, or take another approach.")
+			res, err := fail("The user declined this call. Ask them how to proceed, or take another approach.")
+			res.Skipped = true
+			return res, err
 		}
 	}
 	out, err := tool.Run(ctx, r.env, call.Args)

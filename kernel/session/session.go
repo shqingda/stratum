@@ -522,9 +522,12 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 	usage, err := m.runAgent(ctx, x, r, p)
 	end := proto.TurnEnd{Usage: usage}
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
+		switch {
+		case errors.Is(err, context.Canceled):
 			end.Stopped = true
-		} else {
+		case errors.Is(err, agent.ErrStepLimit):
+			end.Limit = true
+		default:
 			end.Error = agent.Describe(err)
 		}
 	}
