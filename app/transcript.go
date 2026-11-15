@@ -694,13 +694,30 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 		if what == "" {
 			what = compact(ap.Args)
 		}
-		ui.Row(c).Padding(9, 12).Radius(9).Background(p.Chip).Margin(11, 0, 9, 0).Children(func() {
+		editing := a.editing == ap.ID
+		chip := ui.Row(c).Padding(9, 12).Radius(9).Background(p.Chip).Margin(11, 0, 9, 0).AlignItems(ui.Center)
+		if editing {
+			chip.InsetShadow(0, 0, 0, 1, p.Live)
+		}
+		chip.Children(func() {
 			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
 				// A long folder gives way to the command, cut short in
 				// the middle so both ends still say where it is.
 				cwd := home(a.C.Current.Cwd)
 				ui.Text(c, cwd).Font("monospace").FontSize(13.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MaxWidth(160).Shrink(0).Unselectable().Tooltip(cwd)
 				ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Margin(0, 8, 0, 6).Unselectable()
+			}
+			if editing {
+				ui.TextInputBase(c, &a.cmdDraft).Bind(&a.cmdInput).Label(locales.EditCommand()).Font("monospace").FontSize(13.5).TextColor(p.Fg).
+					Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
+					a.cmdDraft = k.Text()
+					if k.Key == ui.KeyEnter && k.Mods == 0 {
+						a.runEdited(ap)
+						return true
+					}
+					return false
+				})
+				return
 			}
 			ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
 		})
@@ -721,19 +738,98 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			if cur := a.C.Current; cur != nil {
 				why("adjustments-horizontal", locales.CurrentMode(modeName(cur.Mode)))
 			}
-		})
-		ui.Row(c).Gap(8).Justify(ui.End).Margin(12, 0, 0, 0).Children(func() {
-			if a.button(c, "deny:"+ap.ID, locales.Deny(), a.approvalHint(c, ap.ID, "esc"), false).Disabled(busy).Clicked() {
-				a.do(a.C.Answer(ap.ID, false, false))
+			if ap.Rule != nil && !editing {
+				// What allowing it for the session, or always, lets through.
+				why("route", locales.RuleScope(ruleText(*ap.Rule)))
 			}
-			if a.button(c, "always:"+ap.ID, locales.AllowForSession(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
-				a.do(a.C.Answer(ap.ID, true, true))
+		})
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
+			if editing {
+				ui.Text(c, locales.EditCommandHint()).FontSize(13).TextColor(p.Mute).Grow(1).MinWidth(0)
+				if a.button(c, "edit-cancel:"+ap.ID, locales.Cancel(), "esc", false).Disabled(busy).Clicked() {
+					a.editing = ""
+				}
+				if a.button(c, "edit-run:"+ap.ID, locales.RunIt(), "⏎", true).Disabled(busy || strings.TrimSpace(a.cmdDraft) == "").Clicked() {
+					a.runEdited(ap)
+				}
+				return
+			}
+			if ap.Kind == "exec" && ap.Command != "" && a.textButton(c, "edit:"+ap.ID, locales.EditCommand()).Disabled(busy).Clicked() {
+				a.editing, a.cmdDraft = ap.ID, ap.Command
+				a.cmdInput.Focus(c)
+			}
+			ui.Spacer(c)
+			denyHint := a.approvalHint(c, ap.ID, "esc")
+			if a.denyWithWords() && a.C.Approvals[0].ID == ap.ID && !busy {
+				denyHint = "⏎" // the words in the composer go with it
+			}
+			if a.button(c, "deny:"+ap.ID, locales.Deny(), denyHint, false).Disabled(busy).Clicked() {
+				a.deny(ap.ID)
+			}
+			if ap.Rule != nil {
+				if a.button(c, "forever:"+ap.ID, locales.AllowAlways(), "", false).Disabled(busy).Clicked() {
+					a.do(a.C.Respond(proto.ApprovalAnswer{ApprovalID: ap.ID, Allow: true, Forever: true}))
+				}
+				if a.button(c, "always:"+ap.ID, locales.AllowForSession(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
+					a.do(a.C.Answer(ap.ID, true, true))
+				}
 			}
 			if a.button(c, "allow:"+ap.ID, locales.Allow(), a.approvalHint(c, ap.ID, "⏎"), true).Disabled(busy).Clicked() {
 				a.do(a.C.Answer(ap.ID, true, false))
 			}
 		})
 	})
+}
+
+// ruleText says what a rule lets run: "以 go test 开头的命令".
+func ruleText(r proto.Rule) string {
+	var s string
+	if r.Prefix != "" {
+		s = locales.RuleCommands(r.Prefix)
+	} else {
+		verb := r.Tool
+		if t, ok := toolFor(r.Tool); ok {
+			verb = t.verb
+		} else if server, name, ok := mcpTool(r.Tool); ok {
+			verb = server + " · " + name
+		}
+		s = locales.RuleTool(verb)
+	}
+	if r.Unrestricted {
+		s += locales.RuleOutside()
+	}
+	return s
+}
+
+// runEdited runs the command as the user changed it.
+func (a *App) runEdited(ap proto.Approval) {
+	cmd := strings.TrimSpace(a.cmdDraft)
+	if cmd == "" || a.C.Answering[ap.ID] {
+		return
+	}
+	cmds, err := a.C.Respond(proto.ApprovalAnswer{ApprovalID: ap.ID, Allow: true, Command: cmd})
+	if a.do(cmds, err); err == nil {
+		a.editing, a.cmdDraft = "", ""
+	}
+}
+
+// denyWithWords reports whether declining the approval waiting takes
+// what is written in the composer with it.
+func (a *App) denyWithWords() bool {
+	return len(a.C.Approvals) > 0 && !a.questionFirst() && strings.TrimSpace(a.draft) != "" && len(a.attached) == 0
+}
+
+// deny declines an approval, with the composer's words if any.
+func (a *App) deny(id string) {
+	ans := proto.ApprovalAnswer{ApprovalID: id}
+	words := a.denyWithWords() && len(a.C.Approvals) > 0 && a.C.Approvals[0].ID == id
+	if words {
+		ans.Text = strings.TrimSpace(a.draft)
+	}
+	cmds, err := a.C.Respond(ans)
+	if a.do(cmds, err); err == nil && words {
+		a.draft = ""
+	}
 }
 
 // waiting is the card of what waits on the user: the top layer of the

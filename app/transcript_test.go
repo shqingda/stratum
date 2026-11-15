@@ -98,3 +98,47 @@ func drain(a *App) {
 	for _, ok := next(a); ok; _, ok = next(a) {
 	}
 }
+
+func TestApprovalRules(t *testing.T) {
+	a := task8App()
+	a.C.Busy = true
+	a.C.Approvals = []proto.Approval{{ID: "x", Tool: "shell", Kind: "exec", Command: "go test ./...", Rule: goTest}}
+	tt := task8Tester(a, false)
+	drain(a)
+	if !tt.HasText("放行：以 go test 开头的命令") {
+		t.Fatalf("no rule shown: %q", tt.Texts())
+	}
+	if err := tt.Click("改命令"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Type(" -run TestAdd")
+	tt.Key(0, ui.KeyEnter)
+	var ans proto.ApprovalAnswer
+	task8Command(t, a, proto.MethodApprovalRespond, &ans)
+	if !ans.Allow || ans.Command != "go test ./... -run TestAdd" || a.editing != "" {
+		t.Fatalf("answer %+v, editing %q", ans, a.editing)
+	}
+
+	delete(a.C.Answering, "x")
+	tt.Frame()
+	if err := tt.Click("总是允许"); err != nil {
+		t.Fatal(err)
+	}
+	task8Command(t, a, proto.MethodApprovalRespond, &ans)
+	if !ans.Allow || !ans.Forever {
+		t.Fatalf("answer %+v", ans)
+	}
+
+	// Esc while changing the command puts it back, and declines nothing.
+	delete(a.C.Answering, "x")
+	tt.Frame()
+	tt.Click("改命令")
+	tt.Frame()
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	task8NoCommand(t, a)
+	if a.editing != "" {
+		t.Fatal("still editing")
+	}
+}

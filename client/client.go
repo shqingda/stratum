@@ -650,6 +650,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	case proto.EventApprovalResolved:
 		var a proto.ApprovalAnswer
 		if json.Unmarshal(e.Data, &a) == nil {
+			if a.Allow && a.Command != "" {
+				c.changed(a)
+			}
 			c.Approvals = slices.DeleteFunc(c.Approvals, func(x proto.Approval) bool { return x.ID == a.ApprovalID })
 			delete(c.Answering, a.ApprovalID)
 		}
@@ -997,6 +1000,30 @@ func (c *Client) Cancel() ([]proto.Command, error) {
 func (c *Client) Answer(id string, allow, always bool) ([]proto.Command, error) {
 	return c.answer(proto.ApprovalAnswer{ApprovalID: id, Allow: allow, Always: always})
 }
+
+// changed shows the command the user changed a call to, on its step.
+func (c *Client) changed(a proto.ApprovalAnswer) {
+	i := slices.IndexFunc(c.Approvals, func(x proto.Approval) bool { return x.ID == a.ApprovalID })
+	if i < 0 {
+		return
+	}
+	ap := c.Approvals[i]
+	for j := len(c.Entries) - 1; j >= 0; j-- {
+		if e := c.Entries[j]; e.Role == Tool && !e.Done && e.Text == ap.Tool && string(e.Args) == string(ap.Args) {
+			var args map[string]any
+			if json.Unmarshal(e.Args, &args) == nil {
+				args["command"] = a.Command
+				e.Args, _ = json.Marshal(args)
+				e.Detail = summarize(args)
+			}
+			return
+		}
+	}
+}
+
+// Respond answers an approval in full: declined with words, kept as a
+// rule, or with the command changed.
+func (c *Client) Respond(ans proto.ApprovalAnswer) ([]proto.Command, error) { return c.answer(ans) }
 
 // Reply answers the model's question; an empty text skips it.
 func (c *Client) Reply(id, text string) ([]proto.Command, error) {

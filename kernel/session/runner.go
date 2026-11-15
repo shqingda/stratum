@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/shqingda/talos/kernel/perm"
@@ -63,26 +64,40 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 		return llm.ToolResult{}, err
 	}
 	decision := perm.Decide(perm.Mode(x.Mode), req, r.env.Sandboxed)
-	r.m.mu.Lock()
-	if decision == perm.AskUser && r.run.always[call.Name] {
+	if decision == perm.AskUser && r.allowed(ctx, req) {
 		decision = perm.Allow
 	}
-	r.m.mu.Unlock()
+	var changed string
 	switch decision {
 	case perm.Deny:
 		return fail("Talos does not allow this call.")
 	case perm.AskUser:
-		allowed, err := r.ask(ctx, call, req)
+		ans, err := r.ask(ctx, call, req)
 		if err != nil {
 			return llm.ToolResult{}, err
 		}
-		if !allowed {
-			res, err := fail("The user declined this call. Ask them how to proceed, or take another approach.")
+		if !ans.Allow {
+			why := "Ask them how to proceed, or take another approach."
+			if t := strings.TrimSpace(ans.Text); t != "" {
+				why = "They said: " + t
+			}
+			res, err := fail("The user declined this call. %s", why)
 			res.Skipped = true
 			return res, err
 		}
+		if cmd := strings.TrimSpace(ans.Command); cmd != "" && cmd != strings.TrimSpace(req.Command) && req.Kind == perm.Exec {
+			var args map[string]any
+			if json.Unmarshal(call.Args, &args) == nil {
+				args["command"] = cmd
+				call.Args, _ = json.Marshal(args)
+				changed = cmd
+			}
+		}
 	}
 	out, err := tool.Run(ctx, r.env, call.Args)
+	if changed != "" {
+		out = fmt.Sprintf("The user changed the command before it ran. It ran:\n%s\n\n%s", changed, out)
+	}
 	if ctx.Err() != nil {
 		return llm.ToolResult{}, ctx.Err()
 	}
@@ -113,24 +128,47 @@ func (r *runner) question(ctx context.Context, call llm.ToolCall) (llm.ToolResul
 
 // ask records an approval request and waits for the answer or the end of
 // the turn.
-func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (bool, error) {
+func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (proto.ApprovalAnswer, error) {
+	rule := ruleFor(req)
 	a := proto.Approval{ID: newID(), Tool: call.Name, Args: call.Args, Kind: string(req.Kind), Command: req.Command, Reason: reason(req, r.env)}
+	if req.Kind != perm.Exec || rule.Prefix != "" {
+		a.Rule = &rule
+	}
 	for _, p := range req.Paths {
 		a.Paths = append(a.Paths, p.Abs)
 	}
 	ans, err := r.wait(ctx, a)
-	if err != nil {
-		return false, err
+	if err != nil || !ans.Allow || a.Rule == nil || ans.Command != "" && strings.TrimSpace(ans.Command) != strings.TrimSpace(req.Command) {
+		return ans, err // a changed command keeps no rule of the one asked about
 	}
-	if ans.Allow && ans.Always {
-		r.m.mu.Lock()
-		if r.run.always == nil {
-			r.run.always = map[string]bool{}
+	switch {
+	case ans.Forever:
+		set, err := r.m.Settings(context.WithoutCancel(ctx))
+		if err == nil && !slices.Contains(set.Rules, rule) {
+			set.Rules = append(set.Rules, rule)
+			r.m.SetSettings(context.WithoutCancel(ctx), set)
 		}
-		r.run.always[call.Name] = true
+	case ans.Always:
+		r.m.mu.Lock()
+		if r.m.allowed == nil {
+			r.m.allowed = map[string][]proto.Rule{}
+		}
+		r.m.allowed[r.sessionID] = append(r.m.allowed[r.sessionID], rule)
 		r.m.mu.Unlock()
 	}
-	return ans.Allow, nil
+	return ans, nil
+}
+
+// allowed reports whether a rule of the session or of the settings lets
+// req run unasked.
+func (r *runner) allowed(ctx context.Context, req perm.Request) bool {
+	r.m.mu.Lock()
+	rules := slices.Clone(r.m.allowed[r.sessionID])
+	r.m.mu.Unlock()
+	if set, err := r.m.Settings(context.WithoutCancel(ctx)); err == nil {
+		rules = append(rules, set.Rules...)
+	}
+	return slices.ContainsFunc(rules, func(x proto.Rule) bool { return allows(x, req) })
 }
 
 // wait records an approval request and waits for the answer or the end

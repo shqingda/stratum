@@ -254,6 +254,126 @@ func (msgs Messages) Deny() string {
 	return Catalog.Format(msgs.locale, "deny", nil)
 }
 
+// AllowAlways says "总是允许"
+// in the language the app shows.
+func AllowAlways() string { return In(i18n.Locale()).AllowAlways() }
+
+// AllowAlways says "总是允许"
+// in the language of msgs.
+func (msgs Messages) AllowAlways() string {
+	return Catalog.Format(msgs.locale, "allowAlways", nil)
+}
+
+// EditCommand says "改命令"
+// in the language the app shows.
+func EditCommand() string { return In(i18n.Locale()).EditCommand() }
+
+// EditCommand says "改命令"
+// in the language of msgs.
+func (msgs Messages) EditCommand() string {
+	return Catalog.Format(msgs.locale, "editCommand", nil)
+}
+
+// EditCommandHint says "改好后运行的是改过的命令"
+// in the language the app shows.
+func EditCommandHint() string { return In(i18n.Locale()).EditCommandHint() }
+
+// EditCommandHint says "改好后运行的是改过的命令"
+// in the language of msgs.
+func (msgs Messages) EditCommandHint() string {
+	return Catalog.Format(msgs.locale, "editCommandHint", nil)
+}
+
+// RunIt says "运行"
+// in the language the app shows.
+func RunIt() string { return In(i18n.Locale()).RunIt() }
+
+// RunIt says "运行"
+// in the language of msgs.
+func (msgs Messages) RunIt() string {
+	return Catalog.Format(msgs.locale, "runIt", nil)
+}
+
+// RuleScope says "放行：{what}"
+// in the language the app shows.
+func RuleScope(what string) string { return In(i18n.Locale()).RuleScope(what) }
+
+// RuleScope says "放行：{what}"
+// in the language of msgs.
+func (msgs Messages) RuleScope(what string) string {
+	return Catalog.Format(msgs.locale, "ruleScope", map[string]any{"what": what})
+}
+
+// RuleCommands says "以 {prefix} 开头的命令"
+// in the language the app shows.
+func RuleCommands(prefix string) string { return In(i18n.Locale()).RuleCommands(prefix) }
+
+// RuleCommands says "以 {prefix} 开头的命令"
+// in the language of msgs.
+func (msgs Messages) RuleCommands(prefix string) string {
+	return Catalog.Format(msgs.locale, "ruleCommands", map[string]any{"prefix": prefix})
+}
+
+// RuleTool says "所有「{tool}」"
+// in the language the app shows.
+func RuleTool(tool string) string { return In(i18n.Locale()).RuleTool(tool) }
+
+// RuleTool says "所有「{tool}」"
+// in the language of msgs.
+func (msgs Messages) RuleTool(tool string) string {
+	return Catalog.Format(msgs.locale, "ruleTool", map[string]any{"tool": tool})
+}
+
+// RuleOutside says "（沙箱外）"
+// in the language the app shows.
+func RuleOutside() string { return In(i18n.Locale()).RuleOutside() }
+
+// RuleOutside says "（沙箱外）"
+// in the language of msgs.
+func (msgs Messages) RuleOutside() string {
+	return Catalog.Format(msgs.locale, "ruleOutside", nil)
+}
+
+// ComposerDenyPlaceholder says "写下意见，⏎ 拒绝这一步并告诉它为什么"
+// in the language the app shows.
+func ComposerDenyPlaceholder() string { return In(i18n.Locale()).ComposerDenyPlaceholder() }
+
+// ComposerDenyPlaceholder says "写下意见，⏎ 拒绝这一步并告诉它为什么"
+// in the language of msgs.
+func (msgs Messages) ComposerDenyPlaceholder() string {
+	return Catalog.Format(msgs.locale, "composerDenyPlaceholder", nil)
+}
+
+// AlwaysAllowed says "总是允许的"
+// in the language the app shows.
+func AlwaysAllowed() string { return In(i18n.Locale()).AlwaysAllowed() }
+
+// AlwaysAllowed says "总是允许的"
+// in the language of msgs.
+func (msgs Messages) AlwaysAllowed() string {
+	return Catalog.Format(msgs.locale, "alwaysAllowed", nil)
+}
+
+// NoRules says "还没有。审批时点「总是允许」会存在这里。"
+// in the language the app shows.
+func NoRules() string { return In(i18n.Locale()).NoRules() }
+
+// NoRules says "还没有。审批时点「总是允许」会存在这里。"
+// in the language of msgs.
+func (msgs Messages) NoRules() string {
+	return Catalog.Format(msgs.locale, "noRules", nil)
+}
+
+// RemoveRule says "移除 {what}"
+// in the language the app shows.
+func RemoveRule(what string) string { return In(i18n.Locale()).RemoveRule(what) }
+
+// RemoveRule says "移除 {what}"
+// in the language of msgs.
+func (msgs Messages) RemoveRule(what string) string {
+	return Catalog.Format(msgs.locale, "removeRule", map[string]any{"what": what})
+}
+
 // Skip says "跳过"
 // in the language the app shows.
 func Skip() string { return In(i18n.Locale()).Skip() }

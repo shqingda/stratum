@@ -48,6 +48,9 @@ type App struct {
 	toEnd    bool   // put the composer's caret at the end of its draft
 	mention  mention
 	find     find
+	editing  string // the approval whose command is being changed
+	cmdDraft string // the command as changed
+	cmdInput ui.Handle
 	drafts   drafts       // keeps each session's draft in the kernel
 	query    string       // the sidebar's search
 	list     ui.ListState // the transcript

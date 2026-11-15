@@ -65,6 +65,13 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
 	}
+	if a.editing != "" {
+		// The command being changed has Enter; Esc puts it back.
+		if key == ui.KeyEscape && mods == 0 {
+			a.editing = ""
+		}
+		return key == ui.KeyEscape || key == ui.KeyEnter
+	}
 	if a.find.on && key == ui.KeyEscape && mods == 0 {
 		a.closeFind()
 		return true
@@ -94,6 +101,13 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return key == ui.KeyEnter
 	}
+	// Words written while a call waits decline it and say why.
+	if key == ui.KeyEnter && mods == 0 && a.denyWithWords() {
+		if ap := a.C.Approvals[0]; !a.C.Answering[ap.ID] && !a.keyRepeat {
+			a.deny(ap.ID)
+		}
+		return true
+	}
 	if key == ui.KeyEnter && mods == 0 && a.ready() {
 		if !a.keyRepeat {
 			a.submit()
@@ -119,6 +133,9 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		case key == ui.KeyEscape && mods == 0:
 		default:
 			return false
+		}
+		if ap.Rule == nil {
+			always = false // nothing to keep: it is allowed once
 		}
 		if !a.C.Answering[ap.ID] && !a.keyRepeat {
 			a.do(a.C.Answer(ap.ID, allow, always))

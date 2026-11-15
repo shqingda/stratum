@@ -92,7 +92,7 @@ func TestTask8ApprovalShortcuts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := task8App()
 			a.C.Busy = true
-			a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell"}, {ID: "second", Tool: "write_file"}, {ID: "third", Tool: "edit_file"}}
+			a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell", Rule: goTest}, {ID: "second", Tool: "write_file"}, {ID: "third", Tool: "edit_file"}}
 			tt := task8Tester(a, false)
 			tt.Key(tc.mods, tc.key)
 			var answer proto.ApprovalAnswer
@@ -112,17 +112,17 @@ func TestTask8ApprovalShortcuts(t *testing.T) {
 func TestTask8ComposerConflicts(t *testing.T) {
 	a := task8App()
 	a.C.Busy = true
-	a.C.Approvals = []proto.Approval{{ID: "oldest", Tool: "shell"}}
+	a.C.Approvals = []proto.Approval{{ID: "oldest", Tool: "shell", Rule: goTest}}
 	tt := task8Tester(a, false)
-	for _, text := range []string{"第一条", "第二条"} {
-		tt.Type(text)
-		tt.Key(0, ui.KeyEnter)
-		var prompt proto.Prompt
-		task8Command(t, a, proto.MethodPrompt, &prompt)
-		if prompt.Text != text || a.draft != "" {
-			t.Fatalf("sent %q, want %q; draft %q", prompt.Text, text, a.draft)
-		}
+	// Words written while a call waits decline it and say why.
+	tt.Type("别跑这个")
+	tt.Key(0, ui.KeyEnter)
+	var no proto.ApprovalAnswer
+	task8Command(t, a, proto.MethodApprovalRespond, &no)
+	if no.Allow || no.Text != "别跑这个" || a.draft != "" {
+		t.Fatalf("declined %+v, draft %q", no, a.draft)
 	}
+	delete(a.C.Answering, "oldest")
 	tt.Type("保留")
 	tt.Key(ui.Shift, ui.KeyEnter)
 	tt.Type("换行")
@@ -181,7 +181,7 @@ func TestTask8ApprovalHints(t *testing.T) {
 	for _, dark := range []bool{false, true} {
 		a := task8App()
 		a.C.Entries = nil
-		a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell", Command: "go test ./..."}, {ID: "second", Tool: "write_file", Paths: []string{"notes.txt"}}}
+		a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell", Command: "go test ./...", Rule: goTest}, {ID: "second", Tool: "write_file", Paths: []string{"notes.txt"}}}
 		tt := task8Tester(a, dark)
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
 		texts := strings.Join(tt.Texts(), "|")
@@ -190,8 +190,9 @@ func TestTask8ApprovalHints(t *testing.T) {
 		}
 		snapshot(t, tt, "t8-approval-keys-"+appearance)
 		tt.Type("回车发送这条消息")
-		if strings.Contains(strings.Join(tt.Texts(), "|"), "|⏎|") {
-			t.Fatal("allow still advertises Enter while draft is nonempty")
+		// Enter declines with the words now: the hint moves to 拒绝.
+		if texts := strings.Join(tt.Texts(), "|"); strings.Count(texts, "|⏎|") != 1 || !strings.Contains(texts, "拒绝|拒绝|⏎|总是允许") {
+			t.Fatalf("Enter is not on 拒绝 while a draft is written: %q", texts)
 		}
 		snapshot(t, tt, "t8-draft-keys-"+appearance)
 	}
@@ -206,7 +207,7 @@ func TestTask8HeldApprovalKeyDoesNotAnswerNext(t *testing.T) {
 			t.Run(fmt.Sprintf("composer-%v/key-%d/mods-%d", composerFocus, key.key, key.mods), func(t *testing.T) {
 				a := task8App()
 				a.C.Busy = true
-				a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell"}, {ID: "second", Tool: "write_file"}}
+				a.C.Approvals = []proto.Approval{{ID: "first", Tool: "shell", Rule: goTest}, {ID: "second", Tool: "write_file"}}
 				var tt *ui.Tester
 				if composerFocus {
 					tt = task8Tester(a, false)
@@ -411,3 +412,5 @@ func TestMention(t *testing.T) {
 		t.Fatal("the list stayed")
 	}
 }
+
+var goTest = &proto.Rule{Tool: "shell", Prefix: "go test"}

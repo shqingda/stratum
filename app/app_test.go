@@ -40,7 +40,7 @@ func working() *App {
 		{Key: 7, Role: client.Tool, Text: "shell", Detail: "go test ./... -run TestAdd -v", CallID: "e"},
 	}
 	args, _ := json.Marshal(map[string]string{"command": "go test ./... -run TestAdd -v"})
-	c.Approvals = []proto.Approval{{ID: "x", Tool: "shell", Kind: "exec", Command: "go test ./... -run TestAdd -v", Args: args, Reason: "沙箱内：无网络，只写工作区"}}
+	c.Approvals = []proto.Approval{{ID: "x", Tool: "shell", Kind: "exec", Command: "go test ./... -run TestAdd -v", Args: args, Reason: "沙箱内：无网络，只写工作区", Rule: &proto.Rule{Tool: "shell", Prefix: "go test"}}}
 	c.Queued = []proto.Queued{{ID: "q1", Text: "测试过了就顺手把 Sub 也检查一遍"}}
 	a := New(c)
 	a.now = func() time.Time { return now }

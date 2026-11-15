@@ -311,16 +311,32 @@ type Approval struct {
 	// with Options to pick from; the answer's Text replies.
 	Question string   `json:"question,omitempty"`
 	Options  []string `json:"options,omitempty"`
+	// Rule is what allowing it for the session, or always, lets run
+	// unasked from then on.
+	Rule *Rule `json:"rule,omitempty"`
 }
 
-// ApprovalAnswer is the user's answer. Always allows the tool for the rest
-// of the session.
+// Rule lets calls run unasked: those of a tool, and of a command tool
+// the command lines that start with Prefix's words. A rule for commands
+// outside the sandbox allows only those.
+type Rule struct {
+	Tool         string `json:"tool"`
+	Prefix       string `json:"prefix,omitempty"`
+	Unrestricted bool   `json:"unrestricted,omitempty"`
+}
+
+// ApprovalAnswer is the user's answer. Always keeps the approval's rule
+// for the rest of the session, Forever in the settings.
 type ApprovalAnswer struct {
 	SessionID  string `json:"sessionId"`
 	ApprovalID string `json:"approvalId"`
 	Allow      bool   `json:"allow"`
 	Always     bool   `json:"always,omitempty"`
-	Text       string `json:"text,omitempty"` // the reply to a question
+	Forever    bool   `json:"forever,omitempty"`
+	// Text replies to a question, or says why a call was declined.
+	Text string `json:"text,omitempty"`
+	// Command is the command line the user changed it to before it ran.
+	Command string `json:"command,omitempty"`
 }
 
 // Account is a signed-in provider account.
@@ -516,6 +532,8 @@ type Settings struct {
 	// steps folded into a line, "thinking" its steps and reasoning, "all"
 	// every step on its own row.
 	Detail string `json:"detail,omitempty"`
+	// Rules are the calls allowed unasked in every session.
+	Rules []Rule `json:"rules,omitempty"`
 }
 
 type ModelRef struct {

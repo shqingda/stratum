@@ -47,7 +47,7 @@ func stateTool() *client.Entry {
 }
 
 func stateApproval(id string) proto.Approval {
-	return proto.Approval{ID: id, Tool: "shell", Kind: "exec", Command: "go test ./... -run " + id, Reason: "沙箱内：无网络，只写工作区"}
+	return proto.Approval{ID: id, Tool: "shell", Kind: "exec", Command: "go test ./... -run " + id, Reason: "沙箱内：无网络，只写工作区", Rule: goTest}
 }
 
 // Text input values and placeholders are exposed through accessibility, not Texts.

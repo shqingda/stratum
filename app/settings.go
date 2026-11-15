@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -464,6 +465,23 @@ func (a *App) permissionsPage(c *ui.Context) {
 			}
 		})
 	}).Label(locales.NewSessionPermissions())
+	section(c, p, locales.AlwaysAllowed(), false)
+	group(c, p, func() {
+		r := rows{c: c, p: p}
+		if len(set.Rules) == 0 {
+			ui.Text(c, locales.NoRules()).FontSize(12.5).TextColor(p.Mute).Padding(11, 12)
+		}
+		for i, rule := range set.Rules {
+			what := ruleText(rule)
+			r.row(fmt.Sprintf("rule:%d:%s:%s", i, rule.Tool, rule.Prefix), what, "", func() {
+				if a.iconButton(c, fmt.Sprintf("rule-x:%d", i), "x", locales.RemoveRule(what)).Clicked() {
+					s := set
+					s.Rules = slices.Delete(slices.Clone(set.Rules), i, i+1)
+					a.do(a.C.SaveSettings(s))
+				}
+			})
+		}
+	})
 }
 
 func (a *App) radioDot(c *ui.Context, on bool) {

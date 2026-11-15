@@ -126,6 +126,9 @@ func (a *App) box(c *ui.Context) {
 		if a.C.Busy {
 			ph = locales.ComposerQueuePlaceholder()
 		}
+		if len(a.C.Approvals) > 0 {
+			ph = locales.ComposerDenyPlaceholder()
+		}
 		if a.questionFirst() {
 			ph = locales.ComposerAnswerPlaceholder()
 		}

@@ -50,11 +50,14 @@ type Manager struct {
 	Sandboxed bool
 	Clock     agent.Clock // real time when nil
 
-	mu    sync.Mutex
-	runs  map[string]*run
-	subs  map[int]func(proto.Event)
-	nextS int
-	wg    sync.WaitGroup
+	mu   sync.Mutex
+	runs map[string]*run
+	// allowed are the rules the user allowed for the rest of a session,
+	// by its ID, until Talos quits.
+	allowed map[string][]proto.Rule
+	subs    map[int]func(proto.Event)
+	nextS   int
+	wg      sync.WaitGroup
 }
 
 // New makes a manager with the default tools.
@@ -69,7 +72,6 @@ type run struct {
 	queued    []waiting // prompts sent while it runs, oldest first
 	nextQ     int       // numbers the queued prompts
 	approvals map[string]*pending
-	always    map[string]bool // tools the user allowed for the rest of the turn
 }
 
 // waiting is a prompt in a run's queue.
