@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
 )
 
 func (a *App) keys(c *ui.Context) {
@@ -86,6 +87,14 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return true
 	}
+	// ⌘Enter steers the running turn: the words join it after its
+	// current tool calls rather than waiting for it to end.
+	if key == ui.KeyEnter && mods == ui.Cmd && a.ready() && len(a.C.Approvals) == 0 {
+		if !a.keyRepeat {
+			a.steer()
+		}
+		return true
+	}
 	if len(a.C.Approvals) > 0 {
 		ap := a.C.Approvals[0]
 		allow, always := false, false
@@ -103,6 +112,17 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return true
 	}
+	// Enter in an empty composer sends the oldest waiting prompt now.
+	if key == ui.KeyEnter && mods == 0 && a.C.Busy {
+		for _, q := range a.C.Queued {
+			if !q.Steer {
+				if !a.keyRepeat {
+					a.do(a.C.SendNow(q.ID))
+				}
+				return true
+			}
+		}
+	}
 	if key == ui.KeyEscape && mods == 0 && a.C.Busy {
 		if !a.keyRepeat {
 			a.do(a.C.Cancel())
@@ -115,6 +135,14 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 func (a *App) composerKey(k ui.TextKey) bool {
 	text := k.Text()
 	a.draft = text
+	// ↑ in an empty composer brings back the last thing sent, to send
+	// again or change.
+	if k.Key == ui.KeyUp && k.Mods == 0 && strings.TrimSpace(text) == "" {
+		if last := a.lastSent(); last != "" {
+			a.recall = last // the view sets it, as the app sets a draft
+			return true
+		}
+	}
 	handled := a.actionKey(k.Mods, k.Key)
 	if a.draft != text {
 		k.SetText(a.draft)
@@ -136,4 +164,14 @@ func (a *App) approvalHint(c *ui.Context, id, hint string) string {
 // approval.
 func (a *App) questionFirst() bool {
 	return len(a.C.Approvals) > 0 && a.C.Approvals[0].Kind == "question"
+}
+
+// lastSent is the text of the user's last message in the session.
+func (a *App) lastSent() string {
+	for i := len(a.C.Entries) - 1; i >= 0; i-- {
+		if e := a.C.Entries[i]; e.Role == client.User && e.Text != "" {
+			return e.Text
+		}
+	}
+	return ""
 }

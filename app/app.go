@@ -44,6 +44,7 @@ type App struct {
 	now      func() time.Time
 	err      string       // the last command that could not be sent
 	draft    string       // what the composer holds
+	recall   string       // a sent message ↑ brings back, for the next frame
 	query    string       // the sidebar's search
 	list     ui.ListState // the transcript
 	md       markdown.Options

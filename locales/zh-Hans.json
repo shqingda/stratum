@@ -50,7 +50,7 @@
   "effortHigh": "高",
   "effortXhigh": "极高",
   "composerPlaceholder": "让 Talos 做点什么",
-  "composerQueuePlaceholder": "运行中：回车排队",
+  "composerQueuePlaceholder": "运行中：⏎ 排队，⌘⏎ 插话",
   "composerAnswerPlaceholder": "回答上面的问题，回车发送",
   "noImageSupport": "当前模型看不了图片，换一个再发",
   "local": "本机",
@@ -382,6 +382,9 @@
       }
     }
   },
+  "sendNow": "立即发送",
+  "unqueue": "不发了",
+  "steerSoon": "下一步插入",
   "editedFiles": "改了 {count} 个文件",
   "@editedFiles": {
     "placeholders": {

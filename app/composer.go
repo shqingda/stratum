@@ -6,7 +6,9 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/talos/proto"
 )
 
 // effortLabel names a reasoning effort.
@@ -43,18 +45,11 @@ func (a *App) composer(c *ui.Context) {
 // of an empty session.
 func (a *App) dock(c *ui.Context) {
 	p := a.p
-	seen := map[string]int{}
-	for _, q := range a.C.Queued {
-		seen[q]++ // the same words queued twice are two rows
-		ui.Row(c.Key(struct {
-			q string
-			n int
-		}{q, seen[q]})).Height(34).Padding(0, 6, 0, 12).Margin(0, 20, -1, 20).Gap(8).AlignItems(ui.Center).
-			Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 12, Opacity: 0}, Exit: &ui.Motion{Y: -24, Opacity: 0}}).Children(func() {
-			sym(c, "corner-down-right", 14, p.Mute)
-			ui.Text(c, q).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		})
+	a.takeBack()
+	if len(a.C.Queued) > 0 {
+		// The waiting prompts are a tray tucked under the composer's top.
+		ui.Column(c).Margin(0, 20, -1, 20).Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).Clip().
+			Transition(ui.ElementTransition{Size: true, Duration: 180 * time.Millisecond}).Children(func() { a.queue(c) })
 	}
 	a.box(c)
 	switch {
@@ -62,6 +57,35 @@ func (a *App) dock(c *ui.Context) {
 		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
 	case !a.helloShown():
 		a.status(c)
+	}
+}
+
+// queue lists the prompts waiting while a turn runs.
+func (a *App) queue(c *ui.Context) {
+	p := a.p
+	for i, q := range a.C.Queued {
+		row := ui.Row(c.Key("q:"+q.ID)).Height(34).Padding(0, 6, 0, 12).Gap(8).AlignItems(ui.Center).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 12, Opacity: 0}, Exit: &ui.Motion{Y: -24, Opacity: 0}})
+		if i > 0 {
+			row.BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge)
+		}
+		row.Children(func() {
+			if q.Steer {
+				// It joins the running turn at its next step.
+				sym(c, "arrow-up", 14, p.Live)
+			} else {
+				sym(c, "corner-down-right", 14, p.Mute)
+			}
+			ui.Text(c, client.QueuedLabel(q)).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			if q.Steer {
+				ui.Text(c, locales.SteerSoon()).FontSize(12.5).TextColor(p.Live).SingleLine().Shrink(0)
+			} else if a.textButton(c, "now:"+q.ID, locales.SendNow()).Clicked() {
+				a.do(a.C.SendNow(q.ID))
+			}
+			if a.iconPill(c, "unq:"+q.ID, "x", locales.Unqueue()).Clicked() {
+				a.do(a.C.Unqueue(q.ID))
+			}
+		})
 	}
 }
 
@@ -86,7 +110,16 @@ func (a *App) box(c *ui.Context) {
 		if a.questionFirst() {
 			ph = locales.ComposerAnswerPlaceholder()
 		}
-		ui.TextAreaBase(c, &a.draft).Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
+		recalled := a.recall != ""
+		if recalled {
+			a.draft, a.recall = a.recall, ""
+		}
+		area := ui.TextAreaBase(c, &a.draft)
+		if recalled {
+			n := len([]rune(a.draft))
+			area.SetTextSelection(n, n) // go on writing at its end
+		}
+		area.Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
 			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
 		if a.noImages() {
 			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
@@ -112,16 +145,36 @@ func (a *App) ready() bool {
 	return strings.TrimSpace(a.draft) != "" || len(a.attached) > 0
 }
 
-func (a *App) submit() {
+func (a *App) submit() { a.send1(a.C.Prompt) }
+
+// steer sends the draft into the running turn.
+func (a *App) steer() { a.send1(a.C.Steer) }
+
+func (a *App) send1(send func(string, ...llm.Image) ([]proto.Command, error)) {
 	if !a.ready() {
 		return
 	}
 	text, images := a.prompt()
-	cmds, err := a.C.Prompt(text, images...)
+	cmds, err := send(text, images...)
 	a.do(cmds, err)
 	if err == nil {
 		a.draft, a.attached = "", nil
 	}
+}
+
+// takeBack puts the prompts a stopped turn gave back into the composer,
+// before what is being written there.
+func (a *App) takeBack() {
+	cur := a.C.Current
+	if cur == nil || len(a.C.Returned[cur.ID]) == 0 {
+		return
+	}
+	back := strings.Join(a.C.Returned[cur.ID], "\n\n")
+	delete(a.C.Returned, cur.ID)
+	if strings.TrimSpace(a.draft) != "" {
+		back += "\n\n" + a.draft
+	}
+	a.draft = back
 }
 
 // iconPill is a composer control that is only a symbol.
@@ -208,4 +261,16 @@ func (a *App) status(c *ui.Context) {
 		}
 		item("lock", locales.SandboxOn())
 	})
+}
+
+// textButton is a small button that is only words.
+func (a *App) textButton(c *ui.Context, key, label string) ui.Element {
+	p := a.p
+	b := ui.ButtonBase(c.Key(key)).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Label(label).Shrink(0)
+	press(b)
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() { ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine() })
+	return b
 }

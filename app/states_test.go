@@ -153,8 +153,10 @@ func TestStateMatrix(t *testing.T) {
 			}
 			a.draft = strings.Join(lines, "\n")
 		}, want: []string{"第 01 行"}},
-		{name: "composer-three-queued", setup: func(a *App) { a.C.Queued = []string{"检查 Add", "检查 Sub", "更新 README"} }, want: []string{"检查 Add", "检查 Sub", "更新 README"}},
-		{name: "composer-busy", setup: func(a *App) { a.C.Busy = true }, want: []string{"运行中：回车排队", "停止"}},
+		{name: "composer-three-queued", setup: func(a *App) {
+			a.C.Queued = []proto.Queued{{ID: "1", Text: "检查 Add"}, {ID: "2", Text: "检查 Sub"}, {ID: "3", Text: "更新 README", Steer: true}}
+		}, want: []string{"检查 Add", "检查 Sub", "更新 README"}},
+		{name: "composer-busy", setup: func(a *App) { a.C.Busy = true }, want: []string{"运行中：⏎ 排队，⌘⏎ 插话", "停止"}},
 		{name: "composer-error", setup: func(a *App) { a.err = "发送失败：内核连接已断开，请稍后重试。" }, want: []string{"发送失败"}},
 	}
 	for _, phase := range []client.Phase{client.Starting, client.Handshaking, client.Syncing, client.Disconnected, client.Ready} {

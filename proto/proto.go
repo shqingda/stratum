@@ -133,21 +133,54 @@ type Snapshot struct {
 	Session   Session    `json:"session"`
 	Revision  int64      `json:"revision"`
 	Running   bool       `json:"running"`
-	Queued    []string   `json:"queued,omitempty"`    // prompts waiting for the turn to take them
+	Queued    []Queued   `json:"queued,omitempty"`    // prompts waiting for the turn to take them
 	Approvals []Approval `json:"approvals,omitempty"` // waiting for the user
 }
 
-// Prompt sends the user's message. While a turn runs, it joins that turn
-// after its current tool calls.
+// Prompt sends the user's message. While a turn runs, it waits in the
+// queue and starts the next turn once this one ends; one that steers
+// joins the running turn instead, after its current tool calls.
 type Prompt struct {
 	SessionID string      `json:"sessionId"`
 	Text      string      `json:"text"`
 	Images    []llm.Image `json:"images,omitempty"`
+	Steer     bool        `json:"steer,omitempty"`
 }
 
 // PromptResult says what became of a prompt.
 type PromptResult struct {
-	Queued bool `json:"queued"` // joined the running turn
+	Queued bool   `json:"queued"`       // waits in the running turn's queue
+	ID     string `json:"id,omitempty"` // its Queued.ID
+}
+
+// Queued is a prompt waiting while a turn runs.
+type Queued struct {
+	ID     string `json:"id"`
+	Text   string `json:"text"`
+	Images int    `json:"images,omitempty"`
+	Steer  bool   `json:"steer,omitempty"` // joins the running turn
+}
+
+// MethodQueueEdit changes a waiting prompt: QueueEdit → {}.
+const MethodQueueEdit = "queue.edit"
+
+// QueueEdit removes a waiting prompt ("remove") or sends it into the
+// running turn after its current tool calls ("steer").
+type QueueEdit struct {
+	SessionID string `json:"sessionId"`
+	ID        string `json:"id"`
+	Action    string `json:"action"`
+}
+
+// EventQueue streams a session's queue each time it changes. When the
+// turns stop, by the user or by an error, the prompts still waiting are
+// Returned to the user to send again.
+const EventQueue = "queue"
+
+// Queue is the data of EventQueue.
+type Queue struct {
+	Items    []Queued `json:"items,omitempty"`
+	Returned []Queued `json:"returned,omitempty"`
 }
 
 // EventsQuery reads a session's log after a revision.

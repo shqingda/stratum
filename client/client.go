@@ -128,7 +128,10 @@ type Client struct {
 
 	Entries []*Entry
 	Busy    bool
-	Queued  []string // prompts waiting for the running turn
+	Queued  []proto.Queued // prompts waiting while the turn runs
+	// Returned are prompts that were still waiting when a session's turns
+	// stopped, by session, for the composer to take back.
+	Returned map[string][]string
 	// Older is the log having events before the ones shown.
 	Older, LoadingOlder bool
 	// MCP is how the MCP servers are for the folder MCPFor, nil until
@@ -247,6 +250,9 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 		}
 		if f.Event.Type == proto.EventSession {
 			c.sessionUpdated(*f.Event) // any session's: the list shows them all
+		}
+		if f.Event.Type == proto.EventQueue {
+			c.returned(*f.Event) // any session's, kept until it is opened
 		}
 		if c.Current == nil || f.Event.SessionID != c.Current.ID {
 			c.mark(*f.Event)
@@ -644,6 +650,11 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.endStream()
 			c.notice("%s", locales.FellBack(c.modelName(f.From), c.modelName(f.To)))
 		}
+	case proto.EventQueue:
+		var q proto.Queue
+		if json.Unmarshal(e.Data, &q) == nil {
+			c.Queued = q.Items
+		}
 	case proto.EventRetry:
 		var r proto.Retry
 		_ = json.Unmarshal(e.Data, &r)
@@ -652,7 +663,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		var t proto.TurnEnd
 		_ = json.Unmarshal(e.Data, &t)
 		c.endStream()
-		c.Busy, c.Queued, c.Approvals = false, nil, nil
+		c.Busy, c.Approvals = false, nil // the queue says itself what became of it
 		c.thought = nil
 		c.Workspace.BranchStale = true // the turn may have switched it
 		clear(c.Answering)
@@ -686,9 +697,6 @@ func (c *Client) message(seq int64, m llm.Message) {
 		if text.Len() > 0 || len(images) > 0 {
 			c.endStream()
 			c.add(&Entry{Seq: seq, Role: User, Text: text.String(), Images: images, Done: true})
-			if i := slices.Index(c.Queued, queuedLabel(text.String(), len(images))); i >= 0 {
-				c.Queued = slices.Delete(c.Queued, i, i+1) // the turn took it
-			}
 		}
 	case llm.Assistant:
 		var thought strings.Builder
@@ -823,20 +831,48 @@ func (c *Client) mutation(method string, params any, done func(json.RawMessage) 
 }
 
 // Prompt sends text and images to the current session. While a turn
-// runs, the prompt waits in Queued until the turn takes it.
+// runs, the prompt waits in Queued and starts the next turn.
 func (c *Client) Prompt(text string, images ...llm.Image) ([]proto.Command, error) {
+	return c.prompt(false, text, images)
+}
+
+// Steer sends text and images into the running turn, after its current
+// tool calls; with none running it is a prompt.
+func (c *Client) Steer(text string, images ...llm.Image) ([]proto.Command, error) {
+	return c.prompt(true, text, images)
+}
+
+func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Command, error) {
 	if strings.TrimSpace(text) == "" && len(images) == 0 {
 		return nil, errors.New(locales.NothingToSend())
 	}
-	session := c.Current
-	p := proto.Prompt{SessionID: sessionID(session), Text: text, Images: images}
-	return c.mutation(proto.MethodPrompt, p, func(r json.RawMessage) []proto.Command {
-		var res proto.PromptResult
-		if json.Unmarshal(r, &res) == nil && res.Queued && c.Current == session {
-			c.Queued = append(c.Queued, queuedLabel(text, len(images)))
+	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
+	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
+}
+
+// Unqueue takes back a waiting prompt; SendNow makes it join the running
+// turn.
+func (c *Client) Unqueue(id string) ([]proto.Command, error) { return c.editQueue(id, "remove") }
+func (c *Client) SendNow(id string) ([]proto.Command, error) { return c.editQueue(id, "steer") }
+
+func (c *Client) editQueue(id, action string) ([]proto.Command, error) {
+	return c.mutation(proto.MethodQueueEdit, proto.QueueEdit{SessionID: sessionID(c.Current), ID: id, Action: action}, nil)
+}
+
+// returned keeps the prompts a session's stopped turns gave back.
+func (c *Client) returned(e proto.Event) {
+	var q proto.Queue
+	if json.Unmarshal(e.Data, &q) != nil || len(q.Returned) == 0 {
+		return
+	}
+	if c.Returned == nil {
+		c.Returned = map[string][]string{}
+	}
+	for _, it := range q.Returned {
+		if it.Text != "" {
+			c.Returned[e.SessionID] = append(c.Returned[e.SessionID], it.Text)
 		}
-		return nil
-	})
+	}
 }
 
 func sessionID(s *proto.Session) string {
@@ -956,6 +992,9 @@ func (c *Client) ListModels(account string) ([]proto.Command, error) {
 	c.modelsReq = cmd.ID
 	return []proto.Command{cmd}, nil
 }
+
+// QueuedLabel is how a queued prompt shows: its text, or what it holds.
+func QueuedLabel(q proto.Queued) string { return queuedLabel(q.Text, q.Images) }
 
 // queuedLabel is how a queued prompt shows: its text, or what it holds
 // when it has none.

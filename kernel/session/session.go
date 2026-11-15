@@ -13,6 +13,7 @@ import (
 	"github.com/shqingda/talos/kernel/mcp"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -65,9 +66,29 @@ func New(st *store.Store, open func(string) (llm.Provider, error)) *Manager {
 type run struct {
 	turnSeq   int64
 	cancel    context.CancelFunc
-	queued    []proto.Prompt
+	queued    []waiting // prompts sent while it runs, oldest first
+	nextQ     int       // numbers the queued prompts
 	approvals map[string]*pending
 	always    map[string]bool // tools the user allowed for the rest of the turn
+}
+
+// waiting is a prompt in a run's queue.
+type waiting struct {
+	id    string
+	steer bool
+	p     proto.Prompt
+}
+
+func (w waiting) item() proto.Queued {
+	return proto.Queued{ID: w.id, Text: w.p.Text, Images: len(w.p.Images), Steer: w.steer}
+}
+
+func items(ws []waiting) []proto.Queued {
+	var out []proto.Queued
+	for _, w := range ws {
+		out = append(out, w.item())
+	}
+	return out
 }
 
 type pending struct {
@@ -224,7 +245,7 @@ func (m *Manager) Get(ctx context.Context, id string) (proto.Snapshot, error) {
 	if r := m.runs[id]; r != nil {
 		snap.Running = true
 		for _, q := range r.queued {
-			snap.Queued = append(snap.Queued, q.Text)
+			snap.Queued = append(snap.Queued, q.item())
 		}
 		for _, p := range r.approvals {
 			snap.Approvals = append(snap.Approvals, p.approval)
@@ -289,8 +310,65 @@ func (m *Manager) Cancel(id string) {
 	m.mu.Unlock()
 }
 
-// Prompt starts a turn with the user's text, or queues the text into the
-// running turn. receipt names the command, to record what became of it.
+// next takes the prompt the next turn starts with: the steering ones
+// left over, joined, else the oldest waiting. m.mu is held.
+func (r *run) next() (proto.Prompt, bool) {
+	var p proto.Prompt
+	rest := r.queued[:0:0]
+	for _, w := range r.queued {
+		if !w.steer {
+			rest = append(rest, w)
+			continue
+		}
+		if p.SessionID == "" {
+			p = w.p
+			continue
+		}
+		p.Text += "\n\n" + w.p.Text
+		p.Images = append(p.Images, w.p.Images...)
+	}
+	if p.SessionID != "" {
+		r.queued = rest
+		return p, true
+	}
+	if len(r.queued) == 0 {
+		return p, false
+	}
+	p = r.queued[0].p
+	r.queued = r.queued[1:]
+	return p, true
+}
+
+// EditQueue removes a waiting prompt, or makes it join the running turn.
+func (m *Manager) EditQueue(e proto.QueueEdit) error {
+	m.mu.Lock()
+	r := m.runs[e.SessionID]
+	if r == nil {
+		m.mu.Unlock()
+		return proto.Errorf("not_found", "no turn runs")
+	}
+	i := slices.IndexFunc(r.queued, func(w waiting) bool { return w.id == e.ID })
+	if i < 0 {
+		m.mu.Unlock()
+		return proto.Errorf("not_found", "no such prompt waits")
+	}
+	switch e.Action {
+	case "remove":
+		r.queued = slices.Delete(r.queued, i, i+1)
+	case "steer":
+		r.queued[i].steer = true
+	default:
+		m.mu.Unlock()
+		return proto.Errorf("bad_request", "unknown action %q", e.Action)
+	}
+	q := items(r.queued)
+	m.mu.Unlock()
+	m.stream(e.SessionID, proto.EventQueue, proto.Queue{Items: q})
+	return nil
+}
+
+// Prompt starts a turn with the user's text, or queues the text while a
+// turn runs. receipt names the command, to record what became of it.
 func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (proto.PromptResult, error) {
 	if strings.TrimSpace(p.Text) == "" && len(p.Images) == 0 {
 		return proto.PromptResult{}, proto.Errorf("bad_request", "text is empty")
@@ -301,9 +379,13 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 	}
 	m.mu.Lock()
 	if r := m.runs[x.ID]; r != nil {
-		r.queued = append(r.queued, p)
+		r.nextQ++
+		w := waiting{id: fmt.Sprintf("q%d", r.nextQ), steer: p.Steer, p: p}
+		r.queued = append(r.queued, w)
+		q := items(r.queued)
 		m.mu.Unlock()
-		return proto.PromptResult{Queued: true}, nil
+		m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
+		return proto.PromptResult{Queued: true, ID: w.id}, nil
 	}
 	if m.runs == nil {
 		m.runs = map[string]*run{}
@@ -320,16 +402,40 @@ func (m *Manager) Prompt(ctx context.Context, p proto.Prompt, receipt string) (p
 	go func() {
 		defer m.wg.Done()
 		err := m.turn(runCtx, x, r, p)
-		cancel()
-		m.mu.Lock()
-		delete(m.runs, x.ID)
-		m.mu.Unlock()
 		if receipt != "" {
 			rc := store.Receipt{ID: receipt, SessionID: x.ID, Method: proto.MethodPrompt, Status: "completed"}
 			if err != nil && !errors.Is(err, context.Canceled) {
 				rc.Status, rc.Error = "failed", err.Error()
 			}
 			m.Store.PutReceipt(context.Background(), rc)
+		}
+		// A turn that ended well takes the next prompt waiting: those
+		// that meant to join it and came too late first, all together,
+		// else the oldest one.
+		for err == nil {
+			m.mu.Lock()
+			next, ok := r.next()
+			q := items(r.queued)
+			m.mu.Unlock()
+			if !ok {
+				break
+			}
+			m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
+			if x2, e := m.Store.GetSession(context.WithoutCancel(runCtx), x.ID); e == nil {
+				x = x2 // its model or mode may have changed meanwhile
+			}
+			err = m.turn(runCtx, x, r, next)
+		}
+		cancel()
+		m.mu.Lock()
+		delete(m.runs, x.ID)
+		back := items(r.queued)
+		r.queued = nil
+		m.mu.Unlock()
+		// Stopped or failed, the turns go no further: what still waits
+		// goes back to the user rather than running unasked.
+		if len(back) > 0 {
+			m.stream(x.ID, proto.EventQueue, proto.Queue{Returned: back})
 		}
 	}()
 	return proto.PromptResult{}, nil
@@ -441,12 +547,21 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
 		Steer: func() []llm.Part {
 			m.mu.Lock()
-			q := r.queued
-			r.queued = nil
-			m.mu.Unlock()
 			var parts []llm.Part
-			for _, p := range q {
-				parts = append(parts, promptParts(p)...)
+			rest := r.queued[:0:0]
+			for _, w := range r.queued {
+				if w.steer {
+					parts = append(parts, promptParts(w.p)...)
+				} else {
+					rest = append(rest, w)
+				}
+			}
+			changed := len(rest) != len(r.queued)
+			r.queued = rest
+			q := items(rest)
+			m.mu.Unlock()
+			if changed {
+				m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
 			}
 			return parts
 		},

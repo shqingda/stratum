@@ -534,11 +534,11 @@ func (msgs Messages) ComposerPlaceholder() string {
 	return Catalog.Format(msgs.locale, "composerPlaceholder", nil)
 }
 
-// ComposerQueuePlaceholder says "运行中：回车排队"
+// ComposerQueuePlaceholder says "运行中：⏎ 排队，⌘⏎ 插话"
 // in the language the app shows.
 func ComposerQueuePlaceholder() string { return In(i18n.Locale()).ComposerQueuePlaceholder() }
 
-// ComposerQueuePlaceholder says "运行中：回车排队"
+// ComposerQueuePlaceholder says "运行中：⏎ 排队，⌘⏎ 插话"
 // in the language of msgs.
 func (msgs Messages) ComposerQueuePlaceholder() string {
 	return Catalog.Format(msgs.locale, "composerQueuePlaceholder", nil)
@@ -2436,6 +2436,36 @@ func GitLooks(count int) string { return In(i18n.Locale()).GitLooks(count) }
 // in the language of msgs.
 func (msgs Messages) GitLooks(count int) string {
 	return Catalog.Format(msgs.locale, "gitLooks", map[string]any{"count": count})
+}
+
+// SendNow says "立即发送"
+// in the language the app shows.
+func SendNow() string { return In(i18n.Locale()).SendNow() }
+
+// SendNow says "立即发送"
+// in the language of msgs.
+func (msgs Messages) SendNow() string {
+	return Catalog.Format(msgs.locale, "sendNow", nil)
+}
+
+// Unqueue says "不发了"
+// in the language the app shows.
+func Unqueue() string { return In(i18n.Locale()).Unqueue() }
+
+// Unqueue says "不发了"
+// in the language of msgs.
+func (msgs Messages) Unqueue() string {
+	return Catalog.Format(msgs.locale, "unqueue", nil)
+}
+
+// SteerSoon says "下一步插入"
+// in the language the app shows.
+func SteerSoon() string { return In(i18n.Locale()).SteerSoon() }
+
+// SteerSoon says "下一步插入"
+// in the language of msgs.
+func (msgs Messages) SteerSoon() string {
+	return Catalog.Format(msgs.locale, "steerSoon", nil)
 }
 
 // EditedFiles says "改了 {count} 个文件"

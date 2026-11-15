@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -242,5 +243,60 @@ func TestTask8SearchFocusViews(t *testing.T) {
 		}
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
 		snapshot(t, tt, "t8-search-focus-"+appearance)
+	}
+}
+
+// While a turn runs, ⏎ queues, ⌘⏎ steers, ⏎ in an empty composer sends
+// the oldest waiting prompt now, ↑ brings back the last one sent, and
+// what a stopped turn gives back lands in the composer.
+func TestQueueKeys(t *testing.T) {
+	a := task8App()
+	a.C.Busy = true
+	a.C.Entries = append(a.C.Entries, &client.Entry{Key: 99, Role: client.User, Text: "上一条", Done: true})
+	tt := task8Tester(a, false)
+
+	tt.Type("排队")
+	tt.Key(0, ui.KeyEnter)
+	var p proto.Prompt
+	task8Command(t, a, proto.MethodPrompt, &p)
+	if p.Text != "排队" || p.Steer {
+		t.Fatalf("⏎ sent %+v", p)
+	}
+	tt.Type("插话")
+	tt.Key(ui.Cmd, ui.KeyEnter)
+	task8Command(t, a, proto.MethodPrompt, &p)
+	if p.Text != "插话" || !p.Steer {
+		t.Fatalf("⌘⏎ sent %+v", p)
+	}
+
+	tt.Key(0, ui.KeyUp)
+	if a.draft != "上一条" {
+		t.Fatalf("↑ draft %q", a.draft)
+	}
+
+	for range 3 {
+		tt.Key(0, ui.KeyBackspace)
+	}
+	a.C.Queued = []proto.Queued{{ID: "q1", Text: "排队"}}
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	var edit proto.QueueEdit
+	task8Command(t, a, proto.MethodQueueEdit, &edit)
+	if edit.ID != "q1" || edit.Action != "steer" {
+		t.Fatalf("⏎ on empty %+v", edit)
+	}
+	if err := tt.Click("不发了"); err != nil {
+		t.Fatal(err)
+	}
+	task8Command(t, a, proto.MethodQueueEdit, &edit)
+	if edit.Action != "remove" {
+		t.Fatalf("remove %+v", edit)
+	}
+
+	a.C.Queued = nil
+	a.C.Returned = map[string][]string{a.C.Current.ID: {"没发出去的"}}
+	tt.Frame()
+	if a.draft != "没发出去的" || len(a.C.Returned) != 0 {
+		t.Fatalf("taken back %q %v", a.draft, a.C.Returned)
 	}
 }

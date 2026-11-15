@@ -265,21 +265,39 @@ func TestQueuedPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.Receive(resp(cmds[0].ID, proto.PromptResult{Queued: true}))
-	if len(c.Queued) != 1 {
+	if p := params[proto.Prompt](t, cmds[0]); p.Steer {
+		t.Error("a prompt steers")
+	}
+	// The queue streams itself: the kernel says what waits.
+	c.Receive(ev(0, proto.EventQueue, proto.Queue{Items: []proto.Queued{{ID: "q1", Text: "also this"}}}))
+	c.Receive(resp(cmds[0].ID, proto.PromptResult{Queued: true, ID: "q1"}))
+	if len(c.Queued) != 1 || c.Queued[0].ID != "q1" {
 		t.Fatal(c.Queued)
 	}
-	c.Receive(ev(2, proto.EventMessage, msg(llm.User, "also this")))
+	cmds, _ = c.SendNow("q1")
+	if p := params[proto.QueueEdit](t, cmds[0]); p.ID != "q1" || p.Action != "steer" || p.SessionID != sid {
+		t.Error(p)
+	}
+	c.Receive(ev(0, proto.EventQueue, proto.Queue{}))
 	if len(c.Queued) != 0 {
 		t.Error(c.Queued)
+	}
+	cmds, _ = c.Steer("and this")
+	if p := params[proto.Prompt](t, cmds[0]); !p.Steer {
+		t.Error("Steer does not steer")
 	}
 	cmds, _ = c.Cancel()
 	if p := params[proto.SessionRef](t, cmds[0]); p.SessionID != sid {
 		t.Error(p)
 	}
-	c.Receive(ev(3, proto.EventTurnEnd, proto.TurnEnd{Stopped: true}))
+	c.Receive(ev(2, proto.EventTurnEnd, proto.TurnEnd{Stopped: true}))
 	if _, err := c.Cancel(); err == nil || c.Entries[len(c.Entries)-1].Role != Notice {
 		t.Errorf("%v %v", err, texts(c))
+	}
+	// What still waited comes back, for the composer to take.
+	c.Receive(ev(0, proto.EventQueue, proto.Queue{Returned: []proto.Queued{{ID: "q2", Text: "and this"}}}))
+	if got := c.Returned[sid]; len(got) != 1 || got[0] != "and this" {
+		t.Errorf("returned %q", got)
 	}
 }
 

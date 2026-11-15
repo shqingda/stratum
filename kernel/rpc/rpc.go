@@ -155,6 +155,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Prompt(ctx, p, cmd.ID)
+	case proto.MethodQueueEdit:
+		p, err := params[proto.QueueEdit](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return nil, m.EditQueue(p)
 	case proto.MethodCancel:
 		p, err := params[proto.SessionRef](cmd)
 		if err != nil {
