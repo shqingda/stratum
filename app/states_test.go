@@ -145,7 +145,7 @@ func TestStateMatrix(t *testing.T) {
 			a.C.Approvals = []proto.Approval{stateApproval("TestAdd")}
 			a.C.Answering["TestAdd"] = true
 		}, want: []string{"需要你允许"}},
-		{name: "composer-empty", want: []string{"让 Talos 做点什么"}},
+		{name: "composer-empty", want: []string{"描述任务，用 @ 引用文件"}},
 		{name: "composer-multiline", setup: func(a *App) {
 			var lines []string
 			for i := range 12 {

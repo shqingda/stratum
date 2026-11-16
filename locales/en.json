@@ -82,7 +82,7 @@
   "effortMedium": "Medium",
   "effortHigh": "High",
   "effortXhigh": "Extra High",
-  "composerPlaceholder": "Ask Talos to do something",
+  "composerPlaceholder": "Describe the task; type @ to bring in a file",
   "composerQueuePlaceholder": "Running: ⏎ queues, ⌘⏎ steers",
   "composerAnswerPlaceholder": "Answer the question above and press Return",
   "noImageSupport": "This model can’t read images. Choose another to send them.",

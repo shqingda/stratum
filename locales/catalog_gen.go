@@ -854,11 +854,11 @@ func (msgs Messages) EffortXhigh() string {
 	return Catalog.Format(msgs.locale, "effortXhigh", nil)
 }
 
-// ComposerPlaceholder says "让 Talos 做点什么"
+// ComposerPlaceholder says "描述任务，用 @ 引用文件"
 // in the language the app shows.
 func ComposerPlaceholder() string { return In(i18n.Locale()).ComposerPlaceholder() }
 
-// ComposerPlaceholder says "让 Talos 做点什么"
+// ComposerPlaceholder says "描述任务，用 @ 引用文件"
 // in the language of msgs.
 func (msgs Messages) ComposerPlaceholder() string {
 	return Catalog.Format(msgs.locale, "composerPlaceholder", nil)
