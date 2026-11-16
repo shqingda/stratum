@@ -2328,6 +2328,46 @@ func (msgs Messages) MenuSession() string {
 	return Catalog.Format(msgs.locale, "menuSession", nil)
 }
 
+// ChooseFolder says "选择文件夹…"
+// in the language the app shows.
+func ChooseFolder() string { return In(i18n.Locale()).ChooseFolder() }
+
+// ChooseFolder says "选择文件夹…"
+// in the language of msgs.
+func (msgs Messages) ChooseFolder() string {
+	return Catalog.Format(msgs.locale, "chooseFolder", nil)
+}
+
+// DefaultModelNote says "你直接对话的那个"
+// in the language the app shows.
+func DefaultModelNote() string { return In(i18n.Locale()).DefaultModelNote() }
+
+// DefaultModelNote says "你直接对话的那个"
+// in the language of msgs.
+func (msgs Messages) DefaultModelNote() string {
+	return Catalog.Format(msgs.locale, "defaultModelNote", nil)
+}
+
+// SubtasksNote says "agent 分出去的子任务用它"
+// in the language the app shows.
+func SubtasksNote() string { return In(i18n.Locale()).SubtasksNote() }
+
+// SubtasksNote says "agent 分出去的子任务用它"
+// in the language of msgs.
+func (msgs Messages) SubtasksNote() string {
+	return Catalog.Format(msgs.locale, "subtasksNote", nil)
+}
+
+// LightNote says "起标题、写摘要，快而便宜的就够"
+// in the language the app shows.
+func LightNote() string { return In(i18n.Locale()).LightNote() }
+
+// LightNote says "起标题、写摘要，快而便宜的就够"
+// in the language of msgs.
+func (msgs Messages) LightNote() string {
+	return Catalog.Format(msgs.locale, "lightNote", nil)
+}
+
 // SettingsGeneralLede says "新会话的默认做法，和什么时候通知你。"
 // in the language the app shows.
 func SettingsGeneralLede() string { return In(i18n.Locale()).SettingsGeneralLede() }

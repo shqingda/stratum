@@ -160,6 +160,9 @@ func (a *App) box(c *ui.Context) {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
+			if cur != nil && a.helloShown() {
+				a.folderPill(c, cur)
+			}
 			if cur != nil {
 				a.modelPill(c, cur.Model)
 				a.effortPill(c, effortLabel(cur.Effort))

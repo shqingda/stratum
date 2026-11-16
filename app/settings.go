@@ -403,7 +403,7 @@ func (a *App) modelsPage(c *ui.Context) {
 	section(c, p, locales.NewSessions(), true)
 	group(c, p, func() {
 		r := rows{c: c, p: p}
-		r.row("set-model-row", locales.DefaultModel(), "", func() { a.defaultModel(c, set) })
+		r.row("set-model-row", locales.DefaultModel(), locales.DefaultModelNote(), func() { a.defaultModel(c, set) })
 		r.row("set-effort-row", locales.ReasoningEffort(), "", func() {
 			a.picker(c, "set-effort", "", effortLabel(set.Effort)).PopoverMenuButton(func(m *ui.Menu) {
 				for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
@@ -420,10 +420,10 @@ func (a *App) modelsPage(c *ui.Context) {
 	section(c, p, locales.BackgroundTasks(), false)
 	group(c, p, func() {
 		r := rows{c: c, p: p}
-		r.row("role:sub", locales.Subtasks(), "", func() {
+		r.row("role:sub", locales.Subtasks(), locales.SubtasksNote(), func() {
 			a.roleModel(c, "sub", set.Sub, &a.subMenu, func(ref *proto.ModelRef) { s := set; s.Sub = ref; a.do(a.C.SaveSettings(s)) })
 		})
-		r.row("role:light", locales.TitlesAndSummaries(), "", func() {
+		r.row("role:light", locales.TitlesAndSummaries(), locales.LightNote(), func() {
 			a.roleModel(c, "light", set.Light, &a.lightMenu, func(ref *proto.ModelRef) { s := set; s.Light = ref; a.do(a.C.SaveSettings(s)) })
 		})
 	})
@@ -527,11 +527,11 @@ func (a *App) accountName(id string) string {
 	return id
 }
 
-func modeRows() []struct{ id, label, sub string } {
-	return []struct{ id, label, sub string }{
-		{"ask", locales.ModeAsk(), locales.ModeAskSub()},
-		{"auto", locales.ModeAuto(), locales.ModeAutoSub()},
-		{"full", locales.ModeFullAccess(), locales.ModeFullSub()},
+func modeRows() []struct{ id, icon, label, sub string } {
+	return []struct{ id, icon, label, sub string }{
+		{"ask", "eye", locales.ModeAsk(), locales.ModeAskSub()},
+		{"auto", "shield-half", locales.ModeAuto(), locales.ModeAutoSub()},
+		{"full", "shield-off", locales.ModeFullAccess(), locales.ModeFullSub()},
 	}
 }
 
@@ -543,24 +543,30 @@ func (a *App) permissionsPage(c *ui.Context) {
 		mode = "ask"
 	}
 	section(c, p, locales.NewSessions(), true)
+	// Three cards side by side, as the mockup has them; the chosen one
+	// has a darker edge.
 	ui.RadioGroup(c, func() {
-		group(c, p, func() {
-			r := rows{c: c, p: p}
+		ui.Row(c).Gap(8).AlignItems(ui.Stretch).Children(func() {
 			for _, m := range modeRows() {
-				r.sep()
 				chosen := mode
-				it := ui.RadioBase(c.Key("set-mode:"+m.id), &chosen, m.id).Row().MinHeight(44).Padding(7, 12).Gap(10).AlignItems(ui.Center).Label(m.label)
+				it := ui.RadioBase(c.Key("set-mode:"+m.id), &chosen, m.id).Column().Grow(1).Basis(0).MinWidth(0).Padding(12).Gap(4).Radius(10).AlignItems(ui.Start).Justify(ui.Start).
+					Background(p.Card).Label(m.label)
+				if m.id == mode {
+					it.Border(1.5, p.Fg)
+				} else {
+					it.Border(.5, p.Edge2)
+				}
 				if chosen != mode {
 					s := set
 					s.Mode = chosen
 					a.do(a.C.SaveSettings(s))
 				}
 				it.Children(func() {
-					a.radioDot(c, m.id == mode)
-					ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
-						ui.Text(c, m.label).FontSize(13).TextColor(p.Fg)
-						ui.Text(c, m.sub).FontSize(12).TextColor(p.Mute)
+					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+						sym(c, m.icon, 15, p.Fg)
+						ui.Text(c, m.label).FontSize(13).FontWeight(600).TextColor(p.Fg)
 					})
+					ui.Text(c, m.sub).FontSize(12).LineHeight(1.45).TextColor(p.Fg2)
 				})
 			}
 		})

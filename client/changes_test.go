@@ -103,3 +103,35 @@ func TestRevertedFiles(t *testing.T) {
 	restore(proto.EventChangesRedone, "")
 	is(false, false)
 }
+
+// A session not yet begun moves to another folder: the new one is shown,
+// though the old one's deletion answers before the new one is read.
+func TestNewSessionInAgainstKernel(t *testing.T) {
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	other, _ := filepath.EvalSymlinks(t.TempDir())
+	st, err := store.Open(filepath.Join(t.TempDir(), "talos.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	m := session.New(st, func(string) (llm.Provider, error) { return &llm.Script{}, nil })
+	m.Defaults = func() (string, string) { return "script", "script" }
+	defer m.Close()
+
+	c := newClient(dir, "t")
+	k := dial(t, m, c)
+	k.until("ready", func() bool { return c.Phase == Ready })
+	old := c.Current.ID
+	drop, err := c.Delete(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k.do(c.NewSessionIn(other))
+	k.do(drop, nil)
+	k.until("the new session", func() bool { return c.Phase == Ready && c.Current != nil && c.Current.Cwd == other })
+	for _, s := range c.Sessions {
+		if s.ID == old {
+			t.Fatal("the empty session stayed")
+		}
+	}
+}

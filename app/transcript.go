@@ -760,7 +760,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				why("route", locales.RuleScope(ruleText(*ap.Rule)))
 			}
 		})
-		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
+		ui.Row(c).Gap(8).Wrap().Justify(ui.End).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
 			if editing {
 				ui.Text(c, locales.EditCommandHint()).FontSize(13).TextColor(p.Mute).Grow(1).MinWidth(0)
 				if a.button(c, "edit-cancel:"+ap.ID, locales.Cancel(), "esc", false).Disabled(busy).Clicked() {

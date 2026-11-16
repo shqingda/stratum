@@ -1111,6 +1111,16 @@ func (c *Client) NewSession() ([]proto.Command, error) {
 	return []proto.Command{c.create()}, nil
 }
 
+// NewSessionIn makes dir the workspace, creates a session there and
+// shows it.
+func (c *Client) NewSessionIn(dir string) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	c.Cwd = dir
+	return []proto.Command{c.create()}, nil
+}
+
 // Open shows another session.
 func (c *Client) Open(id string) ([]proto.Command, error) {
 	if c.Phase != Ready {
@@ -1126,6 +1136,9 @@ func (c *Client) Open(id string) ([]proto.Command, error) {
 func (c *Client) Delete(id string) ([]proto.Command, error) {
 	return c.mutation(proto.MethodSessionDelete, proto.SessionRef{SessionID: id}, func(json.RawMessage) []proto.Command {
 		c.Sessions = slices.DeleteFunc(c.Sessions, func(s proto.Session) bool { return s.ID == id })
+		if c.want != "" && c.want != id {
+			return nil // another session is on its way
+		}
 		if c.Current != nil && c.Current.ID == id {
 			c.want = ""
 			c.Phase = Syncing

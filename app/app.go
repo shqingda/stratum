@@ -90,14 +90,14 @@ type App struct {
 	commitMsg   string
 	commitInput ui.Handle
 
-	searchInput                                 ui.Handle
-	keyRepeat                                   bool
-	visibleSessions                             []string
-	menuSession                                 string
-	modelMenu, effortMenu, modeMenu, detailMenu bool
-	modelsRequested                             bool
-	modelsPending, modelsAccount, modelsError   string
-	modelsLoadedAccount                         string
+	searchInput                                             ui.Handle
+	keyRepeat                                               bool
+	visibleSessions                                         []string
+	menuSession                                             string
+	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu bool
+	modelsRequested                                         bool
+	modelsPending, modelsAccount, modelsError               string
+	modelsLoadedAccount                                     string
 
 	keyOpen, keyMenu bool
 	keyProvider, key string
@@ -113,13 +113,14 @@ type App struct {
 	attached []attachment
 	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
 	pick     func() []string           // the open panel
+	pickDir  func() string             // the open panel, for a folder
 	update   func(func())              // runs on the UI thread, as Serve was given
 	menuRuns []func(c *ui.Context)     // commands from the menu bar, for the next frame
 }
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, opened: map[string]bool{}, locale: &memLocale{},
+	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 

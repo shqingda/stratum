@@ -344,3 +344,30 @@ func TestTask8PhaseViews(t *testing.T) {
 		}
 	}
 }
+
+// A session not yet begun moves to another folder: one there takes its
+// place, and the empty one goes; a begun one stays.
+func TestMoveTo(t *testing.T) {
+	a := task8App()
+	old := a.C.Current.ID
+	a.moveTo(a.C.Current.Cwd)
+	task8NoCommand(t, a)
+
+	a.moveTo("/tmp/other")
+	var sc proto.SessionCreate
+	task8Command(t, a, proto.MethodSessionCreate, &sc)
+	if sc.Cwd != "/tmp/other" {
+		t.Fatalf("created in %q", sc.Cwd)
+	}
+	task8NoCommand(t, a) // the old one had begun
+
+	a = task8App()
+	a.C.Entries = nil
+	a.moveTo("/tmp/other")
+	task8Command(t, a, proto.MethodSessionCreate, nil)
+	var ref proto.SessionRef
+	task8Command(t, a, proto.MethodSessionDelete, &ref)
+	if ref.SessionID != old {
+		t.Fatalf("deleted %q, want %q", ref.SessionID, old)
+	}
+}

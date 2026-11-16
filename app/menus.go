@@ -2,6 +2,9 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
+
+	"github.com/egoist/mygo"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
@@ -188,4 +191,60 @@ func phaseText(phase client.Phase) string {
 	default:
 		return locales.PhaseUnknown()
 	}
+}
+
+// folderPill moves a session not yet begun to another folder: one the
+// sidebar knows, or one chosen with the open panel.
+func (a *App) folderPill(c *ui.Context, cur *proto.Session) {
+	a.pill(c, "folder", "folder", filepath.Base(cur.Cwd), true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+		seen := map[string]bool{}
+		for _, s := range a.C.Sessions {
+			if seen[s.Cwd] {
+				continue
+			}
+			seen[s.Cwd] = true
+			dir, _ := a.splitPath(s.Cwd)
+			if m.Item(filepath.Base(s.Cwd)).ID("folder:" + s.Cwd).Subtitle(dir).Checked(s.Cwd == cur.Cwd).Chosen() {
+				a.moveTo(s.Cwd)
+			}
+		}
+		if a.pickDir != nil && a.update != nil {
+			m.Separator()
+			if m.Item(locales.ChooseFolder()).ID("folder:choose").Chosen() {
+				go func() {
+					if dir := a.pickDir(); dir != "" {
+						a.update(func() { a.moveTo(dir) })
+					}
+				}()
+			}
+		}
+	}, a.menuOptions(&a.folderMenu))
+}
+
+// moveTo starts the session over in dir: a new one there, and the empty
+// one here goes.
+func (a *App) moveTo(dir string) {
+	cur := a.C.Current
+	if cur == nil || dir == cur.Cwd {
+		return
+	}
+	// Both are asked while the client is ready; the new one goes first.
+	var drop []proto.Command
+	var dropErr error
+	if len(a.C.Entries) == 0 {
+		drop, dropErr = a.C.Delete(cur.ID)
+	}
+	cmds, err := a.C.NewSessionIn(dir)
+	if a.do(cmds, err); err == nil && drop != nil {
+		a.do(drop, dropErr)
+	}
+}
+
+// pickFolder is the system's open panel, for one folder.
+func pickFolder() string {
+	paths, _ := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: locales.ChooseFolder(), Directory: true, CreateDirectories: true})
+	if len(paths) == 0 {
+		return ""
+	}
+	return paths[0]
 }
