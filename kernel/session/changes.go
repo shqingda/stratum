@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/shqingda/talos/kernel/changes"
 	"github.com/shqingda/talos/kernel/store"
@@ -45,9 +46,7 @@ func (m *Manager) ChangesApply(ctx context.Context, q proto.ChangeQuery, redo bo
 	if q.TurnSeq <= 0 {
 		return proto.ChangeResult{}, proto.Errorf("bad_request", "turnSeq must be positive")
 	}
-	m.mu.Lock()
-	if len(m.runs) != 0 {
-		m.mu.Unlock()
+	if !m.lockIdle(ctx) {
 		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
 	}
 	x, err := m.session(ctx, q.SessionID)
@@ -90,7 +89,9 @@ func (m *Manager) ChangesRevertHunk(ctx context.Context, q proto.HunkQuery) (pro
 	if q.TurnSeq <= 0 || q.Path == "" {
 		return proto.ChangeResult{}, proto.Errorf("bad_request", "turnSeq and path are required")
 	}
-	m.mu.Lock()
+	if !m.lockIdle(ctx) {
+		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
+	}
 	unlocked := false
 	unlock := func() {
 		if !unlocked {
@@ -99,9 +100,6 @@ func (m *Manager) ChangesRevertHunk(ctx context.Context, q proto.HunkQuery) (pro
 		}
 	}
 	defer unlock()
-	if len(m.runs) != 0 {
-		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
-	}
 	x, err := m.session(ctx, q.SessionID)
 	if err != nil {
 		return proto.ChangeResult{}, err
@@ -132,4 +130,25 @@ func changeError(err error) error {
 		return proto.Errorf("not_found", "no recorded change")
 	}
 	return err
+}
+
+// lockIdle takes m.mu once no turn runs, and says whether it did. A turn
+// tells the client it is over a moment before it lets go of the session,
+// so an undo pressed at once waits that moment out rather than failing.
+func (m *Manager) lockIdle(ctx context.Context) bool {
+	for wait := 0; ; wait++ {
+		m.mu.Lock()
+		if len(m.runs) == 0 {
+			return true
+		}
+		m.mu.Unlock()
+		if wait == 50 {
+			return false
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
 }
