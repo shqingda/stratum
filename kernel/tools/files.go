@@ -190,6 +190,7 @@ var EditFile = fileTool(&Tool{
 		if !a.ReplaceAll {
 			n = 1
 		}
+		at := strings.Count(s[:strings.Index(s, a.OldText)], "\n") + 1
 		s = strings.Replace(s, a.OldText, a.NewText, n)
 		after := []byte(s)
 		if err := writeAtomic(root, name, after); err != nil {
@@ -200,7 +201,10 @@ var EditFile = fileTool(&Tool{
 				return "", fmt.Errorf("file %s was changed, but recording change failed: %w", a.Path, err)
 			}
 		}
-		return fmt.Sprintf("Edited %s (%d replacement%s)", a.Path, n, plural(n)), nil
+		if n == 1 {
+			return fmt.Sprintf("Edited %s (1 replacement at line %d)", a.Path, at), nil
+		}
+		return fmt.Sprintf("Edited %s (%d replacements)", a.Path, n), nil
 	},
 })
 

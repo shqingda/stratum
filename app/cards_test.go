@@ -108,10 +108,16 @@ func TestToolResultFormats(t *testing.T) {
 		{"Edited a (b).go (0 replacements)", 0},
 		{"Edited a (b).go (1 replacement) trailing", 0},
 		{"Edited another.go (1 replacement)", 0},
+		{"Edited a (b).go (1 replacement at line 6)", 1},
+		{"Edited a (b).go (1 replacement at line 0)", 0},
+		{"Edited a (b).go (3 replacements at line 6)", 0},
 	} {
-		if got := editReplacements(tc.output, "a (b).go"); got != tc.want {
+		if got, _ := editReplacements(tc.output, "a (b).go"); got != tc.want {
 			t.Errorf("editReplacements(%q)=%d, want %d", tc.output, got, tc.want)
 		}
+	}
+	if _, line := editReplacements("Edited a (b).go (1 replacement at line 6)", "a (b).go"); line != 6 {
+		t.Errorf("line %d, want 6", line)
 	}
 }
 

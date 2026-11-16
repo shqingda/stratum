@@ -103,17 +103,17 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 			if e.Text == "write_file" && args.Content != nil {
 				suffix := fmt.Sprintf(" %s (%d lines)", args.Path, strings.Count(*args.Content, "\n")+1)
 				if e.Output == "Created"+suffix || e.Output == "Wrote"+suffix {
-					a.diffCard(c, e, args.Path, "", *args.Content, locales.NewFile())
+					a.diffCard(c, e, args.Path, "", *args.Content, locales.NewFile(), 1)
 					return
 				}
 			}
 			if e.Text == "edit_file" && args.OldText != nil && *args.OldText != "" && args.NewText != nil {
-				if n := editReplacements(e.Output, args.Path); n == 1 || (n > 1 && args.ReplaceAll) {
+				if n, line := editReplacements(e.Output, args.Path); n == 1 || (n > 1 && args.ReplaceAll) {
 					note := ""
 					if n > 1 {
 						note = locales.ReplacedTimes(n)
 					}
-					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note)
+					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note, line)
 					return
 				}
 			}
@@ -142,26 +142,32 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 	a.step(c, e)
 }
 
-func editReplacements(output, path string) int {
+// editReplacements reads edit_file's output: how many places it changed
+// and, for one, the line the change starts at (0 when it does not say).
+func editReplacements(output, path string) (n, line int) {
 	rest, ok := strings.CutPrefix(output, "Edited "+path+" (")
 	if !ok {
-		return 0
+		return 0, 0
 	}
-	var n int
 	if _, err := fmt.Sscanf(rest, "%d replacement", &n); err != nil || n < 1 {
-		return 0
+		return 0, 0
 	}
-	suffix := "replacement)"
-	if n != 1 {
-		suffix = "replacements)"
+	switch {
+	case n != 1 && rest == fmt.Sprintf("%d replacements)", n):
+	case n == 1 && rest == "1 replacement)":
+	case n == 1:
+		if _, err := fmt.Sscanf(rest, "1 replacement at line %d)", &line); err != nil || line < 1 || rest != fmt.Sprintf("1 replacement at line %d)", line) {
+			return 0, 0
+		}
+	default:
+		return 0, 0
 	}
-	if rest != fmt.Sprintf("%d %s", n, suffix) {
-		return 0
-	}
-	return n
+	return n, line
 }
 
-func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, note string) {
+// diffCard shows an edit: first is the file's line the texts start at,
+// 0 when unknown, and the lines are then counted within the texts.
+func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, note string, first int) {
 	p := a.p
 	// In a finished turn's work an edit is one line that opens to its card.
 	if a.inWork && !a.editLine(c, e, path, oldText, newText) {
@@ -218,7 +224,10 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 					bg, signColor = p.Minus.Alpha(.10), p.Minus
 				}
 				ui.Row(c).Height(20).Children(func() {
-					ui.Text(c, strconv.Itoa(line.number)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End).Tooltip(locales.LineNumberInArgs())
+					num := ui.Text(c, strconv.Itoa(line.number+max(first, 1)-1)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End)
+					if first == 0 {
+						num.Tooltip(locales.LineNumberInArgs())
+					}
 					ui.Text(c, line.sign).Width(14).Height(20).Shrink(0).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(signColor).Background(bg)
 					text := ui.Text(c, strings.TrimSuffix(line.text, "\n")).Grow(1).MinWidth(0).Height(20).Padding(0, 6).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(p.Fg).Background(bg).PreserveSpaces().SingleLine().Selectable()
 					if !strings.HasSuffix(line.text, "\n") {

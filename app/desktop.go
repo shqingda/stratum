@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/egoist/mygo/plugins/updater"
 	"slices"
 	"strings"
 
@@ -68,6 +69,7 @@ const notePrefix = "session:"
 // clicking a notification opens its session.
 func (a *App) UseDesktop() {
 	a.desk, a.locale = system{}, systemLocale{}
+	a.version, a.checkUpdates = mygo.App.Version(), updater.CheckForUpdates
 	mygo.App.OnNotificationClick(func(id string) {
 		sid, ok := strings.CutPrefix(id, notePrefix)
 		if !ok || a.update == nil {

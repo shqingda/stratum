@@ -15,17 +15,17 @@ import (
 // settingsPages are the pages of the settings, in the order of the list,
 // with the words their search finds them by.
 var settingsPages = []struct {
-	id, symbol   string
-	label, words func(locales.Messages) string
+	id, symbol         string
+	label, words, lede func(locales.Messages) string // lede: the line under the page's title; nil for none
 }{
-	{"general", "adjustments-horizontal", locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords},
-	{"accounts", "user-circle", locales.Messages.SettingsAccounts, locales.Messages.SettingsAccountsWords},
-	{"models", "sparkles", locales.Messages.SettingsModels, locales.Messages.SettingsModelsWords},
-	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords},
-	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords},
-	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords},
-	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords},
-	{"about", "info-circle", locales.Messages.SettingsAbout, locales.Messages.SettingsAboutWords},
+	{"general", "adjustments-horizontal", locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords, locales.Messages.SettingsGeneralLede},
+	{"accounts", "user-circle", locales.Messages.SettingsAccounts, locales.Messages.SettingsAccountsWords, locales.Messages.SettingsAccountsLede},
+	{"models", "sparkles", locales.Messages.SettingsModels, locales.Messages.SettingsModelsWords, locales.Messages.SettingsModelsLede},
+	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
+	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
+	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
+	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
+	{"about", "info-circle", locales.Messages.SettingsAbout, locales.Messages.SettingsAboutWords, nil},
 }
 
 // finds says whether a settings page answers a search, in any language
@@ -64,7 +64,7 @@ func (a *App) openSettingsPage(id string) {
 // settingsView is the settings: a list of pages, and the page.
 func (a *App) settingsView(c *ui.Context) {
 	p := a.p
-	title := ""
+	title, lede := "", ""
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		ui.Column(c).Width(200).Shrink(0).Padding(0, 10).Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
 			ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).DragWindow().Children(func() {
@@ -79,6 +79,9 @@ func (a *App) settingsView(c *ui.Context) {
 				label := pg.label(locales.In(i18n.Locale()))
 				if pg.id == a.settingsPage {
 					title = label
+					if pg.lede != nil {
+						lede = pg.lede(locales.In(i18n.Locale()))
+					}
 				}
 				if q != "" && !finds(pg.label, pg.words, q) {
 					continue
@@ -100,11 +103,15 @@ func (a *App) settingsView(c *ui.Context) {
 			}
 		})
 		ui.Column(c).Grow(1).MinWidth(0).Background(p.Bg).Children(func() {
-			ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 22).AlignItems(ui.Center).DragWindow().Children(func() {
-				ui.Text(c, title).FontSize(13).FontWeight(600).TextColor(p.Fg)
-			})
+			ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 			ui.Scroll(c).Grow(1).Children(func() {
 				ui.Column(c).Width(580).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 20, 40, 20).Children(func() {
+					// The page's title and what it is for, as the mockup has
+					// them; the about page has its own heading.
+					if lede != "" {
+						ui.Text(c, title).FontSize(20).FontWeight(650).TextColor(p.Fg).Margin(0, 0, 4, 0)
+						ui.Text(c, lede).FontSize(13).TextColor(p.Fg2).Margin(0, 0, 14, 0)
+					}
 					switch a.settingsPage {
 					case "accounts":
 						a.accountsPage(c)
@@ -296,9 +303,9 @@ func (a *App) appearancePage(c *ui.Context) {
 // aboutPage says which build this is, as Go recorded it.
 func (a *App) aboutPage(c *ui.Context) {
 	p := a.p
-	version, commit, built := "devel", "", ""
+	version, commit, built := a.version, "", ""
 	if bi, ok := debug.ReadBuildInfo(); ok {
-		if v := bi.Main.Version; v != "" && v != "(devel)" {
+		if v := bi.Main.Version; version == "" && v != "" && v != "(devel)" {
 			version = v
 		}
 		for _, kv := range bi.Settings {
@@ -314,13 +321,20 @@ func (a *App) aboutPage(c *ui.Context) {
 			}
 		}
 	}
+	if version == "" {
+		version = "devel"
+	}
 	ui.Column(c).AlignItems(ui.Center).Gap(6).Padding(24, 0, 18, 0).Children(func() {
-		ui.Text(c, "Talos").FontSize(20).FontWeight(600).TextColor(p.Fg)
-		ui.Text(c, version).FontSize(13).TextColor(p.Mute).Selectable()
+		ui.Image(c, mark).Size(56, 56)
+		ui.Text(c, "Talos").FontSize(20).FontWeight(600).TextColor(p.Fg).Margin(6, 0, 0, 0)
+		ui.Text(c, locales.VersionIs(version)).FontSize(13).TextColor(p.Mute).Selectable()
+		if a.checkUpdates != nil && a.pushButton(c, "check-updates", locales.CheckForUpdates()).Margin(8, 0, 0, 0).Clicked() {
+			a.checkUpdates()
+		}
 	})
 	group(c, p, func() {
 		r := rows{c: c, p: p}
-		for _, kv := range [][2]string{{locales.Version(), version}, {locales.BuildCommit(), commit}, {locales.BuildTime(), built}} {
+		for _, kv := range [][2]string{{locales.BuildCommit(), commit}, {locales.BuildTime(), built}} {
 			if kv[1] == "" {
 				continue
 			}

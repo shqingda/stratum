@@ -42,7 +42,7 @@ func (a *App) keys(c *ui.Context) {
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBackslash, func() {
 		if !c.ShortcutRepeated() {
-			a.noSide = !a.noSide
+			a.toggleSide()
 		}
 	})
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {

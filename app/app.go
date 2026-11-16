@@ -67,16 +67,24 @@ type App struct {
 	opened             map[string]bool // tool calls whose output shows
 	inWork             bool            // building a finished turn's folded work
 	noSide             bool            // the sidebar is hidden
-	sideOpen           float32         // how far the sidebar is out, 0 to 1, on its way
-	dockH              float32         // how tall the composer floating on the transcript was
-	pal                bool            // the ⌘K palette shows
-	jump               int64           // a message to scroll to, from a search
-	jumpIn             string          // the session it is in
-	palSel             int             // its row chosen by the arrow keys
-	stats              map[string][2]int
-	rv                 review
-	seen               map[string]time.Time // when approvals first showed
-	openIn             func(app, dir string) error
+	// panelWas is whether the review panel was open last frame; sideMoved
+	// that opening it in a narrow window put the sidebar away, so that
+	// closing it brings the sidebar back.
+	panelWas, sideMoved bool
+	sideOpen            float32 // how far the sidebar is out, 0 to 1, on its way
+	dockH               float32 // how tall the composer floating on the transcript was
+	pal                 bool    // the ⌘K palette shows
+	jump                int64   // a message to scroll to, from a search
+	jumpIn              string  // the session it is in
+	palSel              int     // its row chosen by the arrow keys
+	stats               map[string][2]int
+	rv                  review
+	seen                map[string]time.Time // when approvals first showed
+	openIn              func(app, dir string) error
+	// version is the app's, as packaged; checkUpdates asks the updater,
+	// nil where there is none.
+	version      string
+	checkUpdates func()
 
 	openMenu    bool
 	commitMsg   string
@@ -106,6 +114,7 @@ type App struct {
 	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
 	pick     func() []string           // the open panel
 	update   func(func())              // runs on the UI thread, as Serve was given
+	menuRuns []func(c *ui.Context)     // commands from the menu bar, for the next frame
 }
 
 // New returns an app over c, not connected yet.
@@ -203,6 +212,7 @@ func (a *App) View(c *ui.Context) {
 		a.keys(c)
 		return
 	}
+	a.runMenu(c)
 	a.syncDraft(c)
 	a.markSeen(c)
 	if a.settingsOpen {
@@ -210,6 +220,7 @@ func (a *App) View(c *ui.Context) {
 		a.keys(c)
 		return
 	}
+	a.fitPanel(c)
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -235,14 +246,15 @@ func (a *App) helloShown() bool {
 	return a.C.CanAct() && len(a.C.Entries) == 0 && len(a.C.Approvals) == 0
 }
 
-// main is the sheet the session is on, raised off the window with a
-// gap round it; the sidebar takes the gap's place on the left as it comes
-// out. The review panel is a second sheet beside it.
+// main is the sheet the session is on. It fills the window; a hairline
+// parts it from the sidebar, and another from the review panel beside it.
 func (a *App) main(c *ui.Context) {
 	p := a.p
-	sheet := ui.Column(c).Grow(1).MinWidth(0).Margin(sheetGap, sheetGap, sheetGap, sheetGap*(1-a.sideOpen)).
-		Radius(12).Background(p.Sheet).Clip()
-	raise(sheet, p).Children(func() {
+	sheet := ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
+	if a.sideOpen > 0.001 {
+		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+	}
+	sheet.Children(func() {
 		a.bar(c)
 		a.transcript(c)
 		if !a.helloShown() {
@@ -255,9 +267,6 @@ func (a *App) main(c *ui.Context) {
 	}
 }
 
-// sheetGap is the window showing round the sheets.
-const sheetGap = 8
-
 // textZoom is how much the window's content is zoomed for a text size.
 func textZoom(size string) float32 {
 	switch size {
@@ -267,4 +276,30 @@ func textZoom(size string) float32 {
 		return 1.15
 	}
 	return 1
+}
+
+// minMain is the narrowest the session's sheet gets beside the panel
+// before the sidebar makes room.
+const minMain = 600
+
+// fitPanel puts the sidebar away when the review panel opens in a window
+// too narrow for all three, and brings it back when the panel closes.
+func (a *App) fitPanel(c *ui.Context) {
+	if a.rv.open == a.panelWas {
+		return
+	}
+	a.panelWas = a.rv.open
+	w, _ := c.Size()
+	switch {
+	case a.rv.open && !a.noSide && w < sidebarWidth+reviewWidth+minMain:
+		a.noSide, a.sideMoved = true, true
+	case !a.rv.open && a.sideMoved:
+		a.noSide, a.sideMoved = false, false
+	}
+}
+
+// toggleSide shows or hides the sidebar as the user asks, which the panel
+// then leaves alone.
+func (a *App) toggleSide() {
+	a.noSide, a.sideMoved = !a.noSide, false
 }

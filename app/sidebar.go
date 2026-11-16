@@ -37,15 +37,18 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		side.Background(p.Side)
 	}
 	side.Children(func() {
-		bar := c.TitleBar()
-		ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 12, 0, bar.Left+8).Gap(2).DragWindow().Children(func() {
-			ui.Spacer(c)
-			if a.iconButton(c, "new-top", "edit", locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
+		ui.Box(c).Height(barHeight).Shrink(0).DragWindow()
+		ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.Image(c, mark).Size(24, 24)
+			ui.Text(c, "Talos").FontSize(16).FontWeight(600).TextColor(p.Fg)
+		})
+		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
+			if a.navItem(c, "new-top", "edit", locales.NewSession(), "⌘ N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
 				a.do(a.C.NewSession())
 			}
-		})
-		a.search(c)
-		ui.Column(c).Padding(2, 8, 6, 8).Children(func() {
+			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
+				a.openPalette(c)
+			}
 			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
 				a.openMCP()
 			}
@@ -66,41 +69,36 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 // controls whether the sidebar is out or not, so it is always where the
 // pointer left it.
 func (a *App) sideToggle(c *ui.Context) {
-	symbol, tip := "layout-sidebar-left-collapse", locales.HideSidebar()
+	tip := locales.HideSidebar()
 	if a.noSide {
-		symbol, tip = "layout-sidebar-left-expand", locales.ShowSidebar()
+		tip = locales.ShowSidebar()
 	}
-	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-28)/2).Size(28, 28).ZIndex(10).Children(func() {
-		if a.iconButton(c, "side", symbol, tip).Clicked() {
-			a.noSide = !a.noSide
+	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-32)/2).Size(32, 32).ZIndex(10).Children(func() {
+		b := ui.ButtonBase(c.Key("side")).Size(32, 32).Radius(8).Center().Label(tip).Tooltip(tip)
+		press(b)
+		color := a.p.Fg2
+		if b.Hovered() {
+			b.Background(a.p.Hover)
+			color = a.p.Fg
+		}
+		b.Children(func() { sym(c, "layout-sidebar", 17, color) })
+		if b.Clicked() {
+			a.toggleSide()
 		}
 	})
 }
 
 // toggleLeft is where the sidebar's toggle sits: past the window controls.
-func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left, 8) + 4 }
-
-func (a *App) search(c *ui.Context) {
-	p := a.p
-	b := ui.ButtonBase(c.Key("search")).Row().Height(30).Margin(0, 10, 8, 10).Padding(0, 9).Gap(7).Radius(8).Background(p.Chip).AlignItems(ui.Center).Label(locales.Search())
-	if b.Clicked() {
-		a.openPalette(c)
-	}
-	b.Children(func() {
-		sym(c, "search", 15, p.Mute)
-		ui.Text(c, locales.Search()).FontSize(14).TextColor(p.Mute).Grow(1)
-		ui.Text(c, "⌘K").FontSize(12).TextColor(p.Mute)
-	})
-}
+func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+8, 12) }
 
 func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
 	p := a.p
-	it := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 10).Gap(9).Radius(7).AlignItems(ui.Center).Label(label)
+	it := ui.ButtonBase(c.Key(key)).Row().Height(36).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
 	if it.Hovered() {
 		it.Background(p.Hover)
 	}
 	it.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, symbol, 16, p.Fg2) })
+		ui.Box(c).Width(17).Center().Children(func() { sym(c, symbol, 17, p.Fg2) })
 		ui.Text(c, label).FontSize(14).TextColor(p.Fg).SingleLine()
 		ui.Spacer(c)
 		if kbd != "" {

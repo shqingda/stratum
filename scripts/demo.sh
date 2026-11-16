@@ -6,8 +6,10 @@
 #   scripts/demo.sh [folder]
 #
 # The folder (default: a new temporary one) gets three repositories: calc,
-# whose test fails because Add subtracts, and site and notes, which fill the
-# sidebar. What a message to the demo account does depends on its words:
+# whose test fails because Add subtracts, and site and notes, copies of it
+# that fill the sidebar; the scripted answers are about this code, so they
+# hold in any of the three. What a message to the demo account does depends
+# on its words:
 #
 #   修 / fix          read, test, edit, test again (the default)
 #   跑测试 / test      run the tests and report the failure
@@ -66,7 +68,7 @@ EOF
 fi
 for name in site notes; do
 	if repo $name; then
-		echo "# $name" >README.md
+		cp "$root/calc/go.mod" "$root/calc/add.go" "$root/calc/add_test.go" .
 		git add -A && git -c user.name=demo -c user.email=demo@example.test commit -qm "$name"
 	fi
 done

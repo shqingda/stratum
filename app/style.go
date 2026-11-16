@@ -53,30 +53,41 @@ var copied = map[uint64]time.Time{}
 // with the language and a copy icon, the code under it.
 func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 	p := a.p
+	copyButton := func() ui.Element {
+		h := fnv.New64a()
+		h.Write([]byte(b.Code()))
+		key := h.Sum64()
+		done := c.Now().Sub(copied[key]) < 2*time.Second
+		btn := ui.ButtonBase(c).Size(24, 24).Radius(6).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
+		if btn.Hovered() {
+			btn.Background(p.Hover)
+		}
+		btn.Children(func() {
+			if done {
+				sym(c, "check", 12, p.Fg2)
+			} else {
+				sym(c, "copy", 12, p.Mute)
+			}
+		})
+		if btn.Clicked() {
+			c.WriteClipboard(b.Code())
+			copied[key] = c.Now()
+			c.After(2 * time.Second)
+		}
+		return btn
+	}
 	ui.Column(c).Radius(10).Background(p.Chip).Margin(10, 0, 12, 0).Clip().Children(func() {
+		if b.Language == "" {
+			// No language to name: the copy button sits over the code's
+			// top right rather than on a header line of its own.
+			b.Body(c)
+			copyButton().Absolute().Top(6).Right(8)
+			return
+		}
 		ui.Row(c).Height(30).Padding(0, 8, 0, 12).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, b.Language).FontSize(12.5).TextColor(p.Mute)
 			ui.Spacer(c)
-			h := fnv.New64a()
-			h.Write([]byte(b.Code()))
-			key := h.Sum64()
-			done := c.Now().Sub(copied[key]) < 2*time.Second
-			btn := ui.ButtonBase(c).Size(24, 24).Radius(6).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
-			if btn.Hovered() {
-				btn.Background(p.Hover)
-			}
-			btn.Children(func() {
-				if done {
-					sym(c, "check", 12, p.Fg2)
-				} else {
-					sym(c, "copy", 12, p.Mute)
-				}
-			})
-			if btn.Clicked() {
-				c.WriteClipboard(b.Code())
-				copied[key] = c.Now()
-				c.After(2 * time.Second)
-			}
+			copyButton()
 		})
 		b.Body(c)
 	})

@@ -44,6 +44,9 @@ func TestFileTools(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(env.Root, "src/a.go")); strings.Contains(string(b), "A()") {
 		t.Error(string(b))
 	}
+	if out, err := call(t, env, EditFile, map[string]any{"path": "src/a.go", "old_text": "func B() {}\nfunc B", "new_text": "func B() {}\nfunc C"}); err != nil || out != "Edited src/a.go (1 replacement at line 3)" {
+		t.Errorf("%q %v", out, err)
+	}
 	if out, _ := call(t, env, ListDir, map[string]any{"path": "."}); out != "src/\n" {
 		t.Errorf("%q", out)
 	}

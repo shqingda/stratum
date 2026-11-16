@@ -2318,6 +2318,96 @@ func (msgs Messages) ShowSidebar() string {
 	return Catalog.Format(msgs.locale, "showSidebar", nil)
 }
 
+// MenuSession says "会话"
+// in the language the app shows.
+func MenuSession() string { return In(i18n.Locale()).MenuSession() }
+
+// MenuSession says "会话"
+// in the language of msgs.
+func (msgs Messages) MenuSession() string {
+	return Catalog.Format(msgs.locale, "menuSession", nil)
+}
+
+// SettingsGeneralLede says "新会话的默认做法，和什么时候通知你。"
+// in the language the app shows.
+func SettingsGeneralLede() string { return In(i18n.Locale()).SettingsGeneralLede() }
+
+// SettingsGeneralLede says "新会话的默认做法，和什么时候通知你。"
+// in the language of msgs.
+func (msgs Messages) SettingsGeneralLede() string {
+	return Catalog.Format(msgs.locale, "settingsGeneralLede", nil)
+}
+
+// SettingsAccountsLede says "凭据存在钥匙串里。订阅账号按额度计，不显示费用。"
+// in the language the app shows.
+func SettingsAccountsLede() string { return In(i18n.Locale()).SettingsAccountsLede() }
+
+// SettingsAccountsLede says "凭据存在钥匙串里。订阅账号按额度计，不显示费用。"
+// in the language of msgs.
+func (msgs Messages) SettingsAccountsLede() string {
+	return Catalog.Format(msgs.locale, "settingsAccountsLede", nil)
+}
+
+// SettingsModelsLede says "每种工作用哪个模型，想多深。"
+// in the language the app shows.
+func SettingsModelsLede() string { return In(i18n.Locale()).SettingsModelsLede() }
+
+// SettingsModelsLede says "每种工作用哪个模型，想多深。"
+// in the language of msgs.
+func (msgs Messages) SettingsModelsLede() string {
+	return Catalog.Format(msgs.locale, "settingsModelsLede", nil)
+}
+
+// SettingsPermissionsLede says "新会话能做什么，什么时候先问你。"
+// in the language the app shows.
+func SettingsPermissionsLede() string { return In(i18n.Locale()).SettingsPermissionsLede() }
+
+// SettingsPermissionsLede says "新会话能做什么，什么时候先问你。"
+// in the language of msgs.
+func (msgs Messages) SettingsPermissionsLede() string {
+	return Catalog.Format(msgs.locale, "settingsPermissionsLede", nil)
+}
+
+// SettingsAppearanceLede says "主题和文字大小。"
+// in the language the app shows.
+func SettingsAppearanceLede() string { return In(i18n.Locale()).SettingsAppearanceLede() }
+
+// SettingsAppearanceLede says "主题和文字大小。"
+// in the language of msgs.
+func (msgs Messages) SettingsAppearanceLede() string {
+	return Catalog.Format(msgs.locale, "settingsAppearanceLede", nil)
+}
+
+// SettingsShortcutsLede says "键盘能做的事。"
+// in the language the app shows.
+func SettingsShortcutsLede() string { return In(i18n.Locale()).SettingsShortcutsLede() }
+
+// SettingsShortcutsLede says "键盘能做的事。"
+// in the language of msgs.
+func (msgs Messages) SettingsShortcutsLede() string {
+	return Catalog.Format(msgs.locale, "settingsShortcutsLede", nil)
+}
+
+// SettingsMcpLede says "Talos 能用的技能和 MCP 服务器。"
+// in the language the app shows.
+func SettingsMcpLede() string { return In(i18n.Locale()).SettingsMcpLede() }
+
+// SettingsMcpLede says "Talos 能用的技能和 MCP 服务器。"
+// in the language of msgs.
+func (msgs Messages) SettingsMcpLede() string {
+	return Catalog.Format(msgs.locale, "settingsMcpLede", nil)
+}
+
+// ToggleSidebarMenu says "显示或隐藏边栏"
+// in the language the app shows.
+func ToggleSidebarMenu() string { return In(i18n.Locale()).ToggleSidebarMenu() }
+
+// ToggleSidebarMenu says "显示或隐藏边栏"
+// in the language of msgs.
+func (msgs Messages) ToggleSidebarMenu() string {
+	return Catalog.Format(msgs.locale, "toggleSidebarMenu", nil)
+}
+
 // HideSidebar says "隐藏边栏"
 // in the language the app shows.
 func HideSidebar() string { return In(i18n.Locale()).HideSidebar() }
@@ -2758,14 +2848,24 @@ func (msgs Messages) DetailNote() string {
 	return Catalog.Format(msgs.locale, "detailNote", nil)
 }
 
-// Version says "版本"
+// VersionIs says "版本 {version}"
 // in the language the app shows.
-func Version() string { return In(i18n.Locale()).Version() }
+func VersionIs(version string) string { return In(i18n.Locale()).VersionIs(version) }
 
-// Version says "版本"
+// VersionIs says "版本 {version}"
 // in the language of msgs.
-func (msgs Messages) Version() string {
-	return Catalog.Format(msgs.locale, "version", nil)
+func (msgs Messages) VersionIs(version string) string {
+	return Catalog.Format(msgs.locale, "versionIs", map[string]any{"version": version})
+}
+
+// CheckForUpdates says "检查更新…"
+// in the language the app shows.
+func CheckForUpdates() string { return In(i18n.Locale()).CheckForUpdates() }
+
+// CheckForUpdates says "检查更新…"
+// in the language of msgs.
+func (msgs Messages) CheckForUpdates() string {
+	return Catalog.Format(msgs.locale, "checkForUpdates", nil)
 }
 
 // BuildCommit says "提交"

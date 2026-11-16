@@ -84,7 +84,7 @@ func (a *App) bar(c *ui.Context) {
 	p := a.p
 	// Past the sidebar the title starts at 20; with the sidebar in, past
 	// its toggle; in between, as far as the sidebar is.
-	shut := toggleLeft(c) + 28 + 12 - sheetGap
+	shut := toggleLeft(c) + 32 + 12
 	left := 22*a.sideOpen + shut*(1-a.sideOpen)
 	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 10, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		cur := a.C.Current
@@ -700,7 +700,12 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			what += "\n" + compact(ap.Args)
 		}
 		if what == "" && len(ap.Paths) > 0 {
-			what = strings.Join(ap.Paths, "\n")
+			var rel []string
+			for _, path := range ap.Paths {
+				dir, base := a.splitPath(path)
+				rel = append(rel, dir+base)
+			}
+			what = strings.Join(rel, "\n")
 		}
 		if what == "" {
 			what = compact(ap.Args)
@@ -732,6 +737,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			}
 			ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
 		})
+		a.approvalDiff(c, ap)
 		ui.Row(c).Gap(14).Children(func() {
 			why := func(symbol, s string) {
 				ui.Row(c).Gap(4).AlignItems(ui.Center).MinWidth(0).Children(func() {
@@ -1092,4 +1098,52 @@ func (a *App) copyButton(c *ui.Context, text string, shown bool) {
 		copied[key] = c.Now()
 		c.After(2 * time.Second)
 	}
+}
+
+// approvalDiff shows what a file change asked about would change, before
+// it runs: the first lines of the edit, or of the new file.
+func (a *App) approvalDiff(c *ui.Context, ap proto.Approval) {
+	if ap.Tool != "edit_file" && ap.Tool != "write_file" {
+		return
+	}
+	var args struct {
+		OldText string `json:"old_text"`
+		NewText string `json:"new_text"`
+		Content *string
+	}
+	if json.Unmarshal(ap.Args, &args) != nil {
+		return
+	}
+	oldText, newText := args.OldText, args.NewText
+	if ap.Tool == "write_file" {
+		if args.Content == nil {
+			return
+		}
+		oldText, newText = "", *args.Content
+	}
+	lines, _ := lineDiff(oldText, newText)
+	if len(lines) == 0 {
+		return
+	}
+	p := a.p
+	const most = 10
+	ui.Column(c).Radius(9).Clip().Border(.5, p.Edge).Margin(0, 0, 9, 0).Children(func() {
+		for _, line := range lines[:min(most, len(lines))] {
+			bg, signColor := ui.Transparent, p.Mute
+			switch line.sign {
+			case "+":
+				bg, signColor = p.Plus.Alpha(.10), p.Plus
+			case "−":
+				bg, signColor = p.Minus.Alpha(.10), p.Minus
+			}
+			ui.Row(c).Height(20).Background(bg).Children(func() {
+				ui.Text(c, line.sign).Width(22).Shrink(0).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(signColor).TextAlign(ui.Center)
+				ui.Text(c, strings.TrimSuffix(line.text, "\n")).Grow(1).MinWidth(0).Padding(0, 6, 0, 0).Font("monospace").FontSize(13).FixedLineHeight(20).
+					TextColor(p.Fg).PreserveSpaces().SingleLine().Selectable()
+			})
+		}
+		if len(lines) > most {
+			ui.Text(c, locales.MoreLines(len(lines)-most)).FontSize(12.5).TextColor(p.Mute).Padding(4, 10)
+		}
+	})
 }

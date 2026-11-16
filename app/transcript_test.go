@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -140,5 +141,24 @@ func TestApprovalRules(t *testing.T) {
 	task8NoCommand(t, a)
 	if a.editing != "" {
 		t.Fatal("still editing")
+	}
+}
+
+// A file change asked about names the file from the workspace and shows
+// what it would change.
+func TestApprovalDiff(t *testing.T) {
+	a := working()
+	cwd := a.C.Current.Cwd
+	args, _ := json.Marshal(map[string]string{"path": "add.go", "old_text": "\treturn a - b\n", "new_text": "\treturn a + b\n"})
+	a.C.Approvals = []proto.Approval{{ID: "e", Tool: "edit_file", Kind: "write", Paths: []string{cwd + "/add.go"}, Args: args}}
+	tt := ui.NewTester(a.View, 1200, 780)
+	tt.Frame()
+	for _, want := range []string{"add.go", "\treturn a - b", "\treturn a + b"} {
+		if !tt.HasText(want) {
+			t.Errorf("no %q in %q", want, tt.Texts())
+		}
+	}
+	if tt.HasText(cwd + "/add.go") {
+		t.Error("the card shows the absolute path")
 	}
 }

@@ -106,7 +106,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), run: func() { a.archive(s, !s.Archived) }})
 		add(opt{icon: "trash", label: locales.DeleteSession(), sub: title(s), run: func() { a.deleting = s.ID }})
 	}
-	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: func() { a.noSide = !a.noSide }})
+	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: a.toggleSide})
 	themes := []struct{ id, name string }{{"", locales.ThemeAuto()}, {"light", locales.ThemeLight()}, {"dark", locales.ThemeDark()}}
 	for _, t := range themes {
 		if t.id != set.Theme {

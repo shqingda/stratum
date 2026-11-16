@@ -16,6 +16,7 @@ import (
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/kernel/boot"
 	"github.com/shqingda/talos/llm/auth"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -54,7 +55,7 @@ func main() {
 	a := app.New(client.New(cwd))
 	mygo.Use(native.Plugin) // checks a day apart; builds without updates never do
 	mygo.App.WhenReady(func() {
-		mygo.App.SetMenu(menu())
+		mygo.App.SetMenu(menu(a))
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title:          "Talos",
 			Width:          1200,
@@ -75,12 +76,16 @@ func main() {
 	}
 }
 
-// menu is the default menu bar with "Check for Updates…" after About.
-func menu() *mygo.Menu {
+// menu is the default menu bar with "Check for Updates…" after About and
+// the app's own commands: Settings, a Session menu and the sidebar in View.
+func menu(a *app.App) *mygo.Menu {
+	session, settings, sidebar := a.MenuBar()
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Talos", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleAbout},
 			updater.MenuItem(),
+			mygo.Separator(),
+			settings,
 			mygo.Separator(),
 			{Role: mygo.RoleServices},
 			mygo.Separator(),
@@ -90,8 +95,9 @@ func menu() *mygo.Menu {
 			mygo.Separator(),
 			{Role: mygo.RoleQuit},
 		}},
+		{Label: locales.MenuSession(), Submenu: session},
 		{Role: mygo.RoleEditMenu},
-		{Role: mygo.RoleViewMenu},
+		{Label: "View", Submenu: []*mygo.MenuItem{sidebar, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}},
 		{Role: mygo.RoleWindowMenu},
 	})
 }
