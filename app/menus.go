@@ -238,8 +238,7 @@ func (a *App) folderPill(c *ui.Context, cur *proto.Session) {
 				continue
 			}
 			seen[dirPath] = true
-			dir, _ := a.splitPath(dirPath)
-			if m.Item(filepath.Base(dirPath)).ID("folder:" + dirPath).Subtitle(dir).Checked(dirPath == curDir).Chosen() {
+			if m.Item(filepath.Base(dirPath)).ID("folder:" + dirPath).Checked(dirPath == curDir).Chosen() {
 				a.moveTo(dirPath)
 			}
 		}

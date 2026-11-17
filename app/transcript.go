@@ -468,15 +468,14 @@ func (a *App) empty(c *ui.Context) {
 	})
 }
 
-// hello is a new session: what it works on, the composer in the middle
-// and the sessions to go back to.
+// hello is a new session: what it works on in the center while the composer
+// stays anchored at the bottom.
 func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
 	ui.Image(c, mark).Size(44, 44)
 	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
-	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 26, 0)
-	ui.Column(c).Width(640).MaxWidthPercent(100).Children(func() { a.dock(c) })
+	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 72, 0)
 	if a.noSide {
 		var recent []proto.Session
 		for _, s := range a.C.Sessions {
@@ -485,7 +484,7 @@ func (a *App) hello(c *ui.Context) {
 			}
 		}
 		if len(recent) > 0 {
-			ui.Column(c).Width(640).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
+			ui.Column(c).Width(640).MaxWidthPercent(100).Margin(0, 0, 48, 0).Children(func() {
 				ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
 				for _, s := range recent {
 					a.sessionRow(c, s)

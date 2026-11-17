@@ -286,7 +286,7 @@ func (a *App) main(c *ui.Context) {
 	sheet.Children(func() {
 		a.bar(c)
 		a.transcript(c)
-		if !a.helloShown() {
+		if a.C.Current != nil && a.C.CanAct() {
 			a.composer(c)
 		}
 		a.findBar(c)
