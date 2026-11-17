@@ -539,3 +539,78 @@ func TestMentionBare(t *testing.T) {
 		t.Fatal("a bare @ asked for no files")
 	}
 }
+
+// @ lists other sessions in their own group; Enter inserts @session:<id>.
+func TestMentionSession(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Type("@沙箱")
+	tt.Frame()
+	for done := false; !done; {
+		select {
+		case <-a.out:
+		default:
+			done = true
+		}
+	}
+	a.C.Files = nil
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	task8NoCommand(t, a)
+	tt.Frame()
+	if a.draft != "@session:2 " {
+		t.Fatalf("draft %q", a.draft)
+	}
+}
+
+// @ lists an MCP resource as @server:uri, the Claude Code form.
+func TestMentionResource(t *testing.T) {
+	a := task8App()
+	a.C.MCP = &proto.MCPList{Resources: []proto.MCPResource{{Server: "notes", URI: "note://today", Name: "today"}}}
+	a.C.MCPFor = a.C.Current.Cwd
+	tt := task8Tester(a, false)
+	tt.Type("@today")
+	tt.Frame()
+	for done := false; !done; {
+		select {
+		case <-a.out:
+		default:
+			done = true
+		}
+	}
+	a.C.Files = nil
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	task8NoCommand(t, a)
+	if a.draft != "@notes:note://today " {
+		t.Fatalf("draft %q", a.draft)
+	}
+}
+
+func TestMentionGroups(t *testing.T) {
+	a := task8App()
+	a.C.Files = []string{"src/", "main.go"}
+	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "gone", Title: "已归档", Archived: true, Cwd: a.C.Current.Cwd})
+	a.C.MCP = &proto.MCPList{Resources: []proto.MCPResource{{Server: "notes", URI: "note://today", Name: "today"}}}
+	a.C.MCPFor = a.C.Current.Cwd
+	var texts []string
+	groups := a.mentionGroups()
+	for _, g := range groups {
+		for _, it := range g.items {
+			texts = append(texts, it.kind+":"+it.text)
+		}
+	}
+	want := "session:session:2,session:session:3,session:session:4,session:session:5,folder:src/,file:main.go,resource:notes:note://today"
+	if strings.Join(texts, ",") != want {
+		t.Fatalf("%s", strings.Join(texts, ","))
+	}
+	if groups[0].items[0].note != "talos" {
+		t.Fatalf("note %q", groups[0].items[0].note)
+	}
+	a.mention.query = "沙箱"
+	a.C.Files = nil
+	got := a.mentionItems()
+	if len(got) != 1 || got[0].text != "session:2" {
+		t.Fatalf("%+v", got)
+	}
+}

@@ -513,6 +513,9 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 		// takes no line of its own.
 		msg := ui.Row(c).Margin(4, 0, 18, 0).Justify(ui.End).AlignItems(ui.End).Gap(4)
 		msg.Children(func() {
+			if a.rewindable(e) {
+				a.rewindButton(c, e, msg.Hovered())
+			}
 			if e.Text != "" {
 				a.copyButton(c, e.Text, msg.Hovered())
 			}

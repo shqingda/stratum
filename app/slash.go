@@ -64,6 +64,12 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			}
 		}
 	}
+	if !a.C.Busy && len(a.rewindPrompts()) > 0 {
+		all = append(all, slashItem{"rewind", "history", locales.Rewind(), func(*ui.Context) {
+			clear()
+			a.openRewind()
+		}})
+	}
 	if !a.C.Busy && len(a.C.Entries) > 0 {
 		all = append(all, slashItem{"compact", "fold", locales.CompactNow(), func(*ui.Context) { clear(); a.do(a.C.Compact()) }})
 	}

@@ -174,6 +174,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return nil, m.SetDraft(ctx, p)
+	case proto.MethodRewind:
+		p, err := params[proto.Rewind](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return m.Rewind(ctx, p)
 	case proto.MethodQueueEdit:
 		p, err := params[proto.QueueEdit](cmd)
 		if err != nil {

@@ -345,6 +345,26 @@ func (s *Store) Events(ctx context.Context, sessionID string, after int64, limit
 	return out, rows.Err()
 }
 
+// Truncate drops a session's log from seq on, and the search rows of
+// those messages. File-change records stay, so a restore can still find them.
+func (s *Store) Truncate(ctx context.Context, sessionID string, fromSeq int64) error {
+	if fromSeq <= 0 {
+		return errors.New("store: truncate needs a positive seq")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM message_search WHERE session_id=? AND seq>=?`, sessionID, fromSeq); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM events WHERE session_id=? AND seq>=?`, sessionID, fromSeq); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // Revision is the seq of a session's last event.
 func (s *Store) Revision(ctx context.Context, sessionID string) (int64, error) {
 	var seq int64

@@ -48,6 +48,8 @@ type App struct {
 	toEnd      bool   // put the composer's caret at the end of its draft
 	mention    mention
 	slash      slash
+	rewind     rewind
+	escAt      time.Time // the last Esc in an empty composer, for a second one
 	slashRun   func(i int) // runs the / menu's item i, as last shown
 	slashLen   int
 	filesKey   string // the folder and @ query the files were asked for

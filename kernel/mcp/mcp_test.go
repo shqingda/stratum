@@ -27,6 +27,9 @@ func TestMain(m *testing.M) {
 			}
 			return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "echo: " + a.Text}}}, nil, nil
 		})
+		s.AddResource(&sdk.Resource{URI: "note://today", Name: "today", Description: "A note"}, func(context.Context, *sdk.ReadResourceRequest) (*sdk.ReadResourceResult, error) {
+			return &sdk.ReadResourceResult{Contents: []*sdk.ResourceContents{{URI: "note://today", Text: "hello resource"}}}, nil
+		})
 		s.Run(context.Background(), &sdk.StdioTransport{})
 		return
 	}
@@ -78,6 +81,14 @@ func TestHub(t *testing.T) {
 	trusted = true
 	if set := h.Tools(ctx, cwd); len(set) != 2 {
 		t.Fatalf("trusted tools %v", names(set))
+	}
+	got := h.Resources(cwd)
+	if len(got) != 2 || got[0].Server != "echo" || got[0].URI != "note://today" || got[0].Name != "today" {
+		t.Fatalf("resources %+v", got)
+	}
+	body, err := h.ReadResource(ctx, cwd, "echo", "note://today")
+	if err != nil || body != "hello resource" {
+		t.Fatalf("read %q %v", body, err)
 	}
 }
 

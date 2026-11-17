@@ -61,6 +61,7 @@ func (m *Manager) MCPList(ctx context.Context, q proto.MCPQuery) (proto.MCPList,
 		}
 		out.Servers = append(out.Servers, proto.MCPServer{Name: st.Name, Project: st.Project, Target: target, State: st.State, Error: st.Error, Tools: st.Tools})
 	}
+	out.Resources = m.MCP.Resources(q.Cwd)
 	return out, nil
 }
 

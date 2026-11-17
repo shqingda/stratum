@@ -214,6 +214,86 @@ func (msgs Messages) Undo() string {
 	return Catalog.Format(msgs.locale, "undo", nil)
 }
 
+// Rewind says "回退"
+// in the language the app shows.
+func Rewind() string { return In(i18n.Locale()).Rewind() }
+
+// Rewind says "回退"
+// in the language of msgs.
+func (msgs Messages) Rewind() string {
+	return Catalog.Format(msgs.locale, "rewind", nil)
+}
+
+// RewindCodeAndChat says "恢复代码和对话"
+// in the language the app shows.
+func RewindCodeAndChat() string { return In(i18n.Locale()).RewindCodeAndChat() }
+
+// RewindCodeAndChat says "恢复代码和对话"
+// in the language of msgs.
+func (msgs Messages) RewindCodeAndChat() string {
+	return Catalog.Format(msgs.locale, "rewindCodeAndChat", nil)
+}
+
+// RewindChat says "只恢复对话"
+// in the language the app shows.
+func RewindChat() string { return In(i18n.Locale()).RewindChat() }
+
+// RewindChat says "只恢复对话"
+// in the language of msgs.
+func (msgs Messages) RewindChat() string {
+	return Catalog.Format(msgs.locale, "rewindChat", nil)
+}
+
+// RewindCode says "只恢复代码"
+// in the language the app shows.
+func RewindCode() string { return In(i18n.Locale()).RewindCode() }
+
+// RewindCode says "只恢复代码"
+// in the language of msgs.
+func (msgs Messages) RewindCode() string {
+	return Catalog.Format(msgs.locale, "rewindCode", nil)
+}
+
+// RewindTo says "回退到这里"
+// in the language the app shows.
+func RewindTo() string { return In(i18n.Locale()).RewindTo() }
+
+// RewindTo says "回退到这里"
+// in the language of msgs.
+func (msgs Messages) RewindTo() string {
+	return Catalog.Format(msgs.locale, "rewindTo", nil)
+}
+
+// RewindShell says "终端命令造成的改动回不去"
+// in the language the app shows.
+func RewindShell() string { return In(i18n.Locale()).RewindShell() }
+
+// RewindShell says "终端命令造成的改动回不去"
+// in the language of msgs.
+func (msgs Messages) RewindShell() string {
+	return Catalog.Format(msgs.locale, "rewindShell", nil)
+}
+
+// RewindEmpty says "还没有可以回退的消息"
+// in the language the app shows.
+func RewindEmpty() string { return In(i18n.Locale()).RewindEmpty() }
+
+// RewindEmpty says "还没有可以回退的消息"
+// in the language of msgs.
+func (msgs Messages) RewindEmpty() string {
+	return Catalog.Format(msgs.locale, "rewindEmpty", nil)
+}
+
+// RewindConflict says "这些文件和记录对不上，对话留在原地：{paths}"
+// in the language the app shows.
+func RewindConflict(paths string) string { return In(i18n.Locale()).RewindConflict(paths) }
+
+// RewindConflict says "这些文件和记录对不上，对话留在原地：{paths}"
+// in the language of msgs.
+func (msgs Messages) RewindConflict(paths string) string {
+	return Catalog.Format(msgs.locale, "rewindConflict", map[string]any{"paths": paths})
+}
+
 // Rename says "改名"
 // in the language the app shows.
 func Rename() string { return In(i18n.Locale()).Rename() }
@@ -2736,6 +2816,26 @@ func Files() string { return In(i18n.Locale()).Files() }
 // in the language of msgs.
 func (msgs Messages) Files() string {
 	return Catalog.Format(msgs.locale, "files", nil)
+}
+
+// Folders says "文件夹"
+// in the language the app shows.
+func Folders() string { return In(i18n.Locale()).Folders() }
+
+// Folders says "文件夹"
+// in the language of msgs.
+func (msgs Messages) Folders() string {
+	return Catalog.Format(msgs.locale, "folders", nil)
+}
+
+// McpResources says "MCP 资源"
+// in the language the app shows.
+func McpResources() string { return In(i18n.Locale()).McpResources() }
+
+// McpResources says "MCP 资源"
+// in the language of msgs.
+func (msgs Messages) McpResources() string {
+	return Catalog.Format(msgs.locale, "mcpResources", nil)
 }
 
 // SettingsAppearanceWords says "外观 主题 浅色 深色 字号 文字大小 缩放 详略 工具调用 思考"

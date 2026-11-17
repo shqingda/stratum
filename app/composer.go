@@ -46,7 +46,8 @@ func (a *App) composer(c *ui.Context) {
 func (a *App) dock(c *ui.Context) {
 	p := a.p
 	a.takeBack()
-	a.files(c)
+	a.rewindMenu(c)
+	a.mentionMenu(c)
 	a.slashMenu(c)
 	if len(a.C.Queued) > 0 {
 		// The waiting prompts are a tray tucked under the composer's top.

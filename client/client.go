@@ -776,6 +776,14 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	return nil
 }
 
+// mentionAttach is the block expandMentions appends for the model.
+// The bubble keeps the user's words; the block stays in the log.
+var mentionAttach = regexp.MustCompile(`(?s)\n\n<(?:session|mcp-resource)\b[^>]*>.*?</(?:session|mcp-resource)>`)
+
+func visiblePrompt(text string) string {
+	return strings.TrimRight(mentionAttach.ReplaceAllString(text, ""), "\n")
+}
+
 // message adds a stored message: the user's prompt, the assistant's text
 // and tool calls, or tool results (which travel as a user message).
 func (c *Client) message(seq int64, m llm.Message) {
@@ -789,9 +797,10 @@ func (c *Client) message(seq int64, m llm.Message) {
 	}
 	switch m.Role {
 	case llm.User:
-		if text.Len() > 0 || len(images) > 0 {
+		shown := visiblePrompt(text.String())
+		if shown != "" || len(images) > 0 {
 			c.endStream()
-			c.add(&Entry{Seq: seq, Role: User, Text: text.String(), Images: images, Done: true})
+			c.add(&Entry{Seq: seq, Role: User, Text: shown, Images: images, Done: true})
 		}
 	case llm.Assistant:
 		var thought strings.Builder
@@ -960,6 +969,26 @@ func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Co
 	}
 	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
 	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
+}
+
+// Rewind returns the current session to a prompt. Dropping the
+// conversation reloads the log and keeps the prompt as the draft.
+func (c *Client) Rewind(turn int64, action string) ([]proto.Command, error) {
+	id := sessionID(c.Current)
+	return c.mutation(proto.MethodRewind, proto.Rewind{SessionID: id, TurnSeq: turn, Action: action}, func(r json.RawMessage) []proto.Command {
+		var out proto.RewindResult
+		if json.Unmarshal(r, &out) != nil {
+			return nil
+		}
+		if len(out.Conflicts) > 0 {
+			c.notice("rewind", "%s", locales.RewindConflict(strings.Join(out.Conflicts, locales.ListSeparator())))
+		}
+		if out.Action == "code" || len(out.Conflicts) > 0 {
+			return nil
+		}
+		c.Draft = out.Prompt
+		return []proto.Command{c.bind(id)}
+	})
 }
 
 // Compact has the kernel summarize the session's history now.

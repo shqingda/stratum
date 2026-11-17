@@ -432,6 +432,66 @@ func TestSlashUndo(t *testing.T) {
 	}
 }
 
+// /rewind lists prompts, then the three restores. The first is code and
+// conversation when the turn still has file changes.
+func TestSlashRewind(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{}, a.C.Current.Cwd
+	a.C.Turns = []client.Turn{{Seq: 9, Done: true}}
+	a.C.Changes.Stale = false
+	a.C.Changes.Turns = []proto.ChangeTurn{{TurnSeq: 9, Files: []proto.ChangeFile{{Path: "a.go"}}}}
+	tt := task8Tester(a, false)
+	tt.Type("/rewind")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if !a.rewind.open || a.rewind.step != "prompts" {
+		t.Fatalf("menu %+v", a.rewind)
+	}
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	for _, want := range []string{"恢复代码和对话", "只恢复对话", "只恢复代码"} {
+		if !tt.HasText(want) {
+			t.Fatalf("no %q in %q", want, tt.Texts())
+		}
+	}
+	tt.Key(0, ui.KeyEnter)
+	var q proto.Rewind
+	task8Command(t, a, proto.MethodRewind, &q)
+	if q.TurnSeq != 9 || q.Action != "both" || a.draft == "" {
+		t.Fatalf("%+v draft %q", q, a.draft)
+	}
+}
+
+// A second Esc in an empty composer opens the same menu.
+func TestRewindDoubleEsc(t *testing.T) {
+	a := task8App()
+	a.C.Turns = []client.Turn{{Seq: 9, Done: true}}
+	a.C.Changes.Stale = false
+	tt := task8Tester(a, false)
+	if len(a.rewindPrompts()) == 0 {
+		t.Fatalf("no prompts, turns %d entries %d busy %v", len(a.C.Turns), len(a.C.Entries), a.C.Busy)
+	}
+	tt.Key(0, ui.KeyEscape)
+	opened := a.rewind.open
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	if !a.rewind.open || a.rewind.step != "prompts" {
+		t.Fatalf("menu %+v after first %v esc %v", a.rewind, opened, a.escAt)
+	}
+}
+
+func TestRewindActionsWithoutCode(t *testing.T) {
+	a := task8App()
+	a.C.Turns = []client.Turn{{Seq: 9, Done: true}}
+	a.C.Changes.Stale = false
+	a.openRewindAt(9, "hello")
+	acts := a.rewindActions()
+	if len(acts) != 1 || acts[0].action != "conversation" {
+		t.Fatalf("%+v", acts)
+	}
+}
+
 // /compact asks the kernel to summarize now.
 func TestSlashCompact(t *testing.T) {
 	a := task8App()

@@ -145,6 +145,19 @@ func TestLogThenLive(t *testing.T) {
 	}
 }
 
+func TestUserMentionHidesAttachment(t *testing.T) {
+	text := "what port? @session:abc\n\n<session id=\"abc\" title=\"port notes\">\nuser: the port is 4040\n</session>"
+	c, _ := connected(t, []proto.Event{event(ev(1, proto.EventMessage, msg(llm.User, text)))})
+	if len(c.Entries) != 1 || c.Entries[0].Text != "what port? @session:abc" {
+		t.Fatalf("%q", c.Entries[0].Text)
+	}
+	plain := "leave @file.go alone"
+	c.Receive(ev(2, proto.EventMessage, msg(llm.User, plain)))
+	if c.Entries[1].Text != plain {
+		t.Fatalf("%q", c.Entries[1].Text)
+	}
+}
+
 func TestEventsDuringSyncAreBuffered(t *testing.T) {
 	c, events := connected(t, nil)
 	c.Receive(ev(2, proto.EventMessage, msg(llm.User, "hi")))       // also in the log

@@ -652,11 +652,11 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
 		Steer: func() []llm.Part {
 			m.mu.Lock()
-			var parts []llm.Part
+			var steered []proto.Prompt
 			rest := r.queued[:0:0]
 			for _, w := range r.queued {
 				if w.steer {
-					parts = append(parts, promptParts(w.p)...)
+					steered = append(steered, w.p)
 				} else {
 					rest = append(rest, w)
 				}
@@ -668,10 +668,17 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 			if changed {
 				m.stream(x.ID, proto.EventQueue, proto.Queue{Items: q})
 			}
+			var parts []llm.Part
+			for _, sp := range steered {
+				sp.Text = m.expandMentions(ctx, x, sp.Text)
+				parts = append(parts, promptParts(sp)...)
+			}
 			return parts
 		},
 	}
-	u, err := ag.Run(ctx, cfg, history, llm.Message{Role: llm.User, Parts: promptParts(p)})
+	asked := p
+	asked.Text = m.expandMentions(ctx, x, p.Text)
+	u, err := ag.Run(ctx, cfg, history, llm.Message{Role: llm.User, Parts: promptParts(asked)})
 	subMu.Lock()
 	defer subMu.Unlock()
 	return used.Add(u), err

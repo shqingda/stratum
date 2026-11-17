@@ -23,6 +23,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shqingda/talos/kernel/perm"
 	"github.com/shqingda/talos/kernel/tools"
+	"github.com/shqingda/talos/proto"
 )
 
 // Server is a server's configuration, as .mcp.json files write it: a
@@ -112,10 +113,11 @@ type Hub struct {
 }
 
 type conn struct {
-	ready   chan struct{}
-	session *sdk.ClientSession
-	tools   []*sdk.Tool
-	err     error
+	ready     chan struct{}
+	session   *sdk.ClientSession
+	tools     []*sdk.Tool
+	resources []proto.MCPResource
+	err       error
 }
 
 func key(cwd string, e Entry) string {
@@ -148,7 +150,7 @@ func (h *Hub) conn(cwd string, e Entry) *conn {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 		defer cancel()
-		c.session, c.tools, c.err = dial(ctx, cwd, e)
+		c.session, c.tools, c.resources, c.err = dial(ctx, cwd, e)
 		close(c.ready)
 		if h.Changed != nil {
 			h.Changed()
@@ -169,7 +171,7 @@ func (h *Hub) drop(cwd string, e Entry, c *conn) {
 	}
 }
 
-func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.Tool, error) {
+func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.Tool, []proto.MCPResource, error) {
 	var t sdk.Transport
 	s := e.Server
 	switch {
@@ -192,22 +194,33 @@ func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.
 		t = &sdk.StreamableClientTransport{Endpoint: os.ExpandEnv(s.URL), DisableStandaloneSSE: true,
 			HTTPClient: &http.Client{Transport: headerTransport(headers)}}
 	default:
-		return nil, nil, errors.New("neither command nor url is set")
+		return nil, nil, nil, errors.New("neither command nor url is set")
 	}
 	client := sdk.NewClient(&sdk.Implementation{Name: "talos", Version: "0.2.0"}, nil)
 	session, err := client.Connect(ctx, t, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	var list []*sdk.Tool
 	for tool, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			session.Close()
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		list = append(list, tool)
 	}
-	return session, list, nil
+	// A server with no resources, or a list that fails, still keeps its tools.
+	var resources []proto.MCPResource
+	for r, err := range session.Resources(ctx, nil) {
+		if err != nil || len(resources) == 50 {
+			break
+		}
+		if r == nil || r.URI == "" || strings.ContainsAny(r.URI, " \t") {
+			continue
+		}
+		resources = append(resources, proto.MCPResource{URI: r.URI, Name: r.Name, Description: r.Description})
+	}
+	return session, list, resources, nil
 }
 
 func expand(args []string) []string {
@@ -345,6 +358,83 @@ func (h *Hub) tool(cwd string, e Entry, c *conn, t *sdk.Tool) *tools.Tool {
 			return out, nil
 		},
 	}
+}
+
+// HasServer reports whether cwd may use a server of that name.
+func (h *Hub) HasServer(cwd, name string) bool {
+	es, _ := h.entries(cwd)
+	return slices.ContainsFunc(es, func(e Entry) bool { return e.Name == name && !strings.ContainsAny(e.Name, " \t:") })
+}
+
+// Resources are the resources of servers cwd may use that have already
+// connected. It does not wait for one still connecting.
+func (h *Hub) Resources(cwd string) []proto.MCPResource {
+	es, _ := h.entries(cwd)
+	var out []proto.MCPResource
+	for _, e := range es {
+		c := h.conn(cwd, e)
+		select {
+		case <-c.ready:
+		default:
+			continue
+		}
+		if c.err != nil {
+			continue
+		}
+		for _, r := range c.resources {
+			r.Server = e.Name
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// ReadResource reads one resource. A missing URI returns the server's error
+// and leaves the connection up.
+func (h *Hub) ReadResource(ctx context.Context, cwd, server, uri string) (string, error) {
+	es, err := h.entries(cwd)
+	if err != nil && len(es) == 0 {
+		return "", err
+	}
+	for _, e := range es {
+		if e.Name != server {
+			continue
+		}
+		c := h.conn(cwd, e)
+		select {
+		case <-c.ready:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+		if c.err != nil {
+			return "", c.err
+		}
+		res, err := c.session.ReadResource(ctx, &sdk.ReadResourceParams{URI: uri})
+		if err != nil {
+			return "", err
+		}
+		return resourceText(res), nil
+	}
+	return "", fmt.Errorf("no MCP server %q", server)
+}
+
+func resourceText(res *sdk.ReadResourceResult) string {
+	if res == nil {
+		return ""
+	}
+	var parts []string
+	for _, c := range res.Contents {
+		if c == nil {
+			continue
+		}
+		switch {
+		case c.Text != "":
+			parts = append(parts, c.Text)
+		case len(c.Blob) > 0:
+			parts = append(parts, "[binary "+c.MIMEType+"]")
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // Close stops every server.

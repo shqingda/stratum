@@ -191,6 +191,31 @@ type FilesQuery struct {
 // is there when they come back to it, after a crash too: DraftSet → {}.
 const MethodDraftSet = "draft.set"
 
+// MethodRewind returns a session to a prompt the user sent.
+// Rewind → RewindResult. Action "both" restores files and drops the
+// conversation from that prompt on, "conversation" drops only the
+// conversation, and "code" restores only files. A shell command's
+// effects are not files, so they stay.
+const MethodRewind = "session.rewind"
+
+// Rewind names the turn.start of the prompt to return to.
+type Rewind struct {
+	SessionID string `json:"sessionId"`
+	TurnSeq   int64  `json:"turnSeq"`
+	Action    string `json:"action"` // both, conversation, code
+}
+
+// RewindResult is what a rewind did. Prompt is set when the conversation
+// was dropped, for the composer to offer again. Conflicts are files that
+// no longer match the record; the conversation is then left in place.
+type RewindResult struct {
+	TurnSeq   int64    `json:"turnSeq"`
+	Action    string   `json:"action"`
+	Prompt    string   `json:"prompt,omitempty"`
+	Paths     []string `json:"paths,omitempty"`
+	Conflicts []string `json:"conflicts,omitempty"`
+}
+
 // DraftSet is a session's draft; empty forgets it.
 type DraftSet struct {
 	SessionID string `json:"sessionId"`
@@ -660,7 +685,17 @@ type MCPList struct {
 	// Commands are prompts kept as files: .talos/commands/*.md and
 	// .claude/commands/*.md in the folder, then ~/.talos/commands.
 	Commands []CommandInfo `json:"commands,omitempty"`
-	Error    string        `json:"error,omitempty"` // a config file that did not read
+	// Resources are what connected servers offer for @server:uri.
+	Resources []MCPResource `json:"resources,omitempty"`
+	Error     string        `json:"error,omitempty"` // a config file that did not read
+}
+
+// MCPResource is one resource a connected server listed.
+type MCPResource struct {
+	Server      string `json:"server"`
+	URI         string `json:"uri"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // CommandInfo is a saved prompt the / menu offers; $ARGUMENTS in Body is

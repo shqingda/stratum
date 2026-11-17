@@ -7,10 +7,13 @@ import (
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 )
 
-// mention is the @ word being written at the caret, which names a file
-// of the workspace from a list above the composer.
+// mention is the @ word being written at the caret. The list above the
+// composer offers other sessions, folders, files and MCP resources.
+// Claude Desktop groups the first three; Claude Code adds @server:uri.
 type mention struct {
 	caret int    // the caret as the composer was last built
 	at    int    // the rune the @ is at, -1 with no such word
@@ -20,6 +23,19 @@ type mention struct {
 	open  bool // the list shows
 	place int  // where the caret goes next frame, +1
 }
+
+// mentionItem is one row. text is what replaces the @ word, without the @.
+type mentionItem struct {
+	kind string // session, folder, file, resource
+	text string
+	name string
+	note string
+}
+
+const (
+	mentionSessions  = 5
+	mentionResources = 8
+)
 
 // mentionAt finds the @ word that ends at the caret.
 func (a *App) mentionAt() (int, string) {
@@ -35,11 +51,11 @@ func (a *App) mentionAt() (int, string) {
 	return -1, ""
 }
 
-// files lists the workspace's files the @ word names.
-func (a *App) files(c *ui.Context) {
+// mentionMenu lists what the @ word can name.
+func (a *App) mentionMenu(c *ui.Context) {
 	m := &a.mention
 	if m.place > 0 {
-		return // the caret moves after a file just put in
+		return // the caret moves after a row just put in
 	}
 	at, q := a.mentionAt()
 	if at != m.at || q != m.query {
@@ -59,42 +75,183 @@ func (a *App) files(c *ui.Context) {
 			a.quiet(cmds, nil)
 		}
 	}
-	files := a.mentionList()
-	if len(files) == 0 {
+	a.ensureMCP()
+	groups := a.mentionGroups()
+	flat := flattenMentions(groups)
+	if len(flat) == 0 {
 		return
 	}
-	m.sel = min(m.sel, len(files)-1)
+	m.sel = min(m.sel, len(flat)-1)
 	m.open = true
 	p := a.p
 	list := ui.Column(c).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card)
 	lift(list, p)
 	list.Children(func() {
-		for i, f := range files {
-			row := ui.ButtonBase(c.Key("file:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(f)
-			if i == m.sel || row.Hovered() {
-				row.Background(p.Hover)
-			}
-			row.Children(func() {
-				g := strings.TrimSuffix(f, "/") // a folder ends in /
-				icon, name := "file", path.Base(g)
-				if g != f {
-					icon, name = "folder", name+"/"
+		ui.Scroll(c).MaxHeight(320).Children(func() {
+			n := 0
+			for _, g := range groups {
+				ui.Text(c, g.label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 2, 10)
+				for _, it := range g.items {
+					i, item := n, it
+					n++
+					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(30).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name)
+					if i == m.sel || row.Hovered() {
+						row.Background(p.Hover)
+					}
+					row.Children(func() {
+						sym(c, mentionIcon(item.kind), 14, p.Mute)
+						ui.Text(c, item.name).FontSize(13.5).TextColor(p.Fg).SingleLine().Shrink(0)
+						if item.note != "" {
+							ui.Text(c, item.note).FontSize(12.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MinWidth(0)
+						}
+					})
+					if row.Clicked() {
+						a.complete(item.text)
+					}
 				}
-				sym(c, icon, 14, p.Mute)
-				ui.Text(c, name).FontSize(13.5).TextColor(p.Fg).SingleLine().Shrink(0)
-				if dir := path.Dir(g); dir != "." {
-					ui.Text(c, dir).FontSize(12.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MinWidth(0)
-				}
-			})
-			if row.Clicked() {
-				a.complete(f)
 			}
-		}
+		})
 	})
 }
 
-// complete puts the file in place of the @ word, the caret after it.
-func (a *App) complete(file string) {
+func mentionIcon(kind string) string {
+	switch kind {
+	case "session":
+		return "message"
+	case "folder":
+		return "folder"
+	case "resource":
+		return "plug"
+	default:
+		return "file"
+	}
+}
+
+// ensureMCP reads the folder's servers once, so @ can list their resources.
+func (a *App) ensureMCP() {
+	cur := a.C.Current
+	if cur == nil || a.C.Phase != client.Ready {
+		return
+	}
+	if a.C.MCP != nil && a.C.MCPFor == cur.Cwd {
+		return
+	}
+	if a.slashAsked == cur.Cwd {
+		return
+	}
+	a.slashAsked = cur.Cwd
+	a.quiet(a.C.ReadMCP())
+}
+
+type mentionGroup struct {
+	label string
+	items []mentionItem
+}
+
+func (a *App) mentionGroups() []mentionGroup {
+	var sessions, folders, files, resources []mentionItem
+	for _, it := range a.mentionItems() {
+		switch it.kind {
+		case "session":
+			sessions = append(sessions, it)
+		case "folder":
+			folders = append(folders, it)
+		case "resource":
+			resources = append(resources, it)
+		default:
+			files = append(files, it)
+		}
+	}
+	var groups []mentionGroup
+	add := func(label string, items []mentionItem) {
+		if len(items) > 0 {
+			groups = append(groups, mentionGroup{label, items})
+		}
+	}
+	add(locales.Sessions(), sessions)
+	add(locales.Folders(), folders)
+	add(locales.Files(), files)
+	add(locales.McpResources(), resources)
+	return groups
+}
+
+func flattenMentions(groups []mentionGroup) []mentionItem {
+	var flat []mentionItem
+	for _, g := range groups {
+		flat = append(flat, g.items...)
+	}
+	return flat
+}
+
+func (a *App) mentionItems() []mentionItem {
+	q := strings.ToLower(a.mention.query)
+	var items []mentionItem
+	if a.C.Current != nil {
+		n := 0
+		for _, s := range a.C.Sessions {
+			if s.ID == a.C.Current.ID || s.Archived {
+				continue
+			}
+			title := s.Title
+			if title == "" {
+				title = s.ID
+			}
+			if q != "" && !strings.Contains(strings.ToLower(title), q) && !strings.Contains(strings.ToLower(s.ID), q) {
+				continue
+			}
+			if n == mentionSessions {
+				break
+			}
+			n++
+			note := ""
+			if s.Cwd != a.C.Current.Cwd {
+				note = path.Base(s.Cwd)
+			}
+			items = append(items, mentionItem{kind: "session", text: "session:" + s.ID, name: title, note: note})
+		}
+	}
+	for _, f := range a.mentionList() {
+		g := strings.TrimSuffix(f, "/")
+		kind, name := "file", path.Base(g)
+		if g != f {
+			kind, name = "folder", name+"/"
+		}
+		note := ""
+		if dir := path.Dir(g); dir != "." {
+			note = dir
+		}
+		items = append(items, mentionItem{kind: kind, text: f, name: name, note: note})
+	}
+	if l := a.C.MCP; l != nil && a.C.Current != nil && a.C.MCPFor == a.C.Current.Cwd {
+		n := 0
+		for _, r := range l.Resources {
+			if r.Server == "" || r.URI == "" || strings.ContainsAny(r.Server, " \t:") || strings.ContainsAny(r.URI, " \t") {
+				continue
+			}
+			blob := strings.ToLower(r.Server + " " + r.URI + " " + r.Name + " " + r.Description)
+			if q != "" && !strings.Contains(blob, q) {
+				continue
+			}
+			if n == mentionResources {
+				break
+			}
+			n++
+			name := r.Name
+			if name == "" {
+				name = r.URI
+			}
+			note := r.Server + ":" + r.URI
+			if r.Name == "" {
+				note = r.Description
+			}
+			items = append(items, mentionItem{kind: "resource", text: r.Server + ":" + r.URI, name: name, note: note})
+		}
+	}
+	return items
+}
+
+// complete puts the choice in place of the @ word, the caret after it.
+func (a *App) complete(text string) {
 	m := &a.mention
 	r := []rune(a.draft)
 	if m.at < 0 || m.at >= len(r) {
@@ -104,7 +261,7 @@ func (a *App) complete(file string) {
 	for end < len(r) && !unicode.IsSpace(r[end]) {
 		end++
 	}
-	word := "@" + file
+	word := "@" + text
 	rest := string(r[end:])
 	if rest == "" {
 		rest = " " // the caret goes after a space, the one there or this
@@ -114,11 +271,11 @@ func (a *App) complete(file string) {
 	m.open = false
 }
 
-// mentionKey moves through the list and takes a file from it.
+// mentionKey moves through the list and takes a row from it.
 func (a *App) mentionKey(k ui.TextKey) bool {
 	m := &a.mention
-	files := a.mentionList()
-	n := len(files)
+	items := flattenMentions(a.mentionGroups())
+	n := len(items)
 	if !m.open || n == 0 || k.Mods != 0 {
 		return false
 	}
@@ -128,7 +285,7 @@ func (a *App) mentionKey(k ui.TextKey) bool {
 	case ui.KeyDown:
 		m.sel = (m.sel + 1) % n
 	case ui.KeyEnter, ui.KeyTab:
-		a.complete(files[min(m.sel, n-1)])
+		a.complete(items[min(m.sel, n-1)].text)
 		k.SetText(a.draft)
 	default:
 		return false
@@ -136,8 +293,8 @@ func (a *App) mentionKey(k ui.TextKey) bool {
 	return true
 }
 
-// mentionList is what the @ list shows: with nothing typed yet, the files
-// this session changed come first, the latest first.
+// mentionList is the files the @ list shows: with nothing typed yet, the
+// files this session changed come first, the latest first.
 func (a *App) mentionList() []string {
 	if a.mention.query != "" || a.C.Current == nil {
 		return a.C.Files

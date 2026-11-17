@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
@@ -90,6 +91,15 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	}
 	if a.find.on && key == ui.KeyEscape && mods == 0 {
 		a.closeFind()
+		return true
+	}
+	if key == ui.KeyEscape && mods == 0 && a.rewind.open {
+		a.escAt = time.Time{}
+		if a.rewind.step == "actions" && !a.rewind.bubble {
+			a.rewind.step, a.rewind.sel = "prompts", 0
+		} else {
+			a.rewind = rewind{}
+		}
 		return true
 	}
 	if m := &a.mention; m.open && key == ui.KeyEscape && mods == 0 {
@@ -181,12 +191,25 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return true
 	}
+	if key == ui.KeyEscape && mods == 0 && a.doubleEsc() {
+		return true
+	}
 	return key == ui.KeyEnter && mods == 0
 }
 
 func (a *App) composerKey(k ui.TextKey) bool {
 	text := k.Text()
+	prev := a.draft
 	a.draft = text
+	if a.rewind.open {
+		a.draft = prev
+		if a.rewindKey(k) && a.draft != prev {
+			k.SetText(a.draft)
+		} else {
+			k.SetText(prev)
+		}
+		return true
+	}
 	if a.mentionKey(k) || a.slashKey(k) {
 		return true
 	}
@@ -219,6 +242,29 @@ func (a *App) approvalHint(c *ui.Context, id, hint string) string {
 // approval.
 func (a *App) questionFirst() bool {
 	return len(a.C.Approvals) > 0 && a.C.Approvals[0].Kind == "question"
+}
+
+// doubleEsc opens rewind on a second Esc in an empty composer, as Claude
+// Code does. The first Esc is left for whatever else handles it.
+func (a *App) doubleEsc() bool {
+	if a.rewind.open || a.pal || a.C.Busy {
+		return false
+	}
+	if strings.TrimSpace(a.draft) != "" || len(a.rewindPrompts()) == 0 {
+		a.escAt = time.Time{}
+		return false
+	}
+	now := time.Now()
+	if a.now != nil {
+		now = a.now()
+	}
+	if !a.escAt.IsZero() && now.Sub(a.escAt) < 400*time.Millisecond {
+		a.escAt = time.Time{}
+		a.openRewind()
+		return true
+	}
+	a.escAt = now
+	return false
 }
 
 // lastSent is the text of the user's last message in the session.
