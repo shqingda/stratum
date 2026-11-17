@@ -110,21 +110,8 @@ func (a *App) bar(c *ui.Context) {
 				ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
-		ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
-			sym(c, "folder", 14, p.Mute)
-			ui.Text(c, filepath.Base(cur.Cwd)).FontSize(13.5).TextColor(p.Mute).SingleLine()
-		})
-		if b := a.C.Workspace.Branch; b != "" {
-			ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(1).MinWidth(0).Children(func() {
-				sym(c, "git-branch", 14, p.Mute)
-				ui.Text(c, b).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
-			})
-		}
+		a.workspaceCapsule(c, cur)
 		ui.Spacer(c)
-		a.detailButton(c)
-		a.openButton(c)
-		a.commitButton(c)
-		a.prButton(c)
 		a.reviewToggle(c)
 	})
 }
@@ -490,19 +477,21 @@ func (a *App) hello(c *ui.Context) {
 	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
 	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 	ui.Column(c).Width(540).MaxWidthPercent(100).Children(func() { a.dock(c) })
-	var recent []proto.Session
-	for _, s := range a.C.Sessions {
-		if s.ID != cur.ID && s.Cwd == cur.Cwd && len(recent) < 3 {
-			recent = append(recent, s)
-		}
-	}
-	if len(recent) > 0 {
-		ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
-			ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
-			for _, s := range recent {
-				a.sessionRow(c, s)
+	if a.noSide {
+		var recent []proto.Session
+		for _, s := range a.C.Sessions {
+			if s.ID != cur.ID && s.Cwd == cur.Cwd && len(recent) < 3 {
+				recent = append(recent, s)
 			}
-		})
+		}
+		if len(recent) > 0 {
+			ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
+				ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
+				for _, s := range recent {
+					a.sessionRow(c, s)
+				}
+			})
+		}
 	}
 }
 

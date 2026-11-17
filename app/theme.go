@@ -99,3 +99,15 @@ func press(e ui.Element) ui.Element {
 	}
 	return e.AnimatePose(ui.Pose{Scale: s}, ui.Animation{Duration: 100 * time.Millisecond})
 }
+
+func specular(p *Palette) ui.Color {
+	if p == dark {
+		return ui.RGBA(255, 255, 255, .13)
+	}
+	return ui.RGBA(255, 255, 255, .72)
+}
+
+// rim catches light along the top edge of lifted glass or paper surfaces.
+func rim(e ui.Element, p *Palette) ui.Element {
+	return e.InsetShadow(0, .5, 0, 0, specular(p))
+}

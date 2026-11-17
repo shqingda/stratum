@@ -41,7 +41,7 @@ func TestSettings(t *testing.T) {
 	sent(proto.MethodSettings)
 	a.C.Settings = &proto.Settings{Mode: "auto"}
 	tt.Frame()
-	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || tt.HasText("修复 Add 测试") {
+	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || !tt.HasText("Talos devel") {
 		t.Fatalf("not the general page: %q", tt.Texts())
 	}
 	snapshot(t, tt, "settings")
@@ -102,7 +102,7 @@ func TestSettings(t *testing.T) {
 	if s.Mode != "full" || a.C.Settings.Mode != "full" {
 		t.Fatalf("saved %+v", s)
 	}
-	if err := tt.Click("账号"); err != nil {
+	if err := tt.Click("账号与模型"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
@@ -140,7 +140,7 @@ func TestSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if !tt.HasText("修复 Add 测试") {
+	if tt.HasText("搜索设置") || !tt.HasText("修复 Add 测试") {
 		t.Fatal("closing settings did not go back")
 	}
 }
@@ -241,12 +241,8 @@ func TestAppearanceAndAbout(t *testing.T) {
 	if z := textZoom(a.C.Settings.TextSize); z != 1.15 {
 		t.Errorf("zoom %v for %q", z, a.C.Settings.TextSize)
 	}
-	if err := tt.Click("关于"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if !tt.HasText("Talos") || !tt.HasText("版本") {
-		t.Fatalf("about: %q", tt.Texts())
+	if !tt.HasText("Talos devel") {
+		t.Fatalf("about footer: %q", tt.Texts())
 	}
 }
 

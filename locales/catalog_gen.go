@@ -1654,6 +1654,28 @@ func (msgs Messages) SettingsModels() string {
 	return Catalog.Format(msgs.locale, "settingsModels", nil)
 }
 
+// SettingsAccountsAndModels says "账号与模型"
+// in the language the app shows.
+func SettingsAccountsAndModels() string { return In(i18n.Locale()).SettingsAccountsAndModels() }
+
+// SettingsAccountsAndModels says "账号与模型"
+// in the language of msgs.
+func (msgs Messages) SettingsAccountsAndModels() string {
+	return Catalog.Format(msgs.locale, "settingsAccountsAndModels", nil)
+}
+
+// SettingsAccountsAndModelsWords says "账号 模型 登录 退出 订阅 密钥 默认模型 推理强度 后台任务 子任务 标题 摘要 额度 …"
+// in the language the app shows.
+func SettingsAccountsAndModelsWords() string {
+	return In(i18n.Locale()).SettingsAccountsAndModelsWords()
+}
+
+// SettingsAccountsAndModelsWords says "账号 模型 登录 退出 订阅 密钥 默认模型 推理强度 后台任务 子任务 标题 摘要 额度 …"
+// in the language of msgs.
+func (msgs Messages) SettingsAccountsAndModelsWords() string {
+	return Catalog.Format(msgs.locale, "settingsAccountsAndModelsWords", nil)
+}
+
 // SettingsPermissions says "权限"
 // in the language the app shows.
 func SettingsPermissions() string { return In(i18n.Locale()).SettingsPermissions() }
@@ -1682,6 +1704,26 @@ func SettingsMcp() string { return In(i18n.Locale()).SettingsMcp() }
 // in the language of msgs.
 func (msgs Messages) SettingsMcp() string {
 	return Catalog.Format(msgs.locale, "settingsMcp", nil)
+}
+
+// Done says "完成"
+// in the language the app shows.
+func Done() string { return In(i18n.Locale()).Done() }
+
+// Done says "完成"
+// in the language of msgs.
+func (msgs Messages) Done() string {
+	return Catalog.Format(msgs.locale, "done", nil)
+}
+
+// Inspect says "检查"
+// in the language the app shows.
+func Inspect() string { return In(i18n.Locale()).Inspect() }
+
+// Inspect says "检查"
+// in the language of msgs.
+func (msgs Messages) Inspect() string {
+	return Catalog.Format(msgs.locale, "inspect", nil)
 }
 
 // SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
@@ -2776,6 +2818,16 @@ func SettingsModelsLede() string { return In(i18n.Locale()).SettingsModelsLede()
 // in the language of msgs.
 func (msgs Messages) SettingsModelsLede() string {
 	return Catalog.Format(msgs.locale, "settingsModelsLede", nil)
+}
+
+// SettingsAccountsAndModelsLede says "凭据存在钥匙串里，不同工作可分别指定模型与思考深度。"
+// in the language the app shows.
+func SettingsAccountsAndModelsLede() string { return In(i18n.Locale()).SettingsAccountsAndModelsLede() }
+
+// SettingsAccountsAndModelsLede says "凭据存在钥匙串里，不同工作可分别指定模型与思考深度。"
+// in the language of msgs.
+func (msgs Messages) SettingsAccountsAndModelsLede() string {
+	return Catalog.Format(msgs.locale, "settingsAccountsAndModelsLede", nil)
 }
 
 // SettingsPermissionsLede says "新会话能做什么，什么时候先问你。"

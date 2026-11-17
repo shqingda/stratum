@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/proto"
@@ -11,6 +12,7 @@ import (
 func TestOpenAndCommit(t *testing.T) {
 	a := working()
 	a.C.Busy, a.C.Approvals = false, nil
+	a.C.Workspace.Branch = "main"
 	var opened []string
 	a.openIn = func(app, dir string) error {
 		opened = append(opened, app, dir)
@@ -18,13 +20,13 @@ func TestOpenAndCommit(t *testing.T) {
 	}
 	tt := ui.NewTester(a.View, 1200, 800)
 	tt.Frame()
-	if tt.HasText("提交") {
+	if tt.HasText("提交改动") {
 		t.Fatal("a clean folder offers a commit")
 	}
-	if err := tt.Click("打开"); err != nil {
+	if err := tt.Click("calc · main"); err != nil {
 		t.Fatal(err)
 	}
-	if err := tt.ChooseMenuItem("VS Code"); err != nil {
+	if err := tt.ChooseMenuItem("用 VS Code 打开"); err != nil {
 		t.Fatal(err)
 	}
 	if len(opened) != 2 || opened[0] != "Visual Studio Code" || opened[1] != "/Users/me/Projects/calc" {
@@ -34,14 +36,17 @@ func TestOpenAndCommit(t *testing.T) {
 	a.C.Workspace.Dirty, a.C.Workspace.Added, a.C.Workspace.Removed = true, 9, 3
 	tt.Frame()
 	if !tt.HasText("+9") || !tt.HasText("−3") {
-		t.Fatal("the commit button does not count the lines")
+		t.Fatal("the inspect button does not count the lines")
 	}
-	if err := tt.Click("提交"); err != nil {
+	if err := tt.Click("检查"); err != nil {
 		t.Fatal(err)
 	}
-	tt.Frame()
+	tt.Advance(time.Second)
 	if !a.rv.open {
-		t.Fatal("the commit button did not open the panel")
+		t.Fatal("the inspect button did not open the panel")
+	}
+	if err := tt.Click("提交说明"); err != nil {
+		t.Fatal(err)
 	}
 	tt.Type("修好 Add")
 	if err := tt.Click("提交改动"); err != nil {
@@ -56,6 +61,7 @@ func TestOpenAndCommit(t *testing.T) {
 func TestPRAndCIStatus(t *testing.T) {
 	a := working()
 	a.C.Busy, a.C.Approvals = false, nil
+	a.rv.open = true
 	a.out = make(chan []proto.Command, 16)
 	var openedURL string
 	a.openURL = func(u string) error { openedURL = u; return nil }

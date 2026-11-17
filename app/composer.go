@@ -117,6 +117,7 @@ func (a *App) box(c *ui.Context) {
 	cur := a.C.Current
 	box := ui.Column(c).Radius(18).Background(p.Card).Padding(12, 10, 8, 16)
 	lift(box, p)
+	rim(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {
 		a.attachPaths(files)
 	}
@@ -340,9 +341,6 @@ func (a *App) status(c *ui.Context) {
 			item("git-branch", locales.Worktree())
 		} else {
 			item("device-laptop", locales.Local())
-		}
-		if b := a.C.Workspace.Branch; b != "" {
-			item("git-branch", b)
 		}
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))

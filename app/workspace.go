@@ -3,10 +3,14 @@ package app
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/talos/proto"
 )
 
 // openers are the apps the top bar opens a session's folder in.
@@ -36,11 +40,13 @@ func openBrowser(u string) error {
 	return exec.Command("open", u).Start()
 }
 
-// barButton is a button of the top bar, as the mockup draws them.
+// barButton is a button of the bar or inspector, lifted slightly off the sheet.
 func (a *App) barButton(c *ui.Context, key, symbol, label string, children func()) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).
+	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
 		Label(label).Background(p.Card).Border(.5, p.Edge2)
+	rim(b, p)
+	press(b)
 	if b.Hovered() {
 		b.Background(p.Card.Mix(p.Fg, .04))
 	}
@@ -52,44 +58,52 @@ func (a *App) barButton(c *ui.Context, key, symbol, label string, children func(
 	return b
 }
 
-// openButton opens the session's folder in another app.
-func (a *App) openButton(c *ui.Context) {
+// workspaceCapsule groups the folder, active branch, external openers,
+// and transcript detail preference into one compact top-bar capsule.
+func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	p := a.p
-	dir := a.C.Current.Cwd
-	a.barButton(c, "open", "brand-vscode", locales.Open(), func() {
-		ui.Box(c).Width(.5).AlignSelf(ui.Stretch).Margin(6, 0, 6, 4).Background(p.Edge2)
-		sym(c, "chevron-down", 13, p.Fg2)
-	}).PopoverMenuButton(func(m *ui.Menu) {
+	dir := cur.Cwd
+	label := filepath.Base(dir)
+	if br := a.C.Workspace.Branch; br != "" {
+		label += " · " + br
+	}
+	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(26).Padding(0, 9).Gap(5).Radius(8).AlignItems(ui.Center).
+		Background(p.Chip).Shrink(1).MinWidth(0).Label(label)
+	rim(b, p)
+	press(b)
+	if b.Hovered() {
+		b.Background(p.Sel)
+	}
+	b.Children(func() {
+		sym(c, "folder", 13, p.Mute)
+		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+		sym(c, "chevron-down", 11, p.Mute)
+	})
+	thought := slices.ContainsFunc(a.C.Entries, func(e *client.Entry) bool { return e.Role == client.Thinking })
+	set := a.settings()
+	b.PopoverMenuButton(func(m *ui.Menu) {
 		for _, o := range openers() {
-			if m.Item(o.label).ID("open:" + o.label).Chosen() {
+			if m.Item(locales.OpenWith(o.label)).ID("open:" + o.label).Chosen() {
 				if err := a.openIn(o.app, dir); err != nil {
 					a.err = locales.CouldntOpen(o.label, err.Error())
 				}
 			}
 		}
+		m.Separator()
+		for _, d := range []struct {
+			id   string
+			name func() string
+		}{{"", locales.DetailPlain}, {"thinking", locales.DetailThinking}, {"all", locales.DetailAll}} {
+			if d.id == "thinking" && !thought && set.Detail != "thinking" {
+				continue
+			}
+			if m.Item(locales.DetailTo(d.name())).ID("detail:" + d.id).Checked(set.Detail == d.id).Chosen() {
+				s := a.settings()
+				s.Detail = d.id
+				a.do(a.C.SaveSettings(s))
+			}
+		}
 	}, a.menuOptions(&a.openMenu))
-}
-
-// commitButton shows what is not committed and opens the review panel
-// at the commit message.
-func (a *App) commitButton(c *ui.Context) {
-	w := a.C.Workspace
-	if !w.Dirty {
-		return
-	}
-	p := a.p
-	b := a.barButton(c, "commit", "git-commit", locales.Commit(), func() {
-		if w.Added > 0 {
-			ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(13).TextColor(p.Plus)
-		}
-		if w.Removed > 0 {
-			ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(13).TextColor(p.Minus)
-		}
-	})
-	if b.Clicked() {
-		a.rv.open, a.rv.tab = true, ""
-		a.commitInput.Focus(c)
-	}
 }
 
 // commitField is the commit message; left empty, the session's title.

@@ -200,16 +200,38 @@ func (a *App) fileDiff(key string) *fileDiff {
 	return f
 }
 
-// reviewToggle is the button in the bar that shows and hides the panel.
+// reviewToggle is the button in the bar that shows and hides the inspector.
 func (a *App) reviewToggle(c *ui.Context) {
-	label := locales.ShowChanges()
+	p := a.p
+	w := a.C.Workspace
+	tip := locales.ShowChanges()
 	if a.rv.open {
-		label = locales.HideChanges()
+		tip = locales.HideChanges()
 	}
-	b := a.iconButton(c, "review", "layout-sidebar-right", label)
+	b := ui.ButtonBase(c.Key("review")).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
+		Label(tip).Tooltip(tip).Background(p.Chip)
+	rim(b, p)
+	press(b)
+	fg := p.Fg2
 	if a.rv.open {
-		b.Background(a.p.Sel)
+		b.Background(p.Sel)
+		fg = p.Live
+	} else if b.Hovered() {
+		b.Background(p.Sel)
+		fg = p.Fg
 	}
+	b.Children(func() {
+		if w.Dirty || w.Added > 0 || w.Removed > 0 {
+			if w.Added > 0 {
+				ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).TextColor(p.Plus).SingleLine()
+			}
+			if w.Removed > 0 {
+				ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(12).TextColor(p.Minus).SingleLine()
+			}
+		}
+		ui.Text(c, locales.Inspect()).FontSize(13).FontWeight(500).TextColor(fg).SingleLine()
+		sym(c, "layout-sidebar-right", 15, fg)
+	})
 	if b.Clicked() {
 		a.rv.open = !a.rv.open
 	}
@@ -650,7 +672,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 	}
 	w := a.C.Workspace
 	dirty := w.Dirty
-	if turn <= 0 && !dirty && w.Ahead == 0 {
+	if turn <= 0 && !dirty && w.Ahead == 0 && w.PR == nil {
 		return
 	}
 	reverted := a.C.Changes.Reverted[turn]
@@ -666,10 +688,16 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				}
 			} else if w.Ahead > 0 {
 				note = locales.AheadCommits(w.Ahead)
+			} else if w.PR != nil {
+				note = w.PR.Title
 			}
-			ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, note).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
-			})
+			if note != "" {
+				ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, note).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+				})
+			} else {
+				ui.Spacer(c)
+			}
 		}
 		if turn > 0 {
 			label := locales.UndoTurn()
@@ -685,15 +713,18 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				a.do(a.C.Revert(turn, "", reverted))
 			}
 		}
-		if dirty {
+		switch {
+		case dirty:
 			a.commitGo(c)
-		} else if w.Ahead > 0 {
-			pushBtn := a.button(c, "push", locales.Push(), "", w.PR != nil || w.Branch == w.Base)
+		case w.PR != nil:
+			a.prButton(c)
+		case w.Ahead > 0:
+			pushBtn := a.button(c, "push", locales.Push(), "", w.Branch == w.Base)
 			pushBtn.Disabled(w.Pushing || a.C.Busy)
 			if pushBtn.Clicked() {
 				a.do(a.C.Push())
 			}
-			if w.PR == nil && w.Branch != "" && w.Branch != w.Base {
+			if w.Branch != "" && w.Branch != w.Base {
 				prBtn := a.button(c, "create-pr", locales.CreatePr(), "", true)
 				prBtn.Disabled(w.Pushing || a.C.Busy)
 				if prBtn.Clicked() {

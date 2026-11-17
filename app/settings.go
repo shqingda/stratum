@@ -13,19 +13,18 @@ import (
 )
 
 // settingsPages are the pages of the settings, in the order of the list,
-// with the words their search finds them by.
+// with their macOS squircle tint and search keywords.
 var settingsPages = []struct {
 	id, symbol         string
-	label, words, lede func(locales.Messages) string // lede: the line under the page's title; nil for none
+	badge              ui.Color
+	label, words, lede func(locales.Messages) string
 }{
-	{"general", "adjustments-horizontal", locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords, locales.Messages.SettingsGeneralLede},
-	{"accounts", "user-circle", locales.Messages.SettingsAccounts, locales.Messages.SettingsAccountsWords, locales.Messages.SettingsAccountsLede},
-	{"models", "sparkles", locales.Messages.SettingsModels, locales.Messages.SettingsModelsWords, locales.Messages.SettingsModelsLede},
-	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
-	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
-	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
-	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
-	{"about", "info-circle", locales.Messages.SettingsAbout, locales.Messages.SettingsAboutWords, nil},
+	{"general", "adjustments-horizontal", ui.Hex("#636366"), locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords, locales.Messages.SettingsGeneralLede},
+	{"accounts", "sparkles", ui.Hex("#007AFF"), locales.Messages.SettingsAccountsAndModels, locales.Messages.SettingsAccountsAndModelsWords, locales.Messages.SettingsAccountsAndModelsLede},
+	{"permissions", "shield-half", ui.Hex("#34C759"), locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
+	{"appearance", "palette", ui.Hex("#5856D6"), locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
+	{"shortcuts", "keyboard", ui.Hex("#FF9500"), locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
+	{"mcp", "puzzle", ui.Hex("#32ADE6"), locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
 }
 
 // finds says whether a settings page answers a search, in any language
@@ -52,6 +51,9 @@ func (a *App) openMCP() {
 }
 
 func (a *App) openSettingsPage(id string) {
+	if id == "models" {
+		id = "accounts"
+	}
 	switch id {
 	case "mcp":
 		a.openMCP()
@@ -61,98 +63,123 @@ func (a *App) openSettingsPage(id string) {
 	}
 }
 
-// settingsView is the settings: a translucent sidebar of pages matching the
-// main window, and the active page on the paper sheet beside it.
-func (a *App) settingsView(c *ui.Context, vibrant bool) {
+// settingsSheet renders Settings as a centered floating macOS Sheet over
+// the pushed-back live workspace so spatial context is never lost.
+func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 	p := a.p
-	title, lede := "", ""
-	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
-		side := ui.Column(c).Width(sidebarWidth).Shrink(0).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
-		if !vibrant {
-			side.Background(p.Side)
+	curPage := a.settingsPage
+	if curPage == "models" || curPage == "" {
+		curPage = "accounts"
+		if a.settingsPage == "" {
+			curPage = "general"
 		}
-		side.Children(func() {
-			ui.Box(c).Height(barHeight).Shrink(0).DragWindow()
-			ui.Row(c).Padding(4, 20, 12, 20).Gap(10).AlignItems(ui.Center).Children(func() {
-				ui.Image(c, mark).Size(22, 22)
-				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).TextColor(p.Fg)
-			})
-			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)
-			ui.Column(c).Padding(0, 12, 16, 12).Gap(2).Children(func() {
-				q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
-				for _, pg := range settingsPages {
-					label := pg.label(locales.In(i18n.Locale()))
-					if pg.id == a.settingsPage {
-						title = label
-						if pg.lede != nil {
-							lede = pg.lede(locales.In(i18n.Locale()))
+	}
+	title, lede := "", ""
+	ui.DialogBase(c, &a.settingsOpen, func(backdrop, panel ui.Element) {
+		scrim := ui.RGBA(12, 13, 18, .24)
+		if p == dark {
+			scrim = ui.RGBA(6, 7, 10, .48)
+		}
+		backdrop.Background(scrim).Padding(24)
+		panel.Row().AlignItems(ui.Stretch).Width(800).Height(660).MaxWidthPercent(94).MaxHeightPercent(90).Radius(16).Background(p.Sheet).Clip().
+			Label(locales.Settings())
+		lift(panel, p)
+		rim(panel, p)
+		panel.Children(func() {
+			sideBg := p.Side
+			if p == light {
+				sideBg = ui.Hex("#F1F2F6")
+			} else if p == dark {
+				sideBg = ui.Hex("#1A1C26")
+			}
+			_ = vibrant
+			ui.Column(c).Width(204).Shrink(0).Background(sideBg).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
+				ui.Row(c).Padding(14, 14, 10, 16).AlignItems(ui.Center).Gap(8).Children(func() {
+					ui.Text(c, locales.Settings()).FontSize(15).FontWeight(600).TextColor(p.Fg)
+				})
+				ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 10, 12)
+				ui.Column(c).Grow(1).Padding(0, 10, 8, 10).Gap(2).Children(func() {
+					q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
+					for _, pg := range settingsPages {
+						label := pg.label(locales.In(i18n.Locale()))
+						if pg.id == curPage {
+							title = label
+							if pg.lede != nil {
+								lede = pg.lede(locales.In(i18n.Locale()))
+							}
 						}
+						if q != "" && !finds(pg.label, pg.words, q) {
+							continue
+						}
+						active := pg.id == curPage
+						it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
+							Height(32).Padding(0, 8).Gap(9).Radius(8).AlignItems(ui.Center).Label(label)
+						press(it)
+						switch {
+						case active:
+							it.Background(p.Live)
+						case it.Hovered():
+							it.Background(p.Hover)
+						}
+						if it.Clicked() {
+							a.openSettingsPage(pg.id)
+						}
+						textColor, weight := p.Fg2, 450
+						if active {
+							textColor, weight = ui.Hex("#FFFFFF"), 550
+						} else if it.Hovered() {
+							textColor = p.Fg
+						}
+						it.Children(func() {
+							badgeBg := pg.badge
+							if active {
+								badgeBg = ui.RGBA(255, 255, 255, .22)
+							}
+							ui.Box(c).Size(20, 20).Radius(5).Background(badgeBg).Center().Shrink(0).Children(func() {
+								sym(c, pg.symbol, 12, ui.Hex("#FFFFFF"))
+							})
+							ui.Text(c, label).FontSize(13).FontWeight(weight).TextColor(textColor).SingleLine().Ellipsis("…").MinWidth(0)
+						})
 					}
-					if q != "" && !finds(pg.label, pg.words, q) {
-						continue
+				})
+				a.settingsBuildFoot(c)
+			})
+			ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(p.Sheet).Children(func() {
+				ui.Row(c).Height(50).Shrink(0).Padding(0, 24).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, title).FontSize(15).FontWeight(600).TextColor(p.Fg).SingleLine()
+					ui.Spacer(c)
+					done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 12).Radius(14).AlignItems(ui.Center).
+						Background(p.Chip).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
+					rim(done, p)
+					press(done)
+					if done.Hovered() {
+						done.Background(p.Sel)
 					}
-					if q == "" && pg.id == "about" {
-						ui.Box(c).Height(.5).Shrink(0).Margin(8, 8, 8, 8).Background(p.Edge)
+					done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.Fg).SingleLine() })
+					if done.Clicked() {
+						a.settingsOpen = false
 					}
-					active := pg.id == a.settingsPage
-					it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
-						Height(32).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
-					press(it)
-					switch {
-					case active:
-						it.Background(p.Sel)
-					case it.Hovered():
-						it.Background(p.Hover)
-					}
-					if it.Clicked() {
-						a.openSettingsPage(pg.id)
-					}
-					iconColor, textColor, weight := p.Fg2, p.Fg2, 400
-					if active {
-						iconColor, textColor, weight = p.Fg, p.Fg, 550
-					} else if it.Hovered() {
-						textColor = p.Fg
-					}
-					it.Children(func() {
-						ui.Box(c).Width(16).Center().Children(func() { sym(c, pg.symbol, 16, iconColor) })
-						ui.Text(c, label).FontSize(13.5).FontWeight(weight).TextColor(textColor).SingleLine()
+				})
+				ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
+					ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 28, 40, 28).Children(func() {
+						if lede != "" {
+							ui.Text(c, lede).FontSize(13).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 16, 2)
+						}
+						switch curPage {
+						case "accounts":
+							a.accountsAndModelsPage(c)
+						case "permissions":
+							a.permissionsPage(c)
+						case "appearance":
+							a.appearancePage(c)
+						case "shortcuts":
+							a.shortcutsPage(c)
+						case "mcp":
+							a.mcpPage(c)
+						default:
+							a.generalPage(c)
+						}
 					})
-				}
-			})
-		})
-		ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Children(func() {
-			ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 18).AlignItems(ui.Center).DragWindow().Children(func() {
-				ui.Spacer(c)
-				if a.iconButton(c, "settings-close", "x", locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape).Clicked() {
-					a.settingsOpen = false
-				}
-			})
-			ui.Scroll(c).Grow(1).Children(func() {
-				ui.Column(c).Width(600).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 28, 48, 28).Children(func() {
-					// The page's title and what it is for, as the mockup has
-					// them; the about page has its own heading.
-					if lede != "" {
-						ui.Text(c, title).FontSize(22).FontWeight(650).LetterSpacing(-.3).TextColor(p.Fg).Margin(0, 0, 4, 0)
-						ui.Text(c, lede).FontSize(13.5).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 20, 0)
-					}
-					switch a.settingsPage {
-					case "accounts":
-						a.accountsPage(c)
-					case "models":
-						a.modelsPage(c)
-					case "permissions":
-						a.permissionsPage(c)
-					case "appearance":
-						a.appearancePage(c)
-					case "shortcuts":
-						a.shortcutsPage(c)
-					case "about":
-						a.aboutPage(c)
-					case "mcp":
-						a.mcpPage(c)
-					default:
-						a.generalPage(c)
-					}
 				})
 			})
 		})
@@ -194,7 +221,7 @@ type rows struct {
 
 func (r *rows) sep() {
 	if r.n > 0 {
-		ui.Box(r.c).Height(.5).Shrink(0).Margin(0, 0, 0, 16).Background(r.p.Edge)
+		ui.Box(r.c).Height(.5).Shrink(0).Margin(0, 0, 0, 12).Background(r.p.Edge)
 	}
 	r.n++
 }
@@ -204,7 +231,7 @@ func (r *rows) sep() {
 func (r *rows) row(key, label, sub string, control func()) {
 	r.sep()
 	c, p := r.c, r.p
-	ui.Row(c.Key(key)).MinHeight(44).Padding(9, 14, 9, 16).Gap(14).AlignItems(ui.Center).Children(func() {
+	ui.Row(c.Key(key)).MinHeight(42).Padding(8, 10, 8, 12).Gap(14).AlignItems(ui.Center).Children(func() {
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Text(c, label).FontSize(13.5).TextColor(p.Fg)
 			if sub != "" {
@@ -323,8 +350,8 @@ func (a *App) appearancePage(c *ui.Context) {
 	note(c, p, locales.DetailNote())
 }
 
-// aboutPage says which build this is, as Go recorded it.
-func (a *App) aboutPage(c *ui.Context) {
+// settingsBuildFoot shows the build version and update check in the sheet footer.
+func (a *App) settingsBuildFoot(c *ui.Context) {
 	p := a.p
 	version, commit, built := a.version, "", ""
 	if bi, ok := debug.ReadBuildInfo(); ok {
@@ -336,7 +363,7 @@ func (a *App) aboutPage(c *ui.Context) {
 			case "vcs.revision":
 				commit = kv.Value[:min(7, len(kv.Value))]
 			case "vcs.time":
-				built = kv.Value
+				built, _, _ = strings.Cut(kv.Value, "T")
 			case "vcs.modified":
 				if kv.Value == "true" && commit != "" {
 					commit += "+"
@@ -347,25 +374,30 @@ func (a *App) aboutPage(c *ui.Context) {
 	if version == "" {
 		version = "devel"
 	}
-	ui.Column(c).AlignItems(ui.Center).Gap(6).Padding(24, 0, 18, 0).Children(func() {
-		ui.Image(c, mark).Size(56, 56)
-		ui.Text(c, "Talos").FontSize(20).FontWeight(600).TextColor(p.Fg).Margin(6, 0, 0, 0)
-		ui.Text(c, locales.VersionIs(version)).FontSize(13).TextColor(p.Mute).Selectable()
-		if a.checkUpdates != nil && a.pushButton(c, "check-updates", locales.CheckForUpdates()).Margin(8, 0, 0, 0).Clicked() {
-			a.checkUpdates()
+	tip := strings.TrimSpace(commit + " " + built)
+	ui.Row(c).Height(42).Shrink(0).Padding(0, 14).Gap(6).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
+		v := ui.Text(c, "Talos "+version).FontSize(11.5).TextColor(p.Mute).SingleLine()
+		if tip != "" {
+			v.Tooltip(tip)
 		}
-	})
-	group(c, p, func() {
-		r := rows{c: c, p: p}
-		for _, kv := range [][2]string{{locales.BuildCommit(), commit}, {locales.BuildTime(), built}} {
-			if kv[1] == "" {
-				continue
+		ui.Spacer(c)
+		if a.checkUpdates != nil {
+			b := ui.ButtonBase(c.Key("check-updates")).Padding(2, 6).Radius(5).Center().Label(locales.CheckForUpdates())
+			if b.Hovered() {
+				b.Background(p.Hover)
 			}
-			r.row("about:"+kv[0], kv[0], "", func() {
-				ui.Text(c, kv[1]).Font("monospace").FontSize(12.5).TextColor(p.Fg2).Selectable()
-			})
+			b.Children(func() { ui.Text(c, locales.CheckForUpdates()).FontSize(11.5).TextColor(p.Live).SingleLine() })
+			if b.Clicked() {
+				a.checkUpdates()
+			}
 		}
 	})
+}
+
+func (a *App) accountsAndModelsPage(c *ui.Context) {
+	a.accountsPage(c)
+	ui.Box(c).Height(14).Shrink(0)
+	a.modelsPage(c)
 }
 
 func (a *App) accountsPage(c *ui.Context) {
@@ -584,11 +616,11 @@ func (a *App) permissionsPage(c *ui.Context) {
 			for _, m := range modeRows() {
 				chosen := mode
 				it := ui.RadioBase(c.Key("set-mode:"+m.id), &chosen, m.id).Column().Grow(1).Basis(0).MinWidth(0).Padding(12).Gap(4).Radius(10).AlignItems(ui.Start).Justify(ui.Start).
-					Background(p.Card).Label(m.label)
+					Label(m.label)
 				if m.id == mode {
-					it.Border(1.5, p.Fg)
+					it.Background(p.LiveBg).Border(1, p.Live)
 				} else {
-					it.Border(.5, p.Edge2)
+					it.Background(p.Card).Border(.5, p.Edge2)
 				}
 				if chosen != mode {
 					s := set

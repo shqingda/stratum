@@ -79,6 +79,8 @@ type App struct {
 	// closing it brings the sidebar back.
 	panelWas, sideMoved bool
 	sideOpen            float32 // how far the sidebar is out, 0 to 1, on its way
+	rvOpen              float32 // how far the review inspector is out, 0 to 1
+	settingsAnim        float32 // how far the settings sheet is out, 0 to 1
 	dockH               float32 // how tall the composer floating on the transcript was
 	pal                 bool    // the ⌘K palette shows
 	jump                int64   // a message to scroll to, from a search
@@ -225,12 +227,12 @@ func (a *App) View(c *ui.Context) {
 	a.runMenu(c)
 	a.syncDraft(c)
 	a.markSeen(c)
-	if a.settingsOpen {
-		a.settingsView(c, vibrant)
-		a.keys(c)
-		return
-	}
 	a.fitPanel(c)
+	sTarget := float32(0)
+	if a.settingsOpen {
+		sTarget = 1
+	}
+	a.settingsAnim = c.Root().Spring("settings", sTarget, ui.SpringOptions{Stiffness: 420, Damping: 40})
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -240,6 +242,11 @@ func (a *App) View(c *ui.Context) {
 		target = 0
 	}
 	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 380, Damping: 39})
+	if a.settingsAnim > 0.001 {
+		// Push the live workspace subtly back while a sheet sits above it.
+		s := 1 - 0.015*a.settingsAnim
+		shell.Scale(s, s)
+	}
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
 			ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.sidebar(c, vibrant) })
@@ -247,7 +254,12 @@ func (a *App) View(c *ui.Context) {
 		a.main(c)
 		a.sideToggle(c)
 	})
-	a.palette(c)
+	if !a.settingsOpen {
+		a.palette(c)
+	}
+	if a.settingsOpen {
+		a.settingsSheet(c, vibrant)
+	}
 	a.keys(c)
 }
 
@@ -272,8 +284,13 @@ func (a *App) main(c *ui.Context) {
 		}
 		a.findBar(c)
 	})
+	rvTarget := float32(0)
 	if a.rv.open {
-		a.reviewPanel(c)
+		rvTarget = 1
+	}
+	a.rvOpen = sheet.Spring("review", rvTarget, ui.SpringOptions{Stiffness: 380, Damping: 39})
+	if a.rvOpen > 0.001 {
+		ui.Row(c).Width(a.rvOpen * reviewWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.reviewPanel(c) })
 	}
 }
 

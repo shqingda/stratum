@@ -148,7 +148,7 @@ func (a *App) effortPill(c *ui.Context, label string) {
 		container.Tooltip(locales.NoEffortSupport())
 	}
 	container.Children(func() {
-		b := a.pill(c, "effort", "brain", label, false).Disabled(!a.C.CanAct() || unsupported)
+		b := a.pill(c, "effort", "", label, false).Disabled(!a.C.CanAct() || unsupported)
 		if unsupported {
 			b.Description(locales.NoEffortSupport())
 		}

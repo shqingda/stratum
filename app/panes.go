@@ -15,32 +15,39 @@ import (
 // commands the agent ran, its plan, and the workspace's files.
 func (a *App) reviewTabs(c *ui.Context, files int) {
 	p := a.p
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
-		for _, t := range []struct{ id, label string }{
-			{"", locales.Changes()},
-			{"term", locales.Terminal()},
-			{"plan", locales.Plan()},
-			{"files", locales.Files()},
-		} {
-			on := a.rv.tab == t.id
-			b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(t.label)
-			fg := p.Fg2
-			if on {
-				b.Background(p.Sel)
-				fg = p.Fg
-			} else if b.Hovered() {
-				b.Background(p.Hover)
-			}
-			b.Children(func() {
-				ui.Text(c, t.label).FontSize(13.5).FontWeight(500).TextColor(fg)
-				if t.id == "" && files > 0 {
-					ui.Text(c, fmt.Sprint(files)).FontSize(12).FontWeight(500).TextColor(p.Mute)
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
+		ui.Row(c).Grow(1).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center).Children(func() {
+			for _, t := range []struct{ id, label string }{
+				{"", locales.Changes()},
+				{"files", locales.Files()},
+				{"term", locales.Terminal()},
+				{"plan", locales.Plan()},
+			} {
+				on := a.rv.tab == t.id
+				b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).
+					Height(26).Padding(0, 8).Gap(4).Radius(7).AlignItems(ui.Center).Label(t.label)
+				press(b)
+				fg, weight := p.Fg2, 500
+				if on {
+					b.Background(p.Card)
+					rim(b, p)
+					raise(b, p)
+					fg, weight = p.Fg, 600
+				} else if b.Hovered() {
+					b.Background(p.Hover)
+					fg = p.Fg
 				}
-			})
-			if b.Clicked() {
-				a.rv.tab = t.id
+				b.Children(func() {
+					ui.Text(c, t.label).FontSize(13).FontWeight(weight).TextColor(fg).SingleLine()
+					if t.id == "" && files > 0 {
+						ui.Text(c, fmt.Sprint(files)).FontSize(11.5).FontWeight(500).TextColor(p.Mute).SingleLine()
+					}
+				})
+				if b.Clicked() {
+					a.rv.tab = t.id
+				}
 			}
-		}
+		})
 	})
 }
 
