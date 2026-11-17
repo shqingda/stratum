@@ -65,7 +65,7 @@ func main() {
 			StateKey:       "main",
 			TitleBarStyle:  mygo.TitleBarHiddenInset,
 			TitleBarHeight: 52,
-			Vibrancy:       mygo.VibrancySidebar,
+			Vibrancy:       mygo.VibrancyGlass,
 			Content:        ui.View(a.View),
 		})
 		a.Serve(ctx, k.Server, win.Update)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/i18n"
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
@@ -33,11 +34,16 @@ func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	p := a.p
 	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
-	if !vibrant {
+	topGap := float32(barHeight)
+	if vibrant {
+		side = ui.Column(c).Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).Shrink(0).
+			Material(glass.Glass{Native: true, Clarity: .25}).Clip()
+		topGap = barHeight - 8
+	} else {
 		side.Background(p.Side)
 	}
 	side.Children(func() {
-		ui.Box(c).Height(barHeight).Shrink(0).DragWindow()
+		ui.Box(c).Height(topGap).Shrink(0).DragWindow()
 		ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
 			ui.Image(c, mark).Size(24, 24)
 			ui.Text(c, "Talos").FontSize(16).FontWeight(600).TextColor(p.Fg)

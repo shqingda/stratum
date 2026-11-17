@@ -46,6 +46,11 @@ func (a *App) keys(c *ui.Context) {
 			a.toggleSide()
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyB, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen {
+			a.toggleSide()
+		}
+	})
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {
 		if i < len(a.visibleSessions) {
 			id := a.visibleSessions[i]

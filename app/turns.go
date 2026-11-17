@@ -350,12 +350,14 @@ func (a *App) contextRing(c *ui.Context) {
 		svg = ui.MustParseSVG([]byte(doc))
 		rings[key] = svg
 	}
-	tip := locales.ContextUsed(tokens(a.C.LastInput), tokens(window))
+	tip := fmt.Sprintf("%d%% · %s", pct, locales.ContextUsed(tokens(a.C.LastInput), tokens(window)))
 	if total := a.turnCost(a.C.Usage); total != "" {
 		tip += " · " + total
 	}
-	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(tip).Children(func() {
+	ui.Row(c).Height(28).Gap(5).Padding(0, 4).AlignItems(ui.Center).Tooltip(tip).Children(func() {
 		ui.Image(c, svg).Size(14, 14)
-		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		if pct >= 50 {
+			ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(12).TextColor(p.Mute).SingleLine()
+		}
 	})
 }

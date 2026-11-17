@@ -233,6 +233,13 @@ func (a *App) View(c *ui.Context) {
 		sTarget = 1
 	}
 	a.settingsAnim = c.Root().Spring("settings", sTarget, ui.SpringOptions{Stiffness: 420, Damping: 40})
+	rvTarget := float32(0)
+	if a.rv.open {
+		rvTarget = 1
+	}
+	// Keep the review drawer spring on the root so collapsing the sidebar
+	// never shifts child indices and replays the opening animation.
+	a.rvOpen = c.Root().Spring("review", rvTarget, ui.SpringOptions{Stiffness: 380, Damping: 39})
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -273,7 +280,7 @@ func (a *App) helloShown() bool {
 func (a *App) main(c *ui.Context) {
 	p := a.p
 	sheet := ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
-	if a.sideOpen > 0.001 {
+	if a.sideOpen > 0.001 && !c.Vibrancy() {
 		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
 	}
 	sheet.Children(func() {
@@ -284,11 +291,6 @@ func (a *App) main(c *ui.Context) {
 		}
 		a.findBar(c)
 	})
-	rvTarget := float32(0)
-	if a.rv.open {
-		rvTarget = 1
-	}
-	a.rvOpen = sheet.Spring("review", rvTarget, ui.SpringOptions{Stiffness: 380, Damping: 39})
 	if a.rvOpen > 0.001 {
 		ui.Row(c).Width(a.rvOpen * reviewWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.reviewPanel(c) })
 	}

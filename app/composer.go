@@ -115,8 +115,12 @@ func (a *App) queue(c *ui.Context) {
 func (a *App) box(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	box := ui.Column(c).Radius(18).Background(p.Card).Padding(12, 10, 8, 16)
-	lift(box, p)
+	box := ui.Column(c).Radius(22).Background(p.Card).Border(.5, p.Edge).Padding(14, 14, 10, 18)
+	if a.helloShown() {
+		raise(box, p)
+	} else {
+		lift(box, p)
+	}
 	rim(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {
 		a.attachPaths(files)
@@ -161,7 +165,7 @@ func (a *App) box(c *ui.Context) {
 		if a.noImages() {
 			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
 		}
-		ui.Row(c).Gap(2).Margin(6, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Gap(4).Margin(8, 0, 0, 0).AlignItems(ui.Center).Children(func() {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
@@ -248,29 +252,29 @@ func (a *App) putBack(text string) {
 
 // iconPill is a composer control that is only a symbol.
 func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
-	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
+	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(14).Center().Label(tip).Tooltip(tip)
 	press(b)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
-	b.Children(func() { sym(c, symbol, 16, a.p.Fg2) })
+	b.Children(func() { sym(c, symbol, 15, a.p.Fg2) })
 	return b
 }
 
 func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 8).Gap(5).Radius(7).AlignItems(ui.Center).Label(label)
+	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 9).Gap(5).Radius(14).AlignItems(ui.Center).Label(label)
 	press(b)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}
 	b.Children(func() {
 		if symbol != "" {
-			sym(c, symbol, 15, p.Fg2)
+			sym(c, symbol, 14, p.Fg2)
 		}
-		ui.Text(c, label).FontSize(13.5).TextColor(p.Fg2).SingleLine()
+		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
 		if chevron {
-			sym(c, "chevron-down", 12, p.Mute)
+			sym(c, "chevron-down", 11, p.Mute)
 		}
 	})
 	return b
