@@ -58,7 +58,9 @@ func (a *App) dock(c *ui.Context) {
 	switch {
 	case a.err != "":
 		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
-	case !a.helloShown():
+	case a.helloShown():
+		a.envBar(c)
+	default:
 		a.status(c)
 	}
 }
@@ -162,13 +164,6 @@ func (a *App) box(c *ui.Context) {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
-			if cur != nil && a.helloShown() {
-				a.folderPill(c, cur)
-				a.branchPill(c, cur)
-				if a.C.Workspace.Branch != "" || cur.Worktree {
-					a.worktreePill(c, cur)
-				}
-			}
 			if cur != nil {
 				a.modelPill(c, cur.Model)
 				a.effortPill(c, effortLabel(cur.Effort))
@@ -253,6 +248,7 @@ func (a *App) putBack(text string) {
 // iconPill is a composer control that is only a symbol.
 func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
+	press(b)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
@@ -263,6 +259,7 @@ func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
 func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 8).Gap(5).Radius(7).AlignItems(ui.Center).Label(label)
+	press(b)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}
@@ -314,6 +311,20 @@ func (a *App) goButton(c *ui.Context) {
 			a.submit()
 		}
 	}
+}
+
+func (a *App) envBar(c *ui.Context) {
+	cur := a.C.Current
+	if cur == nil {
+		return
+	}
+	ui.Row(c).Gap(4).Justify(ui.Center).Margin(8, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+		a.folderPill(c, cur)
+		if a.C.Workspace.Branch != "" || cur.Worktree {
+			a.worktreePill(c, cur)
+		}
+		a.branchPill(c, cur)
+	})
 }
 
 func (a *App) status(c *ui.Context) {

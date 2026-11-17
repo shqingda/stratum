@@ -61,56 +61,79 @@ func (a *App) openSettingsPage(id string) {
 	}
 }
 
-// settingsView is the settings: a list of pages, and the page.
-func (a *App) settingsView(c *ui.Context) {
+// settingsView is the settings: a translucent sidebar of pages matching the
+// main window, and the active page on the paper sheet beside it.
+func (a *App) settingsView(c *ui.Context, vibrant bool) {
 	p := a.p
 	title, lede := "", ""
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
-		ui.Column(c).Width(200).Shrink(0).Padding(0, 10).Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
-			ui.Row(c).Height(barHeight).Shrink(0).AlignItems(ui.Center).DragWindow().Children(func() {
+		side := ui.Column(c).Width(sidebarWidth).Shrink(0).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
+		if !vibrant {
+			side.Background(p.Side)
+		}
+		side.Children(func() {
+			ui.Box(c).Height(barHeight).Shrink(0).DragWindow()
+			ui.Row(c).Padding(4, 20, 12, 20).Gap(10).AlignItems(ui.Center).Children(func() {
+				ui.Image(c, mark).Size(22, 22)
+				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).TextColor(p.Fg)
+			})
+			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)
+			ui.Column(c).Padding(0, 12, 16, 12).Gap(2).Children(func() {
+				q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
+				for _, pg := range settingsPages {
+					label := pg.label(locales.In(i18n.Locale()))
+					if pg.id == a.settingsPage {
+						title = label
+						if pg.lede != nil {
+							lede = pg.lede(locales.In(i18n.Locale()))
+						}
+					}
+					if q != "" && !finds(pg.label, pg.words, q) {
+						continue
+					}
+					if q == "" && pg.id == "about" {
+						ui.Box(c).Height(.5).Shrink(0).Margin(8, 8, 8, 8).Background(p.Edge)
+					}
+					active := pg.id == a.settingsPage
+					it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
+						Height(32).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
+					press(it)
+					switch {
+					case active:
+						it.Background(p.Sel)
+					case it.Hovered():
+						it.Background(p.Hover)
+					}
+					if it.Clicked() {
+						a.openSettingsPage(pg.id)
+					}
+					iconColor, textColor, weight := p.Fg2, p.Fg2, 400
+					if active {
+						iconColor, textColor, weight = p.Fg, p.Fg, 550
+					} else if it.Hovered() {
+						textColor = p.Fg
+					}
+					it.Children(func() {
+						ui.Box(c).Width(16).Center().Children(func() { sym(c, pg.symbol, 16, iconColor) })
+						ui.Text(c, label).FontSize(13.5).FontWeight(weight).TextColor(textColor).SingleLine()
+					})
+				}
+			})
+		})
+		ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Children(func() {
+			ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 18).AlignItems(ui.Center).DragWindow().Children(func() {
 				ui.Spacer(c)
 				if a.iconButton(c, "settings-close", "x", locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape).Clicked() {
 					a.settingsOpen = false
 				}
 			})
-			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 0, 10, 0)
-			q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
-			for _, pg := range settingsPages {
-				label := pg.label(locales.In(i18n.Locale()))
-				if pg.id == a.settingsPage {
-					title = label
-					if pg.lede != nil {
-						lede = pg.lede(locales.In(i18n.Locale()))
-					}
-				}
-				if q != "" && !finds(pg.label, pg.words, q) {
-					continue
-				}
-				it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).Height(28).Padding(0, 8).Gap(8).Radius(6).AlignItems(ui.Center).Label(label)
-				switch {
-				case pg.id == a.settingsPage:
-					it.Background(p.Sel)
-				case it.Hovered():
-					it.Background(p.Hover)
-				}
-				if it.Clicked() {
-					a.openSettingsPage(pg.id)
-				}
-				it.Children(func() {
-					ui.Box(c).Width(16).Center().Children(func() { sym(c, pg.symbol, 16, p.Fg2) })
-					ui.Text(c, label).FontSize(13).TextColor(p.Fg).SingleLine()
-				})
-			}
-		})
-		ui.Column(c).Grow(1).MinWidth(0).Background(p.Bg).Children(func() {
-			ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 			ui.Scroll(c).Grow(1).Children(func() {
-				ui.Column(c).Width(580).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 20, 40, 20).Children(func() {
+				ui.Column(c).Width(600).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 28, 48, 28).Children(func() {
 					// The page's title and what it is for, as the mockup has
 					// them; the about page has its own heading.
 					if lede != "" {
-						ui.Text(c, title).FontSize(20).FontWeight(650).TextColor(p.Fg).Margin(0, 0, 4, 0)
-						ui.Text(c, lede).FontSize(13).TextColor(p.Fg2).Margin(0, 0, 14, 0)
+						ui.Text(c, title).FontSize(22).FontWeight(650).LetterSpacing(-.3).TextColor(p.Fg).Margin(0, 0, 4, 0)
+						ui.Text(c, lede).FontSize(13.5).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 20, 0)
 					}
 					switch a.settingsPage {
 					case "accounts":
@@ -146,20 +169,20 @@ func (a *App) settings() proto.Settings {
 
 // section is the bold name over a group of rows; the first sits higher.
 func section(c *ui.Context, p *Palette, label string, first bool) {
-	top := float32(20)
+	top := float32(22)
 	if first {
 		top = 6
 	}
-	ui.Text(c, label).FontSize(13).FontWeight(600).TextColor(p.Fg).Margin(top, 0, 7, 2)
+	ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(p.Fg2).Margin(top, 0, 8, 4)
 }
 
 // note is the small text under a group.
 func note(c *ui.Context, p *Palette, text string) {
-	ui.Text(c, text).FontSize(12).LineHeight(1.45).TextColor(p.Mute).Margin(6, 2, 0, 2)
+	ui.Text(c, text).FontSize(12).LineHeight(1.45).TextColor(p.Mute).Margin(8, 4, 0, 4)
 }
 
 func group(c *ui.Context, p *Palette, children func()) {
-	ui.Column(c).Radius(10).Background(p.Card).Border(.5, p.Edge2).Clip().Children(children)
+	raise(ui.Column(c).Radius(12).Background(p.Card).Border(.5, p.Edge).Clip(), p).Children(children)
 }
 
 // rows draws the rows of a group, with a hairline between two.
@@ -171,7 +194,7 @@ type rows struct {
 
 func (r *rows) sep() {
 	if r.n > 0 {
-		ui.Box(r.c).Height(.5).Shrink(0).Margin(0, 0, 0, 12).Background(r.p.Edge)
+		ui.Box(r.c).Height(.5).Shrink(0).Margin(0, 0, 0, 16).Background(r.p.Edge)
 	}
 	r.n++
 }
@@ -181,11 +204,11 @@ func (r *rows) sep() {
 func (r *rows) row(key, label, sub string, control func()) {
 	r.sep()
 	c, p := r.c, r.p
-	ui.Row(c.Key(key)).MinHeight(40).Padding(7, 10, 7, 12).Gap(14).AlignItems(ui.Center).Children(func() {
-		ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
-			ui.Text(c, label).FontSize(13).TextColor(p.Fg)
+	ui.Row(c.Key(key)).MinHeight(44).Padding(9, 14, 9, 16).Gap(14).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
+			ui.Text(c, label).FontSize(13.5).TextColor(p.Fg)
 			if sub != "" {
-				ui.Text(c, sub).FontSize(12).TextColor(p.Mute)
+				ui.Text(c, sub).FontSize(12).LineHeight(1.4).TextColor(p.Mute)
 			}
 		})
 		control()
@@ -674,10 +697,11 @@ func (a *App) shortcutsPage(c *ui.Context) {
 // selector mark.
 func (a *App) picker(c *ui.Context, key, prefix, value string) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Row().Height(24).Padding(0, 6, 0, 9).Gap(6).Radius(6).AlignItems(ui.Center).
-		Background(p.Card).Border(.5, p.Edge2).Shrink(0).Label(strings.TrimSpace(prefix + " " + value))
+	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 8, 0, 10).Gap(6).Radius(7).AlignItems(ui.Center).
+		Background(p.Sheet).Border(.5, p.Edge2).Shrink(0).Label(strings.TrimSpace(prefix + " " + value))
+	press(b)
 	if b.Hovered() {
-		b.Background(p.Card.Mix(p.Fg, .04))
+		b.Background(p.Hover)
 	}
 	b.Children(func() {
 		if prefix != "" {
@@ -692,9 +716,10 @@ func (a *App) picker(c *ui.Context, key, prefix, value string) ui.Element {
 // pushButton is a plain push button, as the settings draw them.
 func (a *App) pushButton(c *ui.Context, key, label string) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Height(24).Padding(0, 10).Radius(6).Center().Background(p.Card).Border(.5, p.Edge2).Label(label)
+	b := ui.ButtonBase(c.Key(key)).Height(28).Padding(0, 11).Radius(7).Center().Background(p.Sheet).Border(.5, p.Edge2).Label(label)
+	press(b)
 	if b.Hovered() {
-		b.Background(p.Card.Mix(p.Fg, .04))
+		b.Background(p.Hover)
 	}
 	b.Children(func() { ui.Text(c, label).FontSize(13).TextColor(p.Fg) })
 	return b

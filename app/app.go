@@ -226,7 +226,7 @@ func (a *App) View(c *ui.Context) {
 	a.syncDraft(c)
 	a.markSeen(c)
 	if a.settingsOpen {
-		a.settingsView(c)
+		a.settingsView(c, vibrant)
 		a.keys(c)
 		return
 	}
