@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/i18n"
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
@@ -36,8 +35,16 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 	topGap := float32(barHeight)
 	if vibrant {
-		side = ui.Column(c).Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).Shrink(0).
-			Material(glass.Glass{Native: true, Clarity: .25}).Clip()
+		// Window VibrancyGlass already provides the native Liquid Glass
+		// surface behind the transparent root; add only a light tint and
+		// specular rim so sidebar text stays sharp above the glass.
+		tint := ui.RGBA(255, 255, 255, .16)
+		if p == dark {
+			tint = ui.RGBA(22, 24, 32, .22)
+		}
+		side = ui.Column(c).Width(sidebarWidth - 12).Margin(8, 4, 8, 8).Radius(16).Shrink(0).
+			Background(tint).Border(.5, p.Edge).Clip()
+		rim(side, p)
 		topGap = barHeight - 8
 	} else {
 		side.Background(p.Side)
