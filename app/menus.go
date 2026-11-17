@@ -79,7 +79,6 @@ func (a *App) modelPill(c *ui.Context, label string) {
 	b.Children(func() {
 		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
 		ui.Text(c, effort).FontSize(13).TextColor(p.Mute).SingleLine()
-		sym(c, "chevron-down", 11, p.Mute)
 	})
 	b.PopoverMenuButton(func(m *ui.Menu) {
 		a.modelItems(m, a.modelAccount(), a.C.Current.Model, func(id string) {
@@ -191,7 +190,7 @@ func (a *App) effortPill(c *ui.Context, label string) {
 }
 
 func (a *App) modePill(c *ui.Context, label string) {
-	a.pill(c, "mode", "shield-half", label, false).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	a.pill(c, "mode", "", label, false).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		for _, mode := range []struct{ id, description string }{
 			{"ask", locales.ModeAskShort()},
 			{"auto", locales.ModeAutoShort()},

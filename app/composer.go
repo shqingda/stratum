@@ -1,6 +1,7 @@
 package app
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -336,10 +337,15 @@ func (a *App) status(c *ui.Context) {
 				ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
 			})
 		}
-		if cur := a.C.Current; cur != nil && cur.Worktree {
-			item("git-branch", locales.Worktree())
-		} else {
-			item("device-laptop", locales.Local())
+		if cur := a.C.Current; cur != nil {
+			dir := cur.Cwd
+			if cur.Repo != "" {
+				dir = cur.Repo
+			}
+			item("folder", filepath.Base(dir))
+			if cur.Worktree {
+				item("git-branch", locales.Worktree())
+			}
 		}
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))
