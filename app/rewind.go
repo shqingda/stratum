@@ -87,6 +87,7 @@ func (a *App) rewindActions() []rewindAct {
 	if code {
 		acts = append(acts, rewindAct{"code", locales.RewindCode()})
 	}
+	acts = append(acts, rewindAct{"summarize", locales.RewindSummarize()})
 	return acts
 }
 
@@ -168,7 +169,7 @@ func (a *App) rewindPick() {
 }
 
 func (a *App) rewindDo(action string) {
-	if action != "code" {
+	if action == "both" || action == "conversation" {
 		a.draft, a.toEnd = a.rewind.prompt, true
 		a.drafts.kept, a.drafts.last = a.draft, a.draft
 		a.drafts.since = time.Now()

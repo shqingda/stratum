@@ -2,10 +2,16 @@ package session
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/proto"
 )
@@ -80,5 +86,57 @@ func TestTailRunes(t *testing.T) {
 	}
 	if tailRunes("short", 12) != "short" {
 		t.Fatal(tailRunes("short", 12))
+	}
+}
+
+func TestExpandMCPPrompt(t *testing.T) {
+	srv := sdk.NewServer(&sdk.Implementation{Name: "echo", Version: "1"}, nil)
+	srv.AddPrompt(&sdk.Prompt{
+		Name:        "greet",
+		Description: "Greet someone",
+		Arguments:   []*sdk.PromptArgument{{Name: "who", Required: true}},
+	}, func(_ context.Context, r *sdk.GetPromptRequest) (*sdk.GetPromptResult, error) {
+		return &sdk.GetPromptResult{Messages: []*sdk.PromptMessage{
+			{Role: "user", Content: &sdk.TextContent{Text: "hello " + r.Params.Arguments["who"]}},
+		}}, nil
+	})
+	httpSrv := httptest.NewServer(sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return srv }, nil))
+	defer httpSrv.Close()
+
+	script := &llm.Script{Turns: []llm.Turn{{Text: "ok"}}}
+	m, s := changesManager(t, script)
+	userMCP := filepath.Join(t.TempDir(), "mcp.json")
+	cfg, _ := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{
+			"echo": map[string]any{"url": httpSrv.URL},
+		},
+	})
+	if err := os.WriteFile(userMCP, cfg, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m.UseMCP(userMCP)
+	defer m.MCP.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ended := make(chan struct{}, 2)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd {
+			ended <- struct{}{}
+		}
+	})()
+	if _, err := m.Prompt(ctx, proto.Prompt{SessionID: s.ID, Text: `/echo:greet "Alice Bob"`}, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+	case <-ctx.Done():
+		t.Fatal("the prompt turn did not finish")
+	}
+	got := script.Requests[0].Messages[0].PlainText()
+	for _, want := range []string{`/echo:greet "Alice Bob"`, `<mcp-prompt server="echo" name="greet">`, "hello Alice Bob", "</mcp-prompt>"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in %q", want, got)
+		}
 	}
 }

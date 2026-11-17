@@ -88,6 +88,7 @@ type App struct {
 	rv                  review
 	seen                map[string]time.Time // when approvals first showed
 	openIn              func(app, dir string) error
+	openURL             func(url string) error
 	// version is the app's, as packaged; checkUpdates asks the updater,
 	// nil where there is none.
 	version      string
@@ -101,7 +102,7 @@ type App struct {
 	keyRepeat                                               bool
 	visibleSessions                                         []string
 	menuSession                                             string
-	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu bool
+	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu, worktreeMenu bool
 	modelsRequested                                         bool
 	modelsPending, modelsAccount, modelsError               string
 	modelsLoadedAccount                                     string
@@ -114,6 +115,7 @@ type App struct {
 	settingsQuery, keysQuery                  string
 	subMenu, lightMenu                        bool
 	accountsSeen                              int
+	mcpUI                                     mcpState
 	locale                                    Locale
 	theme                                     string // the appearance last applied
 
@@ -127,7 +129,7 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, openIn: openIn, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
+	return &App{C: c, now: time.Now, openIn: openIn, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
 }
 

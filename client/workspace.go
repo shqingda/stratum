@@ -13,6 +13,7 @@ type Workspace struct {
 	proto.Workspace
 	BranchStale bool
 	Committing  bool
+	Pushing     bool
 	// Diffs are the uncommitted files asked for, HEAD against disk, by
 	// path; a new reading of the workspace drops them.
 	Diffs map[string]proto.ChangeDiff
@@ -51,13 +52,47 @@ func (c *Client) Commit(message string) ([]proto.Command, error) {
 	return []proto.Command{cmd}, nil
 }
 
+// Push pushes the current branch to origin.
+func (c *Client) Push() ([]proto.Command, error) {
+	if !c.CanAct() {
+		return nil, ErrNotReady
+	}
+	cmd := c.read(proto.MethodPush, proto.WorkspaceQuery{Cwd: c.Current.Cwd}, nil)
+	c.keepWorkspace(cmd.ID)
+	c.Workspace.Pushing = true
+	failed := c.pending[cmd.ID].failed
+	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
+		c.Workspace.BranchStale = true
+		c.notice("fail", "%s", locales.PushFailed(e.Message))
+		return failed(e)
+	}
+	return []proto.Command{cmd}, nil
+}
+
+// CreatePR pushes HEAD and opens a pull request.
+func (c *Client) CreatePR(title, body string) ([]proto.Command, error) {
+	if !c.CanAct() {
+		return nil, ErrNotReady
+	}
+	cmd := c.read(proto.MethodCreatePR, proto.CreatePR{Cwd: c.Current.Cwd, Title: title, Body: body}, nil)
+	c.keepWorkspace(cmd.ID)
+	c.Workspace.Pushing = true
+	failed := c.pending[cmd.ID].failed
+	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
+		c.Workspace.BranchStale = true
+		c.notice("fail", "%s", locales.PrFailed(e.Message))
+		return failed(e)
+	}
+	return []proto.Command{cmd}, nil
+}
+
 // keepWorkspace takes the answer to request id, unless a later request
 // or another session has come since.
 func (c *Client) keepWorkspace(id string) {
 	session := c.Current.ID
 	keep := func(w proto.Workspace) {
 		if c.Workspace.req == id && c.Current != nil && c.Current.ID == session {
-			c.Workspace.Workspace, c.Workspace.Committing = w, false
+			c.Workspace.Workspace, c.Workspace.Committing, c.Workspace.Pushing = w, false, false
 			c.Workspace.Diffs = map[string]proto.ChangeDiff{}
 			c.Workspace.BaseDiffs = map[string]proto.ChangeDiff{}
 			c.Workspace.Read++

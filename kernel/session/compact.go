@@ -18,12 +18,16 @@ const compactPrompt = "The conversation is about to outgrow the context window. 
 	"what is still open, and anything the user asked to keep in mind. Be specific and brief; call no tools."
 
 // history is what the model is sent of a session: its messages, from the
-// last compaction's summary on.
+// last full compaction's summary on (partial compactions keep what came before).
 func (m *Manager) history(ctx context.Context, sessionID string) ([]llm.Message, error) {
 	events, err := m.Store.Events(ctx, sessionID, 0, 0, store.MessageEvent, proto.EventCompaction, proto.EventShell)
 	if err != nil {
 		return nil, err
 	}
+	return eventsToMessages(events)
+}
+
+func eventsToMessages(events []store.Event) ([]llm.Message, error) {
 	var out []llm.Message
 	for _, e := range events {
 		if e.Type == proto.EventShell {
@@ -37,7 +41,11 @@ func (m *Manager) history(ctx context.Context, sessionID string) ([]llm.Message,
 		if e.Type == proto.EventCompaction {
 			var c proto.Compaction
 			if json.Unmarshal(e.Data, &c) == nil {
-				out = summarized(c.Summary)
+				if c.Partial {
+					out = append(out, summarized(c.Summary)...)
+				} else {
+					out = summarized(c.Summary)
+				}
 			}
 			continue
 		}

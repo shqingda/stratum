@@ -164,6 +164,9 @@ func (a *App) box(c *ui.Context) {
 			}
 			if cur != nil && a.helloShown() {
 				a.folderPill(c, cur)
+				if a.C.Workspace.Branch != "" || cur.Worktree {
+					a.worktreePill(c, cur)
+				}
 			}
 			if cur != nil {
 				a.modelPill(c, cur.Model)
@@ -321,7 +324,11 @@ func (a *App) status(c *ui.Context) {
 				ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
 			})
 		}
-		item("device-laptop", locales.Local())
+		if cur := a.C.Current; cur != nil && cur.Worktree {
+			item("git-branch", locales.Worktree())
+		} else {
+			item("device-laptop", locales.Local())
+		}
 		if b := a.C.Workspace.Branch; b != "" {
 			item("git-branch", b)
 		}

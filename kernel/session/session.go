@@ -43,9 +43,10 @@ type Manager struct {
 	Defaults func() (account, model string)
 	// Accounts lists the signed-in accounts, for backups.
 	Accounts func() []string
-	Tools    tools.Set
-	Skills   skills.Loader
-	MCP      *mcp.Hub // nil without MCP
+	Tools       tools.Set
+	Skills      skills.Loader
+	MCP         *mcp.Hub // nil without MCP
+	WorktreeDir string   // directory holding session git worktrees; TempDir when empty
 	// Sandboxed tells whether commands run in the sandbox.
 	Sandboxed bool
 	Clock     agent.Clock // real time when nil
@@ -62,7 +63,9 @@ type Manager struct {
 
 // New makes a manager with the default tools.
 func New(st *store.Store, open func(string) (llm.Provider, error)) *Manager {
-	return &Manager{Store: st, changes: changes.New(st), Open: open, Tools: tools.Default(), Sandboxed: sandbox.Available()}
+	m := &Manager{Store: st, changes: changes.New(st), Open: open, Tools: tools.Default(), Sandboxed: sandbox.Available()}
+	m.Skills.Disabled = func(name string) bool { return m.skillDisabled(context.Background(), name) }
+	return m
 }
 
 // run is a turn in progress.
@@ -181,14 +184,22 @@ func (m *Manager) Create(ctx context.Context, p proto.SessionCreate) (proto.Sess
 		}
 	}
 	x := store.Session{ID: newID(), Title: p.Title, Cwd: cwd, Account: account, Model: model, Effort: cmpOr(p.Effort, set.Effort), Mode: mode}
+	if p.Worktree {
+		if err := m.enableWorktree(ctx, &x); err != nil {
+			return proto.Session{}, err
+		}
+	}
 	if err := m.Store.CreateSession(ctx, x); err != nil {
+		if p.Worktree {
+			_ = m.disableWorktree(ctx, &x, false)
+		}
 		return proto.Session{}, err
 	}
 	x, err = m.Store.GetSession(ctx, x.ID)
 	if err != nil {
 		return proto.Session{}, err
 	}
-	s := toSession(x)
+	s := m.sessionProto(ctx, x)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
 }
 
@@ -221,7 +232,7 @@ func (m *Manager) List(ctx context.Context) ([]proto.Session, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, x := range xs {
-		out[i] = toSession(x)
+		out[i] = m.sessionProto(ctx, x)
 		if r := m.runs[x.ID]; r != nil {
 			out[i].State = "run"
 			if len(r.approvals) > 0 {
@@ -242,7 +253,7 @@ func (m *Manager) Get(ctx context.Context, id string) (proto.Snapshot, error) {
 	if err != nil {
 		return proto.Snapshot{}, err
 	}
-	snap := proto.Snapshot{Session: toSession(x), Revision: rev}
+	snap := proto.Snapshot{Session: m.sessionProto(ctx, x), Revision: rev}
 	m.mu.Lock()
 	if r := m.runs[id]; r != nil {
 		snap.Running = true
@@ -299,11 +310,22 @@ func (m *Manager) Update(ctx context.Context, u proto.SessionUpdate) (proto.Sess
 	if !perm.Mode(x.Mode).Valid() {
 		return proto.Session{}, proto.Errorf("bad_request", "unknown permission mode %q", x.Mode)
 	}
+	if u.Worktree != nil {
+		if *u.Worktree {
+			if err := m.enableWorktree(ctx, &x); err != nil {
+				return proto.Session{}, err
+			}
+		} else {
+			if err := m.disableWorktree(ctx, &x, true); err != nil {
+				return proto.Session{}, err
+			}
+		}
+	}
 	if err := m.Store.UpdateSession(ctx, x); err != nil {
 		return proto.Session{}, err
 	}
 	x, _ = m.Store.GetSession(ctx, x.ID)
-	s := toSession(x)
+	s := m.sessionProto(ctx, x)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
 }
 
@@ -328,16 +350,19 @@ func (m *Manager) Flag(ctx context.Context, f proto.SessionFlag) (proto.Session,
 	if err := m.Store.SetFlags(ctx, x); err != nil {
 		return proto.Session{}, err
 	}
-	s := toSession(x)
+	s := m.sessionProto(ctx, x)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
 }
 
-// Delete removes a session, stopping its turn.
+// Delete removes a session, stopping its turn and cleaning up any worktree.
 func (m *Manager) Delete(ctx context.Context, id string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if r := m.runs[id]; r != nil {
 		r.cancel()
+	}
+	m.mu.Unlock()
+	if x, err := m.Store.GetSession(ctx, id); err == nil {
+		_ = m.disableWorktree(ctx, &x, false)
 	}
 	return m.Store.DeleteSession(ctx, id)
 }
@@ -543,7 +568,7 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 		x.Title = titleOf(text)
 		m.Store.UpdateSession(context.WithoutCancel(ctx), x)
 		x, _ = m.Store.GetSession(context.WithoutCancel(ctx), x.ID)
-		m.record(ctx, x.ID, proto.EventSession, toSession(x))
+		m.record(ctx, x.ID, proto.EventSession, m.sessionProto(ctx, x))
 		m.retitle(x.ID, x.Title, text)
 	}
 	usage, err := m.runAgent(ctx, x, r, p)
@@ -679,6 +704,9 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	asked := p
 	asked.Text = m.expandMentions(ctx, x, p.Text)
 	u, err := ag.Run(ctx, cfg, history, llm.Message{Role: llm.User, Parts: promptParts(asked)})
+	if err == nil && ctx.Err() == nil {
+		m.runStopHooks(ctx, x.Cwd, x.ID)
+	}
 	subMu.Lock()
 	defer subMu.Unlock()
 	return used.Add(u), err

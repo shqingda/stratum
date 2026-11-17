@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/shqingda/talos/kernel/mcp"
 	"github.com/shqingda/talos/kernel/store"
 	"github.com/shqingda/talos/llm"
 )
@@ -13,17 +14,18 @@ import (
 // mentionRunes is how much of a session or MCP resource is attached.
 const mentionRunes = 4000
 
-// expandMentions attaches what @ words name, after the user's text.
-// @session:<id> is that session's title and dialogue, the latest part
-// when it is long. @<server>:<uri> is an MCP resource, the form Claude
-// Code uses. A file @path is left for the model to read. The same word
-// twice is attached once. The attachment is a snapshot from this send.
+// expandMentions attaches what @ words and /server:prompt commands name,
+// after the user's text. @session:<id> is that session's title and
+// dialogue, the latest part when it is long. @<server>:<uri> is an MCP
+// resource, the form Claude Code uses. A file @path is left for the model
+// to read. The same word twice is attached once. The attachment is a
+// snapshot from this send.
 func (m *Manager) expandMentions(ctx context.Context, current store.Session, text string) string {
-	words := atWords(text)
-	if len(words) == 0 {
-		return text
-	}
 	var blocks []string
+	if block, ok := m.promptCommandBlock(ctx, current, text); ok {
+		blocks = append(blocks, block)
+	}
+	words := atWords(text)
 	seen := map[string]bool{}
 	for _, word := range words {
 		if seen[word] {
@@ -38,6 +40,72 @@ func (m *Manager) expandMentions(ctx context.Context, current store.Session, tex
 		return text
 	}
 	return text + "\n\n" + strings.Join(blocks, "\n\n")
+}
+
+func (m *Manager) promptCommandBlock(ctx context.Context, current store.Session, text string) (string, bool) {
+	if m.MCP == nil {
+		return "", false
+	}
+	rest, ok := strings.CutPrefix(strings.TrimSpace(text), "/")
+	if !ok || rest == "" {
+		return "", false
+	}
+	head, tail := rest, ""
+	if i := strings.IndexFunc(rest, unicode.IsSpace); i >= 0 {
+		head, tail = rest[:i], rest[i+1:]
+	}
+	var server, name string
+	if s, n, ok := strings.Cut(head, ":"); ok && s != "" && n != "" {
+		server, name = s, n
+	} else if s, n, ok := mcp.ServerOf(head); ok && s != "" && n != "" {
+		server, name = s, n
+	} else {
+		return "", false
+	}
+	if !m.MCP.HasServer(current.Cwd, server) {
+		return "", false
+	}
+	readCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	body, err := m.MCP.GetPrompt(readCtx, current.Cwd, server, name, splitArgs(tail))
+	if err != nil {
+		body = err.Error()
+	}
+	return promptBlock(server, name, body), true
+}
+
+// splitArgs splits command arguments, keeping single- and double-quoted phrases together.
+func splitArgs(s string) []string {
+	var out []string
+	var cur strings.Builder
+	var quote rune
+	inArg := false
+	for _, r := range s {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '"' || r == '\'':
+			quote = r
+			inArg = true
+		case unicode.IsSpace(r):
+			if inArg {
+				out = append(out, cur.String())
+				cur.Reset()
+				inArg = false
+			}
+		default:
+			cur.WriteRune(r)
+			inArg = true
+		}
+	}
+	if inArg {
+		out = append(out, cur.String())
+	}
+	return out
 }
 
 // atWords are the @ words: an @ that starts a word, through the next space.
@@ -99,9 +167,15 @@ func resourceBlock(server, uri, body string) string {
 	return "<mcp-resource server=\"" + escapeAttr(server) + "\" uri=\"" + escapeAttr(uri) + "\">\n" + body + "\n</mcp-resource>"
 }
 
+func promptBlock(server, name, body string) string {
+	body = hideClosers(tailRunes(body, mentionRunes))
+	return "<mcp-prompt server=\"" + escapeAttr(server) + "\" name=\"" + escapeAttr(name) + "\">\n" + body + "\n</mcp-prompt>"
+}
+
 func hideClosers(body string) string {
 	body = strings.ReplaceAll(body, "</session>", "</ session>")
-	return strings.ReplaceAll(body, "</mcp-resource>", "</ mcp-resource>")
+	body = strings.ReplaceAll(body, "</mcp-resource>", "</ mcp-resource>")
+	return strings.ReplaceAll(body, "</mcp-prompt>", "</ mcp-prompt>")
 }
 
 func dialogue(msgs []llm.Message) string {

@@ -146,7 +146,7 @@ func (m *Manager) retitle(sessionID, first, text string) {
 		x.Title = titleOf(title)
 		if m.Store.UpdateSession(ctx, x) == nil {
 			x, _ = m.Store.GetSession(ctx, sessionID)
-			m.record(ctx, sessionID, proto.EventSession, toSession(x))
+			m.record(ctx, sessionID, proto.EventSession, m.sessionProto(ctx, x))
 		}
 	}()
 }

@@ -49,6 +49,7 @@ var tools = map[string]struct {
 	"git_diff":    {"plus-minus", func() string { return "git diff" }},
 	"skill":       {"sparkles", locales.ToolSkill},
 	"web_fetch":   {"world", locales.ToolWebFetch},
+	"web_search":  {"world", locales.ToolWebSearch},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},
@@ -122,6 +123,7 @@ func (a *App) bar(c *ui.Context) {
 		a.detailButton(c)
 		a.openButton(c)
 		a.commitButton(c)
+		a.prButton(c)
 		a.reviewToggle(c)
 	})
 }

@@ -94,6 +94,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 			}
 		}
 	}
+	if blocked, reason := r.m.runPreToolHooks(ctx, r.env.Root, r.sessionID, call.Name, call.Args); blocked {
+		return fail("Blocked by PreToolUse hook: %s", reason)
+	}
 	out, err := tool.Run(ctx, r.env, call.Args)
 	if changed != "" {
 		out = fmt.Sprintf("The user changed the command before it ran. It ran:\n%s\n\n%s", changed, out)
@@ -103,6 +106,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	}
 	if err != nil {
 		return fail("%v", err)
+	}
+	if note := r.m.runPostToolHooks(ctx, r.env.Root, r.sessionID, call.Name, call.Args, out); note != "" {
+		out += "\n\n[PostToolUse hook]\n" + note
 	}
 	return llm.ToolResult{Content: out}, nil
 }

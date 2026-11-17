@@ -117,6 +117,7 @@ type conn struct {
 	session   *sdk.ClientSession
 	tools     []*sdk.Tool
 	resources []proto.MCPResource
+	prompts   []proto.MCPPrompt
 	err       error
 }
 
@@ -150,7 +151,7 @@ func (h *Hub) conn(cwd string, e Entry) *conn {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 		defer cancel()
-		c.session, c.tools, c.resources, c.err = dial(ctx, cwd, e)
+		c.session, c.tools, c.resources, c.prompts, c.err = dial(ctx, cwd, e)
 		close(c.ready)
 		if h.Changed != nil {
 			h.Changed()
@@ -171,7 +172,7 @@ func (h *Hub) drop(cwd string, e Entry, c *conn) {
 	}
 }
 
-func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.Tool, []proto.MCPResource, error) {
+func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.Tool, []proto.MCPResource, []proto.MCPPrompt, error) {
 	var t sdk.Transport
 	s := e.Server
 	switch {
@@ -194,18 +195,18 @@ func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.
 		t = &sdk.StreamableClientTransport{Endpoint: os.ExpandEnv(s.URL), DisableStandaloneSSE: true,
 			HTTPClient: &http.Client{Transport: headerTransport(headers)}}
 	default:
-		return nil, nil, nil, errors.New("neither command nor url is set")
+		return nil, nil, nil, nil, errors.New("neither command nor url is set")
 	}
 	client := sdk.NewClient(&sdk.Implementation{Name: "talos", Version: "0.2.0"}, nil)
 	session, err := client.Connect(ctx, t, nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	var list []*sdk.Tool
 	for tool, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			session.Close()
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		list = append(list, tool)
 	}
@@ -220,7 +221,23 @@ func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.
 		}
 		resources = append(resources, proto.MCPResource{URI: r.URI, Name: r.Name, Description: r.Description})
 	}
-	return session, list, resources, nil
+	var prompts []proto.MCPPrompt
+	for p, err := range session.Prompts(ctx, nil) {
+		if err != nil || len(prompts) == 50 {
+			break
+		}
+		if p == nil || p.Name == "" || strings.ContainsAny(p.Name, " \t") {
+			continue
+		}
+		var args []string
+		for _, a := range p.Arguments {
+			if a != nil && a.Name != "" {
+				args = append(args, a.Name)
+			}
+		}
+		prompts = append(prompts, proto.MCPPrompt{Name: p.Name, Description: p.Description, Arguments: args})
+	}
+	return session, list, resources, prompts, nil
 }
 
 func expand(args []string) []string {
@@ -436,6 +453,111 @@ func resourceText(res *sdk.ReadResourceResult) string {
 	}
 	return strings.Join(parts, "\n")
 }
+
+// Prompts are the prompts of servers cwd may use that have already
+// connected. It does not wait for one still connecting.
+func (h *Hub) Prompts(cwd string) []proto.MCPPrompt {
+	es, _ := h.entries(cwd)
+	var out []proto.MCPPrompt
+	for _, e := range es {
+		c := h.conn(cwd, e)
+		select {
+		case <-c.ready:
+		default:
+			continue
+		}
+		if c.err != nil {
+			continue
+		}
+		for _, p := range c.prompts {
+			p.Server = e.Name
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// GetPrompt fetches a prompt from a connected server, mapping positional
+// arguments onto the prompt's declared arguments.
+func (h *Hub) GetPrompt(ctx context.Context, cwd, server, name string, args []string) (string, error) {
+	es, err := h.entries(cwd)
+	if err != nil && len(es) == 0 {
+		return "", err
+	}
+	for _, e := range es {
+		if e.Name != server {
+			continue
+		}
+		c := h.conn(cwd, e)
+		select {
+		case <-c.ready:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+		if c.err != nil {
+			return "", c.err
+		}
+		argMap := map[string]string{}
+		for _, p := range c.prompts {
+			if p.Name != name || len(p.Arguments) == 0 {
+				continue
+			}
+			for i, argName := range p.Arguments {
+				if i >= len(args) {
+					break
+				}
+				if i == len(p.Arguments)-1 && len(args) > len(p.Arguments) {
+					argMap[argName] = strings.Join(args[i:], " ")
+				} else {
+					argMap[argName] = args[i]
+				}
+			}
+			break
+		}
+		res, err := c.session.GetPrompt(ctx, &sdk.GetPromptParams{Name: name, Arguments: argMap})
+		if err != nil {
+			return "", err
+		}
+		return promptText(res), nil
+	}
+	return "", fmt.Errorf("no MCP server %q", server)
+}
+
+func promptText(res *sdk.GetPromptResult) string {
+	if res == nil {
+		return ""
+	}
+	var parts []string
+	for _, msg := range res.Messages {
+		if msg == nil || msg.Content == nil {
+			continue
+		}
+		switch ct := msg.Content.(type) {
+		case *sdk.TextContent:
+			if ct.Text != "" {
+				parts = append(parts, ct.Text)
+			}
+		case *sdk.EmbeddedResource:
+			if ct.Resource != nil {
+				switch {
+				case ct.Resource.Text != "":
+					parts = append(parts, ct.Resource.Text)
+				case len(ct.Resource.Blob) > 0:
+					parts = append(parts, "[binary "+ct.Resource.MIMEType+"]")
+				}
+			}
+		default:
+			b, _ := json.Marshal(ct)
+			if len(b) > 0 {
+				parts = append(parts, string(b))
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// Reset drops every cached connection so the next status or turn reconnects.
+func (h *Hub) Reset() { h.Close() }
 
 // Close stops every server.
 func (h *Hub) Close() {

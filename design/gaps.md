@@ -1,51 +1,51 @@
 # 和主流 agent 的差距
 
-2026-11-16。对照 Claude Code、Codex、versta。依据：Talos 仓库代码（内核工具、协议方法、界面文件），不是逐项真机测试。
+2026-11-18。对照 Claude Code、Codex、versta。依据：Talos 仓库代码（内核工具、协议方法、界面文件），不是逐项真机测试。
 
 ## 已有
 
 - 模型：OpenAI、Anthropic、Gemini 三家；订阅登录；多账号，额度用完切账号。
-- 工具：读、写、改文件，列目录，搜索，shell（沙箱），git status/diff，计划，提问，子任务（task、run_tasks），review，skill。
-- 内核：AGENTS.md、技能目录（skills 包）、MCP（含信任）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
-- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、行内评论）、⌘K、会话内查找、@ 文件、附件和图片、设置、通知、菜单栏。
+- 工具：读、写、改文件，列目录，搜索，shell（沙箱），git status/diff，计划，提问，子任务（task、run_tasks），review，skill，`web_fetch`，`web_search`。
+- 内核：AGENTS.md、技能目录（skills 包，含启用/禁用）、MCP（含信任、添加/编辑/移除、resources、prompts）、Hooks（`PreToolUse` / `PostToolUse` / `Stop`）、worktree 隔离（含 `.worktreeinclude`）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
+- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、行内评论、推送与创建 PR、顶栏 PR/CI 状态）、⌘K、会话内查找、@ 文件/文件夹/会话/MCP 资源、`/` 命令/技能/自定义命令/MCP prompts、用量与费用显示、技能与 MCP 管理界面、设置、通知、菜单栏。
 
 ## 缺的，按影响排
 
 ### 一、输入框（每天都碰）
 
-1. **/ 命令**：最小版已有（app/slash.go）：/new、/changes、/find、/search、/settings、/skills、/model、/effort、/ask、/auto、/full、/stop（运行中）、/undo（撤销最近一轮改动）、/compact（立即压缩上下文，不跑 agent；协议 Prompt.Compact），加当前文件夹的技能（选中后草稿变成「用 X 技能：」，由 agent 调 skill 工具）和自定义命令。还缺：MCP prompts。
-2. **@ 扩展**：已有。空查询先列本会话改过的文件（最近一轮在前，最多 8 条），文件夹以 / 结尾。菜单分组：会话、文件夹、文件、MCP 资源（Claude 桌面版的前三组，Claude Code 的 `@server:uri`）。选会话插入 `@session:<id>`，发送时内核附上标题和对话纯文本（最近 4000 字，更早的截掉）；选资源插入 `@server:uri`，发送时读取并附上。气泡只显示用户写的字，附件留在发给模型的记录里。输入框是纯文本，没有 Claude 桌面版那种芯片。
-3. **编辑并重发 / 回退到某一轮**：已有，照 Claude Code 的 `/rewind`。`/rewind` 或空输入框连按两次 Esc，列出自己发过的消息。选一条后：恢复代码和对话、只恢复对话、只恢复代码。有文件改动才出现两个带代码的选项。恢复对话时，那条消息回到输入框，可以改完再发。消息气泡上悬停也有「回退到这里」。终端命令造成的改动不恢复。还没有 Claude Code 的「从这里摘要」和「摘要到这里」。
+1. **/ 命令**：已有内置命令、自定义命令（`.talos/commands`、`.claude/commands`、`~/.talos/commands`）、当前文件夹技能、`/worktree` 切换以及 MCP prompts（`/server:name` 与 `/mcp__server__name`）。
+2. **@ 扩展**：已有（会话、文件夹、文件、MCP 资源；气泡只显示用户写的字）。输入框仍是纯文本，没有芯片。
+3. **编辑并重发 / 回退到某一轮**：已有，照 Claude Code 的 `/rewind`。支持恢复代码和对话、只恢复对话、只恢复代码、从这里起做摘要（`summarize`）。还没有「摘要到这里」。
 4. **语音输入**：没有。
 
 ### 二、技能和扩展
 
-5. **技能管理界面**：内核能读技能，界面只在「技能与 MCP」里列出。缺：安装（从 git/目录）、启用开关、查看内容、新建。
-6. **自定义命令**：已有。读 `.talos/commands/*.md`、`.claude/commands/*.md`、`~/.talos/commands/*.md`，支持 front matter 的 description 和 `$ARGUMENTS`。
-7. **Hooks**：没有（工具前后、轮次结束时跑用户脚本）。
-8. **MCP 添加**：只能信任已发现的服务器，界面里不能添加、编辑、看日志。
+5. **技能管理界面**：已有（设置 › 技能与 MCP）：安装（本地路径或 Git URL）、新建、启用/禁用开关、展开查看 `SKILL.md` 正文、移除。
+6. **自定义命令**：已有。
+7. **Hooks**：已有内核支持（`.talos/hooks.json`、`.claude/settings.json`、`~/.talos/hooks.json` 的 `PreToolUse`、`PostToolUse`、`Stop`）。缺界面编辑。
+8. **MCP 添加**：已有添加、编辑、移除、项目服务器启用/停用。缺查看服务器运行日志。
 9. **插件**：没有。
 
 ### 三、工具
 
-10. **网页抓取和搜索**：web_fetch 已有（kernel/tools/web.go，新权限类型 net，Full 以外都先问）。web_search 没有（要接搜索服务）。
+10. **网页抓取和搜索**：`web_fetch` 和 `web_search` 均已有（`kernel/tools/web.go`，`perm.Net` 权限，Full 以外都先问；`web_search` 支持 `allowed_domains` / `blocked_domains`）。
 11. **浏览器 / 预览**：没有。
 12. **LSP / 诊断**：没有（改完不知道有没有编译错误，只能靠跑命令）。
 13. **记忆**：没有跨会话的记忆文件。
 
 ### 四、会话和工作流
 
-14. **worktree 隔离**：没有。并行会话改同一个仓库会互相踩。
+14. **worktree 隔离**：已有（新会话在 git 仓库里可切到 Worktree，创建独立分支和目录，拷贝 `.worktreeinclude`，删除会话自动清理）。缺已开始会话的 Hand off（Local 与 Worktree 互搬）。
 15. **分叉会话**：没有。
 16. **后台 / 定时任务**：没有（设计稿有「定时任务」入口）。
-17. **开 PR**：只有 commit，没有推送和建 PR，也没有看 CI。
+17. **开 PR**：已有提交、推送（`workspace.push`）、创建 PR（`workspace.pr`）以及顶栏 PR/CI 状态（`PR #N` 与检查通过/失败/运行中图标）。
 18. **导出 / 分享会话**：没有。
-19. **新会话选分支**：没有。
+19. **新会话选分支**：没有（`worktree` 会固定从 `HEAD` 拉新分支）。
 
 ### 五、可见性
 
-20. **用量和费用**：上下文占比已有（输入框旁）。缺额度和费用。
-21. **模型/推理强度每个角色单独选**：只有一个全局推理强度。
+20. **用量和费用**：已有上下文占比与悬停累计费用、轮次结束费用（基于模型目录单价）。仍缺订阅账号额度和重置时间的数据源。
+21. **模型/推理强度每个角色单独选**：已有各角色单独选模型和推理强度（`ModelRef.Effort` 在内核和 `Sub`/`Light` 已支持，设置页仍共用主强度）。
 
 ### 六、外观（设计稿差异，见 audit.md）
 
@@ -53,11 +53,12 @@
 
 ## 建议顺序
 
-1. / 命令 + 用户调用技能 + 自定义命令（一套机制）。
-2. @ 扩展（文件夹、会话、最近、MCP 资源）已有。
-3. 编辑重发 / 回退到某一轮。已有。没有「从这里摘要」。
-4. web_fetch / web_search。
-5. 用量显示。
-6. worktree 和并行会话。
-7. Hooks、MCP 添加界面、技能安装界面。
-8. 开 PR、看 CI。
+1. ~~`/ 命令 + 用户调用技能 + 自定义命令 + MCP prompts`~~（已有）
+2. ~~`@ 扩展`~~（已有）
+3. ~~`编辑重发 / 回退到某一轮 + 从这里起做摘要`~~（已有）
+4. ~~`web_fetch / web_search`~~（已有）
+5. ~~`用量和费用显示`~~（已有单轮/累计费用；订阅额度缺数据源）
+6. ~~`worktree 隔离`~~（已有）
+7. ~~`Hooks、MCP 添加界面、技能安装界面`~~（已有）
+8. ~~`开 PR、看 CI`~~（已有）
+9. 接下来可做：LSP/诊断、分叉会话、插件/浏览器预览、跨会话记忆、定时任务。

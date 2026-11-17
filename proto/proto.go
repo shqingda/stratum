@@ -107,6 +107,8 @@ type Session struct {
 	Pinned   bool   `json:"pinned,omitempty"`
 	Archived bool   `json:"archived,omitempty"`
 	Mark     string `json:"mark,omitempty"`
+	Worktree bool   `json:"worktree,omitempty"`
+	Repo     string `json:"repo,omitempty"`
 }
 
 // SessionFlag changes how the sidebar shows a session; nil leaves a
@@ -120,12 +122,13 @@ type SessionFlag struct {
 
 // SessionCreate makes a session. Empty fields take defaults.
 type SessionCreate struct {
-	Cwd     string `json:"cwd"`
-	Title   string `json:"title,omitempty"`
-	Account string `json:"account,omitempty"`
-	Model   string `json:"model,omitempty"`
-	Effort  string `json:"effort,omitempty"`
-	Mode    string `json:"mode,omitempty"`
+	Cwd      string `json:"cwd"`
+	Title    string `json:"title,omitempty"`
+	Account  string `json:"account,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Effort   string `json:"effort,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	Worktree bool   `json:"worktree,omitempty"`
 }
 
 // SessionRef names a session.
@@ -141,6 +144,7 @@ type SessionUpdate struct {
 	Model     *string `json:"model,omitempty"`
 	Effort    *string `json:"effort,omitempty"`
 	Mode      *string `json:"mode,omitempty"`
+	Worktree  *bool   `json:"worktree,omitempty"`
 }
 
 // Snapshot is a session's state at a revision.
@@ -194,15 +198,16 @@ const MethodDraftSet = "draft.set"
 // MethodRewind returns a session to a prompt the user sent.
 // Rewind → RewindResult. Action "both" restores files and drops the
 // conversation from that prompt on, "conversation" drops only the
-// conversation, and "code" restores only files. A shell command's
-// effects are not files, so they stay.
+// conversation, "code" restores only files, and "summarize" summarizes
+// the conversation from that prompt on while keeping earlier turns. A
+// shell command's effects are not files, so they stay.
 const MethodRewind = "session.rewind"
 
 // Rewind names the turn.start of the prompt to return to.
 type Rewind struct {
 	SessionID string `json:"sessionId"`
 	TurnSeq   int64  `json:"turnSeq"`
-	Action    string `json:"action"` // both, conversation, code
+	Action    string `json:"action"` // both, conversation, code, summarize
 }
 
 // RewindResult is what a rewind did. Prompt is set when the conversation
@@ -405,8 +410,10 @@ type Model struct {
 	Reasoning bool    `json:"reasoning"`
 	Images    bool    `json:"images,omitempty"` // takes images
 	Default   bool    `json:"default,omitempty"`
-	Input     float64 `json:"input"`  // dollars per million tokens
-	Output    float64 `json:"output"` // dollars per million tokens
+	Input      float64 `json:"input"`                // dollars per million tokens
+	Output     float64 `json:"output"`               // dollars per million tokens
+	CacheRead  float64 `json:"cacheRead,omitempty"`  // dollars per million tokens
+	CacheWrite float64 `json:"cacheWrite,omitempty"` // dollars per million tokens
 }
 
 // ReceiptRef names a command.
@@ -485,14 +492,31 @@ type SearchHit struct {
 }
 
 // MethodWorkspace reads what a session's folder is in git; MethodCommit
-// commits everything in it.
+// commits everything in it; MethodPush pushes HEAD to origin;
+// MethodCreatePR pushes and creates a GitHub pull request.
 const (
 	MethodWorkspace = "workspace.info"   // WorkspaceQuery → Workspace
 	MethodCommit    = "workspace.commit" // Commit → Workspace
+	MethodPush      = "workspace.push"   // WorkspaceQuery → Workspace
+	MethodCreatePR  = "workspace.pr"     // CreatePR → Workspace
 	// MethodWorkspaceDiff reads a file as HEAD has it and as it is now:
 	// WorkspaceQuery with Path → ChangeDiff.
 	MethodWorkspaceDiff = "workspace.diff"
 )
+
+type CreatePR struct {
+	Cwd   string `json:"cwd"`
+	Title string `json:"title"`
+	Body  string `json:"body,omitempty"`
+}
+
+type PullRequest struct {
+	Number int    `json:"number"`
+	Title  string `json:"title,omitempty"`
+	URL    string `json:"url"`
+	State  string `json:"state,omitempty"`  // open, merged, closed
+	Checks string `json:"checks,omitempty"` // pass, fail, pending
+}
 
 type WorkspaceQuery struct {
 	Cwd  string `json:"cwd"`
@@ -516,6 +540,8 @@ type Workspace struct {
 	// are the files changed since, committed or not.
 	Base      string       `json:"base,omitempty"`
 	BaseFiles []ChangeFile `json:"baseFiles,omitempty"`
+	Ahead     int          `json:"ahead,omitempty"`
+	PR        *PullRequest `json:"pr,omitempty"`
 }
 
 type Commit struct {
@@ -638,7 +664,8 @@ const EventCompaction = "compaction"
 
 type Compaction struct {
 	Summary string `json:"summary"`
-	Asked   bool   `json:"asked,omitempty"` // the user asked for it, the context was not full
+	Asked   bool   `json:"asked,omitempty"`   // the user asked for it, the context was not full
+	Partial bool   `json:"partial,omitempty"` // summarizes only from a rewind point on; earlier turns stay
 }
 
 // EventTaskStep is a sub-agent starting a tool call, streamed for the
@@ -664,10 +691,51 @@ type TaskState struct {
 // folder; MethodMCPTrust lets a folder's .mcp.json server run, or stops
 // it. EventMCP, sent to every client, says a server connected or failed.
 const (
-	MethodMCPList  = "mcp.list"  // MCPQuery → MCPList
-	MethodMCPTrust = "mcp.trust" // MCPTrust → MCPList
-	EventMCP       = "mcp.changed"
+	MethodMCPList     = "mcp.list"     // MCPQuery → MCPList
+	MethodMCPTrust    = "mcp.trust"    // MCPTrust → MCPList
+	MethodMCPSave     = "mcp.save"     // MCPSave → MCPList
+	MethodMCPRemove   = "mcp.remove"   // MCPRemove → MCPList
+	MethodSkillSave   = "skill.save"   // SkillSave → MCPList
+	MethodSkillToggle = "skill.toggle" // SkillToggle → MCPList
+	MethodSkillRemove = "skill.remove" // SkillRemove → MCPList
+	EventMCP          = "mcp.changed"
 )
+
+type MCPSave struct {
+	Cwd     string   `json:"cwd"`
+	Name    string   `json:"name"`
+	Project bool     `json:"project,omitempty"`
+	Command string   `json:"command,omitempty"`
+	Args    []string `json:"args,omitempty"`
+	URL     string   `json:"url,omitempty"`
+}
+
+type MCPRemove struct {
+	Cwd     string `json:"cwd"`
+	Name    string `json:"name"`
+	Project bool   `json:"project,omitempty"`
+}
+
+type SkillSave struct {
+	Cwd         string `json:"cwd"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Body        string `json:"body,omitempty"`
+	Project     bool   `json:"project,omitempty"`
+	Source      string `json:"source,omitempty"`
+}
+
+type SkillToggle struct {
+	Cwd     string `json:"cwd"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
+type SkillRemove struct {
+	Cwd     string `json:"cwd"`
+	Name    string `json:"name"`
+	Project bool   `json:"project,omitempty"`
+}
 
 type MCPQuery struct {
 	Cwd string `json:"cwd"`
@@ -687,7 +755,9 @@ type MCPList struct {
 	Commands []CommandInfo `json:"commands,omitempty"`
 	// Resources are what connected servers offer for @server:uri.
 	Resources []MCPResource `json:"resources,omitempty"`
-	Error     string        `json:"error,omitempty"` // a config file that did not read
+	// Prompts are what connected servers offer for /server:name.
+	Prompts []MCPPrompt `json:"prompts,omitempty"`
+	Error   string      `json:"error,omitempty"` // a config file that did not read
 }
 
 // MCPResource is one resource a connected server listed.
@@ -698,6 +768,14 @@ type MCPResource struct {
 	Description string `json:"description,omitempty"`
 }
 
+// MCPPrompt is one prompt a connected server listed, for /server:name.
+type MCPPrompt struct {
+	Server      string   `json:"server"`
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	Arguments   []string `json:"arguments,omitempty"`
+}
+
 // CommandInfo is a saved prompt the / menu offers; $ARGUMENTS in Body is
 // where what the user types after it goes.
 type CommandInfo struct {
@@ -706,10 +784,14 @@ type CommandInfo struct {
 	Body        string `json:"body"`
 }
 
-// SkillInfo names a skill the / menu offers.
+// SkillInfo names a skill the / menu and settings offer.
 type SkillInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	Dir         string `json:"dir,omitempty"`
+	Body        string `json:"body,omitempty"`
+	Project     bool   `json:"project,omitempty"`
+	Disabled    bool   `json:"disabled,omitempty"`
 }
 
 type MCPServer struct {

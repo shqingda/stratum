@@ -644,8 +644,9 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 			}
 		}
 	}
-	dirty := a.C.Workspace.Dirty
-	if turn <= 0 && !dirty {
+	w := a.C.Workspace
+	dirty := w.Dirty
+	if turn <= 0 && !dirty && w.Ahead == 0 {
 		return
 	}
 	reverted := a.C.Changes.Reverted[turn]
@@ -653,9 +654,14 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 		if dirty {
 			a.commitField(c)
 		} else {
-			note := a.turnLabel(turn)
-			if reverted {
-				note = locales.Undone(note)
+			note := ""
+			if turn > 0 {
+				note = a.turnLabel(turn)
+				if reverted {
+					note = locales.Undone(note)
+				}
+			} else if w.Ahead > 0 {
+				note = locales.AheadCommits(w.Ahead)
 			}
 			ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, note).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
@@ -666,7 +672,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 			if reverted {
 				label = locales.RedoTurn()
 			}
-			b := a.button(c, "revert", label, "", !reverted && !dirty)
+			b := a.button(c, "revert", label, "", !reverted && !dirty && w.Ahead == 0)
 			b.Disabled(a.C.Busy)
 			if a.C.Busy {
 				b.Tooltip(locales.CantRestoreWhileRunning())
@@ -677,6 +683,19 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 		}
 		if dirty {
 			a.commitGo(c)
+		} else if w.Ahead > 0 {
+			pushBtn := a.button(c, "push", locales.Push(), "", w.PR != nil || w.Branch == w.Base)
+			pushBtn.Disabled(w.Pushing || a.C.Busy)
+			if pushBtn.Clicked() {
+				a.do(a.C.Push())
+			}
+			if w.PR == nil && w.Branch != "" && w.Branch != w.Base {
+				prBtn := a.button(c, "create-pr", locales.CreatePr(), "", true)
+				prBtn.Disabled(w.Pushing || a.C.Busy)
+				if prBtn.Clicked() {
+					a.do(a.C.CreatePR(a.prTitle(), ""))
+				}
+			}
 		}
 	})
 }

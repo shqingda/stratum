@@ -555,6 +555,9 @@ func (c *Client) sessionUpdated(e proto.Event) {
 	}
 	c.upsertSession(s)
 	if c.Current != nil && c.Current.ID == s.ID {
+		if c.Current.Cwd != s.Cwd {
+			c.Workspace.BranchStale = true
+		}
 		*c.Current = s
 	}
 	if m := c.Marks[s.ID]; m != "run" && m != "wait" {
@@ -715,7 +718,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		if json.Unmarshal(e.Data, &cp) == nil {
 			c.endStream()
 			text := locales.Compacted()
-			if cp.Asked {
+			if cp.Partial {
+				text = locales.CompactedFromHere()
+			} else if cp.Asked {
 				text = locales.CompactedAsked()
 			}
 			c.add(&Entry{Role: Notice, Note: "compact", Text: text, Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
@@ -778,7 +783,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 
 // mentionAttach is the block expandMentions appends for the model.
 // The bubble keeps the user's words; the block stays in the log.
-var mentionAttach = regexp.MustCompile(`(?s)\n\n<(?:session|mcp-resource)\b[^>]*>.*?</(?:session|mcp-resource)>`)
+var mentionAttach = regexp.MustCompile(`(?s)\n\n<(?:session|mcp-resource|mcp-prompt)\b[^>]*>.*?</(?:session|mcp-resource|mcp-prompt)>`)
 
 func visiblePrompt(text string) string {
 	return strings.TrimRight(mentionAttach.ReplaceAllString(text, ""), "\n")
@@ -986,7 +991,9 @@ func (c *Client) Rewind(turn int64, action string) ([]proto.Command, error) {
 		if out.Action == "code" || len(out.Conflicts) > 0 {
 			return nil
 		}
-		c.Draft = out.Prompt
+		if out.Action != "summarize" {
+			c.Draft = out.Prompt
+		}
 		return []proto.Command{c.bind(id)}
 	})
 }

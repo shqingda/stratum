@@ -70,6 +70,17 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			a.openRewind()
 		}})
 	}
+	if !a.C.Busy && len(a.C.Entries) == 0 && (a.C.Workspace.Branch != "" || a.C.Current.Worktree) {
+		wt := !a.C.Current.Worktree
+		note := locales.WorktreeSub()
+		if !wt {
+			note = locales.LocalSub()
+		}
+		all = append(all, slashItem{"worktree", "git-branch", note, func(*ui.Context) {
+			clear()
+			a.do(a.C.Update(proto.SessionUpdate{Worktree: &wt}))
+		}})
+	}
 	if !a.C.Busy && len(a.C.Entries) > 0 {
 		all = append(all, slashItem{"compact", "fold", locales.CompactNow(), func(*ui.Context) { clear(); a.do(a.C.Compact()) }})
 	}
@@ -85,6 +96,9 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 	}
 	if l := a.C.MCP; l != nil && a.C.MCPFor == a.C.Current.Cwd {
 		for _, sk := range l.Skills {
+			if sk.Disabled {
+				continue
+			}
 			name := sk.Name
 			all = append(all, slashItem{name, "sparkles", sk.Description, func(*ui.Context) {
 				// The agent takes it from here, with its skill tool.
@@ -95,6 +109,20 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			name := cmd.Name
 			all = append(all, slashItem{name, "file-text", cmd.Description, func(*ui.Context) {
 				// What follows the name goes where $ARGUMENTS is, on send.
+				a.draft, a.toEnd = "/"+name+" ", true
+			}})
+		}
+		for _, pr := range l.Prompts {
+			name := pr.Server + ":" + pr.Name
+			desc := pr.Description
+			if desc == "" && len(pr.Arguments) > 0 {
+				var args []string
+				for _, arg := range pr.Arguments {
+					args = append(args, "<"+arg+">")
+				}
+				desc = strings.Join(args, " ")
+			}
+			all = append(all, slashItem{name, "plug", desc, func(*ui.Context) {
 				a.draft, a.toEnd = "/"+name+" ", true
 			}})
 		}

@@ -22,6 +22,7 @@
   "rewindCodeAndChat": "恢复代码和对话",
   "rewindChat": "只恢复对话",
   "rewindCode": "只恢复代码",
+  "rewindSummarize": "从这里起做摘要",
   "rewindTo": "回退到这里",
   "rewindShell": "终端命令造成的改动回不去",
   "rewindEmpty": "还没有可以回退的消息",
@@ -95,6 +96,9 @@
   "composerAnswerPlaceholder": "回答上面的问题，回车发送",
   "noImageSupport": "当前模型看不了图片，换一个再发",
   "local": "本机",
+  "localSub": "直接在当前文件夹中运行",
+  "worktree": "Worktree",
+  "worktreeSub": "在独立分支和目录中运行，互不干扰",
   "sandboxOn": "沙箱开启",
   "modeAsk": "询问",
   "modeAuto": "自动",
@@ -328,6 +332,20 @@
       }
     }
   },
+  "addMcpServer": "添加服务器",
+  "edit": "编辑",
+  "remove": "移除",
+  "serverName": "名称",
+  "commandOrUrl": "命令或 URL",
+  "skills": "技能",
+  "installSkill": "安装…",
+  "newSkill": "新建技能",
+  "skillSource": "本地路径或 Git 仓库地址",
+  "skillName": "技能名",
+  "skillDesc": "简述",
+  "skillBody": "说明内容",
+  "skillsEmpty": "还没有技能。点「新建技能」或「安装…」添加。",
+  "install": "安装",
   "switchPermissionMode": "切换权限模式",
   "stopRunning": "停止运行",
   "hideChanges": "隐藏变更",
@@ -335,6 +353,7 @@
   "showSidebar": "显示边栏",
   "menuSession": "会话",
   "toolWebFetch": "读取网页",
+  "toolWebSearch": "搜索网页",
   "kindNet": "访问网络",
   "compactNow": "压缩上下文：把之前的对话总结成摘要",
   "useSkill": "用 {name} 技能：",
@@ -588,6 +607,29 @@
   "commit": "提交",
   "commitMessage": "提交说明",
   "commitChanges": "提交改动",
+  "push": "推送",
+  "pushFailed": "推送失败：{error}",
+  "createPr": "创建 PR",
+  "prFailed": "创建 PR 失败：{error}",
+  "aheadCommits": "{count} 个本地提交待推送",
+  "@aheadCommits": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "prNumber": "PR #{number}",
+  "@prNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "checksPass": "检查通过",
+  "checksFail": "检查失败",
+  "checksPending": "检查运行中",
   "filesChangedSince": "{count} 个文件在这之后又被改过，没有动它们：{files}",
   "@filesChangedSince": {
     "placeholders": {
@@ -615,6 +657,7 @@
   "readSessionEmpty": "读取会话未返回会话信息",
   "readEventsFailed": "读取事件失败：{error}",
   "compactedAsked": "较早的对话已写成摘要",
+  "compactedFromHere": "从这里起的对话已写成摘要",
   "compacted": "上下文快满了，较早的对话已写成摘要",
   "fellBack": "{from} 额度用尽或被限流，换到 {to} 继续",
   "retrying": "正在重试（第 {attempt} 次）：{error}",

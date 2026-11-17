@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
@@ -178,7 +179,54 @@ func (a *App) summary(c *ui.Context, t int) {
 		if u.CacheRead > 0 {
 			item("", locales.TokensCached(tokens(u.CacheRead)))
 		}
+		if cost := a.turnCost(u); cost != "" {
+			item("", cost)
+		}
 	})
+}
+
+func (a *App) modelInfo() (proto.Model, bool) {
+	cur := a.C.Current
+	if cur == nil || cur.Model == "" {
+		return proto.Model{}, false
+	}
+	for _, m := range a.C.Models {
+		if m.ID == cur.Model {
+			return m, true
+		}
+	}
+	provider, _, _ := strings.Cut(cur.Account, "/")
+	if m, ok := llm.FindModel(provider, cur.Model); ok {
+		return proto.Model{
+			ID: m.ID, Name: m.Name, Context: m.Context, Reasoning: m.Reasoning, Images: m.Images,
+			Input: m.Price.Input, Output: m.Price.Output, CacheRead: m.Price.CacheRead, CacheWrite: m.Price.CacheWrite,
+		}, true
+	}
+	return proto.Model{}, false
+}
+
+func (a *App) turnCost(u llm.Usage) string {
+	m, ok := a.modelInfo()
+	if !ok {
+		return ""
+	}
+	return formatCost(costOf(m, u))
+}
+
+func costOf(m proto.Model, u llm.Usage) float64 {
+	fresh := max(0, u.Input-u.CacheRead-u.CacheWrite)
+	return (float64(fresh)*m.Input + float64(u.Output)*m.Output +
+		float64(u.CacheRead)*m.CacheRead + float64(u.CacheWrite)*m.CacheWrite) / 1e6
+}
+
+func formatCost(d float64) string {
+	if d <= 0 {
+		return ""
+	}
+	if d < 0.01 {
+		return "<$0.01"
+	}
+	return fmt.Sprintf("$%.2f", d)
 }
 
 // editLine is an edit as one line, "编辑 add.go +1 −1", and reports
@@ -271,19 +319,14 @@ var rings = map[[2]int]*ui.SVG{}
 // as of the latest request this window saw.
 func (a *App) contextRing(c *ui.Context) {
 	p := a.p
-	cur := a.C.Current
-	if cur == nil || a.C.LastInput == 0 {
+	if a.C.Current == nil || a.C.LastInput == 0 {
 		return
 	}
-	window := 0
-	for _, m := range a.C.Models {
-		if m.ID == cur.Model {
-			window = m.Context
-		}
-	}
-	if window == 0 {
+	m, ok := a.modelInfo()
+	if !ok || m.Context == 0 {
 		return
 	}
+	window := m.Context
 	pct := min(100, (a.C.LastInput*100+window/2)/window)
 	isDark := 0
 	if p == dark {
@@ -308,7 +351,11 @@ func (a *App) contextRing(c *ui.Context) {
 		svg = ui.MustParseSVG([]byte(doc))
 		rings[key] = svg
 	}
-	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(locales.ContextUsed(tokens(a.C.LastInput), tokens(window))).Children(func() {
+	tip := locales.ContextUsed(tokens(a.C.LastInput), tokens(window))
+	if total := a.turnCost(a.C.Usage); total != "" {
+		tip += " · " + total
+	}
+	ui.Row(c).Height(28).Gap(5).Padding(0, 6).AlignItems(ui.Center).Tooltip(tip).Children(func() {
 		ui.Image(c, svg).Size(14, 14)
 		ui.Text(c, fmt.Sprintf("%d%%", pct)).FontSize(12.5).TextColor(p.Mute).SingleLine()
 	})

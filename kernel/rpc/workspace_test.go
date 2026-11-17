@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/shqingda/talos/kernel/session"
@@ -120,5 +121,64 @@ func TestBranchBase(t *testing.T) {
 	d, err := workspaceDiff(ctx, proto.WorkspaceQuery{Cwd: dir, Path: a, Base: true})
 	if err != nil || d.Before == nil || *d.Before != "1\n" || *d.After != "1\n2\n" {
 		t.Fatalf("diff %+v %v", d, err)
+	}
+}
+
+func TestPushCreatePRAndChecks(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	ctx := context.Background()
+	origin := t.TempDir()
+	if out, err := exec.Command("git", "init", "--bare", "-q", origin).CombinedOutput(); err != nil {
+		t.Fatalf("bare init: %s %v", out, err)
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s %v", args, out, err)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("1\n"), 0o644)
+	run("add", "a.txt")
+	run("commit", "-q", "-m", "init")
+	run("remote", "add", "origin", origin)
+	run("push", "-q", "-u", "origin", "main")
+	run("checkout", "-q", "-b", "feat")
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("2\n"), 0o644)
+	run("commit", "-q", "-am", "feat commit")
+
+	var prCreated bool
+	var ghCalls []string
+	oldGH := ghRun
+	ghRun = func(_ context.Context, cwd string, args ...string) ([]byte, error) {
+		ghCalls = append(ghCalls, strings.Join(args, " "))
+		if len(args) >= 2 && args[0] == "pr" && args[1] == "create" {
+			prCreated = true
+			return []byte("https://github.com/example/repo/pull/42\n"), nil
+		}
+		if len(args) >= 2 && args[0] == "pr" && args[1] == "view" && prCreated {
+			return []byte(`{"number":42,"title":"Add feature","url":"https://github.com/example/repo/pull/42","state":"OPEN","statusCheckRollup":[{"conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"FAILURE"}]}`), nil
+		}
+		return nil, errors.New("no pr")
+	}
+	defer func() { ghRun = oldGH }()
+
+	w, err := workspace(ctx, dir)
+	if err != nil || w.Ahead != 1 || w.PR != nil {
+		t.Fatalf("before push: %+v %v", w, err)
+	}
+	w, err = push(ctx, proto.WorkspaceQuery{Cwd: dir})
+	if err != nil || w.Ahead != 0 {
+		t.Fatalf("after push: %+v %v", w, err)
+	}
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("3\n"), 0o644)
+	run("commit", "-q", "-am", "second commit")
+	w, err = createPR(ctx, proto.CreatePR{Cwd: dir, Title: "Add feature"})
+	if err != nil || !prCreated || w.Ahead != 0 || w.PR == nil || w.PR.Number != 42 || w.PR.Checks != "fail" {
+		t.Fatalf("after createPR: %+v %v calls=%v", w, err, ghCalls)
 	}
 }

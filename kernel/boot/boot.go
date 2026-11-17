@@ -65,6 +65,7 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 
 	m := session.New(st, open)
 	m.UseMCP(filepath.Join(auth.Dir, "mcp.json"))
+	m.WorktreeDir = filepath.Join(auth.Dir, "worktrees")
 	m.Accounts = accounts
 	m.Defaults = func() (string, string) {
 		names := accounts()
@@ -137,7 +138,8 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 			var out []proto.Model
 			for _, x := range llm.Models(provider) {
 				out = append(out, proto.Model{ID: x.ID, Name: x.Name, Context: x.Context, Reasoning: x.Reasoning, Images: x.Images,
-					Default: x.ID == llm.DefaultModel(provider), Input: x.Price.Input, Output: x.Price.Output})
+					Default: x.ID == llm.DefaultModel(provider), Input: x.Price.Input, Output: x.Price.Output,
+					CacheRead: x.Price.CacheRead, CacheWrite: x.Price.CacheWrite})
 			}
 			return out, nil
 		},

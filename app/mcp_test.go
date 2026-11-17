@@ -53,3 +53,40 @@ func TestMCPApproval(t *testing.T) {
 	}
 	snapshot(t, tt, "mcp-approval")
 }
+
+func TestMCPAndSkillsManageUI(t *testing.T) {
+	a := working()
+	a.out = make(chan []proto.Command, 16)
+	a.settingsOpen, a.settingsPage = true, "mcp"
+	a.C.MCPFor = "/Users/me/Projects/calc"
+	a.C.MCP = &proto.MCPList{
+		Skills: []proto.SkillInfo{{Name: "lint", Description: "Run lint", Body: "Use golangci-lint", Project: true}},
+	}
+	tt := ui.NewTester(a.View, 1200, 780)
+	tt.Frame()
+	if !tt.HasText("lint") || !tt.HasText("Run lint") {
+		t.Fatalf("skill not shown: %q", tt.Texts())
+	}
+	if err := tt.Click("lint"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !tt.HasText("Use golangci-lint") {
+		t.Fatalf("skill body not expanded: %q", tt.Texts())
+	}
+	if err := tt.Click("添加服务器"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	a.mcpUI.mcpName = "docs"
+	a.mcpUI.mcpTarget = "https://docs.example.com/mcp"
+	tt.Frame()
+	if err := tt.Click("保存"); err != nil {
+		t.Fatal(err)
+	}
+	cmd := sent(a, proto.MethodMCPSave)
+	var save proto.MCPSave
+	if cmd == nil || json.Unmarshal(cmd.Params, &save) != nil || save.Name != "docs" || save.URL != "https://docs.example.com/mcp" {
+		t.Fatalf("save mcp = %+v", save)
+	}
+}

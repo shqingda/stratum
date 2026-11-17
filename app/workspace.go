@@ -29,6 +29,13 @@ func openIn(app, dir string) error {
 	return nil
 }
 
+func openBrowser(u string) error {
+	if strings.TrimSpace(u) == "" {
+		return nil
+	}
+	return exec.Command("open", u).Start()
+}
+
 // barButton is a button of the top bar, as the mockup draws them.
 func (a *App) barButton(c *ui.Context, key, symbol, label string, children func()) ui.Element {
 	p := a.p
@@ -105,5 +112,60 @@ func (a *App) commitGo(c *ui.Context) {
 			a.commitMsg = ""
 		}
 		a.do(cmds, err)
+	}
+}
+
+func (a *App) prTitle() string {
+	if a.C.Current != nil {
+		if t := strings.TrimSpace(a.C.Current.Title); t != "" {
+			return t
+		}
+	}
+	return a.C.Workspace.Branch
+}
+
+// prButton shows the branch's PR and CI status in the top bar, or offers to
+// create a PR once changes are committed on a feature branch.
+func (a *App) prButton(c *ui.Context) {
+	w := a.C.Workspace
+	p := a.p
+	if w.PR != nil {
+		icon := "brand-github"
+		tip := w.PR.Title
+		checkNote := ""
+		switch w.PR.Checks {
+		case "pass":
+			icon, checkNote = "check", locales.ChecksPass()
+		case "fail":
+			icon, checkNote = "alert-circle", locales.ChecksFail()
+		case "pending":
+			icon, checkNote = "clock", locales.ChecksPending()
+		}
+		if checkNote != "" {
+			if tip != "" {
+				tip += " · " + checkNote
+			} else {
+				tip = checkNote
+			}
+		}
+		b := a.barButton(c, "pr-view", icon, locales.PrNumber(w.PR.Number), func() {})
+		if tip != "" {
+			b.Tooltip(tip)
+		}
+		if b.Clicked() && a.openURL != nil {
+			if err := a.openURL(w.PR.URL); err != nil {
+				a.err = err.Error()
+			}
+		}
+		return
+	}
+	if w.Dirty || w.Ahead == 0 || w.Branch == "" || w.Branch == w.Base {
+		return
+	}
+	_ = p
+	b := a.barButton(c, "pr-create", "git-compare", locales.CreatePr(), func() {})
+	b.Disabled(w.Pushing || a.C.Busy)
+	if b.Clicked() {
+		a.do(a.C.CreatePR(a.prTitle(), ""))
 	}
 }

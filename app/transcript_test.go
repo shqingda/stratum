@@ -2,10 +2,12 @@ package app
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/llm"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -160,5 +162,30 @@ func TestApprovalDiff(t *testing.T) {
 	}
 	if tt.HasText(cwd + "/add.go") {
 		t.Error("the card shows the absolute path")
+	}
+}
+
+func TestTurnCost(t *testing.T) {
+	m := proto.Model{ID: "claude-sonnet-5-5", Context: 1000000, Input: 2, Output: 10, CacheRead: 0.1, CacheWrite: 2.5}
+	u := llm.Usage{Input: 10000, Output: 2000, CacheRead: 4000, CacheWrite: 1000}
+	// fresh = 5000 -> 0.01 + 0.02 + 0.0004 + 0.0025 = 0.0329
+	got := costOf(m, u)
+	if math.Abs(got-0.0329) > 1e-6 {
+		t.Fatalf("costOf = %v", got)
+	}
+	if formatCost(0) != "" || formatCost(0.005) != "<$0.01" || formatCost(got) != "$0.03" {
+		t.Fatalf("formatCost mismatch: %q %q %q", formatCost(0), formatCost(0.005), formatCost(got))
+	}
+
+	a := finishedApp()
+	a.C.Current.Account = "anthropic"
+	a.C.Current.Model = "claude-sonnet-5-5"
+	a.C.Models = []proto.Model{m}
+	a.C.Turns[0].Usage = u
+	a.C.Usage = u
+	a.C.LastInput = 10000
+	tt := task8Tester(a, false)
+	if !tt.HasText("$0.03") {
+		t.Fatalf("missing turn cost in %q", tt.Texts())
 	}
 }

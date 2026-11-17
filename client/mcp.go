@@ -42,3 +42,57 @@ func (c *Client) TrustMCP(name string, trust bool) ([]proto.Command, error) {
 		return nil
 	})}, nil
 }
+
+func (c *Client) mcpMutate(method string, payload any, cwd string) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	return []proto.Command{c.mutate(method, payload, func(r json.RawMessage) []proto.Command {
+		c.keepMCP(cwd, r)
+		return nil
+	})}, nil
+}
+
+// SaveMCP adds or updates an MCP server.
+func (c *Client) SaveMCP(s proto.MCPSave) ([]proto.Command, error) {
+	if s.Cwd == "" {
+		s.Cwd = c.mcpCwd()
+	}
+	return c.mcpMutate(proto.MethodMCPSave, s, s.Cwd)
+}
+
+// RemoveMCP removes an MCP server.
+func (c *Client) RemoveMCP(name string, project bool) ([]proto.Command, error) {
+	cwd := c.mcpCwd()
+	return c.mcpMutate(proto.MethodMCPRemove, proto.MCPRemove{Cwd: cwd, Name: name, Project: project}, cwd)
+}
+
+// SaveSkill creates a skill or installs skills from Source.
+func (c *Client) SaveSkill(s proto.SkillSave) ([]proto.Command, error) {
+	if s.Cwd == "" {
+		s.Cwd = c.mcpCwd()
+	}
+	return c.mcpMutate(proto.MethodSkillSave, s, s.Cwd)
+}
+
+// ToggleSkill enables or disables a skill by name.
+func (c *Client) ToggleSkill(name string, enabled bool) ([]proto.Command, error) {
+	cwd := c.mcpCwd()
+	return c.mcpMutate(proto.MethodSkillToggle, proto.SkillToggle{Cwd: cwd, Name: name, Enabled: enabled}, cwd)
+}
+
+// RemoveSkill removes an installed skill directory.
+func (c *Client) RemoveSkill(name string, project bool) ([]proto.Command, error) {
+	cwd := c.mcpCwd()
+	return c.mcpMutate(proto.MethodSkillRemove, proto.SkillRemove{Cwd: cwd, Name: name, Project: project}, cwd)
+}
+
+func (c *Client) mcpCwd() string {
+	if c.MCPFor != "" {
+		return c.MCPFor
+	}
+	if c.Current != nil {
+		return c.Current.Cwd
+	}
+	return c.Cwd
+}

@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -89,5 +90,56 @@ func TestRewindCodeAndBoth(t *testing.T) {
 		if e.Seq >= q.TurnSeq && e.Type != proto.EventChangesReverted {
 			t.Fatalf("kept %s at %d", e.Type, e.Seq)
 		}
+	}
+}
+
+func TestRewindSummarize(t *testing.T) {
+	script := &llm.Script{Turns: []llm.Turn{
+		{Text: "one"},
+		{Text: "two"},
+		{Text: "SUMMARY: from turn 2"},
+	}}
+	m, s := changesManager(t, script)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ended := make(chan struct{}, 4)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd && e.SessionID == s.ID {
+			ended <- struct{}{}
+		}
+	})()
+	for _, text := range []string{"first", "second"} {
+		if _, err := m.Prompt(ctx, proto.Prompt{SessionID: s.ID, Text: text}, ""); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-ended:
+		case <-ctx.Done():
+			t.Fatal("the turn did not end")
+		}
+	}
+	evs, err := m.Store.Events(ctx, s.ID, 0, 0, proto.EventTurnStart)
+	if err != nil || len(evs) != 2 {
+		t.Fatalf("%d events, %v", len(evs), err)
+	}
+	out, err := m.Rewind(ctx, proto.Rewind{SessionID: s.ID, TurnSeq: evs[1].Seq, Action: "summarize"})
+	if err != nil || out.Prompt != "" || out.Action != "summarize" {
+		t.Fatalf("%+v %v", out, err)
+	}
+	// Request 2 should only have been sent turn 2's messages plus compactPrompt.
+	if len(script.Requests) != 3 {
+		t.Fatalf("%d requests", len(script.Requests))
+	}
+	sumReq := script.Requests[2].Messages
+	if len(sumReq) != 3 || sumReq[0].PlainText() != "second" || sumReq[1].PlainText() != "two" {
+		t.Fatalf("summarize sent %+v", sumReq)
+	}
+	h, err := m.history(ctx, s.ID)
+	if err != nil || len(h) != 4 || h[0].PlainText() != "first" || h[1].PlainText() != "one" || !strings.Contains(h[2].PlainText(), "SUMMARY: from turn 2") {
+		t.Fatalf("history %+v %v", h, err)
+	}
+	snap, err := m.Get(ctx, s.ID)
+	if err != nil || snap.Draft != "" {
+		t.Fatalf("draft %q %v", snap.Draft, err)
 	}
 }

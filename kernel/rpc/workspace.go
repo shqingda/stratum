@@ -3,6 +3,8 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,17 @@ import (
 
 	"github.com/shqingda/talos/proto"
 )
+
+var ghRun = defaultGH
+
+func defaultGH(ctx context.Context, cwd string, args ...string) ([]byte, error) {
+	if os.Getenv("TALOS_DEMO") != "" {
+		return nil, errors.New("gh is disabled in demo mode")
+	}
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	cmd.Dir = cwd
+	return cmd.CombinedOutput()
+}
 
 func git(ctx context.Context, cwd string, args ...string) (string, error) {
 	out, err := exec.CommandContext(ctx, "git", append([]string{"-C", cwd, "--no-optional-locks"}, args...)...).CombinedOutput()
@@ -77,7 +90,87 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 		}
 		sort.Slice(w.BaseFiles, func(i, j int) bool { return w.BaseFiles[i].Path < w.BaseFiles[j].Path })
 	}
+	w.Ahead = aheadCount(ctx, cwd, w.Branch, w.Base)
+	w.PR = readPR(ctx, cwd, w.Branch, w.Base)
 	return w, nil
+}
+
+func aheadCount(ctx context.Context, cwd, branch, base string) int {
+	if cnt, err := git(ctx, cwd, "rev-list", "--count", "@{u}..HEAD"); err == nil {
+		if n, err := strconv.Atoi(cnt); err == nil {
+			return n
+		}
+	}
+	if commit, name := branchBase(ctx, cwd); commit != "" && branch != "" && branch != name && branch != base {
+		if cnt, err := git(ctx, cwd, "rev-list", "--count", commit+"..HEAD"); err == nil {
+			if n, err := strconv.Atoi(cnt); err == nil {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
+func readPR(ctx context.Context, cwd, branch, base string) *proto.PullRequest {
+	if ghRun == nil || branch == "" || branch == base {
+		return nil
+	}
+	remote, err := git(ctx, cwd, "remote", "get-url", "origin")
+	if err != nil || remote == "" {
+		return nil
+	}
+	ghCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	out, err := ghRun(ghCtx, cwd, "pr", "view", "--json", "number,title,url,state,statusCheckRollup")
+	if err != nil {
+		return nil
+	}
+	var raw struct {
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		URL    string `json:"url"`
+		State  string `json:"state"`
+		Checks []struct {
+			State      string `json:"state"`
+			Status     string `json:"status"`
+			Conclusion string `json:"conclusion"`
+		} `json:"statusCheckRollup"`
+	}
+	if json.Unmarshal(out, &raw) != nil || raw.Number == 0 || raw.URL == "" {
+		return nil
+	}
+	var hasFail, hasPending, hasPass bool
+	for _, ch := range raw.Checks {
+		c := strings.ToUpper(ch.Conclusion)
+		st := strings.ToUpper(ch.Status)
+		s := strings.ToUpper(ch.State)
+		switch {
+		case c == "FAILURE" || c == "ERROR" || c == "TIMED_OUT" || c == "CANCELLED" || c == "STARTUP_FAILURE" || c == "ACTION_REQUIRED" ||
+			s == "FAILURE" || s == "ERROR":
+			hasFail = true
+		case st == "PENDING" || st == "IN_PROGRESS" || st == "QUEUED" || st == "WAITING" || st == "REQUESTED" ||
+			s == "PENDING" || s == "EXPECTED":
+			hasPending = true
+		case c == "SUCCESS" || c == "NEUTRAL" || c == "SKIPPED" || s == "SUCCESS":
+			hasPass = true
+		}
+	}
+	checks := ""
+	switch {
+	case hasFail:
+		checks = "fail"
+	case hasPending:
+		checks = "pending"
+	case hasPass:
+		checks = "pass"
+	}
+	return &proto.PullRequest{
+		Number: raw.Number,
+		Title:  raw.Title,
+		URL:    raw.URL,
+		State:  strings.ToLower(raw.State),
+		Checks: checks,
+	}
 }
 
 // numstat counts the lines each tracked file gained and lost since a
@@ -192,6 +285,39 @@ func commit(ctx context.Context, p proto.Commit) (proto.Workspace, error) {
 	}
 	if out, err := git(run, p.Cwd, "commit", "-q", "-m", p.Message); err != nil {
 		return proto.Workspace{}, proto.Errorf("internal", "git commit: %s", out)
+	}
+	return workspace(ctx, p.Cwd)
+}
+
+func push(ctx context.Context, q proto.WorkspaceQuery) (proto.Workspace, error) {
+	if !filepath.IsAbs(q.Cwd) {
+		return proto.Workspace{}, proto.Errorf("bad_request", "cwd must be absolute")
+	}
+	run, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	if out, err := git(run, q.Cwd, "push", "-u", "origin", "HEAD"); err != nil {
+		return proto.Workspace{}, proto.Errorf("internal", "git push: %s", out)
+	}
+	return workspace(ctx, q.Cwd)
+}
+
+func createPR(ctx context.Context, p proto.CreatePR) (proto.Workspace, error) {
+	if !filepath.IsAbs(p.Cwd) {
+		return proto.Workspace{}, proto.Errorf("bad_request", "cwd must be absolute")
+	}
+	if strings.TrimSpace(p.Title) == "" {
+		return proto.Workspace{}, proto.Errorf("bad_request", "PR title is required")
+	}
+	run, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	if out, err := git(run, p.Cwd, "push", "-u", "origin", "HEAD"); err != nil {
+		return proto.Workspace{}, proto.Errorf("internal", "git push: %s", out)
+	}
+	if ghRun == nil {
+		return proto.Workspace{}, proto.Errorf("internal", "gh is not available")
+	}
+	if out, err := ghRun(run, p.Cwd, "pr", "create", "--title", p.Title, "--body", p.Body); err != nil {
+		return proto.Workspace{}, proto.Errorf("internal", "gh pr create: %s", strings.TrimSpace(string(out)))
 	}
 	return workspace(ctx, p.Cwd)
 }

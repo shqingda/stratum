@@ -179,10 +179,10 @@ func (s *Store) CreateSession(ctx context.Context, x Session) error {
 	return err
 }
 
-// UpdateSession saves a session's settings and title.
+// UpdateSession saves a session's settings, folder and title.
 func (s *Store) UpdateSession(ctx context.Context, x Session) error {
-	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET title=?, account=?, model=?, effort=?, mode=?, updated_at=? WHERE id=?`,
-		x.Title, x.Account, x.Model, x.Effort, x.Mode, time.Now().UnixMilli(), x.ID)
+	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET title=?, cwd=?, account=?, model=?, effort=?, mode=?, updated_at=? WHERE id=?`,
+		x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, time.Now().UnixMilli(), x.ID)
 	if err == nil {
 		if n, _ := r.RowsAffected(); n == 0 {
 			err = ErrNotFound

@@ -265,3 +265,53 @@ func writeSkillFixture(t *testing.T, path, text string) {
 func skillDocument(name, description, body string) string {
 	return "---\nname: " + name + "\ndescription: " + description + "\n---\n" + body + "\n"
 }
+
+func TestSkillAndMCPManagement(t *testing.T) {
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	global, cwd := filepath.Join(base, "global"), filepath.Join(base, "repo")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := skillsTestManager(t, global, map[string]*llm.Script{"script": {}})
+	m.UseMCP(filepath.Join(global, "mcp.json"))
+	ctx := context.Background()
+
+	// Save & remove MCP server.
+	list, err := m.MCPSave(ctx, proto.MCPSave{Cwd: cwd, Name: "custom", Project: true, Command: "echo-mcp", Args: []string{"stdio"}})
+	if err != nil || len(list.Servers) != 1 || list.Servers[0].Name != "custom" || !list.Servers[0].Project {
+		t.Fatalf("MCPSave = %+v %v", list, err)
+	}
+	list, err = m.MCPRemove(ctx, proto.MCPRemove{Cwd: cwd, Name: "custom", Project: true})
+	if err != nil || len(list.Servers) != 0 {
+		t.Fatalf("MCPRemove = %+v %v", list, err)
+	}
+
+	// Create a skill, install another from a local folder, toggle, and remove.
+	list, err = m.SkillSave(ctx, proto.SkillSave{Cwd: cwd, Name: "review-go", Description: "Review Go code", Body: "Check tests.", Project: true})
+	if err != nil || len(list.Skills) != 1 || list.Skills[0].Name != "review-go" || !list.Skills[0].Project {
+		t.Fatalf("SkillSave = %+v %v", list, err)
+	}
+	srcDir := filepath.Join(base, "src-skill")
+	writeSkillFixture(t, filepath.Join(srcDir, "SKILL.md"), skillDocument("imported", "Imported skill", "Imported body"))
+	list, err = m.SkillSave(ctx, proto.SkillSave{Cwd: cwd, Source: srcDir, Project: false})
+	if err != nil || len(list.Skills) != 2 {
+		t.Fatalf("SkillSave install = %+v %v", list, err)
+	}
+	list, err = m.SkillToggle(ctx, proto.SkillToggle{Cwd: cwd, Name: "review-go", Enabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.Skills.Load(cwd).Find("review-go"); ok {
+		t.Fatal("disabled skill stayed in Load")
+	}
+	if _, ok := m.Skills.LoadAll(cwd).Find("review-go"); !ok {
+		t.Fatal("disabled skill disappeared from LoadAll")
+	}
+	list, err = m.SkillRemove(ctx, proto.SkillRemove{Cwd: cwd, Name: "review-go", Project: true})
+	if err != nil || len(list.Skills) != 1 || list.Skills[0].Name != "imported" {
+		t.Fatalf("SkillRemove = %+v %v", list, err)
+	}
+}

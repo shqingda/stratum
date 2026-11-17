@@ -254,6 +254,16 @@ func (msgs Messages) RewindCode() string {
 	return Catalog.Format(msgs.locale, "rewindCode", nil)
 }
 
+// RewindSummarize says "从这里起做摘要"
+// in the language the app shows.
+func RewindSummarize() string { return In(i18n.Locale()).RewindSummarize() }
+
+// RewindSummarize says "从这里起做摘要"
+// in the language of msgs.
+func (msgs Messages) RewindSummarize() string {
+	return Catalog.Format(msgs.locale, "rewindSummarize", nil)
+}
+
 // RewindTo says "回退到这里"
 // in the language the app shows.
 func RewindTo() string { return In(i18n.Locale()).RewindTo() }
@@ -982,6 +992,36 @@ func Local() string { return In(i18n.Locale()).Local() }
 // in the language of msgs.
 func (msgs Messages) Local() string {
 	return Catalog.Format(msgs.locale, "local", nil)
+}
+
+// LocalSub says "直接在当前文件夹中运行"
+// in the language the app shows.
+func LocalSub() string { return In(i18n.Locale()).LocalSub() }
+
+// LocalSub says "直接在当前文件夹中运行"
+// in the language of msgs.
+func (msgs Messages) LocalSub() string {
+	return Catalog.Format(msgs.locale, "localSub", nil)
+}
+
+// Worktree says "Worktree"
+// in the language the app shows.
+func Worktree() string { return In(i18n.Locale()).Worktree() }
+
+// Worktree says "Worktree"
+// in the language of msgs.
+func (msgs Messages) Worktree() string {
+	return Catalog.Format(msgs.locale, "worktree", nil)
+}
+
+// WorktreeSub says "在独立分支和目录中运行，互不干扰"
+// in the language the app shows.
+func WorktreeSub() string { return In(i18n.Locale()).WorktreeSub() }
+
+// WorktreeSub says "在独立分支和目录中运行，互不干扰"
+// in the language of msgs.
+func (msgs Messages) WorktreeSub() string {
+	return Catalog.Format(msgs.locale, "worktreeSub", nil)
 }
 
 // SandboxOn says "沙箱开启"
@@ -2348,6 +2388,146 @@ func (msgs Messages) ToolCount(count int) string {
 	return Catalog.Format(msgs.locale, "toolCount", map[string]any{"count": count})
 }
 
+// AddMcpServer says "添加服务器"
+// in the language the app shows.
+func AddMcpServer() string { return In(i18n.Locale()).AddMcpServer() }
+
+// AddMcpServer says "添加服务器"
+// in the language of msgs.
+func (msgs Messages) AddMcpServer() string {
+	return Catalog.Format(msgs.locale, "addMcpServer", nil)
+}
+
+// Edit says "编辑"
+// in the language the app shows.
+func Edit() string { return In(i18n.Locale()).Edit() }
+
+// Edit says "编辑"
+// in the language of msgs.
+func (msgs Messages) Edit() string {
+	return Catalog.Format(msgs.locale, "edit", nil)
+}
+
+// Remove says "移除"
+// in the language the app shows.
+func Remove() string { return In(i18n.Locale()).Remove() }
+
+// Remove says "移除"
+// in the language of msgs.
+func (msgs Messages) Remove() string {
+	return Catalog.Format(msgs.locale, "remove", nil)
+}
+
+// ServerName says "名称"
+// in the language the app shows.
+func ServerName() string { return In(i18n.Locale()).ServerName() }
+
+// ServerName says "名称"
+// in the language of msgs.
+func (msgs Messages) ServerName() string {
+	return Catalog.Format(msgs.locale, "serverName", nil)
+}
+
+// CommandOrUrl says "命令或 URL"
+// in the language the app shows.
+func CommandOrUrl() string { return In(i18n.Locale()).CommandOrUrl() }
+
+// CommandOrUrl says "命令或 URL"
+// in the language of msgs.
+func (msgs Messages) CommandOrUrl() string {
+	return Catalog.Format(msgs.locale, "commandOrUrl", nil)
+}
+
+// Skills says "技能"
+// in the language the app shows.
+func Skills() string { return In(i18n.Locale()).Skills() }
+
+// Skills says "技能"
+// in the language of msgs.
+func (msgs Messages) Skills() string {
+	return Catalog.Format(msgs.locale, "skills", nil)
+}
+
+// InstallSkill says "安装…"
+// in the language the app shows.
+func InstallSkill() string { return In(i18n.Locale()).InstallSkill() }
+
+// InstallSkill says "安装…"
+// in the language of msgs.
+func (msgs Messages) InstallSkill() string {
+	return Catalog.Format(msgs.locale, "installSkill", nil)
+}
+
+// NewSkill says "新建技能"
+// in the language the app shows.
+func NewSkill() string { return In(i18n.Locale()).NewSkill() }
+
+// NewSkill says "新建技能"
+// in the language of msgs.
+func (msgs Messages) NewSkill() string {
+	return Catalog.Format(msgs.locale, "newSkill", nil)
+}
+
+// SkillSource says "本地路径或 Git 仓库地址"
+// in the language the app shows.
+func SkillSource() string { return In(i18n.Locale()).SkillSource() }
+
+// SkillSource says "本地路径或 Git 仓库地址"
+// in the language of msgs.
+func (msgs Messages) SkillSource() string {
+	return Catalog.Format(msgs.locale, "skillSource", nil)
+}
+
+// SkillName says "技能名"
+// in the language the app shows.
+func SkillName() string { return In(i18n.Locale()).SkillName() }
+
+// SkillName says "技能名"
+// in the language of msgs.
+func (msgs Messages) SkillName() string {
+	return Catalog.Format(msgs.locale, "skillName", nil)
+}
+
+// SkillDesc says "简述"
+// in the language the app shows.
+func SkillDesc() string { return In(i18n.Locale()).SkillDesc() }
+
+// SkillDesc says "简述"
+// in the language of msgs.
+func (msgs Messages) SkillDesc() string {
+	return Catalog.Format(msgs.locale, "skillDesc", nil)
+}
+
+// SkillBody says "说明内容"
+// in the language the app shows.
+func SkillBody() string { return In(i18n.Locale()).SkillBody() }
+
+// SkillBody says "说明内容"
+// in the language of msgs.
+func (msgs Messages) SkillBody() string {
+	return Catalog.Format(msgs.locale, "skillBody", nil)
+}
+
+// SkillsEmpty says "还没有技能。点「新建技能」或「安装…」添加。"
+// in the language the app shows.
+func SkillsEmpty() string { return In(i18n.Locale()).SkillsEmpty() }
+
+// SkillsEmpty says "还没有技能。点「新建技能」或「安装…」添加。"
+// in the language of msgs.
+func (msgs Messages) SkillsEmpty() string {
+	return Catalog.Format(msgs.locale, "skillsEmpty", nil)
+}
+
+// Install says "安装"
+// in the language the app shows.
+func Install() string { return In(i18n.Locale()).Install() }
+
+// Install says "安装"
+// in the language of msgs.
+func (msgs Messages) Install() string {
+	return Catalog.Format(msgs.locale, "install", nil)
+}
+
 // SwitchPermissionMode says "切换权限模式"
 // in the language the app shows.
 func SwitchPermissionMode() string { return In(i18n.Locale()).SwitchPermissionMode() }
@@ -2416,6 +2596,16 @@ func ToolWebFetch() string { return In(i18n.Locale()).ToolWebFetch() }
 // in the language of msgs.
 func (msgs Messages) ToolWebFetch() string {
 	return Catalog.Format(msgs.locale, "toolWebFetch", nil)
+}
+
+// ToolWebSearch says "搜索网页"
+// in the language the app shows.
+func ToolWebSearch() string { return In(i18n.Locale()).ToolWebSearch() }
+
+// ToolWebSearch says "搜索网页"
+// in the language of msgs.
+func (msgs Messages) ToolWebSearch() string {
+	return Catalog.Format(msgs.locale, "toolWebSearch", nil)
 }
 
 // KindNet says "访问网络"
@@ -3938,6 +4128,96 @@ func (msgs Messages) CommitChanges() string {
 	return Catalog.Format(msgs.locale, "commitChanges", nil)
 }
 
+// Push says "推送"
+// in the language the app shows.
+func Push() string { return In(i18n.Locale()).Push() }
+
+// Push says "推送"
+// in the language of msgs.
+func (msgs Messages) Push() string {
+	return Catalog.Format(msgs.locale, "push", nil)
+}
+
+// PushFailed says "推送失败：{error}"
+// in the language the app shows.
+func PushFailed(error string) string { return In(i18n.Locale()).PushFailed(error) }
+
+// PushFailed says "推送失败：{error}"
+// in the language of msgs.
+func (msgs Messages) PushFailed(error string) string {
+	return Catalog.Format(msgs.locale, "pushFailed", map[string]any{"error": error})
+}
+
+// CreatePr says "创建 PR"
+// in the language the app shows.
+func CreatePr() string { return In(i18n.Locale()).CreatePr() }
+
+// CreatePr says "创建 PR"
+// in the language of msgs.
+func (msgs Messages) CreatePr() string {
+	return Catalog.Format(msgs.locale, "createPr", nil)
+}
+
+// PrFailed says "创建 PR 失败：{error}"
+// in the language the app shows.
+func PrFailed(error string) string { return In(i18n.Locale()).PrFailed(error) }
+
+// PrFailed says "创建 PR 失败：{error}"
+// in the language of msgs.
+func (msgs Messages) PrFailed(error string) string {
+	return Catalog.Format(msgs.locale, "prFailed", map[string]any{"error": error})
+}
+
+// AheadCommits says "{count} 个本地提交待推送"
+// in the language the app shows.
+func AheadCommits(count int) string { return In(i18n.Locale()).AheadCommits(count) }
+
+// AheadCommits says "{count} 个本地提交待推送"
+// in the language of msgs.
+func (msgs Messages) AheadCommits(count int) string {
+	return Catalog.Format(msgs.locale, "aheadCommits", map[string]any{"count": count})
+}
+
+// PrNumber says "PR #{number}"
+// in the language the app shows.
+func PrNumber(number int) string { return In(i18n.Locale()).PrNumber(number) }
+
+// PrNumber says "PR #{number}"
+// in the language of msgs.
+func (msgs Messages) PrNumber(number int) string {
+	return Catalog.Format(msgs.locale, "prNumber", map[string]any{"number": number})
+}
+
+// ChecksPass says "检查通过"
+// in the language the app shows.
+func ChecksPass() string { return In(i18n.Locale()).ChecksPass() }
+
+// ChecksPass says "检查通过"
+// in the language of msgs.
+func (msgs Messages) ChecksPass() string {
+	return Catalog.Format(msgs.locale, "checksPass", nil)
+}
+
+// ChecksFail says "检查失败"
+// in the language the app shows.
+func ChecksFail() string { return In(i18n.Locale()).ChecksFail() }
+
+// ChecksFail says "检查失败"
+// in the language of msgs.
+func (msgs Messages) ChecksFail() string {
+	return Catalog.Format(msgs.locale, "checksFail", nil)
+}
+
+// ChecksPending says "检查运行中"
+// in the language the app shows.
+func ChecksPending() string { return In(i18n.Locale()).ChecksPending() }
+
+// ChecksPending says "检查运行中"
+// in the language of msgs.
+func (msgs Messages) ChecksPending() string {
+	return Catalog.Format(msgs.locale, "checksPending", nil)
+}
+
 // FilesChangedSince says "{count} 个文件在这之后又被改过，没有动它们：{files}"
 // in the language the app shows.
 func FilesChangedSince(count int, files string) string {
@@ -4042,6 +4322,16 @@ func CompactedAsked() string { return In(i18n.Locale()).CompactedAsked() }
 // in the language of msgs.
 func (msgs Messages) CompactedAsked() string {
 	return Catalog.Format(msgs.locale, "compactedAsked", nil)
+}
+
+// CompactedFromHere says "从这里起的对话已写成摘要"
+// in the language the app shows.
+func CompactedFromHere() string { return In(i18n.Locale()).CompactedFromHere() }
+
+// CompactedFromHere says "从这里起的对话已写成摘要"
+// in the language of msgs.
+func (msgs Messages) CompactedFromHere() string {
+	return Catalog.Format(msgs.locale, "compactedFromHere", nil)
 }
 
 // Compacted says "上下文快满了，较早的对话已写成摘要"

@@ -22,12 +22,14 @@ const agentsLimit = 32 << 10
 
 type Skill struct {
 	Name, Description, Dir, Body string
+	Project                      bool
 }
 
 // Catalog is a turn's read-only snapshot; callers must not modify its fields.
 type Catalog struct {
-	Prompt string
-	Skills []Skill
+	Prompt       string
+	Skills       []Skill
+	agentsPrompt string
 }
 
 func (c *Catalog) Find(name string) (Skill, bool) {
@@ -41,33 +43,13 @@ func (c *Catalog) Find(name string) (Skill, bool) {
 
 type Loader struct {
 	GlobalDir string // ~/.talos when empty
+	Disabled  func(name string) bool
 	mu        sync.Mutex
 	cache     map[string]cached
 }
 
-type cached struct {
-	hash    [32]byte
-	catalog *Catalog
-}
-
-type source struct {
-	path   string
-	data   []byte
-	agents bool
-}
-
-// Load rereads files every turn, then reuses the snapshot when their bytes match.
-func (l *Loader) Load(cwd string) *Catalog {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	cwd, err := filepath.Abs(cwd)
-	if err != nil {
-		log.Printf("skills: workspace: %v", err)
-		return &Catalog{Skills: []Skill{}}
-	}
-	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
-		cwd = resolved
-	}
+// GlobalRoot returns the resolved global Talos directory (~/.talos by default).
+func (l *Loader) GlobalRoot() string {
 	global := l.GlobalDir
 	if global == "" {
 		if home, err := os.UserHomeDir(); err == nil {
@@ -79,6 +61,57 @@ func (l *Loader) Load(cwd string) *Catalog {
 			global = abs
 		}
 	}
+	return global
+}
+
+type cached struct {
+	hash    [32]byte
+	catalog *Catalog
+}
+
+type source struct {
+	path    string
+	data    []byte
+	agents  bool
+	project bool
+}
+
+// Load returns the enabled skills and instructions for cwd.
+func (l *Loader) Load(cwd string) *Catalog {
+	full := l.LoadAll(cwd)
+	if l.Disabled == nil || len(full.Skills) == 0 {
+		return full
+	}
+	out := &Catalog{Prompt: full.agentsPrompt, Skills: []Skill{}, agentsPrompt: full.agentsPrompt}
+	for _, sk := range full.Skills {
+		if !l.Disabled(sk.Name) {
+			out.Skills = append(out.Skills, sk)
+		}
+	}
+	if len(out.Skills) > 0 {
+		var summary strings.Builder
+		summary.WriteString("\nAvailable skills (use the skill tool to read one):\n")
+		for _, skill := range out.Skills {
+			fmt.Fprintf(&summary, "- %s: %s\n", skill.Name, skill.Description)
+		}
+		out.Prompt += summary.String()
+	}
+	return out
+}
+
+// LoadAll rereads files every turn, then reuses the snapshot when their bytes match.
+func (l *Loader) LoadAll(cwd string) *Catalog {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	cwd, err := filepath.Abs(cwd)
+	if err != nil {
+		log.Printf("skills: workspace: %v", err)
+		return &Catalog{Skills: []Skill{}}
+	}
+	if resolved, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = resolved
+	}
+	global := l.GlobalRoot()
 	var files []source
 	seen := map[string]bool{}
 	agents := func(dir string) {
@@ -97,12 +130,12 @@ func (l *Loader) Load(cwd string) *Catalog {
 		agents(dir)
 	}
 	if global != "" {
-		files = append(files, skillFiles(global, "skills")...)
+		files = append(files, skillFiles(false, global, "skills")...)
 	}
-	files = append(files, skillFiles(cwd, ".talos", "skills")...)
+	files = append(files, skillFiles(true, cwd, ".talos", "skills")...)
 	hash := sha256.New()
 	for _, file := range files {
-		fmt.Fprintf(hash, "%t:%d:%s:%d:", file.agents, len(file.path), file.path, len(file.data))
+		fmt.Fprintf(hash, "%t:%t:%d:%s:%d:", file.agents, file.project, len(file.path), file.path, len(file.data))
 		hash.Write(file.data)
 	}
 	var sum [32]byte
@@ -122,15 +155,17 @@ func (l *Loader) Load(cwd string) *Catalog {
 			fmt.Fprintf(&instructions, "\nInstructions from %s:\n%s\n", file.path, file.data)
 			continue
 		}
-		skill, err := parseSkill(file.data)
+		skill, err := Parse(file.data)
 		if err != nil {
 			log.Printf("skills: skip %s: %v", file.path, err)
 			continue
 		}
 		skill.Dir = filepath.Dir(file.path)
+		skill.Project = file.project
 		byName[skill.Name] = skill
 	}
-	catalog.Prompt = clipAgents(instructions.String())
+	catalog.agentsPrompt = clipAgents(instructions.String())
+	catalog.Prompt = catalog.agentsPrompt
 	for _, skill := range byName {
 		catalog.Skills = append(catalog.Skills, skill)
 	}
@@ -175,7 +210,7 @@ func projectDirs(cwd string) []string {
 	}
 }
 
-func skillFiles(base string, dirs ...string) []source {
+func skillFiles(project bool, base string, dirs ...string) []source {
 	root, err := os.OpenRoot(base)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
@@ -218,7 +253,7 @@ func skillFiles(base string, dirs ...string) []source {
 		data, ok := readOpened(path, f, err)
 		child.Close()
 		if ok {
-			files = append(files, source{path: path, data: data})
+			files = append(files, source{path: path, data: data, project: project})
 		}
 	}
 	return files
@@ -281,6 +316,9 @@ func clipAgents(s string) string {
 	}
 	return s[:end] + suffix
 }
+
+// Parse parses a SKILL.md document with flat, single-line YAML scalar fields.
+func Parse(data []byte) (Skill, error) { return parseSkill(data) }
 
 // parseSkill deliberately accepts only flat, single-line YAML scalar fields.
 func parseSkill(data []byte) (Skill, error) {

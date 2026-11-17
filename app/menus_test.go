@@ -450,7 +450,7 @@ func TestSlashRewind(t *testing.T) {
 	}
 	tt.Key(0, ui.KeyEnter)
 	tt.Frame()
-	for _, want := range []string{"恢复代码和对话", "只恢复对话", "只恢复代码"} {
+	for _, want := range []string{"恢复代码和对话", "只恢复对话", "只恢复代码", "从这里起做摘要"} {
 		if !tt.HasText(want) {
 			t.Fatalf("no %q in %q", want, tt.Texts())
 		}
@@ -487,7 +487,7 @@ func TestRewindActionsWithoutCode(t *testing.T) {
 	a.C.Changes.Stale = false
 	a.openRewindAt(9, "hello")
 	acts := a.rewindActions()
-	if len(acts) != 1 || acts[0].action != "conversation" {
+	if len(acts) != 2 || acts[0].action != "conversation" || acts[1].action != "summarize" {
 		t.Fatalf("%+v", acts)
 	}
 }
@@ -525,5 +525,21 @@ func TestSlashCommand(t *testing.T) {
 	}
 	if got := a.expandCommand("/other x"); got != "/other x" {
 		t.Fatalf("%q", got)
+	}
+}
+
+func TestSlashMCPPrompt(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{Prompts: []proto.MCPPrompt{{Server: "echo", Name: "greet", Description: "Greet someone", Arguments: []string{"who"}}}}, a.C.Current.Cwd
+	tt := task8Tester(a, false)
+	tt.Type("/echo:")
+	tt.Frame()
+	if !tt.HasText("/echo:greet") || !tt.HasText("Greet someone") {
+		t.Fatalf("missing MCP prompt in slash menu: %q", tt.Texts())
+	}
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.draft != "/echo:greet " {
+		t.Fatalf("draft %q", a.draft)
 	}
 }

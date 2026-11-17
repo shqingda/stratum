@@ -24,7 +24,7 @@ func (a *App) syncMenus() {
 		a.modelsPending = ""
 	}
 	if id != a.menuSession || !a.C.CanAct() {
-		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu = false, false, false, false
+		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu, a.worktreeMenu = false, false, false, false, false
 		a.modelsRequested = false
 		a.menuSession = id
 	}
@@ -196,16 +196,24 @@ func phaseText(phase client.Phase) string {
 // folderPill moves a session not yet begun to another folder: one the
 // sidebar knows, or one chosen with the open panel.
 func (a *App) folderPill(c *ui.Context, cur *proto.Session) {
-	a.pill(c, "folder", "folder", filepath.Base(cur.Cwd), true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	curDir := cur.Cwd
+	if cur.Repo != "" {
+		curDir = cur.Repo
+	}
+	a.pill(c, "folder", "folder", filepath.Base(curDir), true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		seen := map[string]bool{}
 		for _, s := range a.C.Sessions {
-			if seen[s.Cwd] {
+			dirPath := s.Cwd
+			if s.Repo != "" {
+				dirPath = s.Repo
+			}
+			if seen[dirPath] {
 				continue
 			}
-			seen[s.Cwd] = true
-			dir, _ := a.splitPath(s.Cwd)
-			if m.Item(filepath.Base(s.Cwd)).ID("folder:" + s.Cwd).Subtitle(dir).Checked(s.Cwd == cur.Cwd).Chosen() {
-				a.moveTo(s.Cwd)
+			seen[dirPath] = true
+			dir, _ := a.splitPath(dirPath)
+			if m.Item(filepath.Base(dirPath)).ID("folder:" + dirPath).Subtitle(dir).Checked(dirPath == curDir).Chosen() {
+				a.moveTo(dirPath)
 			}
 		}
 		if a.pickDir != nil && a.update != nil {
@@ -219,6 +227,30 @@ func (a *App) folderPill(c *ui.Context, cur *proto.Session) {
 			}
 		}
 	}, a.menuOptions(&a.folderMenu))
+}
+
+// worktreePill toggles whether a session not yet begun runs in an isolated git worktree.
+func (a *App) worktreePill(c *ui.Context, cur *proto.Session) {
+	icon, label := "device-laptop", locales.Local()
+	if cur.Worktree {
+		icon, label = "git-branch", locales.Worktree()
+	}
+	a.pill(c, "worktree", icon, label, true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+		for _, opt := range []struct {
+			on          bool
+			label, desc string
+		}{
+			{false, locales.Local(), locales.LocalSub()},
+			{true, locales.Worktree(), locales.WorktreeSub()},
+		} {
+			wt := opt.on
+			if m.Item(opt.label).ID(fmt.Sprintf("worktree:%v", wt)).Subtitle(opt.desc).Checked(cur.Worktree == wt).Chosen() {
+				if cur.Worktree != wt {
+					a.do(a.C.Update(proto.SessionUpdate{Worktree: &wt}))
+				}
+			}
+		}
+	}, a.menuOptions(&a.worktreeMenu))
 }
 
 // moveTo starts the session over in dir: a new one there, and the empty

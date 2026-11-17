@@ -3,16 +3,36 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/shqingda/talos/kernel/mcp"
+	"github.com/shqingda/talos/kernel/skills"
 	"github.com/shqingda/talos/proto"
 )
 
-const trustKey = "mcp.trusted"
+const (
+	trustKey          = "mcp.trusted"
+	disabledSkillsKey = "skills.disabled"
+)
+
+func (m *Manager) disabledSkills(ctx context.Context) []string {
+	var names []string
+	if b, err := m.Store.Setting(ctx, disabledSkillsKey); err == nil && b != nil {
+		_ = json.Unmarshal(b, &names)
+	}
+	return names
+}
+
+func (m *Manager) skillDisabled(ctx context.Context, name string) bool {
+	return slices.Contains(m.disabledSkills(ctx), name)
+}
 
 func trustID(cwd string, e mcp.Entry) string {
 	return cwd + "\x00" + e.Name + "\x00" + e.Fingerprint
@@ -38,12 +58,20 @@ func (m *Manager) UseMCP(userFile string) {
 	}
 }
 
-// MCPList says how each server is for a folder.
+// MCPList says how each server and skill is for a folder.
 func (m *Manager) MCPList(ctx context.Context, q proto.MCPQuery) (proto.MCPList, error) {
 	out := proto.MCPList{Servers: []proto.MCPServer{}}
 	if q.Cwd != "" {
-		for _, sk := range m.Skills.Load(q.Cwd).Skills {
-			out.Skills = append(out.Skills, proto.SkillInfo{Name: sk.Name, Description: sk.Description})
+		disabled := m.disabledSkills(ctx)
+		for _, sk := range m.Skills.LoadAll(q.Cwd).Skills {
+			out.Skills = append(out.Skills, proto.SkillInfo{
+				Name:        sk.Name,
+				Description: sk.Description,
+				Dir:         sk.Dir,
+				Body:        sk.Body,
+				Project:     sk.Project,
+				Disabled:    slices.Contains(disabled, sk.Name),
+			})
 		}
 	}
 	out.Commands = commands(q.Cwd)
@@ -62,6 +90,7 @@ func (m *Manager) MCPList(ctx context.Context, q proto.MCPQuery) (proto.MCPList,
 		out.Servers = append(out.Servers, proto.MCPServer{Name: st.Name, Project: st.Project, Target: target, State: st.State, Error: st.Error, Tools: st.Tools})
 	}
 	out.Resources = m.MCP.Resources(q.Cwd)
+	out.Prompts = m.MCP.Prompts(q.Cwd)
 	return out, nil
 }
 
@@ -85,6 +114,321 @@ func (m *Manager) MCPTrust(ctx context.Context, t proto.MCPTrust) (proto.MCPList
 		return proto.MCPList{}, err
 	}
 	return m.MCPList(ctx, proto.MCPQuery{Cwd: t.Cwd})
+}
+
+func (m *Manager) mcpConfigPath(cwd string, project bool) (string, error) {
+	if project {
+		if strings.TrimSpace(cwd) == "" {
+			return "", proto.Errorf("bad_request", "cwd is required for a project MCP server")
+		}
+		return filepath.Join(cwd, ".mcp.json"), nil
+	}
+	if m.MCP == nil || m.MCP.UserFile == "" {
+		return "", proto.Errorf("bad_request", "user MCP config path is not set")
+	}
+	return m.MCP.UserFile, nil
+}
+
+// MCPSave adds or updates an MCP server in ~/.talos/mcp.json or <cwd>/.mcp.json.
+func (m *Manager) MCPSave(ctx context.Context, s proto.MCPSave) (proto.MCPList, error) {
+	if m.MCP == nil {
+		return proto.MCPList{}, proto.Errorf("bad_request", "MCP is off")
+	}
+	name := strings.TrimSpace(s.Name)
+	cmd := strings.TrimSpace(s.Command)
+	url := strings.TrimSpace(s.URL)
+	if name == "" || (cmd == "" && url == "") {
+		return proto.MCPList{}, proto.Errorf("bad_request", "server name and command or URL are required")
+	}
+	path, err := m.mcpConfigPath(s.Cwd, s.Project)
+	if err != nil {
+		return proto.MCPList{}, err
+	}
+	doc := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(b, &doc); err != nil {
+			return proto.MCPList{}, proto.Errorf("bad_request", "%s: %v", path, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return proto.MCPList{}, err
+	}
+	servers := map[string]mcp.Server{}
+	if raw, ok := doc["mcpServers"]; ok {
+		rb, _ := json.Marshal(raw)
+		_ = json.Unmarshal(rb, &servers)
+	}
+	entry := servers[name]
+	if url != "" {
+		entry.URL = url
+		entry.Command, entry.Args = "", nil
+	} else {
+		entry.Command = cmd
+		entry.Args = s.Args
+		entry.URL = ""
+	}
+	servers[name] = entry
+	doc["mcpServers"] = servers
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return proto.MCPList{}, err
+	}
+	outBytes, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return proto.MCPList{}, err
+	}
+	if err := os.WriteFile(path, append(outBytes, '\n'), 0o600); err != nil {
+		return proto.MCPList{}, err
+	}
+	if s.Project {
+		es, _ := mcp.Load(m.MCP.UserFile, s.Cwd)
+		if i := slices.IndexFunc(es, func(e mcp.Entry) bool { return e.Name == name && e.Project }); i >= 0 {
+			ids := slices.DeleteFunc(m.trusted(ctx), func(x string) bool { return strings.HasPrefix(x, s.Cwd+"\x00"+name+"\x00") })
+			ids = append(ids, trustID(s.Cwd, es[i]))
+			tb, _ := json.Marshal(ids)
+			_ = m.Store.SetSetting(ctx, trustKey, tb)
+		}
+	}
+	m.MCP.Reset()
+	m.Broadcast(proto.EventMCP, struct{}{})
+	return m.MCPList(ctx, proto.MCPQuery{Cwd: s.Cwd})
+}
+
+// MCPRemove deletes an MCP server from ~/.talos/mcp.json or <cwd>/.mcp.json.
+func (m *Manager) MCPRemove(ctx context.Context, r proto.MCPRemove) (proto.MCPList, error) {
+	if m.MCP == nil {
+		return proto.MCPList{}, proto.Errorf("bad_request", "MCP is off")
+	}
+	path, err := m.mcpConfigPath(r.Cwd, r.Project)
+	if err != nil {
+		return proto.MCPList{}, err
+	}
+	doc := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(b, &doc); err != nil {
+			return proto.MCPList{}, proto.Errorf("bad_request", "%s: %v", path, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return proto.MCPList{}, err
+	}
+	servers := map[string]mcp.Server{}
+	if raw, ok := doc["mcpServers"]; ok {
+		rb, _ := json.Marshal(raw)
+		_ = json.Unmarshal(rb, &servers)
+	}
+	delete(servers, r.Name)
+	doc["mcpServers"] = servers
+	if fileExists(path) || len(servers) > 0 {
+		outBytes, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			return proto.MCPList{}, err
+		}
+		if err := os.WriteFile(path, append(outBytes, '\n'), 0o600); err != nil {
+			return proto.MCPList{}, err
+		}
+	}
+	if r.Project {
+		ids := slices.DeleteFunc(m.trusted(ctx), func(x string) bool { return strings.HasPrefix(x, r.Cwd+"\x00"+r.Name+"\x00") })
+		tb, _ := json.Marshal(ids)
+		_ = m.Store.SetSetting(ctx, trustKey, tb)
+	}
+	m.MCP.Reset()
+	m.Broadcast(proto.EventMCP, struct{}{})
+	return m.MCPList(ctx, proto.MCPQuery{Cwd: r.Cwd})
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// SkillToggle enables or disables a skill by name.
+func (m *Manager) SkillToggle(ctx context.Context, t proto.SkillToggle) (proto.MCPList, error) {
+	name := strings.TrimSpace(t.Name)
+	if name == "" {
+		return proto.MCPList{}, proto.Errorf("bad_request", "skill name is required")
+	}
+	disabled := slices.DeleteFunc(m.disabledSkills(ctx), func(n string) bool { return n == name })
+	if !t.Enabled {
+		disabled = append(disabled, name)
+	}
+	b, _ := json.Marshal(disabled)
+	if err := m.Store.SetSetting(ctx, disabledSkillsKey, b); err != nil {
+		return proto.MCPList{}, err
+	}
+	return m.MCPList(ctx, proto.MCPQuery{Cwd: t.Cwd})
+}
+
+func (m *Manager) skillsRoot(cwd string, project bool) (string, error) {
+	if project {
+		if strings.TrimSpace(cwd) == "" {
+			return "", proto.Errorf("bad_request", "cwd is required for a project skill")
+		}
+		return filepath.Join(cwd, ".talos", "skills"), nil
+	}
+	global := m.Skills.GlobalRoot()
+	if global == "" {
+		return "", proto.Errorf("bad_request", "global skills folder is unavailable")
+	}
+	return filepath.Join(global, "skills"), nil
+}
+
+func validSkillName(name string) bool {
+	return name != "" && !strings.ContainsAny(name, `/\`) && name != "." && name != ".."
+}
+
+// SkillSave creates a skill or installs skills from a local folder or git URL.
+func (m *Manager) SkillSave(ctx context.Context, s proto.SkillSave) (proto.MCPList, error) {
+	root, err := m.skillsRoot(s.Cwd, s.Project)
+	if err != nil {
+		return proto.MCPList{}, err
+	}
+	if src := strings.TrimSpace(s.Source); src != "" {
+		if err := installSkillsFromSource(ctx, src, root); err != nil {
+			return proto.MCPList{}, err
+		}
+		return m.MCPList(ctx, proto.MCPQuery{Cwd: s.Cwd})
+	}
+	name := strings.TrimSpace(s.Name)
+	desc := strings.TrimSpace(s.Description)
+	if !validSkillName(name) || desc == "" {
+		return proto.MCPList{}, proto.Errorf("bad_request", "skill name and description are required")
+	}
+	dir := filepath.Join(root, name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return proto.MCPList{}, err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(formatSkillDoc(name, desc, s.Body)), 0o644); err != nil {
+		return proto.MCPList{}, err
+	}
+	return m.MCPList(ctx, proto.MCPQuery{Cwd: s.Cwd})
+}
+
+// SkillRemove deletes an installed skill directory.
+func (m *Manager) SkillRemove(ctx context.Context, r proto.SkillRemove) (proto.MCPList, error) {
+	name := strings.TrimSpace(r.Name)
+	if !validSkillName(name) {
+		return proto.MCPList{}, proto.Errorf("bad_request", "invalid skill name")
+	}
+	root, err := m.skillsRoot(r.Cwd, r.Project)
+	if err != nil {
+		return proto.MCPList{}, err
+	}
+	if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
+		return proto.MCPList{}, err
+	}
+	return m.MCPList(ctx, proto.MCPQuery{Cwd: r.Cwd})
+}
+
+func formatSkillDoc(name, desc, body string) string {
+	nb, _ := json.Marshal(strings.Join(strings.Fields(name), " "))
+	db, _ := json.Marshal(strings.Join(strings.Fields(desc), " "))
+	body = strings.TrimSpace(body)
+	if body != "" {
+		body += "\n"
+	}
+	return "---\nname: " + string(nb) + "\ndescription: " + string(db) + "\n---\n" + body
+}
+
+func installSkillsFromSource(ctx context.Context, src, targetRoot string) error {
+	srcDir := src
+	if info, err := os.Stat(src); err != nil || !info.IsDir() {
+		tmp, err := os.MkdirTemp("", "talos-skill-src-*")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmp)
+		cloneCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(cloneCtx, "git", "clone", "--depth", "1", src, tmp).CombinedOutput()
+		if err != nil {
+			return proto.Errorf("bad_request", "git clone: %s", strings.TrimSpace(string(out)))
+		}
+		srcDir = tmp
+	}
+	candidates := findSkillDirs(srcDir)
+	if len(candidates) == 0 {
+		return proto.Errorf("not_found", "no SKILL.md found in %s", src)
+	}
+	for _, c := range candidates {
+		data, err := os.ReadFile(filepath.Join(c, "SKILL.md"))
+		if err != nil {
+			return err
+		}
+		sk, err := skills.Parse(data)
+		if err != nil {
+			return proto.Errorf("bad_request", "invalid SKILL.md in %s: %v", c, err)
+		}
+		name := sk.Name
+		if !validSkillName(name) {
+			name = filepath.Base(c)
+		}
+		if !validSkillName(name) {
+			return proto.Errorf("bad_request", "invalid skill name %q", sk.Name)
+		}
+		if err := copySkillDir(c, filepath.Join(targetRoot, name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func findSkillDirs(root string) []string {
+	if fileExists(filepath.Join(root, "SKILL.md")) {
+		return []string{root}
+	}
+	var out []string
+	for _, pattern := range []string{
+		filepath.Join(root, "*", "SKILL.md"),
+		filepath.Join(root, "skills", "*", "SKILL.md"),
+	} {
+		matches, _ := filepath.Glob(pattern)
+		for _, m := range matches {
+			out = append(out, filepath.Dir(m))
+		}
+		if len(out) > 0 {
+			break
+		}
+	}
+	return out
+}
+
+func copySkillDir(src, dst string) error {
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.Type()&os.ModeSymlink != 0 || e.Name() == ".git" {
+			continue
+		}
+		sp := filepath.Join(src, e.Name())
+		dp := filepath.Join(dst, e.Name())
+		if e.IsDir() {
+			if err := copySkillDir(sp, dp); err != nil {
+				return err
+			}
+			continue
+		}
+		in, err := os.Open(sp)
+		if err != nil {
+			return err
+		}
+		out, err := os.OpenFile(dp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		if err != nil {
+			in.Close()
+			return err
+		}
+		_, copyErr := io.Copy(out, in)
+		in.Close()
+		if closeErr := out.Close(); copyErr != nil {
+			return copyErr
+		} else if closeErr != nil {
+			return closeErr
+		}
+	}
+	return nil
 }
 
 // commands reads the saved prompts for cwd: the folder's own first, then

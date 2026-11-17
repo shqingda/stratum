@@ -318,6 +318,36 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return s.Sessions.MCPTrust(ctx, p)
+	case proto.MethodMCPSave:
+		p, err := params[proto.MCPSave](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.MCPSave(ctx, p)
+	case proto.MethodMCPRemove:
+		p, err := params[proto.MCPRemove](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.MCPRemove(ctx, p)
+	case proto.MethodSkillSave:
+		p, err := params[proto.SkillSave](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.SkillSave(ctx, p)
+	case proto.MethodSkillToggle:
+		p, err := params[proto.SkillToggle](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.SkillToggle(ctx, p)
+	case proto.MethodSkillRemove:
+		p, err := params[proto.SkillRemove](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return s.Sessions.SkillRemove(ctx, p)
 	case proto.MethodSetSettings:
 		p, err := params[proto.Settings](cmd)
 		if err != nil {
@@ -331,6 +361,20 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return commit(ctx, p)
+	}
+	if cmd.Method == proto.MethodPush {
+		p, err := params[proto.WorkspaceQuery](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return push(ctx, p)
+	}
+	if cmd.Method == proto.MethodCreatePR {
+		p, err := params[proto.CreatePR](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return createPR(ctx, p)
 	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
 }
