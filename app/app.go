@@ -36,21 +36,26 @@ var mark = func() ui.ImageSource {
 type App struct {
 	C *client.Client
 
-	out      chan []proto.Command
-	desk     Desktop
-	marks    map[string]string // the sessions' states desk last saw
-	badge    int
-	p        *Palette
-	now      func() time.Time
-	err      string // the last command that could not be sent
-	draft    string // what the composer holds
-	recall   string // a sent message ↑ brings back, for the next frame
-	toEnd    bool   // put the composer's caret at the end of its draft
-	mention  mention
-	find     find
-	editing  string // the approval whose command is being changed
-	cmdDraft string // the command as changed
-	cmdInput ui.Handle
+	out        chan []proto.Command
+	desk       Desktop
+	marks      map[string]string // the sessions' states desk last saw
+	badge      int
+	p          *Palette
+	now        func() time.Time
+	err        string // the last command that could not be sent
+	draft      string // what the composer holds
+	recall     string // a sent message ↑ brings back, for the next frame
+	toEnd      bool   // put the composer's caret at the end of its draft
+	mention    mention
+	slash      slash
+	slashRun   func(i int) // runs the / menu's item i, as last shown
+	slashLen   int
+	filesKey   string // the folder and @ query the files were asked for
+	slashAsked string // the folder the / menu last read skills for
+	find       find
+	editing    string // the approval whose command is being changed
+	cmdDraft   string // the command as changed
+	cmdInput   ui.Handle
 
 	renaming, renameIn string // the session being renamed, in "side" or "bar"
 	renameDraft        string

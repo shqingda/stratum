@@ -47,6 +47,7 @@ func (a *App) dock(c *ui.Context) {
 	p := a.p
 	a.takeBack()
 	a.files(c)
+	a.slashMenu(c)
 	if len(a.C.Queued) > 0 {
 		// The waiting prompts are a tray tucked under the composer's top.
 		ui.Column(c).Margin(0, 20, -1, 20).Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).Clip().

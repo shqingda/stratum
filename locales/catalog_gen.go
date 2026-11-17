@@ -2328,6 +2328,46 @@ func (msgs Messages) MenuSession() string {
 	return Catalog.Format(msgs.locale, "menuSession", nil)
 }
 
+// ToolWebFetch says "读取网页"
+// in the language the app shows.
+func ToolWebFetch() string { return In(i18n.Locale()).ToolWebFetch() }
+
+// ToolWebFetch says "读取网页"
+// in the language of msgs.
+func (msgs Messages) ToolWebFetch() string {
+	return Catalog.Format(msgs.locale, "toolWebFetch", nil)
+}
+
+// KindNet says "访问网络"
+// in the language the app shows.
+func KindNet() string { return In(i18n.Locale()).KindNet() }
+
+// KindNet says "访问网络"
+// in the language of msgs.
+func (msgs Messages) KindNet() string {
+	return Catalog.Format(msgs.locale, "kindNet", nil)
+}
+
+// CompactNow says "压缩上下文：把之前的对话总结成摘要"
+// in the language the app shows.
+func CompactNow() string { return In(i18n.Locale()).CompactNow() }
+
+// CompactNow says "压缩上下文：把之前的对话总结成摘要"
+// in the language of msgs.
+func (msgs Messages) CompactNow() string {
+	return Catalog.Format(msgs.locale, "compactNow", nil)
+}
+
+// UseSkill says "用 {name} 技能："
+// in the language the app shows.
+func UseSkill(name string) string { return In(i18n.Locale()).UseSkill(name) }
+
+// UseSkill says "用 {name} 技能："
+// in the language of msgs.
+func (msgs Messages) UseSkill(name string) string {
+	return Catalog.Format(msgs.locale, "useSkill", map[string]any{"name": name})
+}
+
 // ChooseFolder says "选择文件夹…"
 // in the language the app shows.
 func ChooseFolder() string { return In(i18n.Locale()).ChooseFolder() }
@@ -3892,6 +3932,16 @@ func ReadEventsFailed(error string) string { return In(i18n.Locale()).ReadEvents
 // in the language of msgs.
 func (msgs Messages) ReadEventsFailed(error string) string {
 	return Catalog.Format(msgs.locale, "readEventsFailed", map[string]any{"error": error})
+}
+
+// CompactedAsked says "较早的对话已写成摘要"
+// in the language the app shows.
+func CompactedAsked() string { return In(i18n.Locale()).CompactedAsked() }
+
+// CompactedAsked says "较早的对话已写成摘要"
+// in the language of msgs.
+func (msgs Messages) CompactedAsked() string {
+	return Catalog.Format(msgs.locale, "compactedAsked", nil)
 }
 
 // Compacted says "上下文快满了，较早的对话已写成摘要"

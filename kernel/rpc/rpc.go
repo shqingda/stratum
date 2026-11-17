@@ -263,7 +263,7 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 		if p.Limit <= 0 {
 			p.Limit = 20
 		}
-		return ws.Match(listed(ctx, p.Cwd), p.Query, p.Limit), nil
+		return ws.Match(withDirs(listed(ctx, p.Cwd)), p.Query, p.Limit), nil
 	}
 	if cmd.Method == proto.MethodWorkspace {
 		p, err := params[proto.WorkspaceQuery](cmd)

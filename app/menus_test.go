@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -369,5 +370,100 @@ func TestMoveTo(t *testing.T) {
 	task8Command(t, a, proto.MethodSessionDelete, &ref)
 	if ref.SessionID != old {
 		t.Fatalf("deleted %q, want %q", ref.SessionID, old)
+	}
+}
+
+// The / menu lists the app's commands and the folder's skills; Enter
+// runs the one chosen, and a skill becomes words for the agent.
+func TestSlashMenu(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{Skills: []proto.SkillInfo{{Name: "release", Description: "Cut a release"}}}, a.C.Current.Cwd
+	tt := task8Tester(a, false)
+	tt.Type("/se")
+	tt.Frame()
+	if !a.slash.open || a.slashLen != 2 { // search, settings
+		t.Fatalf("open %v, %d items", a.slash.open, a.slashLen)
+	}
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if !a.settingsOpen || a.draft != "" {
+		t.Fatalf("settings %v, draft %q", a.settingsOpen, a.draft)
+	}
+	a.settingsOpen = false
+	tt.Frame()
+	tt.Type("/rel")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if !strings.Contains(a.draft, "release") {
+		t.Fatalf("draft %q", a.draft)
+	}
+}
+
+// / sets the session's permission mode.
+func TestSlashMode(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{}, a.C.Current.Cwd
+	tt := task8Tester(a, false)
+	tt.Type("/full")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	var u proto.SessionUpdate
+	task8Command(t, a, proto.MethodSessionUpdate, &u)
+	if u.Mode == nil || *u.Mode != "full" || a.draft != "" {
+		t.Fatalf("update %+v, draft %q", u, a.draft)
+	}
+}
+
+// /undo puts back the last turn's changes.
+func TestSlashUndo(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{}, a.C.Current.Cwd
+	a.C.Changes.Turns = []proto.ChangeTurn{{TurnSeq: 3, Files: []proto.ChangeFile{{Path: "a.go"}}}}
+	tt := task8Tester(a, false)
+	tt.Type("/undo")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	var q proto.ChangeQuery
+	task8Command(t, a, proto.MethodChangesRevert, &q)
+	if q.TurnSeq != 3 {
+		t.Fatalf("%+v", q)
+	}
+}
+
+// /compact asks the kernel to summarize now.
+func TestSlashCompact(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{}, a.C.Current.Cwd
+	a.C.Entries = []*client.Entry{{Key: 1}}
+	tt := task8Tester(a, false)
+	tt.Type("/compact")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	var p proto.Prompt
+	task8Command(t, a, proto.MethodPrompt, &p)
+	if !p.Compact || a.draft != "" {
+		t.Fatalf("%+v, draft %q", p, a.draft)
+	}
+}
+
+// A saved command goes in as /name, and is sent as its prompt.
+func TestSlashCommand(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{Commands: []proto.CommandInfo{{Name: "ship", Body: "Release $ARGUMENTS now"}}}, a.C.Current.Cwd
+	tt := task8Tester(a, false)
+	tt.Type("/sh")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.draft != "/ship " {
+		t.Fatalf("draft %q", a.draft)
+	}
+	if got := a.expandCommand("/ship v2"); got != "Release v2 now" {
+		t.Fatalf("%q", got)
+	}
+	if got := a.expandCommand("/other x"); got != "/other x" {
+		t.Fatalf("%q", got)
 	}
 }

@@ -108,7 +108,7 @@ func (a *App) choose() {
 
 // prompt is the draft with the files it names, and the pictures it sends.
 func (a *App) prompt() (string, []llm.Image) {
-	text := strings.TrimSpace(a.draft)
+	text := a.expandCommand(strings.TrimSpace(a.draft))
 	var files []string
 	var images []llm.Image
 	for _, at := range a.attached {

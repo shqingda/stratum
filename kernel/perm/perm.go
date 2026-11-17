@@ -48,6 +48,9 @@ const (
 	// MCP calls a tool of an MCP server, which runs outside the sandbox:
 	// only Full mode lets it run unasked.
 	MCP Kind = "mcp"
+	// Net reaches the network from the kernel, as web_fetch does: only
+	// Full mode lets it run unasked.
+	Net Kind = "net"
 )
 
 // Request describes a call for the decision.

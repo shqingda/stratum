@@ -79,7 +79,7 @@ func tokens(msgs []llm.Message) int {
 
 // compact has the model summarize history and records the summary; the
 // conversation the model is sent then starts from it.
-func (m *Manager) compact(ctx context.Context, provider llm.Provider, req llm.Request, sessionID string) ([]llm.Message, llm.Usage, error) {
+func (m *Manager) compact(ctx context.Context, provider llm.Provider, req llm.Request, sessionID string, asked bool) ([]llm.Message, llm.Usage, error) {
 	req.Messages = append(req.Messages, llm.Text(llm.User, compactPrompt))
 	reply, err := llm.Collect(provider.Stream(ctx, req), nil)
 	if err != nil {
@@ -89,7 +89,7 @@ func (m *Manager) compact(ctx context.Context, provider llm.Provider, req llm.Re
 	if summary == "" {
 		return nil, reply.Usage, errEmptySummary
 	}
-	if err := m.record(ctx, sessionID, proto.EventCompaction, proto.Compaction{Summary: summary}); err != nil {
+	if err := m.record(ctx, sessionID, proto.EventCompaction, proto.Compaction{Summary: summary, Asked: asked}); err != nil {
 		return nil, reply.Usage, err
 	}
 	return summarized(summary), reply.Usage, nil

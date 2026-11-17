@@ -53,3 +53,37 @@ func TestCompaction(t *testing.T) {
 		t.Fatalf("history %+v %v", h, err)
 	}
 }
+
+func TestCompactNow(t *testing.T) {
+	script := &llm.Script{Turns: []llm.Turn{
+		{Text: "short answer"},
+		{Text: "SUMMARY: asked once"},
+	}}
+	m, s := changesManager(t, script)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ended := make(chan struct{}, 2)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd {
+			ended <- struct{}{}
+		}
+	})()
+	for _, p := range []proto.Prompt{{SessionID: s.ID, Text: "first"}, {SessionID: s.ID, Text: "/compact", Compact: true}} {
+		if _, err := m.Prompt(ctx, p, ""); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-ended:
+		case <-ctx.Done():
+			t.Fatal("the turn did not end")
+		}
+	}
+	// The second turn only summarized: no agent request follows it.
+	if len(script.Requests) != 2 {
+		t.Fatalf("%d requests", len(script.Requests))
+	}
+	h, err := m.history(ctx, s.ID)
+	if err != nil || len(h) == 0 || !strings.Contains(h[0].PlainText(), "SUMMARY: asked once") {
+		t.Fatalf("history %+v %v", h, err)
+	}
+}

@@ -502,3 +502,40 @@ func TestPaletteFiles(t *testing.T) {
 		}
 	}
 }
+
+// A bare @ lists the files the session changed first.
+func TestMentionRecent(t *testing.T) {
+	a := task8App()
+	a.C.Changes.Turns = []proto.ChangeTurn{
+		{TurnSeq: 1, Files: []proto.ChangeFile{{Path: "old.go"}}},
+		{TurnSeq: 2, Files: []proto.ChangeFile{{Path: "new.go"}, {Path: "old.go"}}},
+	}
+	a.C.Files, a.C.FilesFor = []string{"a.go", "new.go"}, ""
+	a.mention.query = ""
+	got := a.mentionList()
+	if strings.Join(got, ",") != "new.go,old.go,a.go" {
+		t.Fatalf("%v", got)
+	}
+}
+
+// A bare @ asks for the files at once: the empty query is asked too.
+func TestMentionBare(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Type("@")
+	tt.Frame()
+	asked := false
+	for done := false; !done; {
+		select {
+		case cmds := <-a.out:
+			for _, c := range cmds {
+				asked = asked || c.Method == proto.MethodFilesFind
+			}
+		default:
+			done = true
+		}
+	}
+	if !asked {
+		t.Fatal("a bare @ asked for no files")
+	}
+}

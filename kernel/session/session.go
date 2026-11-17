@@ -603,20 +603,25 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	}
 	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt
 	var used llm.Usage
-	if at := m.compactAt(x.Account, x.Model); at > 0 && tokens(history) > at {
+	if at := m.compactAt(x.Account, x.Model); p.Compact && len(history) > 0 || at > 0 && tokens(history) > at {
 		req := llm.Request{Model: x.Model, System: system, Messages: history, Tools: turnTools.Specs(), Effort: x.Effort, SessionID: x.ID}
 		compactWith := provider
 		if light, ok := m.role(set.Light); ok {
 			compactWith, req.Model, req.Effort = light.provider, light.model, set.Light.Effort
 		}
-		short, u, err := m.compact(ctx, compactWith, req, x.ID)
+		short, u, err := m.compact(ctx, compactWith, req, x.ID, p.Compact)
 		used = u
 		switch {
 		case ctx.Err() != nil:
 			return used, ctx.Err()
+		case p.Compact:
+			return used, err
 		case err == nil:
 			history = short
 		} // a failed summary leaves the history whole
+	}
+	if p.Compact {
+		return used, nil
 	}
 	env := tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
 		return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)

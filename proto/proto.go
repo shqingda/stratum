@@ -205,6 +205,8 @@ type Prompt struct {
 	Text      string      `json:"text"`
 	Images    []llm.Image `json:"images,omitempty"`
 	Steer     bool        `json:"steer,omitempty"`
+	// Compact summarizes the history now and runs no agent.
+	Compact bool `json:"compact,omitempty"`
 }
 
 // PromptResult says what became of a prompt.
@@ -611,6 +613,7 @@ const EventCompaction = "compaction"
 
 type Compaction struct {
 	Summary string `json:"summary"`
+	Asked   bool   `json:"asked,omitempty"` // the user asked for it, the context was not full
 }
 
 // EventTaskStep is a sub-agent starting a tool call, streamed for the
@@ -653,7 +656,25 @@ type MCPTrust struct {
 
 type MCPList struct {
 	Servers []MCPServer `json:"servers"`
-	Error   string      `json:"error,omitempty"` // a config file that did not read
+	Skills  []SkillInfo `json:"skills,omitempty"` // the folder's and the user's skills
+	// Commands are prompts kept as files: .talos/commands/*.md and
+	// .claude/commands/*.md in the folder, then ~/.talos/commands.
+	Commands []CommandInfo `json:"commands,omitempty"`
+	Error    string        `json:"error,omitempty"` // a config file that did not read
+}
+
+// CommandInfo is a saved prompt the / menu offers; $ARGUMENTS in Body is
+// where what the user types after it goes.
+type CommandInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Body        string `json:"body"`
+}
+
+// SkillInfo names a skill the / menu offers.
+type SkillInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 }
 
 type MCPServer struct {

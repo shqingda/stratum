@@ -187,7 +187,7 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 func (a *App) composerKey(k ui.TextKey) bool {
 	text := k.Text()
 	a.draft = text
-	if a.mentionKey(k) {
+	if a.mentionKey(k) || a.slashKey(k) {
 		return true
 	}
 	// ↑ in an empty composer brings back the last thing sent, to send

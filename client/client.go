@@ -714,7 +714,11 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		var cp proto.Compaction
 		if json.Unmarshal(e.Data, &cp) == nil {
 			c.endStream()
-			c.add(&Entry{Role: Notice, Note: "compact", Text: locales.Compacted(), Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
+			text := locales.Compacted()
+			if cp.Asked {
+				text = locales.CompactedAsked()
+			}
+			c.add(&Entry{Role: Notice, Note: "compact", Text: text, Output: cp.Summary, CallID: "compaction:" + strconv.FormatInt(e.Seq, 10), Done: true})
 		}
 	case proto.EventFallback:
 		var f proto.Fallback
@@ -956,6 +960,12 @@ func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Co
 	}
 	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
 	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
+}
+
+// Compact has the kernel summarize the session's history now.
+func (c *Client) Compact() ([]proto.Command, error) {
+	p := proto.Prompt{SessionID: sessionID(c.Current), Text: "/compact", Compact: true}
+	return c.mutation(proto.MethodPrompt, p, nil)
 }
 
 // Shell runs a command line of the user's in the current session.

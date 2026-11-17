@@ -48,13 +48,14 @@ var tools = map[string]struct {
 	"git_status":  {"git-branch", func() string { return "git status" }},
 	"git_diff":    {"plus-minus", func() string { return "git diff" }},
 	"skill":       {"sparkles", locales.ToolSkill},
+	"web_fetch":   {"world", locales.ToolWebFetch},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},
 	"run_tasks":   {"hierarchy-3", locales.ToolTasks},
 }
 
-var kinds = map[string]func() string{"read": locales.KindRead, "write": locales.KindWrite, "exec": locales.KindExec, "mcp": locales.KindMcp}
+var kinds = map[string]func() string{"read": locales.KindRead, "write": locales.KindWrite, "exec": locales.KindExec, "mcp": locales.KindMcp, "net": locales.KindNet}
 
 // reasons put the kernel's reasons for asking in the app's words.
 var reasons = map[string]func() string{
