@@ -38,11 +38,11 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		// Window VibrancyGlass already provides the native Liquid Glass
 		// surface behind the transparent root; add only a light tint and
 		// specular rim so sidebar text stays sharp above the glass.
-		tint := ui.RGBA(255, 255, 255, .16)
+		tint := ui.RGBA(255, 255, 255, .18)
 		if p == dark {
-			tint = ui.RGBA(22, 24, 32, .22)
+			tint = ui.RGBA(22, 24, 32, .24)
 		}
-		side = ui.Column(c).Width(sidebarWidth - 12).Margin(8, 4, 8, 8).Radius(16).Shrink(0).
+		side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
 			Background(tint).Border(.5, p.Edge).Clip()
 		rim(side, p)
 		topGap = barHeight - 8

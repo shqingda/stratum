@@ -34,6 +34,19 @@ func TestSidebarToggle(t *testing.T) {
 	}
 }
 
+func TestVibrantSidebarVisible(t *testing.T) {
+	a := working()
+	tt := ui.NewTester(a.View, 1200, 800)
+	tt.SetVibrancy(true)
+	tt.Frame()
+	for _, s := range []string{"Talos", "新会话", "技能与 MCP"} {
+		r, ok := tt.Find(s)
+		if !ok || r.W <= 0 || r.H <= 0 || r.X >= sidebarWidth {
+			t.Fatalf("vibrant sidebar item %q invalid rect: ok=%v rect=%+v", s, ok, r)
+		}
+	}
+}
+
 func TestCopyMessages(t *testing.T) {
 	for _, e := range []*client.Entry{
 		{Key: 1, Role: client.User, Text: "修一下 Add", Done: true},
