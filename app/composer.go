@@ -129,7 +129,7 @@ func (a *App) box(c *ui.Context) {
 		if a.recall != "" {
 			a.draft, a.recall, a.toEnd = a.recall, "", true
 		}
-		ui.Row(c).Gap(6).AlignItems(ui.End).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.End).Children(func() {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
@@ -149,7 +149,7 @@ func (a *App) box(c *ui.Context) {
 				a.mention.caret = caret
 				c.Invalidate()
 			}
-			area.Lines(1, 10).Grow(1).MinWidth(0).Padding(4, 0, 4, 0).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
+			area.Lines(1, 10).Grow(1).MinWidth(0).Padding(5, 0, 5, 0).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
 				LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
 			if _, ok := a.command(); ok {
 				// A draft that starts with ! runs in the terminal.
@@ -309,23 +309,24 @@ func (a *App) goButton(c *ui.Context) {
 }
 
 // metaBar sits directly under the composer pill: environment on the left,
-// model, effort, permission mode, and context ring on the right.
+// model/effort, permission mode, and context ring on the right.
 func (a *App) metaBar(c *ui.Context) {
 	cur := a.C.Current
-	ui.Row(c).Margin(7, 6, 0, 6).Gap(2).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Margin(7, 6, 0, 6).Gap(4).AlignItems(ui.Center).Children(func() {
 		if cur != nil && a.helloShown() {
 			if a.C.Workspace.Branch != "" || cur.Worktree {
 				a.worktreePill(c, cur)
 			}
 			a.folderPill(c, cur)
-			a.branchPill(c, cur)
 		} else {
 			a.status(c)
 		}
 		ui.Spacer(c)
 		if cur != nil {
-			a.modelPill(c, cur.Model)
-			a.effortPill(c, effortLabel(cur.Effort))
+			ui.Row(c).Gap(0).AlignItems(ui.Center).Children(func() {
+				a.modelPill(c, cur.Model)
+				a.effortPill(c, effortLabel(cur.Effort))
+			})
 			a.modePill(c, modeName(cur.Mode))
 			a.contextRing(c)
 		}
@@ -349,7 +350,6 @@ func (a *App) status(c *ui.Context) {
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))
 		}
-		item("lock", locales.SandboxOn())
 	})
 }
 

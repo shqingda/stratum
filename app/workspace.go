@@ -82,6 +82,17 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	thought := slices.ContainsFunc(a.C.Entries, func(e *client.Entry) bool { return e.Role == client.Thinking })
 	set := a.settings()
 	b.PopoverMenuButton(func(m *ui.Menu) {
+		if len(a.C.Workspace.Branches) > 0 && !cur.Worktree && a.C.CanAct() {
+			for _, br := range a.C.Workspace.Branches {
+				branch := br
+				if m.Item(branch).ID("branch:" + branch).Checked(branch == a.C.Workspace.Branch).Chosen() {
+					if branch != a.C.Workspace.Branch {
+						a.do(a.C.Checkout(branch))
+					}
+				}
+			}
+			m.Separator()
+		}
 		for _, o := range openers() {
 			if m.Item(locales.OpenWith(o.label)).ID("open:" + o.label).Chosen() {
 				if err := a.openIn(o.app, dir); err != nil {

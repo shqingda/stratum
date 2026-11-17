@@ -72,6 +72,11 @@ func Theme(p *Palette, isDark bool) *ui.Theme {
 	t.Danger, t.Success = p.Minus, p.Plus
 	t.Selection = p.Live.Alpha(.22)
 	t.Focus = p.Live.Alpha(.5)
+	if isDark {
+		t.Inverse, t.InverseText = p.Card.Mix(p.Fg, .08), p.Fg
+	} else {
+		t.Inverse, t.InverseText = ink, p.OnAcc
+	}
 	t.Radius = 7
 	t.FontSize = 14
 	return t
