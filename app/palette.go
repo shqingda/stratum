@@ -63,7 +63,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
 		}})
 		add(opt{icon: "sparkles", label: locales.SwitchModel(), sub: cur.Model, run: func() { a.modelMenu = true }})
-		add(opt{icon: "brain", label: locales.SwitchEffort(), run: func() { a.effortMenu = true }})
+		add(opt{icon: "brain", label: locales.SwitchEffort(), run: func() { a.modelMenu = true }})
 	}
 	if a.C.Busy {
 		add(opt{icon: "player-stop", label: locales.StopRunning(), kbd: "esc", run: func() { a.do(a.C.Cancel()) }})

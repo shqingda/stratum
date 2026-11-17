@@ -68,10 +68,36 @@ func (a *App) modelPill(c *ui.Context, label string) {
 	if a.modelsAccount != a.modelAccount() {
 		a.modelsRequested = false
 	}
-	a.pill(c, "model", "", label, true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	p := a.p
+	effort := effortLabel(a.C.Current.Effort)
+	b := ui.ButtonBase(c.Key("pill:model")).Row().Height(28).Padding(0, 9).Gap(6).Radius(14).AlignItems(ui.Center).
+		Label(label).Disabled(!a.C.CanAct())
+	press(b)
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() {
+		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
+		ui.Text(c, effort).FontSize(13).TextColor(p.Mute).SingleLine()
+		sym(c, "chevron-down", 11, p.Mute)
+	})
+	b.PopoverMenuButton(func(m *ui.Menu) {
 		a.modelItems(m, a.modelAccount(), a.C.Current.Model, func(id string) {
 			a.do(a.C.Update(proto.SessionUpdate{Model: &id}))
 		})
+		m.Separator()
+		unsupported := a.reasoningUnsupported()
+		sub := m.Submenu(locales.ReasoningEffort(), func(sm *ui.Menu) {
+			for _, ef := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
+				if sm.Item(effortLabel(ef)).ID("effort:" + ef).Checked(a.C.Current.Effort == ef).Chosen() {
+					e := ef
+					a.do(a.C.Update(proto.SessionUpdate{Effort: &e}))
+				}
+			}
+		}).Trailing(effort)
+		if unsupported {
+			sub.Disabled(true).Tooltip(locales.NoEffortSupport())
+		}
 	}, a.menuOptions(&a.modelMenu))
 	if !a.modelMenu {
 		a.modelsRequested = false

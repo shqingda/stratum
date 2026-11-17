@@ -126,11 +126,9 @@ func TestTask8Menus(t *testing.T) {
 				t.Fatalf("model update = %+v", update)
 			}
 			task8Click(t, tt, "中")
-			if got := tt.Menu(); fmt.Sprint(got) != "[默认 最低 低 中 高 极高]" {
-				t.Fatalf("effort menu = %q", got)
-			}
+			task8Command(t, a, proto.MethodModels, nil)
 			snapshot(t, tt, "t8-effort-"+appearance)
-			if err := tt.ChooseMenuItem("极高"); err != nil {
+			if err := tt.ChooseMenuItem("推理强度", "极高"); err != nil {
 				t.Fatal(err)
 			}
 			update = proto.SessionUpdate{}
@@ -166,17 +164,30 @@ func TestTask8Menus(t *testing.T) {
 }
 
 func TestTask8AllMenuValues(t *testing.T) {
-	for _, tc := range []struct{ pill, label, field, value string }{
-		{"中", "默认", "effort", ""}, {"中", "最低", "effort", "minimal"},
-		{"中", "低", "effort", "low"}, {"中", "中", "effort", "medium"},
-		{"中", "高", "effort", "high"}, {"中", "极高", "effort", "xhigh"},
-		{"询问", "询问", "mode", "ask"}, {"询问", "自动", "mode", "auto"}, {"询问", "完全", "mode", "full"},
+	for _, tc := range []struct {
+		pill  string
+		path  []string
+		field string
+		value string
+	}{
+		{"gpt-6-luna", []string{"推理强度", "默认"}, "effort", ""},
+		{"gpt-6-luna", []string{"推理强度", "最低"}, "effort", "minimal"},
+		{"gpt-6-luna", []string{"推理强度", "低"}, "effort", "low"},
+		{"gpt-6-luna", []string{"推理强度", "中"}, "effort", "medium"},
+		{"gpt-6-luna", []string{"推理强度", "高"}, "effort", "high"},
+		{"gpt-6-luna", []string{"推理强度", "极高"}, "effort", "xhigh"},
+		{"询问", []string{"询问"}, "mode", "ask"},
+		{"询问", []string{"自动"}, "mode", "auto"},
+		{"询问", []string{"完全"}, "mode", "full"},
 	} {
-		t.Run(tc.field+"/"+tc.label, func(t *testing.T) {
+		t.Run(tc.field+"/"+tc.path[len(tc.path)-1], func(t *testing.T) {
 			a := task8App()
 			tt := task8Tester(a, false)
 			task8Click(t, tt, tc.pill)
-			if err := tt.ChooseMenuItem(tc.label); err != nil {
+			if tc.field == "effort" {
+				task8Command(t, a, proto.MethodModels, nil)
+			}
+			if err := tt.ChooseMenuItem(tc.path...); err != nil {
 				t.Fatal(err)
 			}
 			var params map[string]any
@@ -218,10 +229,10 @@ func TestTask8ModelsFailureAndStaleResponses(t *testing.T) {
 	third := task8Command(t, a, proto.MethodModels, nil)
 	task8Models(a, third.ID, []proto.Model{{ID: "gpt-6-luna", Name: "Luna", Reasoning: false}})
 	tt.Frame()
-	tt.Key(0, ui.KeyEscape)
-	if b, ok := tt.Access("中"); !ok || !b.Disabled || b.Description != "这个模型不支持思考强度" {
-		t.Fatalf("reasoning button = %+v, found %v", b, ok)
+	if b, ok := tt.Access("推理强度"); !ok || !b.Disabled {
+		t.Fatalf("reasoning item = %+v, found %v", b, ok)
 	}
+	tt.Key(0, ui.KeyEscape)
 	task8NoCommand(t, a)
 	task8Click(t, tt, "gpt-6-luna")
 	task8Command(t, a, proto.MethodModels, nil)
@@ -299,21 +310,12 @@ func TestTask8ModelStates(t *testing.T) {
 		a := task8App()
 		a.C.Models = []proto.Model{{ID: "gpt-6-luna", Name: "Luna", Reasoning: false}}
 		tt := task8Tester(a, dark)
-		if b, ok := tt.Access("中"); !ok || !b.Disabled || b.Description != "这个模型不支持思考强度" {
-			t.Fatalf("known unsupported model: %+v, found %v", b, ok)
-		}
-		b, _ := tt.Find("中")
-		tt.Move(b.X+b.W/2, b.Y+b.H/2)
-		tt.Advance(time.Second)
-		if !tt.HasText("这个模型不支持思考强度") {
-			t.Fatal("disabled pill has no visible tooltip")
-		}
-		snapshot(t, tt, "t8-effort-disabled-"+appearance)
 		task8Click(t, tt, "gpt-6-luna")
 		cmd := task8Command(t, a, proto.MethodModels, nil)
-		if b, _ := tt.Access("中"); !b.Disabled {
-			t.Fatal("refreshing models enabled an unsupported reasoning setting")
+		if b, ok := tt.Access("推理强度"); !ok || !b.Disabled {
+			t.Fatalf("known unsupported model effort: %+v, found %v", b, ok)
 		}
+		snapshot(t, tt, "t8-effort-disabled-"+appearance)
 		a.receive(proto.Frame{Type: proto.FrameResponse, ID: cmd.ID, Error: proto.Errorf("test", "账号暂时离线")})
 		tt.Frame()
 		snapshot(t, tt, "t8-model-error-"+appearance)

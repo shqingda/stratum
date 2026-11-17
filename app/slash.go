@@ -49,7 +49,7 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 	// The composer's own menus, opened from here.
 	all = append(all,
 		slashItem{"model", "sparkles", locales.DefaultModel(), func(*ui.Context) { clear(); a.modelMenu = true }},
-		slashItem{"effort", "brain", locales.ReasoningEffort(), func(*ui.Context) { clear(); a.effortMenu = true }},
+		slashItem{"effort", "brain", locales.ReasoningEffort(), func(*ui.Context) { clear(); a.modelMenu = true }},
 	)
 	// /undo puts back the last turn's changes not yet undone.
 	if turns := a.C.Changes.Turns; !a.C.Busy {

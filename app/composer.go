@@ -308,25 +308,19 @@ func (a *App) goButton(c *ui.Context) {
 	}
 }
 
-// metaBar sits directly under the composer pill: environment on the left,
-// model/effort, permission mode, and context ring on the right.
+// metaBar sits directly under the composer pill: folder/status on the left,
+// unified model+effort, permission mode, and context ring on the right.
 func (a *App) metaBar(c *ui.Context) {
 	cur := a.C.Current
 	ui.Row(c).Margin(7, 6, 0, 6).Gap(4).AlignItems(ui.Center).Children(func() {
 		if cur != nil && a.helloShown() {
-			if a.C.Workspace.Branch != "" || cur.Worktree {
-				a.worktreePill(c, cur)
-			}
 			a.folderPill(c, cur)
 		} else {
 			a.status(c)
 		}
 		ui.Spacer(c)
 		if cur != nil {
-			ui.Row(c).Gap(0).AlignItems(ui.Center).Children(func() {
-				a.modelPill(c, cur.Model)
-				a.effortPill(c, effortLabel(cur.Effort))
-			})
+			a.modelPill(c, cur.Model)
 			a.modePill(c, modeName(cur.Mode))
 			a.contextRing(c)
 		}
@@ -335,11 +329,11 @@ func (a *App) metaBar(c *ui.Context) {
 
 func (a *App) status(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Gap(10).Padding(0, 4).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Height(28).Gap(10).Padding(0, 6).AlignItems(ui.Center).Children(func() {
 		item := func(symbol, label string) {
-			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-				sym(c, symbol, 13, p.Mute)
-				ui.Text(c, label).FontSize(12).TextColor(p.Mute).SingleLine()
+			ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
+				sym(c, symbol, 14, p.Fg2)
+				ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
 			})
 		}
 		if cur := a.C.Current; cur != nil && cur.Worktree {
