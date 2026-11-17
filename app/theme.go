@@ -62,9 +62,13 @@ func Theme(p *Palette, isDark bool) *ui.Theme {
 	t.SurfacePressed = p.Card.Mix(p.Fg, .08)
 	t.Border = p.Edge2
 	t.Text, t.TextMuted = p.Fg, p.Fg2
-	t.Accent, t.AccentText = p.Acc, p.OnAcc
-	t.AccentHover = p.Acc.Mix(p.Bg, .12)
-	t.AccentPressed = p.Acc.Mix(p.Bg, .22)
+	accent := ui.Hex("#0A84FF")
+	if isDark {
+		accent = ui.Hex("#2F6FED")
+	}
+	t.Accent, t.AccentText = accent, ui.Hex("#FFFFFF")
+	t.AccentHover = accent.Mix(p.Bg, .12)
+	t.AccentPressed = accent.Mix(p.Bg, .22)
 	t.Danger, t.Success = p.Minus, p.Plus
 	t.Selection = p.Live.Alpha(.22)
 	t.Focus = p.Live.Alpha(.5)

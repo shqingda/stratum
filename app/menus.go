@@ -48,7 +48,9 @@ func (a *App) receive(f proto.Frame) {
 
 func (a *App) menuOptions(open *bool) ui.PopoverMenuButtonOptions {
 	return ui.PopoverMenuButtonOptions{Open: open, Panel: func(panel ui.Element) {
-		panel.Background(a.p.Card).Border(.5, a.p.Edge2).Radius(10)
+		panel.Background(a.p.Card).Border(.5, a.p.Edge2).Radius(12).NoShadow()
+		lift(panel, a.p)
+		rim(panel, a.p)
 	}}
 }
 

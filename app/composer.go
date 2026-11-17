@@ -55,13 +55,9 @@ func (a *App) dock(c *ui.Context) {
 			Transition(ui.ElementTransition{Size: true, Duration: 180 * time.Millisecond}).Children(func() { a.queue(c) })
 	}
 	a.box(c)
-	switch {
-	case a.err != "":
-		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(8, 0, 0, 0).Center()
-	case a.helloShown():
-		a.envBar(c)
-	default:
-		a.status(c)
+	a.metaBar(c)
+	if a.err != "" {
+		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(6, 0, 0, 0).Center()
 	}
 }
 
@@ -114,8 +110,7 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	cur := a.C.Current
-	box := ui.Column(c).Radius(22).Background(p.Card).Border(.5, p.Edge).Padding(14, 14, 10, 18)
+	box := ui.Column(c).Radius(22).Background(p.Card).Border(.5, p.Edge).Padding(9, 10, 9, 10)
 	if a.helloShown() {
 		raise(box, p)
 	} else {
@@ -131,64 +126,57 @@ func (a *App) box(c *ui.Context) {
 	svc := c.Services()
 	box.Children(func() {
 		a.attachments(c)
-		ph := locales.ComposerPlaceholder()
-		if a.C.Busy {
-			ph = locales.ComposerQueuePlaceholder()
-		}
-		if len(a.C.Approvals) > 0 {
-			ph = locales.ComposerDenyPlaceholder()
-		}
-		if a.questionFirst() {
-			ph = locales.ComposerAnswerPlaceholder()
-		}
 		if a.recall != "" {
 			a.draft, a.recall, a.toEnd = a.recall, "", true
 		}
-		area := ui.TextAreaBase(c, &a.draft)
-		if a.toEnd {
-			// A draft put in whole is written on from its end.
-			n := len([]rune(a.draft))
-			area.SetTextSelection(n, n)
-			a.toEnd = false
-		}
-		if pl := a.mention.place; pl > 0 {
-			area.SetTextSelection(pl-1, pl-1)
-			a.mention.place = 0
-		}
-		if _, caret := area.TextSelection(); caret != a.mention.caret {
-			// The @ word is found before the composer is built.
-			a.mention.caret = caret
-			c.Invalidate()
-		}
-		area.Lines(2, 10).Placeholder(ph).PlaceholderColor(p.Mute).TextColor(p.Fg).
-			LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
-		if a.noImages() {
-			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(4, 0, 0, 0)
-		}
-		ui.Row(c).Gap(4).Margin(8, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Gap(6).AlignItems(ui.End).Children(func() {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
-			if cur != nil {
-				a.modePill(c, modeName(cur.Mode))
+			area := ui.TextAreaBase(c, &a.draft)
+			if a.toEnd {
+				// A draft put in whole is written on from its end.
+				n := len([]rune(a.draft))
+				area.SetTextSelection(n, n)
+				a.toEnd = false
 			}
-			ui.Spacer(c)
-			if cur != nil {
-				a.modelPill(c, cur.Model)
-				a.effortPill(c, effortLabel(cur.Effort))
+			if pl := a.mention.place; pl > 0 {
+				area.SetTextSelection(pl-1, pl-1)
+				a.mention.place = 0
 			}
+			if _, caret := area.TextSelection(); caret != a.mention.caret {
+				// The @ word is found before the composer is built.
+				a.mention.caret = caret
+				c.Invalidate()
+			}
+			area.Lines(1, 10).Grow(1).MinWidth(0).Padding(4, 0, 4, 0).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
+				LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
 			if _, ok := a.command(); ok {
 				// A draft that starts with ! runs in the terminal.
-				ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(0, 4, 0, 4).Children(func() {
+				ui.Row(c).Height(30).Gap(5).AlignItems(ui.Center).Margin(0, 4, 0, 0).Shrink(0).Children(func() {
 					sym(c, "terminal-2", 14, p.Live)
 					ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
 				})
-			} else {
-				a.contextRing(c)
 			}
 			a.goButton(c)
 		})
+		if a.noImages() {
+			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(6, 0, 0, 6)
+		}
 	})
+}
+
+func (a *App) composerPlaceholder() string {
+	switch {
+	case a.questionFirst():
+		return locales.ComposerAnswerPlaceholder()
+	case len(a.C.Approvals) > 0:
+		return locales.ComposerDenyPlaceholder()
+	case a.C.Busy:
+		return locales.ComposerQueuePlaceholder()
+	default:
+		return locales.ComposerPlaceholder()
+	}
 }
 
 // ready is a draft or attachments to send.
@@ -320,28 +308,37 @@ func (a *App) goButton(c *ui.Context) {
 	}
 }
 
-func (a *App) envBar(c *ui.Context) {
+// metaBar sits directly under the composer pill: environment on the left,
+// model, effort, permission mode, and context ring on the right.
+func (a *App) metaBar(c *ui.Context) {
 	cur := a.C.Current
-	if cur == nil {
-		return
-	}
-	ui.Row(c).Margin(8, 8, 0, 8).Gap(4).AlignItems(ui.Center).Children(func() {
-		a.folderPill(c, cur)
-		a.branchPill(c, cur)
+	ui.Row(c).Margin(7, 6, 0, 6).Gap(2).AlignItems(ui.Center).Children(func() {
+		if cur != nil && a.helloShown() {
+			if a.C.Workspace.Branch != "" || cur.Worktree {
+				a.worktreePill(c, cur)
+			}
+			a.folderPill(c, cur)
+			a.branchPill(c, cur)
+		} else {
+			a.status(c)
+		}
 		ui.Spacer(c)
-		if a.C.Workspace.Branch != "" || cur.Worktree {
-			a.worktreePill(c, cur)
+		if cur != nil {
+			a.modelPill(c, cur.Model)
+			a.effortPill(c, effortLabel(cur.Effort))
+			a.modePill(c, modeName(cur.Mode))
+			a.contextRing(c)
 		}
 	})
 }
 
 func (a *App) status(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Gap(14).Justify(ui.Center).Margin(8, 0, 0, 0).Children(func() {
+	ui.Row(c).Gap(10).Padding(0, 4).AlignItems(ui.Center).Children(func() {
 		item := func(symbol, label string) {
 			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 				sym(c, symbol, 13, p.Mute)
-				ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).SingleLine()
+				ui.Text(c, label).FontSize(12).TextColor(p.Mute).SingleLine()
 			})
 		}
 		if cur := a.C.Current; cur != nil && cur.Worktree {
