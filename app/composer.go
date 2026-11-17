@@ -170,14 +170,16 @@ func (a *App) box(c *ui.Context) {
 				a.choose()
 			}
 			if cur != nil {
-				a.modelPill(c, cur.Model)
-				a.effortPill(c, effortLabel(cur.Effort))
 				a.modePill(c, modeName(cur.Mode))
 			}
 			ui.Spacer(c)
+			if cur != nil {
+				a.modelPill(c, cur.Model)
+				a.effortPill(c, effortLabel(cur.Effort))
+			}
 			if _, ok := a.command(); ok {
 				// A draft that starts with ! runs in the terminal.
-				ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(0, 6, 0, 0).Children(func() {
+				ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(0, 4, 0, 4).Children(func() {
 					sym(c, "terminal-2", 14, p.Live)
 					ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
 				})
@@ -323,12 +325,13 @@ func (a *App) envBar(c *ui.Context) {
 	if cur == nil {
 		return
 	}
-	ui.Row(c).Gap(4).Justify(ui.Center).Margin(8, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Margin(8, 8, 0, 8).Gap(4).AlignItems(ui.Center).Children(func() {
 		a.folderPill(c, cur)
+		a.branchPill(c, cur)
+		ui.Spacer(c)
 		if a.C.Workspace.Branch != "" || cur.Worktree {
 			a.worktreePill(c, cur)
 		}
-		a.branchPill(c, cur)
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/i18n"
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
@@ -86,16 +87,10 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 		lift(panel, p)
 		rim(panel, p)
 		panel.Children(func() {
-			sideBg := p.Side
-			if p == light {
-				sideBg = ui.Hex("#F1F2F6")
-			} else if p == dark {
-				sideBg = ui.Hex("#1A1C26")
-			}
 			_ = vibrant
-			ui.Column(c).Width(204).Shrink(0).Background(sideBg).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
+			ui.Column(c).Width(204).Shrink(0).Material(glass.Glass{Clarity: .35}).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
 				ui.Row(c).Padding(14, 14, 10, 16).AlignItems(ui.Center).Gap(8).Children(func() {
-					ui.Text(c, locales.Settings()).FontSize(15).FontWeight(600).TextColor(p.Fg)
+					ui.Text(c, locales.Settings()).FontSize(15).FontWeight(650).TextColor(p.Fg)
 				})
 				ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 10, 12)
 				ui.Column(c).Grow(1).Padding(0, 10, 8, 10).Gap(2).Children(func() {
@@ -117,7 +112,8 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 						press(it)
 						switch {
 						case active:
-							it.Background(p.Live)
+							it.Background(p.Sel)
+							rim(it, p)
 						case it.Hovered():
 							it.Background(p.Hover)
 						}
@@ -126,16 +122,12 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 						}
 						textColor, weight := p.Fg2, 450
 						if active {
-							textColor, weight = ui.Hex("#FFFFFF"), 550
+							textColor, weight = p.Fg, 600
 						} else if it.Hovered() {
 							textColor = p.Fg
 						}
 						it.Children(func() {
-							badgeBg := pg.badge
-							if active {
-								badgeBg = ui.RGBA(255, 255, 255, .22)
-							}
-							ui.Box(c).Size(20, 20).Radius(5).Background(badgeBg).Center().Shrink(0).Children(func() {
+							ui.Box(c).Size(20, 20).Radius(5).Background(pg.badge).Center().Shrink(0).Children(func() {
 								sym(c, pg.symbol, 12, ui.Hex("#FFFFFF"))
 							})
 							ui.Text(c, label).FontSize(13).FontWeight(weight).TextColor(textColor).SingleLine().Ellipsis("…").MinWidth(0)
@@ -144,26 +136,11 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 				})
 				a.settingsBuildFoot(c)
 			})
-			ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(p.Sheet).Children(func() {
-				ui.Row(c).Height(50).Shrink(0).Padding(0, 24).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, title).FontSize(15).FontWeight(600).TextColor(p.Fg).SingleLine()
-					ui.Spacer(c)
-					done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 12).Radius(14).AlignItems(ui.Center).
-						Background(p.Chip).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
-					rim(done, p)
-					press(done)
-					if done.Hovered() {
-						done.Background(p.Sel)
-					}
-					done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.Fg).SingleLine() })
-					if done.Clicked() {
-						a.settingsOpen = false
-					}
-				})
+			ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(p.Sheet).Clip().Children(func() {
 				ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
-					ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(4, 28, 40, 28).Children(func() {
+					ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(56, 28, 40, 28).Children(func() {
 						if lede != "" {
-							ui.Text(c, lede).FontSize(13).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 16, 2)
+							ui.Text(c, lede).FontSize(13).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 14, 2)
 						}
 						switch curPage {
 						case "accounts":
@@ -180,6 +157,19 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 							a.generalPage(c)
 						}
 					})
+				})
+				ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(58).PassThrough().
+					Material(glass.ScrollEdge{Background: p.Sheet})
+				ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(50).Padding(0, 24).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, title).FontSize(16).FontWeight(650).LetterSpacing(-.2).TextColor(p.Fg).SingleLine()
+					ui.Spacer(c)
+					done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 14).Radius(14).AlignItems(ui.Center).
+						Background(p.Acc).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
+					press(done)
+					done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.OnAcc).SingleLine() })
+					if done.Clicked() {
+						a.settingsOpen = false
+					}
 				})
 			})
 		})
@@ -198,9 +188,9 @@ func (a *App) settings() proto.Settings {
 func section(c *ui.Context, p *Palette, label string, first bool) {
 	top := float32(22)
 	if first {
-		top = 6
+		top = 4
 	}
-	ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(p.Fg2).Margin(top, 0, 8, 4)
+	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(top, 0, 6, 4)
 }
 
 // note is the small text under a group.
@@ -209,7 +199,10 @@ func note(c *ui.Context, p *Palette, text string) {
 }
 
 func group(c *ui.Context, p *Palette, children func()) {
-	raise(ui.Column(c).Radius(12).Background(p.Card).Border(.5, p.Edge).Clip(), p).Children(children)
+	g := ui.Column(c).Radius(12).Background(p.Card).Border(.5, p.Edge).Clip()
+	raise(g, p)
+	rim(g, p)
+	g.Children(children)
 }
 
 // rows draws the rows of a group, with a hairline between two.
@@ -395,8 +388,9 @@ func (a *App) settingsBuildFoot(c *ui.Context) {
 }
 
 func (a *App) accountsAndModelsPage(c *ui.Context) {
+	section(c, a.p, locales.SettingsAccounts(), true)
 	a.accountsPage(c)
-	ui.Box(c).Height(14).Shrink(0)
+	ui.Box(c).Height(10).Shrink(0)
 	a.modelsPage(c)
 }
 
