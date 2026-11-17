@@ -111,11 +111,9 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	box := ui.Column(c).Radius(22).Background(p.Card).Border(.5, p.Edge).Padding(9, 10, 9, 10)
-	if a.helloShown() {
+	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(7, 10, 7, 10)
+	if !a.helloShown() {
 		raise(box, p)
-	} else {
-		lift(box, p)
 	}
 	rim(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {

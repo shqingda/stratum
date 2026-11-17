@@ -18,7 +18,7 @@ import (
 	"github.com/shqingda/talos/proto"
 )
 
-const columnWidth = 680
+const columnWidth = 720
 
 // tools is how a tool call shows: its symbol and verb.
 // toolInfo is how a tool shows in the transcript.
@@ -476,7 +476,7 @@ func (a *App) hello(c *ui.Context) {
 	ui.Image(c, mark).Size(44, 44)
 	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
 	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 26, 0)
-	ui.Column(c).Width(540).MaxWidthPercent(100).Children(func() { a.dock(c) })
+	ui.Column(c).Width(columnWidth).MaxWidthPercent(100).Children(func() { a.dock(c) })
 	if a.noSide {
 		var recent []proto.Session
 		for _, s := range a.C.Sessions {
@@ -485,7 +485,7 @@ func (a *App) hello(c *ui.Context) {
 			}
 		}
 		if len(recent) > 0 {
-			ui.Column(c).Width(540).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
+			ui.Column(c).Width(columnWidth).MaxWidthPercent(100).Margin(22, 0, 0, 0).Children(func() {
 				ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
 				for _, s := range recent {
 					a.sessionRow(c, s)
