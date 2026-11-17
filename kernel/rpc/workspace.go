@@ -90,9 +90,21 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 		}
 		sort.Slice(w.BaseFiles, func(i, j int) bool { return w.BaseFiles[i].Path < w.BaseFiles[j].Path })
 	}
+	w.Branches = localBranches(ctx, cwd)
 	w.Ahead = aheadCount(ctx, cwd, w.Branch, w.Base)
 	w.PR = readPR(ctx, cwd, w.Branch, w.Base)
 	return w, nil
+}
+
+func localBranches(ctx context.Context, cwd string) []string {
+	out := gitOut(ctx, cwd, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	var branches []string
+	for _, line := range strings.Split(out, "\n") {
+		if br := strings.TrimSpace(line); br != "" {
+			branches = append(branches, br)
+		}
+	}
+	return branches
 }
 
 func aheadCount(ctx context.Context, cwd, branch, base string) int {
@@ -318,6 +330,22 @@ func createPR(ctx context.Context, p proto.CreatePR) (proto.Workspace, error) {
 	}
 	if out, err := ghRun(run, p.Cwd, "pr", "create", "--title", p.Title, "--body", p.Body); err != nil {
 		return proto.Workspace{}, proto.Errorf("internal", "gh pr create: %s", strings.TrimSpace(string(out)))
+	}
+	return workspace(ctx, p.Cwd)
+}
+
+func checkout(ctx context.Context, p proto.Checkout) (proto.Workspace, error) {
+	if !filepath.IsAbs(p.Cwd) {
+		return proto.Workspace{}, proto.Errorf("bad_request", "cwd must be absolute")
+	}
+	br := strings.TrimSpace(p.Branch)
+	if br == "" {
+		return proto.Workspace{}, proto.Errorf("bad_request", "branch is required")
+	}
+	run, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	if out, err := git(run, p.Cwd, "checkout", br); err != nil {
+		return proto.Workspace{}, proto.Errorf("internal", "git checkout: %s", out)
 	}
 	return workspace(ctx, p.Cwd)
 }

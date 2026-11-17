@@ -88,6 +88,9 @@ func (a *App) rewindActions() []rewindAct {
 		acts = append(acts, rewindAct{"code", locales.RewindCode()})
 	}
 	acts = append(acts, rewindAct{"summarize", locales.RewindSummarize()})
+	if prompts := a.rewindPrompts(); len(prompts) > 0 && prompts[0].seq < a.rewind.seq {
+		acts = append(acts, rewindAct{"summarize_before", locales.RewindSummarizeBefore()})
+	}
 	return acts
 }
 

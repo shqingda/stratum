@@ -77,7 +77,7 @@ func Decide(mode Mode, req Request, sandboxed bool) Decision {
 		return Allow
 	}
 	for _, p := range req.Paths {
-		if !p.Inside || workspace.Sensitive(p.Abs) {
+		if !p.Inside || (workspace.Sensitive(p.Abs) && req.Tool != "memory") {
 			return AskUser
 		}
 	}

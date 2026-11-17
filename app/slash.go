@@ -82,7 +82,13 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 		}})
 	}
 	if !a.C.Busy && len(a.C.Entries) > 0 {
-		all = append(all, slashItem{"compact", "fold", locales.CompactNow(), func(*ui.Context) { clear(); a.do(a.C.Compact()) }})
+		all = append(all,
+			slashItem{"compact", "fold", locales.CompactNow(), func(*ui.Context) { clear(); a.do(a.C.Compact()) }},
+			slashItem{"fork", "git-branch", locales.ForkNote(), func(*ui.Context) { clear(); a.do(a.C.Fork(a.C.Current.ID)) }},
+		)
+	}
+	if len(a.C.Entries) > 0 {
+		all = append(all, slashItem{"export", "copy", locales.ExportNote(), func(c *ui.Context) { clear(); c.WriteClipboard(a.sessionMarkdown()) }})
 	}
 	if a.C.Busy {
 		all = append(all, slashItem{"stop", "player-stop", locales.Stop(), func(*ui.Context) { clear(); a.do(a.C.Cancel()) }})

@@ -143,3 +143,81 @@ func TestRewindSummarize(t *testing.T) {
 		t.Fatalf("draft %q %v", snap.Draft, err)
 	}
 }
+
+func TestRewindSummarizeBefore(t *testing.T) {
+	script := &llm.Script{Turns: []llm.Turn{
+		{Text: "one"},
+		{Text: "two"},
+		{Text: "three"},
+		{Text: "SUMMARY: turn 1 done"},
+	}}
+	m, s := changesManager(t, script)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ended := make(chan struct{}, 4)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd && e.SessionID == s.ID {
+			ended <- struct{}{}
+		}
+	})()
+	for _, text := range []string{"first", "second", "third"} {
+		if _, err := m.Prompt(ctx, proto.Prompt{SessionID: s.ID, Text: text}, ""); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-ended:
+		case <-ctx.Done():
+			t.Fatal("the turn did not end")
+		}
+	}
+	evs, err := m.Store.Events(ctx, s.ID, 0, 0, proto.EventTurnStart)
+	if err != nil || len(evs) != 3 {
+		t.Fatalf("%d events, %v", len(evs), err)
+	}
+	out, err := m.Rewind(ctx, proto.Rewind{SessionID: s.ID, TurnSeq: evs[1].Seq, Action: "summarize_before"})
+	if err != nil || out.Prompt != "" || out.Action != "summarize_before" {
+		t.Fatalf("%+v %v", out, err)
+	}
+	// Request 3 should only summarize turn 1.
+	sumReq := script.Requests[3].Messages
+	if len(sumReq) != 3 || sumReq[0].PlainText() != "first" || sumReq[1].PlainText() != "one" {
+		t.Fatalf("summarize_before sent %+v", sumReq)
+	}
+	h, err := m.history(ctx, s.ID)
+	if err != nil || len(h) != 6 || !strings.Contains(h[0].PlainText(), "SUMMARY: turn 1 done") || h[2].PlainText() != "second" || h[4].PlainText() != "third" {
+		t.Fatalf("history %+v %v", h, err)
+	}
+}
+
+func TestForkSession(t *testing.T) {
+	script := &llm.Script{Turns: []llm.Turn{{Text: "one"}, {Text: "two"}}}
+	m, s := changesManager(t, script)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	ended := make(chan struct{}, 4)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd {
+			ended <- struct{}{}
+		}
+	})()
+	if _, err := m.Prompt(ctx, proto.Prompt{SessionID: s.ID, Text: "hello"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+	case <-ctx.Done():
+		t.Fatal("the turn did not end")
+	}
+
+	forked, err := m.Fork(ctx, proto.SessionRef{SessionID: s.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if forked.ID == s.ID || forked.ParentID != s.ID || !strings.HasSuffix(forked.Title, "(fork)") {
+		t.Fatalf("forked = %+v", forked)
+	}
+	h, err := m.history(ctx, forked.ID)
+	if err != nil || len(h) != 2 || h[0].PlainText() != "hello" || h[1].PlainText() != "one" {
+		t.Fatalf("forked history = %+v %v", h, err)
+	}
+}

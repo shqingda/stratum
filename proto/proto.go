@@ -73,6 +73,7 @@ const (
 	MethodSessionUpdate   = "session.update"   // SessionUpdate → Session
 	MethodSessionDelete   = "session.delete"   // SessionRef → {}
 	MethodSessionFlag     = "session.flag"     // SessionFlag → Session
+	MethodSessionFork     = "session.fork"     // SessionRef → Session
 	MethodPrompt          = "prompt"           // Prompt → PromptResult
 	MethodCancel          = "cancel"           // SessionRef → {}
 	MethodEvents          = "events"           // EventsQuery → EventPage
@@ -90,14 +91,15 @@ type Hello struct {
 
 // Session is a conversation in a workspace.
 type Session struct {
-	ID      string    `json:"id"`
-	Title   string    `json:"title"`
-	Cwd     string    `json:"cwd"`
-	Account string    `json:"account"`
-	Model   string    `json:"model"`
-	Effort  string    `json:"effort,omitempty"`
-	Mode    string    `json:"mode"` // ask, auto, full
-	Created time.Time `json:"created"`
+	ID       string    `json:"id"`
+	Title    string    `json:"title"`
+	Cwd      string    `json:"cwd"`
+	Account  string    `json:"account"`
+	Model    string    `json:"model"`
+	Effort   string    `json:"effort,omitempty"`
+	Mode     string    `json:"mode"` // ask, auto, full
+	ParentID string    `json:"parentId,omitempty"`
+	Created  time.Time `json:"created"`
 	Updated time.Time `json:"updated"`
 	// State is set only in the list: "run" while a turn runs, "wait"
 	// while it waits for an approval.
@@ -198,8 +200,9 @@ const MethodDraftSet = "draft.set"
 // MethodRewind returns a session to a prompt the user sent.
 // Rewind → RewindResult. Action "both" restores files and drops the
 // conversation from that prompt on, "conversation" drops only the
-// conversation, "code" restores only files, and "summarize" summarizes
-// the conversation from that prompt on while keeping earlier turns. A
+// conversation, "code" restores only files, "summarize" summarizes
+// the conversation from that prompt on while keeping earlier turns,
+// and "summarize_before" summarizes earlier turns up to that prompt. A
 // shell command's effects are not files, so they stay.
 const MethodRewind = "session.rewind"
 
@@ -207,7 +210,7 @@ const MethodRewind = "session.rewind"
 type Rewind struct {
 	SessionID string `json:"sessionId"`
 	TurnSeq   int64  `json:"turnSeq"`
-	Action    string `json:"action"` // both, conversation, code, summarize
+	Action    string `json:"action"` // both, conversation, code, summarize, summarize_before
 }
 
 // RewindResult is what a rewind did. Prompt is set when the conversation
@@ -495,14 +498,20 @@ type SearchHit struct {
 // commits everything in it; MethodPush pushes HEAD to origin;
 // MethodCreatePR pushes and creates a GitHub pull request.
 const (
-	MethodWorkspace = "workspace.info"   // WorkspaceQuery → Workspace
-	MethodCommit    = "workspace.commit" // Commit → Workspace
-	MethodPush      = "workspace.push"   // WorkspaceQuery → Workspace
-	MethodCreatePR  = "workspace.pr"     // CreatePR → Workspace
+	MethodWorkspace = "workspace.info"     // WorkspaceQuery → Workspace
+	MethodCommit    = "workspace.commit"   // Commit → Workspace
+	MethodPush      = "workspace.push"     // WorkspaceQuery → Workspace
+	MethodCreatePR  = "workspace.pr"       // CreatePR → Workspace
+	MethodCheckout  = "workspace.checkout" // Checkout → Workspace
 	// MethodWorkspaceDiff reads a file as HEAD has it and as it is now:
 	// WorkspaceQuery with Path → ChangeDiff.
 	MethodWorkspaceDiff = "workspace.diff"
 )
+
+type Checkout struct {
+	Cwd    string `json:"cwd"`
+	Branch string `json:"branch"`
+}
 
 type CreatePR struct {
 	Cwd   string `json:"cwd"`
@@ -540,6 +549,7 @@ type Workspace struct {
 	// are the files changed since, committed or not.
 	Base      string       `json:"base,omitempty"`
 	BaseFiles []ChangeFile `json:"baseFiles,omitempty"`
+	Branches  []string     `json:"branches,omitempty"`
 	Ahead     int          `json:"ahead,omitempty"`
 	PR        *PullRequest `json:"pr,omitempty"`
 }
@@ -666,6 +676,7 @@ type Compaction struct {
 	Summary string `json:"summary"`
 	Asked   bool   `json:"asked,omitempty"`   // the user asked for it, the context was not full
 	Partial bool   `json:"partial,omitempty"` // summarizes only from a rewind point on; earlier turns stay
+	UpToSeq int64  `json:"upToSeq,omitempty"` // summarizes messages with seq < UpToSeq; later turns stay
 }
 
 // EventTaskStep is a sub-agent starting a tool call, streamed for the

@@ -543,3 +543,22 @@ func TestSlashMCPPrompt(t *testing.T) {
 		t.Fatalf("draft %q", a.draft)
 	}
 }
+
+func TestSlashForkAndExport(t *testing.T) {
+	a := task8App()
+	a.C.MCP, a.C.MCPFor = &proto.MCPList{}, a.C.Current.Cwd
+	a.C.Entries = append(a.C.Entries, &client.Entry{Key: 2, Role: client.Assistant, Text: "已修好", Done: true})
+	md := a.sessionMarkdown()
+	if !strings.Contains(md, "# ") || !strings.Contains(md, "## User") || !strings.Contains(md, "## Assistant\n\n已修好") {
+		t.Fatalf("markdown = %q", md)
+	}
+	tt := task8Tester(a, false)
+	tt.Type("/fork")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	var ref proto.SessionRef
+	task8Command(t, a, proto.MethodSessionFork, &ref)
+	if ref.SessionID != a.C.Current.ID {
+		t.Fatalf("forked ref = %+v", ref)
+	}
+}

@@ -181,4 +181,12 @@ func TestPushCreatePRAndChecks(t *testing.T) {
 	if err != nil || !prCreated || w.Ahead != 0 || w.PR == nil || w.PR.Number != 42 || w.PR.Checks != "fail" {
 		t.Fatalf("after createPR: %+v %v calls=%v", w, err, ghCalls)
 	}
+
+	if len(w.Branches) != 2 || w.Branch != "feat" {
+		t.Fatalf("branches = %v current %q", w.Branches, w.Branch)
+	}
+	w, err = checkout(ctx, proto.Checkout{Cwd: dir, Branch: "main"})
+	if err != nil || w.Branch != "main" {
+		t.Fatalf("checkout main: %+v %v", w, err)
+	}
 }

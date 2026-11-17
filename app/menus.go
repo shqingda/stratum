@@ -24,7 +24,7 @@ func (a *App) syncMenus() {
 		a.modelsPending = ""
 	}
 	if id != a.menuSession || !a.C.CanAct() {
-		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu, a.worktreeMenu = false, false, false, false, false
+		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu, a.worktreeMenu, a.branchMenu = false, false, false, false, false, false
 		a.modelsRequested = false
 		a.menuSession = id
 	}
@@ -251,6 +251,23 @@ func (a *App) worktreePill(c *ui.Context, cur *proto.Session) {
 			}
 		}
 	}, a.menuOptions(&a.worktreeMenu))
+}
+
+// branchPill switches the git branch of a new session before it starts.
+func (a *App) branchPill(c *ui.Context, cur *proto.Session) {
+	if a.C.Workspace.Branch == "" || cur.Worktree {
+		return
+	}
+	a.pill(c, "branch", "git-branch", a.C.Workspace.Branch, true).Disabled(!a.C.CanAct() || len(a.C.Workspace.Branches) == 0).PopoverMenuButton(func(m *ui.Menu) {
+		for _, br := range a.C.Workspace.Branches {
+			branch := br
+			if m.Item(branch).ID("branch:" + branch).Checked(branch == a.C.Workspace.Branch).Chosen() {
+				if branch != a.C.Workspace.Branch {
+					a.do(a.C.Checkout(branch))
+				}
+			}
+		}
+	}, a.menuOptions(&a.branchMenu))
 }
 
 // moveTo starts the session over in dir: a new one there, and the empty

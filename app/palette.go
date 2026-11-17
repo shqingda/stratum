@@ -47,6 +47,12 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	cur := a.C.Current
 	if cur != nil {
 		add(opt{icon: "search", label: locales.FindInSession(), kbd: "⌘F", run: func() { a.openFind(c) }})
+		if len(a.C.Entries) > 0 {
+			add(opt{icon: "copy", label: locales.ExportMarkdown(), run: func() { c.WriteClipboard(a.sessionMarkdown()) }})
+			if !a.C.Busy {
+				add(opt{icon: "git-branch", label: locales.ForkSession(), run: func() { a.do(a.C.Fork(cur.ID)) }})
+			}
+		}
 	}
 	if cur != nil && a.C.CanAct() {
 		next := map[string]string{"ask": "auto", "auto": "full", "full": "ask"}[cur.Mode]

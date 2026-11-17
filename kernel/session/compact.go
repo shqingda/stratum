@@ -27,24 +27,48 @@ func (m *Manager) history(ctx context.Context, sessionID string) ([]llm.Message,
 	return eventsToMessages(events)
 }
 
+type seqMsg struct {
+	seq int64
+	msg llm.Message
+}
+
 func eventsToMessages(events []store.Event) ([]llm.Message, error) {
-	var out []llm.Message
+	var out []seqMsg
 	for _, e := range events {
 		if e.Type == proto.EventShell {
 			// A command of the user's is something they tell the model.
 			var sh proto.Shell
 			if json.Unmarshal(e.Data, &sh) == nil {
-				out = append(out, llm.Text(llm.User, shellNote(sh)))
+				out = append(out, seqMsg{seq: e.Seq, msg: llm.Text(llm.User, shellNote(sh))})
 			}
 			continue
 		}
 		if e.Type == proto.EventCompaction {
 			var c proto.Compaction
 			if json.Unmarshal(e.Data, &c) == nil {
-				if c.Partial {
-					out = append(out, summarized(c.Summary)...)
-				} else {
-					out = summarized(c.Summary)
+				sum := summarized(c.Summary)
+				switch {
+				case c.UpToSeq > 0:
+					var kept []seqMsg
+					for _, sm := range out {
+						if sm.seq >= c.UpToSeq {
+							kept = append(kept, sm)
+						}
+					}
+					var next []seqMsg
+					for _, m := range sum {
+						next = append(next, seqMsg{seq: c.UpToSeq - 1, msg: m})
+					}
+					out = append(next, kept...)
+				case c.Partial:
+					for _, m := range sum {
+						out = append(out, seqMsg{seq: e.Seq, msg: m})
+					}
+				default:
+					out = out[:0]
+					for _, m := range sum {
+						out = append(out, seqMsg{seq: e.Seq, msg: m})
+					}
 				}
 			}
 			continue
@@ -53,9 +77,13 @@ func eventsToMessages(events []store.Event) ([]llm.Message, error) {
 		if err := json.Unmarshal(e.Data, &msg); err != nil {
 			return nil, err
 		}
-		out = append(out, msg)
+		out = append(out, seqMsg{seq: e.Seq, msg: msg})
 	}
-	return out, nil
+	msgs := make([]llm.Message, len(out))
+	for i, sm := range out {
+		msgs[i] = sm.msg
+	}
+	return msgs, nil
 }
 
 func summarized(summary string) []llm.Message {

@@ -164,6 +164,7 @@ func (a *App) box(c *ui.Context) {
 			}
 			if cur != nil && a.helloShown() {
 				a.folderPill(c, cur)
+				a.branchPill(c, cur)
 				if a.C.Workspace.Branch != "" || cur.Worktree {
 					a.worktreePill(c, cur)
 				}

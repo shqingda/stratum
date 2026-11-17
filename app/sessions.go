@@ -1,9 +1,12 @@
 package app
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
@@ -30,6 +33,9 @@ func (a *App) sessionMenu(m *ui.Menu, s proto.Session) {
 	if m.Item(pin).Chosen() {
 		on := !s.Pinned
 		a.do(a.C.Flag(proto.SessionFlag{SessionID: s.ID, Pinned: &on}))
+	}
+	if m.Item(locales.ForkSession()).Chosen() {
+		a.do(a.C.Fork(s.ID))
 	}
 	m.Separator()
 	if s.Archived {
@@ -205,4 +211,34 @@ func (a *App) markSeen(c *ui.Context) {
 	if c.WindowActive() && !a.C.Busy && len(a.C.Approvals) == 0 && a.keptUnread != cur.ID {
 		a.send(a.C.Seen(cur.ID))
 	}
+}
+
+func (a *App) sessionMarkdown() string {
+	var b strings.Builder
+	if cur := a.C.Current; cur != nil {
+		fmt.Fprintf(&b, "# %s\n\n", title(*cur))
+	}
+	for _, e := range a.C.Entries {
+		switch e.Role {
+		case client.User:
+			if e.Text != "" {
+				fmt.Fprintf(&b, "## User\n\n%s\n\n", e.Text)
+			}
+		case client.Assistant:
+			if e.Text != "" {
+				fmt.Fprintf(&b, "## Assistant\n\n%s\n\n", e.Text)
+			}
+		case client.Tool:
+			line := e.Text
+			if e.Detail != "" {
+				line += " " + e.Detail
+			}
+			fmt.Fprintf(&b, "- `%s`\n", line)
+		case client.Notice:
+			if e.Text != "" {
+				fmt.Fprintf(&b, "> %s\n\n", e.Text)
+			}
+		}
+	}
+	return strings.TrimSpace(b.String()) + "\n"
 }

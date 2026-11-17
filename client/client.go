@@ -718,7 +718,9 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		if json.Unmarshal(e.Data, &cp) == nil {
 			c.endStream()
 			text := locales.Compacted()
-			if cp.Partial {
+			if cp.UpToSeq > 0 {
+				text = locales.CompactedUpTo()
+			} else if cp.Partial {
 				text = locales.CompactedFromHere()
 			} else if cp.Asked {
 				text = locales.CompactedAsked()
@@ -991,7 +993,7 @@ func (c *Client) Rewind(turn int64, action string) ([]proto.Command, error) {
 		if out.Action == "code" || len(out.Conflicts) > 0 {
 			return nil
 		}
-		if out.Action != "summarize" {
+		if out.Action != "summarize" && out.Action != "summarize_before" {
 			c.Draft = out.Prompt
 		}
 		return []proto.Command{c.bind(id)}
@@ -1176,6 +1178,27 @@ func (c *Client) Open(id string) ([]proto.Command, error) {
 		return nil, nil
 	}
 	return []proto.Command{c.bind(id)}, nil
+}
+
+// Fork branches off a copy of a session and opens it.
+func (c *Client) Fork(id string) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	if id == "" && c.Current != nil {
+		id = c.Current.ID
+	}
+	if id == "" {
+		return nil, ErrNotReady
+	}
+	return []proto.Command{c.mutate(proto.MethodSessionFork, proto.SessionRef{SessionID: id}, func(r json.RawMessage) []proto.Command {
+		var s proto.Session
+		if json.Unmarshal(r, &s) != nil || s.ID == "" {
+			return nil
+		}
+		c.upsertSession(s)
+		return []proto.Command{c.bind(s.ID)}
+	})}, nil
 }
 
 // Delete deletes a session; if it is shown, another is.

@@ -156,7 +156,7 @@ func toProto(e store.Event) proto.Event {
 
 func toSession(x store.Session) proto.Session {
 	return proto.Session{ID: x.ID, Title: x.Title, Cwd: x.Cwd, Account: x.Account, Model: x.Model,
-		Effort: x.Effort, Mode: x.Mode, Created: x.Created, Updated: x.Updated, Pinned: x.Pinned, Archived: x.Archived, Mark: x.Mark}
+		Effort: x.Effort, Mode: x.Mode, ParentID: x.ParentID, Created: x.Created, Updated: x.Updated, Pinned: x.Pinned, Archived: x.Archived, Mark: x.Mark}
 }
 
 // Create makes a session.
@@ -351,6 +351,55 @@ func (m *Manager) Flag(ctx context.Context, f proto.SessionFlag) (proto.Session,
 		return proto.Session{}, err
 	}
 	s := m.sessionProto(ctx, x)
+	return s, m.record(ctx, s.ID, proto.EventSession, s)
+}
+
+// Fork creates a new session branched off an existing session, copying its
+// conversation history and settings.
+func (m *Manager) Fork(ctx context.Context, ref proto.SessionRef) (proto.Session, error) {
+	src, err := m.session(ctx, ref.SessionID)
+	if err != nil {
+		return proto.Session{}, err
+	}
+	cwd := src.Cwd
+	if meta, ok := m.worktreeMetaOf(ctx, src.ID); ok {
+		cwd = meta.Repo
+	}
+	title := src.Title
+	if title != "" {
+		title += " (fork)"
+	}
+	dst := store.Session{
+		ID:       newID(),
+		Title:    title,
+		Cwd:      cwd,
+		Account:  src.Account,
+		Model:    src.Model,
+		Effort:   src.Effort,
+		Mode:     src.Mode,
+		ParentID: src.ID,
+	}
+	if err := m.Store.CreateSession(ctx, dst); err != nil {
+		return proto.Session{}, err
+	}
+	evs, err := m.Store.Events(ctx, src.ID, 0, 0)
+	if err != nil {
+		return proto.Session{}, err
+	}
+	for _, e := range evs {
+		switch e.Type {
+		case proto.EventSession, proto.EventApprovalRequest, proto.EventApprovalResolved:
+			continue
+		}
+		if _, err := m.Store.Append(context.WithoutCancel(ctx), dst.ID, e.Type, json.RawMessage(e.Data)); err != nil {
+			return proto.Session{}, err
+		}
+	}
+	dst, err = m.Store.GetSession(ctx, dst.ID)
+	if err != nil {
+		return proto.Session{}, err
+	}
+	s := m.sessionProto(ctx, dst)
 	return s, m.record(ctx, s.ID, proto.EventSession, s)
 }
 

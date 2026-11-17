@@ -493,6 +493,9 @@ func (a *App) roleModel(c *ui.Context, key string, ref *proto.ModelRef, open *bo
 	name, model := "", locales.SameAsDefault()
 	if ref != nil {
 		name, model = a.accountName(ref.Account), ref.Model
+		if ref.Effort != "" {
+			model += " · " + effortLabel(ref.Effort)
+		}
 	}
 	a.picker(c, "role-model:"+key, name, model).PopoverMenuButton(func(m *ui.Menu) {
 		if m.Item(locales.SameAsDefault()).ID("role-same:" + key).Checked(ref == nil).Chosen() {
@@ -514,6 +517,14 @@ func (a *App) roleModel(c *ui.Context, key string, ref *proto.ModelRef, open *bo
 				r.Model = id
 				save(&r)
 			})
+			m.Separator()
+			for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
+				if m.Item(effortLabel(effort)).ID("role-effort:" + key + ":" + effort).Checked(ref.Effort == effort).Chosen() {
+					r := *ref
+					r.Effort = effort
+					save(&r)
+				}
+			}
 		}
 	}, a.menuOptions(open))
 }

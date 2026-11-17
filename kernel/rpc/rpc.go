@@ -150,6 +150,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Flag(ctx, p)
+	case proto.MethodSessionFork:
+		p, err := params[proto.SessionRef](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return m.Fork(ctx, p)
 	case proto.MethodSessionDelete:
 		p, err := params[proto.SessionRef](cmd)
 		if err != nil {
@@ -375,6 +381,13 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return createPR(ctx, p)
+	}
+	if cmd.Method == proto.MethodCheckout {
+		p, err := params[proto.Checkout](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return checkout(ctx, p)
 	}
 	return nil, proto.Errorf("bad_request", "unknown method %q", cmd.Method)
 }

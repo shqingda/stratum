@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -43,4 +44,27 @@ func TestTerminalAndPlan(t *testing.T) {
 		}
 	}
 	snapshot(t, tt, "pane-plan")
+}
+
+func TestFilesPane(t *testing.T) {
+	a := screen1()
+	a.C.Files = []string{"src/", "notes.md"}
+	a.C.FilesFor = ""
+	var opened string
+	a.openIn = func(_ string, path string) error { opened = path; return nil }
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	if err := tt.Click("文件"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !tt.HasText("notes.md") || !tt.HasText("src/") {
+		t.Fatalf("files pane missing entries: %q", tt.Texts())
+	}
+	if err := tt.Click("notes.md"); err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(a.C.Current.Cwd, "notes.md"); opened != want {
+		t.Fatalf("opened %q, want %q", opened, want)
+	}
 }

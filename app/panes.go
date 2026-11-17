@@ -12,11 +12,16 @@ import (
 )
 
 // reviewTabs switches the review panel between the changes, the
-// commands the agent ran, and its plan.
+// commands the agent ran, its plan, and the workspace's files.
 func (a *App) reviewTabs(c *ui.Context, files int) {
 	p := a.p
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
-		for _, t := range []struct{ id, label string }{{"", locales.Changes()}, {"term", locales.Terminal()}, {"plan", locales.Plan()}} {
+		for _, t := range []struct{ id, label string }{
+			{"", locales.Changes()},
+			{"term", locales.Terminal()},
+			{"plan", locales.Plan()},
+			{"files", locales.Files()},
+		} {
 			on := a.rv.tab == t.id
 			b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(t.label)
 			fg := p.Fg2
@@ -149,6 +154,52 @@ func (a *App) planPane(c *ui.Context) {
 					}
 				})
 			})
+		}
+	})
+}
+
+// filesPane lists matching workspace files and opens one in the default editor.
+func (a *App) filesPane(c *ui.Context) {
+	p := a.p
+	cur := a.C.Current
+	if cur == nil {
+		a.reviewNote(c, locales.NoOpenSession())
+		return
+	}
+	q := strings.TrimSpace(a.rv.fileQuery)
+	if key := cur.Cwd + "\x00" + q; a.filesKey != key && a.C.Phase == client.Ready {
+		if cmds := a.C.FindFiles(q); cmds != nil {
+			a.filesKey = key
+			a.quiet(cmds, nil)
+		}
+	}
+	ui.Column(c).Padding(10, 12, 6, 12).Children(func() {
+		ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
+	})
+	if len(a.C.Files) == 0 {
+		a.reviewNote(c, locales.NoFilesFound())
+		return
+	}
+	ui.Scroll(c).Grow(1).Padding(4, 8, 12, 8).Children(func() {
+		for _, f := range a.C.Files {
+			isDir := strings.HasSuffix(f, "/")
+			icon := "file-text"
+			if isDir {
+				icon = "folder"
+			}
+			row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
+			if row.Hovered() {
+				row.Background(p.Hover)
+			}
+			row.Children(func() {
+				sym(c, icon, 14, p.Mute)
+				ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
+			})
+			if row.Clicked() && !isDir && a.openIn != nil {
+				if err := a.openIn("", filepath.Join(cur.Cwd, f)); err != nil {
+					a.err = locales.CouldntOpen(f, err.Error())
+				}
+			}
 		}
 	})
 }

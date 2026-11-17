@@ -25,7 +25,8 @@ const (
 // changed in files, and taking a turn's changes back.
 type review struct {
 	open bool
-	tab  string // "", "term" or "plan"
+	tab  string // "", "term", "plan", or "files"
+	fileQuery string
 	// uncommitted shows what git has not got, in place of a turn: turn,
 	// or the last one when 0.
 	uncommitted bool
@@ -226,6 +227,9 @@ func (a *App) reviewPanel(c *ui.Context) {
 			return
 		case "plan":
 			a.planPane(c)
+			return
+		case "files":
+			a.filesPane(c)
 			return
 		}
 		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {

@@ -35,55 +35,51 @@ func (c *Client) ReadWorkspace() ([]proto.Command, error) {
 	return []proto.Command{cmd}, nil
 }
 
-// Commit commits everything in the current session's folder.
-func (c *Client) Commit(message string) ([]proto.Command, error) {
+func (c *Client) workspaceAction(method string, params any, failMsg func(string) string) ([]proto.Command, error) {
 	if !c.CanAct() {
 		return nil, ErrNotReady
 	}
-	cmd := c.read(proto.MethodCommit, proto.Commit{Cwd: c.Current.Cwd, Message: message}, nil)
+	cmd := c.read(method, params, nil)
 	c.keepWorkspace(cmd.ID)
-	c.Workspace.Committing = true
 	failed := c.pending[cmd.ID].failed
 	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
-		c.Workspace.BranchStale = true // the answer carries no workspace
-		c.notice("fail", "%s", locales.CommitFailed(e.Message))
+		c.Workspace.BranchStale = true
+		c.notice("fail", "%s", failMsg(e.Message))
 		return failed(e)
 	}
 	return []proto.Command{cmd}, nil
+}
+
+// Commit commits everything in the current session's folder.
+func (c *Client) Commit(message string) ([]proto.Command, error) {
+	cmds, err := c.workspaceAction(proto.MethodCommit, proto.Commit{Cwd: c.Current.Cwd, Message: message}, locales.CommitFailed)
+	if err == nil {
+		c.Workspace.Committing = true
+	}
+	return cmds, err
 }
 
 // Push pushes the current branch to origin.
 func (c *Client) Push() ([]proto.Command, error) {
-	if !c.CanAct() {
-		return nil, ErrNotReady
+	cmds, err := c.workspaceAction(proto.MethodPush, proto.WorkspaceQuery{Cwd: c.Current.Cwd}, locales.PushFailed)
+	if err == nil {
+		c.Workspace.Pushing = true
 	}
-	cmd := c.read(proto.MethodPush, proto.WorkspaceQuery{Cwd: c.Current.Cwd}, nil)
-	c.keepWorkspace(cmd.ID)
-	c.Workspace.Pushing = true
-	failed := c.pending[cmd.ID].failed
-	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
-		c.Workspace.BranchStale = true
-		c.notice("fail", "%s", locales.PushFailed(e.Message))
-		return failed(e)
-	}
-	return []proto.Command{cmd}, nil
+	return cmds, err
 }
 
 // CreatePR pushes HEAD and opens a pull request.
 func (c *Client) CreatePR(title, body string) ([]proto.Command, error) {
-	if !c.CanAct() {
-		return nil, ErrNotReady
+	cmds, err := c.workspaceAction(proto.MethodCreatePR, proto.CreatePR{Cwd: c.Current.Cwd, Title: title, Body: body}, locales.PrFailed)
+	if err == nil {
+		c.Workspace.Pushing = true
 	}
-	cmd := c.read(proto.MethodCreatePR, proto.CreatePR{Cwd: c.Current.Cwd, Title: title, Body: body}, nil)
-	c.keepWorkspace(cmd.ID)
-	c.Workspace.Pushing = true
-	failed := c.pending[cmd.ID].failed
-	c.pending[cmd.ID].failed = func(e *proto.Error) []proto.Command {
-		c.Workspace.BranchStale = true
-		c.notice("fail", "%s", locales.PrFailed(e.Message))
-		return failed(e)
-	}
-	return []proto.Command{cmd}, nil
+	return cmds, err
+}
+
+// Checkout switches the current folder's checked-out branch.
+func (c *Client) Checkout(branch string) ([]proto.Command, error) {
+	return c.workspaceAction(proto.MethodCheckout, proto.Checkout{Cwd: c.Current.Cwd, Branch: branch}, locales.SwitchBranchFailed)
 }
 
 // keepWorkspace takes the answer to request id, unless a later request

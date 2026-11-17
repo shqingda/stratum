@@ -249,3 +249,40 @@ func TestAppearanceAndAbout(t *testing.T) {
 		t.Fatalf("about: %q", tt.Texts())
 	}
 }
+
+func TestRoleModelEffort(t *testing.T) {
+	a := working()
+	a.C.Busy, a.C.Approvals = false, nil
+	a.C.Settings = &proto.Settings{
+		Sub: &proto.ModelRef{Account: "chatgpt", Model: "gpt-6-luna", Effort: "high"},
+	}
+	a.settingsOpen, a.settingsPage = true, "models"
+	a.out = make(chan []proto.Command, 16)
+	tt := ui.NewTester(a.View, 1120, 800)
+	tt.Frame()
+	if !tt.HasText("gpt-6-luna · 高") {
+		t.Fatalf("missing role effort label in %q", tt.Texts())
+	}
+	if err := tt.Click("gpt-6-luna · 高"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tt.ChooseMenuItem("低"); err != nil {
+		t.Fatal(err)
+	}
+	var saved proto.Settings
+	for done := false; !done; {
+		select {
+		case cmds := <-a.out:
+			for _, cmd := range cmds {
+				if cmd.Method == proto.MethodSetSettings {
+					_ = json.Unmarshal(cmd.Params, &saved)
+				}
+			}
+		default:
+			done = true
+		}
+	}
+	if saved.Sub == nil || saved.Sub.Effort != "low" {
+		t.Fatalf("saved Sub = %+v", saved.Sub)
+	}
+}

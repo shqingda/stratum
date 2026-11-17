@@ -102,7 +102,7 @@ type App struct {
 	keyRepeat                                               bool
 	visibleSessions                                         []string
 	menuSession                                             string
-	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu, worktreeMenu bool
+	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu, worktreeMenu, branchMenu bool
 	modelsRequested                                         bool
 	modelsPending, modelsAccount, modelsError               string
 	modelsLoadedAccount                                     string

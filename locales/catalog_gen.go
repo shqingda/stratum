@@ -264,6 +264,16 @@ func (msgs Messages) RewindSummarize() string {
 	return Catalog.Format(msgs.locale, "rewindSummarize", nil)
 }
 
+// RewindSummarizeBefore says "摘要到这里"
+// in the language the app shows.
+func RewindSummarizeBefore() string { return In(i18n.Locale()).RewindSummarizeBefore() }
+
+// RewindSummarizeBefore says "摘要到这里"
+// in the language of msgs.
+func (msgs Messages) RewindSummarizeBefore() string {
+	return Catalog.Format(msgs.locale, "rewindSummarizeBefore", nil)
+}
+
 // RewindTo says "回退到这里"
 // in the language the app shows.
 func RewindTo() string { return In(i18n.Locale()).RewindTo() }
@@ -2608,6 +2618,66 @@ func (msgs Messages) ToolWebSearch() string {
 	return Catalog.Format(msgs.locale, "toolWebSearch", nil)
 }
 
+// ToolMemory says "记忆"
+// in the language the app shows.
+func ToolMemory() string { return In(i18n.Locale()).ToolMemory() }
+
+// ToolMemory says "记忆"
+// in the language of msgs.
+func (msgs Messages) ToolMemory() string {
+	return Catalog.Format(msgs.locale, "toolMemory", nil)
+}
+
+// ForkSession says "分叉会话"
+// in the language the app shows.
+func ForkSession() string { return In(i18n.Locale()).ForkSession() }
+
+// ForkSession says "分叉会话"
+// in the language of msgs.
+func (msgs Messages) ForkSession() string {
+	return Catalog.Format(msgs.locale, "forkSession", nil)
+}
+
+// ForkNote says "从当前对话复制出一个新会话继续"
+// in the language the app shows.
+func ForkNote() string { return In(i18n.Locale()).ForkNote() }
+
+// ForkNote says "从当前对话复制出一个新会话继续"
+// in the language of msgs.
+func (msgs Messages) ForkNote() string {
+	return Catalog.Format(msgs.locale, "forkNote", nil)
+}
+
+// ExportMarkdown says "复制会话为 Markdown"
+// in the language the app shows.
+func ExportMarkdown() string { return In(i18n.Locale()).ExportMarkdown() }
+
+// ExportMarkdown says "复制会话为 Markdown"
+// in the language of msgs.
+func (msgs Messages) ExportMarkdown() string {
+	return Catalog.Format(msgs.locale, "exportMarkdown", nil)
+}
+
+// ExportNote says "把整个对话整理成 Markdown 复制到剪贴板"
+// in the language the app shows.
+func ExportNote() string { return In(i18n.Locale()).ExportNote() }
+
+// ExportNote says "把整个对话整理成 Markdown 复制到剪贴板"
+// in the language of msgs.
+func (msgs Messages) ExportNote() string {
+	return Catalog.Format(msgs.locale, "exportNote", nil)
+}
+
+// NoFilesFound says "没有匹配的文件"
+// in the language the app shows.
+func NoFilesFound() string { return In(i18n.Locale()).NoFilesFound() }
+
+// NoFilesFound says "没有匹配的文件"
+// in the language of msgs.
+func (msgs Messages) NoFilesFound() string {
+	return Catalog.Format(msgs.locale, "noFilesFound", nil)
+}
+
 // KindNet says "访问网络"
 // in the language the app shows.
 func KindNet() string { return In(i18n.Locale()).KindNet() }
@@ -4218,6 +4288,16 @@ func (msgs Messages) ChecksPending() string {
 	return Catalog.Format(msgs.locale, "checksPending", nil)
 }
 
+// SwitchBranchFailed says "切换分支失败：{error}"
+// in the language the app shows.
+func SwitchBranchFailed(error string) string { return In(i18n.Locale()).SwitchBranchFailed(error) }
+
+// SwitchBranchFailed says "切换分支失败：{error}"
+// in the language of msgs.
+func (msgs Messages) SwitchBranchFailed(error string) string {
+	return Catalog.Format(msgs.locale, "switchBranchFailed", map[string]any{"error": error})
+}
+
 // FilesChangedSince says "{count} 个文件在这之后又被改过，没有动它们：{files}"
 // in the language the app shows.
 func FilesChangedSince(count int, files string) string {
@@ -4332,6 +4412,16 @@ func CompactedFromHere() string { return In(i18n.Locale()).CompactedFromHere() }
 // in the language of msgs.
 func (msgs Messages) CompactedFromHere() string {
 	return Catalog.Format(msgs.locale, "compactedFromHere", nil)
+}
+
+// CompactedUpTo says "到这里为止的对话已写成摘要"
+// in the language the app shows.
+func CompactedUpTo() string { return In(i18n.Locale()).CompactedUpTo() }
+
+// CompactedUpTo says "到这里为止的对话已写成摘要"
+// in the language of msgs.
+func (msgs Messages) CompactedUpTo() string {
+	return Catalog.Format(msgs.locale, "compactedUpTo", nil)
 }
 
 // Compacted says "上下文快满了，较早的对话已写成摘要"

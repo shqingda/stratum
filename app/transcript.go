@@ -50,6 +50,7 @@ var tools = map[string]struct {
 	"skill":       {"sparkles", locales.ToolSkill},
 	"web_fetch":   {"world", locales.ToolWebFetch},
 	"web_search":  {"world", locales.ToolWebSearch},
+	"memory":      {"brain", locales.ToolMemory},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},

@@ -73,6 +73,7 @@ type source struct {
 	path    string
 	data    []byte
 	agents  bool
+	memory  bool
 	project bool
 }
 
@@ -129,13 +130,25 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 	for _, dir := range projectDirs(cwd) {
 		agents(dir)
 	}
+	memory := func(path string) {
+		if !seen[path] {
+			seen[path] = true
+			if data, ok := readRegular(path); ok {
+				files = append(files, source{path: path, data: data, agents: true, memory: true})
+			}
+		}
+	}
+	if global != "" {
+		memory(filepath.Join(global, "MEMORY.md"))
+	}
+	memory(filepath.Join(cwd, ".talos", "MEMORY.md"))
 	if global != "" {
 		files = append(files, skillFiles(false, global, "skills")...)
 	}
 	files = append(files, skillFiles(true, cwd, ".talos", "skills")...)
 	hash := sha256.New()
 	for _, file := range files {
-		fmt.Fprintf(hash, "%t:%t:%d:%s:%d:", file.agents, file.project, len(file.path), file.path, len(file.data))
+		fmt.Fprintf(hash, "%t:%t:%t:%d:%s:%d:", file.agents, file.memory, file.project, len(file.path), file.path, len(file.data))
 		hash.Write(file.data)
 	}
 	var sum [32]byte
@@ -152,7 +165,11 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 			if instructions.Len() == 0 {
 				instructions.WriteString("\nAGENTS.md instructions (later, nearer-workspace instructions take precedence):\n")
 			}
-			fmt.Fprintf(&instructions, "\nInstructions from %s:\n%s\n", file.path, file.data)
+			if file.memory {
+				fmt.Fprintf(&instructions, "\nMemory from %s:\n%s\n", file.path, file.data)
+			} else {
+				fmt.Fprintf(&instructions, "\nInstructions from %s:\n%s\n", file.path, file.data)
+			}
 			continue
 		}
 		skill, err := Parse(file.data)
