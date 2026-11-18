@@ -230,7 +230,7 @@ func (a *App) View(c *ui.Context) {
 	}
 	// Keep the review drawer spring on the root so collapsing the sidebar
 	// never shifts child indices and replays the opening animation.
-	a.rvOpen = c.Root().Spring("review", rvTarget, ui.SpringOptions{Stiffness: 380, Damping: 39})
+	a.rvOpen = c.Root().Spring("review", rvTarget, ui.SpringOptions{Stiffness: 300, Damping: 34.6})
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -239,10 +239,14 @@ func (a *App) View(c *ui.Context) {
 	if a.noSide {
 		target = 0
 	}
-	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 380, Damping: 39})
+	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 300, Damping: 34.6})
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
-			ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.sidebar(c, vibrant) })
+			sideWrap := ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip()
+			if a.sideOpen < 0.999 {
+				sideWrap.Translate(-(1-a.sideOpen)*10, 0).Opacity(min(1, a.sideOpen*1.35))
+			}
+			sideWrap.Children(func() { a.sidebar(c, vibrant) })
 		}
 		a.main(c)
 		a.sideToggle(c)

@@ -51,9 +51,6 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 			ui.Text(c, "Talos").FontSize(16).FontWeight(600).TextColor(p.Fg)
 		})
 		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
-			if a.navItem(c, "new-top", "edit", locales.NewSession(), "⌘ N").KeyShortcuts(ui.Cmd, ui.KeyN).Clicked() {
-				a.do(a.C.NewSession())
-			}
 			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
 				a.openPalette(c)
 			}
@@ -82,45 +79,41 @@ func (a *App) sideToggle(c *ui.Context) {
 	if a.noSide {
 		tip = locales.ShowSidebar()
 	}
-	const pillW, pillH = float32(68), float32(30)
+	const pillW, pillH = float32(76), float32(34)
 	leftClosed := toggleLeft(c)
-	leftOpen := float32(sidebarWidth) - 20 - pillW
+	leftOpen := float32(sidebarWidth) - 18 - pillW
 	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
-	bg := ui.RGBA(255, 255, 255, .90)
-	shadow := ui.RGBA(0, 0, 0, .09)
+	bg := ui.RGBA(255, 255, 255, .92)
+	shadow := ui.RGBA(0, 0, 0, .08)
 	if p == dark {
-		bg = ui.RGBA(38, 38, 42, .86)
+		bg = ui.RGBA(38, 38, 42, .88)
 		shadow = ui.RGBA(0, 0, 0, .36)
 	}
-	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2+2).
-		Size(pillW, pillH).Radius(pillH/2).Padding(0, 3).AlignItems(ui.Center).Justify(ui.Center).
+	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2+1).
+		Size(pillW, pillH).Radius(pillH/2).Padding(0, 5).Gap(4).AlignItems(ui.Center).Justify(ui.Center).
 		Background(bg).Border(.5, p.Edge).Shadow(0, 1, 4, 0, shadow).ZIndex(10)
 	rim(pill, p)
 	pill.Children(func() {
-		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(29, 24).Radius(12).Center().
-			Label(locales.NewSession()).Tooltip(locales.NewSession())
+		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(31, 28).Radius(14).Center().
+			Label(locales.NewSession()).Tooltip(locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN)
 		press(newBtn)
-		newCol := p.Fg2
+		newCol := p.Fg
 		if newBtn.Hovered() {
 			newBtn.Background(p.Hover)
-			newCol = p.Fg
 		}
-		newBtn.Children(func() { sym(c, "edit", 16, newCol) })
+		newBtn.Children(func() { sym(c, "edit", 18, newCol) })
 		if newBtn.Clicked() {
 			a.do(a.C.NewSession())
 		}
 
-		ui.Box(c).Width(.5).Height(15).Margin(0, 1.5, 0, 1.5).Background(p.Edge)
-
-		togBtn := ui.ButtonBase(c.Key("side")).Size(29, 24).Radius(12).Center().
+		togBtn := ui.ButtonBase(c.Key("side")).Size(31, 28).Radius(14).Center().
 			Label(tip).Tooltip(tip)
 		press(togBtn)
-		togCol := p.Fg2
+		togCol := p.Fg
 		if togBtn.Hovered() {
 			togBtn.Background(p.Hover)
-			togCol = p.Fg
 		}
-		togBtn.Children(func() { sym(c, "layout-sidebar", 17, togCol) })
+		togBtn.Children(func() { sym(c, "layout-sidebar", 19, togCol) })
 		if togBtn.Clicked() {
 			a.toggleSide()
 		}

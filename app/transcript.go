@@ -500,27 +500,7 @@ func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
 	a.heroEmblem(c, 52)
-	titleMarginBottom := float32(64)
-	if a.noSide {
-		titleMarginBottom = 24
-	}
-	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(8, 0, titleMarginBottom, 0)
-	if a.noSide {
-		var recent []proto.Session
-		for _, s := range a.C.Sessions {
-			if s.ID != cur.ID && s.Cwd == cur.Cwd && len(recent) < 3 {
-				recent = append(recent, s)
-			}
-		}
-		if len(recent) > 0 {
-			ui.Column(c).Width(640).MaxWidthPercent(100).Margin(0, 0, 48, 0).Children(func() {
-				ui.Text(c, locales.Recent()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(0, 0, 4, 10)
-				for _, s := range recent {
-					a.sessionRow(c, s)
-				}
-			})
-		}
-	}
+	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(8, 0, 64, 0)
 }
 
 func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
