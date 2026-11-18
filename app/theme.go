@@ -110,24 +110,20 @@ func press(e ui.Element) ui.Element {
 	return e.Scale(s, s)
 }
 
-// tintedGlass returns macOS Tinted Liquid Glass: higher opacity and contrast
-// than Clear so sidebar and HUD text stays crisp without background bleed.
+// tintedGlass returns macOS Tinted Liquid Glass: balanced frosted tint and
+// contrast over Clear so sidebar text stays sharp while preserving glass depth.
 func tintedGlass(p *Palette) glass.Glass {
-	tint := ui.RGBA(244, 245, 248, .62)
+	tint := ui.RGBA(244, 245, 248, .28)
 	if p == dark {
-		tint = ui.RGBA(20, 20, 22, .68)
+		tint = ui.RGBA(20, 20, 22, .36)
 	}
 	return glass.Glass{Tint: tint, Native: true}
 }
 
-// glassButton returns an interactive Tinted Liquid Glass material for
-// floating toolbar and sidebar toggle controls.
+// glassButton returns an interactive Liquid Glass material for floating
+// toolbar and sidebar toggle controls without an opaque tint wash.
 func glassButton(p *Palette) glass.Glass {
-	tint := ui.RGBA(250, 250, 252, .68)
-	if p == dark {
-		tint = ui.RGBA(32, 32, 35, .64)
-	}
-	return glass.Glass{Tint: tint, Interactive: true}
+	return glass.Glass{Interactive: true, Native: true}
 }
 
 func specular(p *Palette) ui.Color {

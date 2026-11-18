@@ -83,8 +83,7 @@ func (a *App) sideToggle(c *ui.Context) {
 	}
 	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-30)/2).Size(30, 30).ZIndex(10).Children(func() {
 		b := ui.ButtonBase(c.Key("side")).Size(30, 30).Radius(15).Center().
-			Material(glassButton(a.p)).Border(.5, a.p.Edge).Label(tip).Tooltip(tip)
-		rim(b, a.p)
+			Material(glassButton(a.p)).Label(tip).Tooltip(tip)
 		press(b)
 		color := a.p.Fg2
 		if b.Hovered() {
