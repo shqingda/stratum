@@ -48,11 +48,11 @@ func brandMark(c *ui.Context, size float32, col ui.Color) ui.Element {
 }
 
 // heroMark renders the specular metallic Talos emblem for the Welcome canvas
-// and empty states, using light or dark brushed metal gradients.
+// and empty states using ui.Image so SVG gradients and reflections keep their own colors.
 func heroMark(c *ui.Context, size float32, isDark bool) ui.Element {
 	name := "talos-hero-light"
 	if isDark {
 		name = "talos-hero-dark"
 	}
-	return ui.Icon(c, icon(name)).Size(size, size).Shrink(0)
+	return ui.Image(c, icon(name)).Size(size, size).Shrink(0)
 }
