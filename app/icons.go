@@ -40,3 +40,9 @@ func icon(name string) *ui.SVG {
 func sym(c *ui.Context, name string, size float32, col ui.Color) ui.Element {
 	return ui.Icon(c, icon(name)).Size(size, size).TextColor(col).Shrink(0)
 }
+
+// brandMark renders the monochrome cutout Talos emblem without a background
+// plate, tinted to col so it adapts to light, dark, and vibrancy surfaces.
+func brandMark(c *ui.Context, size float32, col ui.Color) ui.Element {
+	return sym(c, "talos", size, col)
+}

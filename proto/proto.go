@@ -812,4 +812,5 @@ type MCPServer struct {
 	State   string   `json:"state"`             // untrusted, connecting, ok, fail
 	Error   string   `json:"error,omitempty"`
 	Tools   []string `json:"tools,omitempty"`
+	Logs    []string `json:"logs,omitempty"`
 }

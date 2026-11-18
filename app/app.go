@@ -6,7 +6,6 @@ package app
 import (
 	"bufio"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"io"
 	"time"
@@ -17,19 +16,6 @@ import (
 	"github.com/shqingda/talos/kernel/rpc"
 	"github.com/shqingda/talos/proto"
 )
-
-//go:embed assets/mark.png
-var markPNG []byte
-
-// mark is the app icon, drawn from a PNG: mygo's SVG leaves out the
-// gradients and clips the icon is made of.
-var mark = func() ui.ImageSource {
-	src, err := ui.DecodeImage(markPNG)
-	if err != nil {
-		panic(err)
-	}
-	return src
-}()
 
 // App is the state of the window. Everything in it is touched on the UI
 // thread only: frames from the kernel come in through update.

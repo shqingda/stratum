@@ -5,9 +5,9 @@
 ## 已有
 
 - 模型：OpenAI、Anthropic、Gemini 三家；订阅登录；多账号，额度用完切账号。
-- 工具：读、写、改文件，列目录，搜索，shell（沙箱），git status/diff，计划，提问，子任务（task、run_tasks），review，skill，`web_fetch`，`web_search`，`memory`（跨会话 `MEMORY.md` 读写）。
-- 内核：AGENTS.md、跨会话 `MEMORY.md`（全局和项目）、技能目录（skills 包，含启用/禁用）、MCP（含信任、添加/编辑/移除、resources、prompts）、Hooks（`PreToolUse` / `PostToolUse` / `Stop`）、worktree 隔离（含 `.worktreeinclude`）、会话分叉（`session.fork`）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
-- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、文件、行内评论、推送与创建 PR、顶栏 PR/CI 状态）、⌘K、会话内查找、@ 文件/文件夹/会话/MCP 资源、`/` 命令/技能/自定义命令/MCP prompts/`/fork`/`/export`/`/worktree`、新会话分支选择、用量与费用显示、技能与 MCP 管理界面、各角色模型与推理强度选择、设置、通知、菜单栏。
+- 工具：读、写、改文件，列目录，搜索，shell（沙箱），git status/diff，计划，提问，子任务（task、run_tasks），review，skill，`web_fetch`，`web_search`，`memory`（跨会话 `MEMORY.md` 读写），`diagnostics`（Go/TS/Rust/Python 静态与类型诊断）。
+- 内核：AGENTS.md、跨会话 `MEMORY.md`（全局和项目）、技能目录（skills 包，含启用/禁用）、MCP（含信任、添加/编辑/移除、运行日志、resources、prompts）、Hooks（`PreToolUse` / `PostToolUse` / `Stop`）、worktree 隔离（含 `.worktreeinclude`）、会话分叉（`session.fork`）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
+- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、文件、行内评论、推送与创建 PR、顶栏 PR/CI 状态）、⌘K、会话内查找、@ 文件/文件夹/会话/MCP 资源、`/` 命令/技能/自定义命令/MCP prompts/`/fork`/`/export`/`/worktree`、分支切换、用量与费用显示、技能与 MCP 管理界面（含日志查看）、各角色模型与推理强度选择、统一设置（已合并账号与模型）、通知、菜单栏。
 
 ## 缺的，按影响排
 
@@ -23,14 +23,14 @@
 5. **技能管理界面**：已有（设置 › 技能与 MCP）：安装（本地路径或 Git URL）、新建、启用/禁用开关、展开查看 `SKILL.md` 正文、移除。
 6. **自定义命令**：已有。
 7. **Hooks**：已有内核支持（`.talos/hooks.json`、`.claude/settings.json`、`~/.talos/hooks.json` 的 `PreToolUse`、`PostToolUse`、`Stop`）。缺界面编辑。
-8. **MCP 添加**：已有添加、编辑、移除、项目服务器启用/停用。缺查看服务器运行日志。
+8. **MCP 添加**：已有添加、编辑、移除、项目服务器启用/停用与运行日志查看。
 9. **插件**：没有。
 
 ### 三、工具
 
 10. **网页抓取和搜索**：`web_fetch` 和 `web_search` 均已有。
 11. **浏览器 / 预览**：没有。
-12. **LSP / 诊断**：没有（改完不知道有没有编译错误，只能靠跑命令）。
+12. **LSP / 诊断**：已有 `diagnostics` 工具（支持 Go `go vet`、TypeScript `tsc --noEmit`、Rust `cargo check`、Python `py_compile`）；仍缺持久化 LSP 语言服务器守护进程。
 13. **记忆**：已有跨会话 `MEMORY.md`（全局 `~/.talos/MEMORY.md` 与项目 `.talos/MEMORY.md`）自动加载和 `memory` 工具。
 
 ### 四、会话和工作流
@@ -49,11 +49,10 @@
 
 ### 六、外观（设计稿差异，见 audit.md）
 
-22. Review「文件」页签已有；仍缺用户消息样式与设置分页合并。
+22. Review「文件」页签与设置「账号与模型」分页合并已有；仍缺用户消息左侧引用块样式。
 
 ## 建议顺序
 
-1. LSP / 诊断（改文件后自动读取编译/类型错误）。
-2. 浏览器 / 预览。
-3. 插件。
-4. 后台 / 定时任务、语音输入、已开始会话 Worktree Hand off、MCP 日志查看、Hooks 界面编辑。
+1. 浏览器 / 预览。
+2. 插件。
+3. 持久化 LSP、后台 / 定时任务、语音输入、已开始会话 Worktree Hand off、Hooks 界面编辑。

@@ -52,7 +52,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	side.Children(func() {
 		ui.Box(c).Height(topGap).Shrink(0).DragWindow()
 		ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
-			ui.Image(c, mark).Size(24, 24)
+			brandMark(c, 22, p.Fg)
 			ui.Text(c, "Talos").FontSize(16).FontWeight(600).TextColor(p.Fg)
 		})
 		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
@@ -107,6 +107,7 @@ func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+8, 12) }
 func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
 	p := a.p
 	it := ui.ButtonBase(c.Key(key)).Row().Height(36).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
+	press(it)
 	if it.Hovered() {
 		it.Background(p.Hover)
 	}

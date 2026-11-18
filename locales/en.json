@@ -263,6 +263,8 @@
   "toolWebFetch": "Fetch",
   "toolWebSearch": "Search the web",
   "toolMemory": "Memory",
+  "toolDiagnostics": "Diagnostics",
+  "logs": "Logs",
   "forkSession": "Fork Session",
   "forkNote": "Branch off a copy of this conversation",
   "exportMarkdown": "Copy Session as Markdown",

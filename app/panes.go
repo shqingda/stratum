@@ -195,6 +195,7 @@ func (a *App) filesPane(c *ui.Context) {
 				icon = "folder"
 			}
 			row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
+			press(row)
 			if row.Hovered() {
 				row.Background(p.Hover)
 			}

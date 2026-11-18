@@ -360,6 +360,8 @@
   "toolWebFetch": "读取网页",
   "toolWebSearch": "搜索网页",
   "toolMemory": "记忆",
+  "toolDiagnostics": "诊断",
+  "logs": "日志",
   "forkSession": "分叉会话",
   "forkNote": "从当前对话复制出一个新会话继续",
   "exportMarkdown": "复制会话为 Markdown",

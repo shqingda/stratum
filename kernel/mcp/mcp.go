@@ -51,6 +51,7 @@ type Status struct {
 	State string // untrusted, connecting, ok, fail
 	Error string
 	Tools []string
+	Logs  []string
 }
 
 // connectTimeout bounds starting a server and listing its tools.
@@ -119,6 +120,48 @@ type conn struct {
 	resources []proto.MCPResource
 	prompts   []proto.MCPPrompt
 	err       error
+	logs      *logRing
+}
+
+type logRing struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (r *logRing) Write(p []byte) (int, error) {
+	if r == nil {
+		return len(p), nil
+	}
+	for _, line := range strings.Split(strings.TrimRight(string(p), "\r\n"), "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line != "" {
+			r.add(line)
+		}
+	}
+	return len(p), nil
+}
+
+func (r *logRing) add(line string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.lines = append(r.lines, line)
+	if len(r.lines) > 50 {
+		r.lines = r.lines[len(r.lines)-50:]
+	}
+}
+
+func (r *logRing) snapshot() []string {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.lines) == 0 {
+		return nil
+	}
+	out := make([]string, len(r.lines))
+	copy(out, r.lines)
+	return out
 }
 
 func key(cwd string, e Entry) string {
@@ -146,12 +189,15 @@ func (h *Hub) conn(cwd string, e Entry) *conn {
 	if h.conns == nil {
 		h.conns = map[string]*conn{}
 	}
-	c := &conn{ready: make(chan struct{})}
+	c := &conn{ready: make(chan struct{}), logs: &logRing{}}
 	h.conns[k] = c
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
 		defer cancel()
-		c.session, c.tools, c.resources, c.prompts, c.err = dial(ctx, cwd, e)
+		c.session, c.tools, c.resources, c.prompts, c.err = dial(ctx, cwd, e, c.logs)
+		if c.err != nil {
+			c.logs.add("connect error: " + c.err.Error())
+		}
 		close(c.ready)
 		if h.Changed != nil {
 			h.Changed()
@@ -172,7 +218,7 @@ func (h *Hub) drop(cwd string, e Entry, c *conn) {
 	}
 }
 
-func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.Tool, []proto.MCPResource, []proto.MCPPrompt, error) {
+func dial(ctx context.Context, cwd string, e Entry, logs *logRing) (*sdk.ClientSession, []*sdk.Tool, []proto.MCPResource, []proto.MCPPrompt, error) {
 	var t sdk.Transport
 	s := e.Server
 	switch {
@@ -186,6 +232,7 @@ func dial(ctx context.Context, cwd string, e Entry) (*sdk.ClientSession, []*sdk.
 		if e.Project {
 			cmd.Dir = cwd
 		}
+		cmd.Stderr = logs
 		t = &sdk.CommandTransport{Command: cmd}
 	case s.URL != "":
 		headers := map[string]string{}
@@ -279,6 +326,7 @@ func (h *Hub) Status(cwd string) ([]Status, error) {
 			default:
 				st.State = "connecting"
 			}
+			st.Logs = c.logs.snapshot()
 		}
 		out = append(out, st)
 	}

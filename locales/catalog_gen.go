@@ -2670,6 +2670,26 @@ func (msgs Messages) ToolMemory() string {
 	return Catalog.Format(msgs.locale, "toolMemory", nil)
 }
 
+// ToolDiagnostics says "诊断"
+// in the language the app shows.
+func ToolDiagnostics() string { return In(i18n.Locale()).ToolDiagnostics() }
+
+// ToolDiagnostics says "诊断"
+// in the language of msgs.
+func (msgs Messages) ToolDiagnostics() string {
+	return Catalog.Format(msgs.locale, "toolDiagnostics", nil)
+}
+
+// Logs says "日志"
+// in the language the app shows.
+func Logs() string { return In(i18n.Locale()).Logs() }
+
+// Logs says "日志"
+// in the language of msgs.
+func (msgs Messages) Logs() string {
+	return Catalog.Format(msgs.locale, "logs", nil)
+}
+
 // ForkSession says "分叉会话"
 // in the language the app shows.
 func ForkSession() string { return In(i18n.Locale()).ForkSession() }

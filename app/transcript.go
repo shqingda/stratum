@@ -51,6 +51,7 @@ var tools = map[string]struct {
 	"web_fetch":   {"world", locales.ToolWebFetch},
 	"web_search":  {"world", locales.ToolWebSearch},
 	"memory":      {"brain", locales.ToolMemory},
+	"diagnostics": {"alert-circle", locales.ToolDiagnostics},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},
@@ -457,11 +458,11 @@ func (a *App) empty(c *ui.Context) {
 			}
 			ui.Text(c, locales.KernelDisconnectedHint()).FontSize(13).TextColor(p.Mute)
 		case a.C.Phase != client.Ready:
-			ui.Image(c, mark).Size(56, 56).Opacity(.5)
-			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(12, 0, 0, 0)
+			brandMark(c, 52, p.Fg).Opacity(.5)
+			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(14, 0, 0, 0)
 		case a.C.Current == nil:
-			ui.Image(c, mark).Size(56, 56)
-			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(12, 0, 0, 0)
+			brandMark(c, 52, p.Fg)
+			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(14, 0, 0, 0)
 		default:
 			a.hello(c)
 		}
@@ -473,9 +474,12 @@ func (a *App) empty(c *ui.Context) {
 func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	ui.Image(c, mark).Size(44, 44)
-	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(22, 0, 6, 0)
-	ui.Text(c, locales.HelloLead()).TextColor(p.Fg2).Margin(0, 0, 72, 0)
+	brandMark(c, 42, p.Fg)
+	titleMarginBottom := float32(64)
+	if a.noSide {
+		titleMarginBottom = 24
+	}
+	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(16, 0, titleMarginBottom, 0)
 	if a.noSide {
 		var recent []proto.Session
 		for _, s := range a.C.Sessions {

@@ -120,7 +120,7 @@ func (a *App) box(c *ui.Context) {
 		a.attachPaths(files)
 	}
 	if box.FileDragOver() {
-		box.Border(1, p.Fg2)
+		box.Border(1.5, p.Live)
 	}
 	svc := c.Services()
 	box.Children(func() {

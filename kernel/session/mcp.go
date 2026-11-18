@@ -87,7 +87,7 @@ func (m *Manager) MCPList(ctx context.Context, q proto.MCPQuery) (proto.MCPList,
 		if st.Server.Command != "" {
 			target = strings.Join(append([]string{st.Server.Command}, st.Server.Args...), " ")
 		}
-		out.Servers = append(out.Servers, proto.MCPServer{Name: st.Name, Project: st.Project, Target: target, State: st.State, Error: st.Error, Tools: st.Tools})
+		out.Servers = append(out.Servers, proto.MCPServer{Name: st.Name, Project: st.Project, Target: target, State: st.State, Error: st.Error, Tools: st.Tools, Logs: st.Logs})
 	}
 	out.Resources = m.MCP.Resources(q.Cwd)
 	out.Prompts = m.MCP.Prompts(q.Cwd)

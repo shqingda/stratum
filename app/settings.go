@@ -14,18 +14,17 @@ import (
 )
 
 // settingsPages are the pages of the settings, in the order of the list,
-// with their macOS squircle tint and search keywords.
+// with their search keywords and page descriptions.
 var settingsPages = []struct {
 	id, symbol         string
-	badge              ui.Color
 	label, words, lede func(locales.Messages) string
 }{
-	{"general", "adjustments-horizontal", ui.Hex("#636366"), locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords, locales.Messages.SettingsGeneralLede},
-	{"accounts", "sparkles", ui.Hex("#007AFF"), locales.Messages.SettingsAccountsAndModels, locales.Messages.SettingsAccountsAndModelsWords, locales.Messages.SettingsAccountsAndModelsLede},
-	{"permissions", "shield-half", ui.Hex("#34C759"), locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
-	{"appearance", "palette", ui.Hex("#5856D6"), locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
-	{"shortcuts", "keyboard", ui.Hex("#FF9500"), locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
-	{"mcp", "puzzle", ui.Hex("#32ADE6"), locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
+	{"general", "adjustments-horizontal", locales.Messages.SettingsGeneral, locales.Messages.SettingsGeneralWords, locales.Messages.SettingsGeneralLede},
+	{"accounts", "sparkles", locales.Messages.SettingsAccountsAndModels, locales.Messages.SettingsAccountsAndModelsWords, locales.Messages.SettingsAccountsAndModelsLede},
+	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
+	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
+	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
+	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
 }
 
 // finds says whether a settings page answers a search, in any language
@@ -95,7 +94,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		side.Children(func() {
 			ui.Box(c).Height(topGap).Shrink(0).DragWindow()
 			ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
-				ui.Image(c, mark).Size(24, 24)
+				brandMark(c, 22, p.Fg)
 				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).TextColor(p.Fg)
 			})
 			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)

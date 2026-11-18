@@ -40,7 +40,7 @@ func (a *App) onboarding(c *ui.Context) {
 	ui.Column(c).Fill().Background(p.Bg).Children(func() {
 		ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
 		ui.Column(c).Grow(1).AlignItems(ui.Center).Padding(70, 20, 20, 20).Children(func() {
-			ui.Image(c, mark).Size(58, 58).Margin(-5, 0, -5, 0)
+			brandMark(c, 52, p.Fg)
 			ui.Text(c, locales.OnboardingTitle()).FontSize(24).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
 			ui.Text(c, locales.OnboardingLead()).FontSize(14).TextColor(p.Fg2).Margin(0, 0, 26, 0)
 			ui.Column(c).Width(460).MaxWidthPercent(100).Children(func() { a.loginList(c) })

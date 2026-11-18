@@ -22,6 +22,7 @@ type mcpState struct {
 	skillDesc        string
 	skillBody        string
 	skillSource      string
+	mcpLogsOpen      map[string]bool
 }
 
 // mcpPage lists the MCP servers and skills of the current session's folder.
@@ -187,6 +188,12 @@ func (a *App) mcpRow(c *ui.Context, s proto.MCPServer) {
 		case "ok":
 			ui.Text(c, locales.ToolCount(len(s.Tools))).FontSize(12).TextColor(p.Mute).Shrink(0).Tooltip(strings.Join(s.Tools, locales.ListSeparator()))
 		}
+		if len(s.Logs) > 0 && a.textButton(c, "mcp-logs:"+s.Name, locales.Logs()).Clicked() {
+			if a.mcpUI.mcpLogsOpen == nil {
+				a.mcpUI.mcpLogsOpen = map[string]bool{}
+			}
+			a.mcpUI.mcpLogsOpen[s.Name] = !a.mcpUI.mcpLogsOpen[s.Name]
+		}
 		a.iconButton(c, "mcp-menu:"+s.Name, "dots", locales.ItemActions(s.Name)).PopoverMenuButton(func(m *ui.Menu) {
 			if m.Item(locales.Edit()).ID("mcp-edit:" + s.Name).Chosen() {
 				a.mcpUI.mcpFormOpen = true
@@ -205,6 +212,13 @@ func (a *App) mcpRow(c *ui.Context, s proto.MCPServer) {
 			}
 		}, a.menuOptions(nil))
 	})
+	if len(s.Logs) > 0 && a.mcpUI.mcpLogsOpen[s.Name] {
+		ui.Scroll(c.Key("mcp-logs-scroll:"+s.Name)).MaxHeight(140).Margin(0, 12, 10, 14).Radius(7).Background(p.Chip).Children(func() {
+			ui.ScrollHorizontal(c).Children(func() {
+				ui.Text(c, strings.Join(s.Logs, "\n")).Font("monospace").FontSize(11.5).LineHeight(1.45).TextColor(p.Fg2).Padding(8, 10).Selectable()
+			})
+		})
+	}
 }
 
 func (a *App) skillsSection(c *ui.Context, skills []proto.SkillInfo) {
