@@ -73,30 +73,61 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	a.deleteDialog(c)
 }
 
-// sideToggle shows or hides the sidebar. It stays beside the window
-// controls whether the sidebar is out or not, so it is always where the
-// pointer left it.
+// sideToggle is the Safari-style floating Liquid Glass pill holding New Session
+// and Sidebar Toggle. It sits at the top-right of the open sidebar and glides
+// smoothly beside the window traffic lights as the sidebar collapses.
 func (a *App) sideToggle(c *ui.Context) {
+	p := a.p
 	tip := locales.HideSidebar()
 	if a.noSide {
 		tip = locales.ShowSidebar()
 	}
-	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-28)/2+2).Size(28, 28).ZIndex(10).Children(func() {
-		b := ui.ButtonBase(c.Key("side")).Size(28, 28).Radius(14).Center().
-			Material(glassButton(a.p)).Shadow(0, 1, 3, 0, ui.RGBA(0, 0, 0, .10)).Label(tip).Tooltip(tip)
-		press(b)
-		color := a.p.Fg2
-		if b.Hovered() {
-			color = a.p.Fg
+	const pillW, pillH = float32(68), float32(30)
+	leftClosed := toggleLeft(c)
+	leftOpen := float32(sidebarWidth) - 20 - pillW
+	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
+	bg := ui.RGBA(255, 255, 255, .90)
+	shadow := ui.RGBA(0, 0, 0, .09)
+	if p == dark {
+		bg = ui.RGBA(38, 38, 42, .86)
+		shadow = ui.RGBA(0, 0, 0, .36)
+	}
+	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2+2).
+		Size(pillW, pillH).Radius(pillH/2).Padding(0, 3).AlignItems(ui.Center).Justify(ui.Center).
+		Background(bg).Border(.5, p.Edge).Shadow(0, 1, 4, 0, shadow).ZIndex(10)
+	rim(pill, p)
+	pill.Children(func() {
+		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(29, 24).Radius(12).Center().
+			Label(locales.NewSession()).Tooltip(locales.NewSession())
+		press(newBtn)
+		newCol := p.Fg2
+		if newBtn.Hovered() {
+			newBtn.Background(p.Hover)
+			newCol = p.Fg
 		}
-		b.Children(func() { sym(c, "layout-sidebar", 15, color) })
-		if b.Clicked() {
+		newBtn.Children(func() { sym(c, "edit", 16, newCol) })
+		if newBtn.Clicked() {
+			a.do(a.C.NewSession())
+		}
+
+		ui.Box(c).Width(.5).Height(15).Margin(0, 1.5, 0, 1.5).Background(p.Edge)
+
+		togBtn := ui.ButtonBase(c.Key("side")).Size(29, 24).Radius(12).Center().
+			Label(tip).Tooltip(tip)
+		press(togBtn)
+		togCol := p.Fg2
+		if togBtn.Hovered() {
+			togBtn.Background(p.Hover)
+			togCol = p.Fg
+		}
+		togBtn.Children(func() { sym(c, "layout-sidebar", 17, togCol) })
+		if togBtn.Clicked() {
 			a.toggleSide()
 		}
 	})
 }
 
-// toggleLeft is where the sidebar's toggle sits: past the window controls.
+// toggleLeft is where the sidebar pill rests when collapsed: past the traffic lights.
 func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+10, 14) }
 
 func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
