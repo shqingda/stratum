@@ -51,8 +51,10 @@ func (a *App) mcpPage(c *ui.Context) {
 		group(c, p, func() {
 			ui.Column(c).Padding(14).Gap(8).Children(func() {
 				ui.Text(c, locales.McpEmpty()).FontSize(12.5).TextColor(p.Fg2)
-				ui.Text(c, `{"mcpServers": {"github": {"command": "github-mcp-server", "args": ["stdio"]}}}`).
-					Font("monospace").FontSize(12).TextColor(p.Fg).Padding(8, 10).Radius(7).Background(p.Chip).Selectable()
+				ui.ScrollHorizontal(c).Radius(7).Background(p.Chip).Children(func() {
+					ui.Text(c, `{"mcpServers": {"github": {"command": "github-mcp-server", "args": ["stdio"]}}}`).
+						Font("monospace").FontSize(12).TextColor(p.Fg).Padding(8, 10).SingleLine().Selectable()
+				})
 			})
 		})
 	default:
