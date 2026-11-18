@@ -56,14 +56,15 @@ func (a *App) keys(c *ui.Context) {
 		if !c.ShortcutRepeated() && !a.pal && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
 			modes := modeRows()
 			cur := a.C.Current.Mode
-			next := modes[0].id
+			next := modes[0]
 			for i, m := range modes {
 				if m.id == cur {
-					next = modes[(i+1)%len(modes)].id
+					next = modes[(i+1)%len(modes)]
 					break
 				}
 			}
-			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
+			a.do(a.C.Update(proto.SessionUpdate{Mode: &next.id}))
+			a.flash(next.icon, next.label)
 		}
 	})
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {

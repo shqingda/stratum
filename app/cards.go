@@ -82,62 +82,100 @@ func lineDiff(oldText, newText string) (lines []diffLine, replaced bool) {
 	return lines, false
 }
 
-func (a *App) card(c *ui.Context, e *client.Entry) {
-	if !e.Done || e.Skipped || e.Output == "" || !strings.HasPrefix(strings.TrimSpace(string(e.Args)), "{") {
-		a.step(c, e)
-		return
+// parsedCard caches decoded tool arguments and validated output rows so
+// steady 60-120fps frames avoid repeating json.Unmarshal and regex scans.
+type parsedCard struct {
+	argsLen int
+	outLen  int
+	kind    string // "diff", "shell", "rows", "plain"
+	path    string
+	oldText string
+	newText string
+	note    string
+	line    int
+	rows    []string
+	count   int
+}
+
+func (a *App) cachedCard(e *client.Entry) parsedCard {
+	if e.CallID != "" && a.cardCache != nil {
+		if pc, ok := a.cardCache[e.CallID]; ok && pc.argsLen == len(e.Args) && pc.outLen == len(e.Output) {
+			return pc
+		}
 	}
+	pc := parsedCard{argsLen: len(e.Args), outLen: len(e.Output), kind: "plain"}
 	switch e.Text {
 	case "edit_file", "write_file":
-		if e.Failed {
-			break
-		}
-		var args struct {
-			Path       string
-			OldText    *string `json:"old_text"`
-			NewText    *string `json:"new_text"`
-			Content    *string
-			ReplaceAll bool `json:"replace_all"`
-		}
-		if json.Unmarshal(e.Args, &args) == nil && args.Path != "" {
-			if e.Text == "write_file" && args.Content != nil {
-				suffix := fmt.Sprintf(" %s (%d lines)", args.Path, strings.Count(*args.Content, "\n")+1)
-				if e.Output == "Created"+suffix || e.Output == "Wrote"+suffix {
-					a.diffCard(c, e, args.Path, "", *args.Content, locales.NewFile(), 1)
-					return
-				}
+		if !e.Failed {
+			var args struct {
+				Path       string
+				OldText    *string `json:"old_text"`
+				NewText    *string `json:"new_text"`
+				Content    *string
+				ReplaceAll bool `json:"replace_all"`
 			}
-			if e.Text == "edit_file" && args.OldText != nil && *args.OldText != "" && args.NewText != nil {
-				if n, line := editReplacements(e.Output, args.Path); n == 1 || (n > 1 && args.ReplaceAll) {
-					note := ""
-					if n > 1 {
-						note = locales.ReplacedTimes(n)
+			if json.Unmarshal(e.Args, &args) == nil && args.Path != "" {
+				if e.Text == "write_file" && args.Content != nil {
+					suffix := fmt.Sprintf(" %s (%d lines)", args.Path, strings.Count(*args.Content, "\n")+1)
+					if e.Output == "Created"+suffix || e.Output == "Wrote"+suffix {
+						pc.kind, pc.path, pc.newText, pc.note, pc.line = "diff", args.Path, *args.Content, locales.NewFile(), 1
 					}
-					a.diffCard(c, e, args.Path, *args.OldText, *args.NewText, note, line)
-					return
+				} else if e.Text == "edit_file" && args.OldText != nil && *args.OldText != "" && args.NewText != nil {
+					if n, line := editReplacements(e.Output, args.Path); n == 1 || (n > 1 && args.ReplaceAll) {
+						note := ""
+						if n > 1 {
+							note = locales.ReplacedTimes(n)
+						}
+						pc.kind, pc.path, pc.oldText, pc.newText, pc.note, pc.line = "diff", args.Path, *args.OldText, *args.NewText, note, line
+					}
 				}
 			}
 		}
 	case "shell":
 		var args struct{ Command string }
 		if json.Unmarshal(e.Args, &args) == nil && strings.TrimSpace(args.Command) != "" {
-			a.shellCard(c, e)
-			return
+			pc.kind = "shell"
 		}
 	case "search", "list_dir":
-		if e.Failed {
-			break
-		}
-		if rows, count, ok := resultRows(e); ok {
-			if a.cardStep(c, e, locales.Results(count), false) {
-				a.cardOutput(c, func() {
-					for _, row := range rows {
-						ui.Text(c, row).Font("monospace").FontSize(13).TextColor(a.p.Fg2).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
-					}
-				})
+		if !e.Failed {
+			if rows, count, ok := resultRows(e); ok {
+				pc.kind, pc.rows, pc.count = "rows", rows, count
 			}
-			return
 		}
+	}
+	if e.CallID != "" {
+		if a.cardCache == nil {
+			a.cardCache = make(map[string]parsedCard, 64)
+		} else if len(a.cardCache) >= 512 {
+			clear(a.cardCache)
+		}
+		a.cardCache[e.CallID] = pc
+	}
+	return pc
+}
+
+func (a *App) card(c *ui.Context, e *client.Entry) {
+	if !e.Done || e.Skipped || e.Output == "" || !strings.HasPrefix(strings.TrimSpace(string(e.Args)), "{") {
+		a.step(c, e)
+		return
+	}
+	pc := a.cachedCard(e)
+	switch pc.kind {
+	case "diff":
+		a.diffCard(c, e, pc.path, pc.oldText, pc.newText, pc.note, pc.line)
+		return
+	case "shell":
+		a.shellCard(c, e)
+		return
+	case "rows":
+		if a.cardStep(c, e, locales.Results(pc.count), false) {
+			a.cardOutput(c, func() {
+				for _, row := range pc.rows {
+					ui.Text(c, row).Font("monospace").FontSize(13).TextColor(a.p.Fg2).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
+				}
+			})
+		}
+		return
 	}
 	a.step(c, e)
 }

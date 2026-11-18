@@ -96,6 +96,38 @@ func (a *App) archivedToast(c *ui.Context) {
 	})
 }
 
+// flash shows a brief Apple-style HUD pill at the top center for keyboard or
+// slash actions that otherwise have no visible confirmation.
+func (a *App) flash(icon, text string) {
+	a.toast.icon = icon
+	a.toast.text = text
+	a.toast.at = a.now()
+}
+
+const toastFor = 1800 * time.Millisecond
+
+func (a *App) toastHUD(c *ui.Context) {
+	t := a.toast
+	left := toastFor - a.now().Sub(t.at)
+	if t.text == "" || left <= 0 {
+		a.toast.text = ""
+		return
+	}
+	c.After(left)
+	p := a.p
+	ui.Row(c).Absolute().Top(barHeight+8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
+		pill := ui.Row(c.Key("toast-hud")).Height(32).Padding(0, 12).Gap(7).Radius(16).
+			Background(p.Card).Border(.5, p.Edge2).AlignItems(ui.Center).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Opacity: 0}, Exit: &ui.Motion{Y: -4, Opacity: 0}})
+		lift(pill, p).Children(func() {
+			if t.icon != "" {
+				sym(c, t.icon, 13, p.Fg2)
+			}
+			ui.Text(c, t.text).FontSize(12.5).FontWeight(500).TextColor(p.Fg)
+		})
+	})
+}
+
 // deleteDialog asks before a session is deleted, which cannot be undone.
 func (a *App) deleteDialog(c *ui.Context) {
 	open := a.deleting != ""
@@ -110,7 +142,11 @@ func (a *App) deleteDialog(c *ui.Context) {
 	}
 	p := a.p
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		backdrop.Background(ui.RGBA(18, 19, 26, .18))
+		scrim := ui.RGBA(12, 12, 14, .18)
+		if p == dark {
+			scrim = ui.RGBA(0, 0, 0, .42)
+		}
+		backdrop.Background(scrim)
 		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.DeleteTitle(title(s)))
 		lift(panel, p).Children(func() {
 			ui.Text(c, locales.DeleteTitle(title(s))).FontSize(15).FontWeight(600).TextColor(p.Fg)

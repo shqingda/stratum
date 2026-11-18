@@ -51,6 +51,11 @@ type App struct {
 	renameFocus        bool
 	deleting           string // the session asked about deleting
 	undone             undo   // the archiving that can be undone
+	toast              struct {
+		icon, text string
+		at         time.Time
+	}
+	cardCache          map[string]parsedCard
 	keptUnread         string // marked unread while shown
 	showArchived       bool
 	drafts             drafts       // keeps each session's draft in the kernel
@@ -243,6 +248,7 @@ func (a *App) View(c *ui.Context) {
 		a.sideToggle(c)
 	})
 	a.palette(c)
+	a.toastHUD(c)
 	a.keys(c)
 }
 

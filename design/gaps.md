@@ -51,8 +51,10 @@
 
 22. Review「文件」页签与设置「账号与模型」分页合并已有；仍缺用户消息左侧引用块样式。
 
-## 建议顺序
+## 待补能力路线图（已记录，后续推进）
 
-1. 浏览器 / 预览。
-2. 插件。
-3. 持久化 LSP、后台 / 定时任务、语音输入、已开始会话 Worktree Hand off、Hooks 界面编辑。
+1. **持久化 LSP 语言服务器接入**（跳转定义、查找引用、悬停类型与实时诊断，补齐 OpenCode LSP 工具能力）。
+2. **内置浏览器 / 本地预览**（打开 `localhost` 预览、截图、抓控制台与网络报错，补齐 Devin / Cursor 预览闭环）。
+3. **后台 / 定时任务（Automations）**（支持 cron 定时巡检与桌面通知，补齐 Devin / Claude Desktop 自动化能力）。
+4. **已开始会话的 Local ↔ Worktree Hand off**（会话中途在本地工作区与独立 Worktree 间互搬，补齐 Codex App 工作流）。
+5. **Hooks 可视化编辑器与插件包系统**（为现有的 `.talos/hooks.json` 引擎提供设置页可视化配置与插件打包）。
