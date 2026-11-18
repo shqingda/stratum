@@ -40,6 +40,11 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 	clear := func() { a.draft = "" }
 	all := []slashItem{
 		{"new", "edit", locales.NewSession(), func(*ui.Context) { clear(); a.do(a.C.NewSession()) }},
+		{"init", "file-text", locales.InitNote(), func(*ui.Context) { a.draft, a.toEnd = locales.InitPrompt(), true }},
+		{"review", "git-branch", locales.ReviewNote(), func(*ui.Context) {
+			a.rv.open = true
+			a.draft, a.toEnd = locales.ReviewPrompt(), true
+		}},
 		{"changes", "layout-sidebar-right", locales.ShowChanges(), func(*ui.Context) { clear(); a.rv.open = !a.rv.open }},
 		{"find", "search", locales.FindInSession(), func(c *ui.Context) { clear(); a.openFind(c) }},
 		{"search", "search", locales.Search(), func(c *ui.Context) { clear(); a.openPalette(c) }},

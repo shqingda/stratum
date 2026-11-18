@@ -2730,6 +2730,46 @@ func (msgs Messages) ExportNote() string {
 	return Catalog.Format(msgs.locale, "exportNote", nil)
 }
 
+// InitNote says "生成或更新项目的 AGENTS.md 指引"
+// in the language the app shows.
+func InitNote() string { return In(i18n.Locale()).InitNote() }
+
+// InitNote says "生成或更新项目的 AGENTS.md 指引"
+// in the language of msgs.
+func (msgs Messages) InitNote() string {
+	return Catalog.Format(msgs.locale, "initNote", nil)
+}
+
+// InitPrompt says "…"
+// in the language the app shows.
+func InitPrompt() string { return In(i18n.Locale()).InitPrompt() }
+
+// InitPrompt says "…"
+// in the language of msgs.
+func (msgs Messages) InitPrompt() string {
+	return Catalog.Format(msgs.locale, "initPrompt", nil)
+}
+
+// ReviewNote says "审查当前未提交改动"
+// in the language the app shows.
+func ReviewNote() string { return In(i18n.Locale()).ReviewNote() }
+
+// ReviewNote says "审查当前未提交改动"
+// in the language of msgs.
+func (msgs Messages) ReviewNote() string {
+	return Catalog.Format(msgs.locale, "reviewNote", nil)
+}
+
+// ReviewPrompt says "…"
+// in the language the app shows.
+func ReviewPrompt() string { return In(i18n.Locale()).ReviewPrompt() }
+
+// ReviewPrompt says "…"
+// in the language of msgs.
+func (msgs Messages) ReviewPrompt() string {
+	return Catalog.Format(msgs.locale, "reviewPrompt", nil)
+}
+
 // NoFilesFound says "没有匹配的文件"
 // in the language the app shows.
 func NoFilesFound() string { return In(i18n.Locale()).NoFilesFound() }

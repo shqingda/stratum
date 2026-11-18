@@ -6,6 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/proto"
 )
 
 func (a *App) keys(c *ui.Context) {
@@ -49,6 +50,20 @@ func (a *App) keys(c *ui.Context) {
 	c.OnWindowShortcut(ui.Cmd, ui.KeyB, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen {
 			a.toggleSide()
+		}
+	})
+	c.OnWindowShortcut(ui.Shift, ui.KeyTab, func() {
+		if !c.ShortcutRepeated() && !a.pal && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
+			modes := modeRows()
+			cur := a.C.Current.Mode
+			next := modes[0].id
+			for i, m := range modes {
+				if m.id == cur {
+					next = modes[(i+1)%len(modes)].id
+					break
+				}
+			}
+			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
 		}
 	})
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {

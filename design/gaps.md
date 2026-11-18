@@ -6,8 +6,8 @@
 
 - 模型：OpenAI、Anthropic、Gemini 三家；订阅登录；多账号，额度用完切账号。
 - 工具：读、写、改文件，列目录，搜索，shell（沙箱），git status/diff，计划，提问，子任务（task、run_tasks），review，skill，`web_fetch`，`web_search`，`memory`（跨会话 `MEMORY.md` 读写），`diagnostics`（Go/TS/Rust/Python 静态与类型诊断）。
-- 内核：AGENTS.md、跨会话 `MEMORY.md`（全局和项目）、技能目录（skills 包，含启用/禁用）、MCP（含信任、添加/编辑/移除、运行日志、resources、prompts）、Hooks（`PreToolUse` / `PostToolUse` / `Stop`）、worktree 隔离（含 `.worktreeinclude`）、会话分叉（`session.fork`）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
-- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、文件、行内评论、推送与创建 PR、顶栏 PR/CI 状态）、⌘K、会话内查找、@ 文件/文件夹/会话/MCP 资源、`/` 命令/技能/自定义命令/MCP prompts/`/fork`/`/export`/`/worktree`、分支切换、用量与费用显示、技能与 MCP 管理界面（含日志查看）、各角色模型与推理强度选择、统一设置（已合并账号与模型）、通知、菜单栏。
+- 内核：AGENTS.md / CLAUDE.md / AGENTS.override.md、跨会话 `MEMORY.md`（全局和项目）、技能目录（skills 包，含启用/禁用）、MCP（含信任、添加/编辑/移除、运行日志、resources、prompts）、Hooks（`PreToolUse` / `PostToolUse` / `Stop`）、worktree 隔离（含 `.worktreeinclude`）、会话分叉（`session.fork`）、上下文压缩、权限三档和规则、改动记录和撤销（整轮、单块、重做）。
+- 界面：会话列表和状态、审批卡、改动卡、Review 面板（变更、终端、计划、文件、行内评论、推送与创建 PR、顶栏 PR/CI 状态）、⌘K、Shift+Tab 权限模式切换、会话内查找、@ 文件/文件夹/会话/MCP 资源、`/` 命令/技能/自定义命令/MCP prompts/`/init`/`/review`/`/fork`/`/export`/`/worktree`、分支切换、用量与费用显示、技能与 MCP 管理界面（含日志查看）、各角色模型与推理强度选择、统一设置（已合并账号与模型）、通知、菜单栏。
 
 ## 缺的，按影响排
 

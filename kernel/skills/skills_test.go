@@ -377,3 +377,18 @@ func TestPinnedSkillDirectoryRejectsReplacement(t *testing.T) {
 		t.Fatal("new load accepted directory symlink")
 	}
 }
+
+func TestClaudeAndOverrideInstructions(t *testing.T) {
+	cwd := t.TempDir()
+	write(t, filepath.Join(cwd, "AGENTS.md"), "AGENTS_BASE")
+	write(t, filepath.Join(cwd, "CLAUDE.md"), "CLAUDE_RULES")
+	write(t, filepath.Join(cwd, "AGENTS.override.md"), "OVERRIDE_RULES")
+
+	catalog := (&Loader{GlobalDir: t.TempDir()}).Load(cwd)
+	i1 := strings.Index(catalog.Prompt, "AGENTS_BASE")
+	i2 := strings.Index(catalog.Prompt, "CLAUDE_RULES")
+	i3 := strings.Index(catalog.Prompt, "OVERRIDE_RULES")
+	if i1 < 0 || i2 <= i1 || i3 <= i2 {
+		t.Fatalf("unexpected instruction order: i1=%d i2=%d i3=%d\n%s", i1, i2, i3, catalog.Prompt)
+	}
+}

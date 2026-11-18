@@ -116,11 +116,13 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 	var files []source
 	seen := map[string]bool{}
 	agents := func(dir string) {
-		path := filepath.Join(dir, "AGENTS.md")
-		if !seen[path] {
-			seen[path] = true
-			if data, ok := readRegular(path); ok {
-				files = append(files, source{path: path, data: data, agents: true})
+		for _, name := range []string{"AGENTS.md", "CLAUDE.md", "AGENTS.override.md"} {
+			path := filepath.Join(dir, name)
+			if !seen[path] {
+				seen[path] = true
+				if data, ok := readRegular(path); ok {
+					files = append(files, source{path: path, data: data, agents: true})
+				}
 			}
 		}
 	}

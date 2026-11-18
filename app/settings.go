@@ -82,7 +82,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		if vibrant {
 			tint := ui.RGBA(255, 255, 255, .18)
 			if p == dark {
-				tint = ui.RGBA(22, 24, 32, .24)
+				tint = ui.RGBA(16, 16, 17, .36)
 			}
 			side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
 				Background(tint).Border(.5, p.Edge).Clip()

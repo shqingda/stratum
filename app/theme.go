@@ -20,9 +20,9 @@ type Palette struct {
 }
 
 var (
-	ink  = ui.Hex("#12131A")
-	mist = ui.Hex("#E8EAEF")
-	haze = ui.Hex("#A9B1C1") // dark lines and fills are this, faint
+	ink        = ui.Hex("#12131A")
+	pureWhite  = ui.Hex("#F4F4F5")
+	neutralAsh = ui.Hex("#A1A1AA") // dark lines and fills are neutral gray, zero blue cast
 
 	light = &Palette{
 		Bg: ui.Hex("#ECEEF2"), Side: ui.RGBA(232, 234, 239, .86), Pane: ui.Hex("#FBFBFC"), Card: ui.Hex("#FFFFFF"), Sheet: ui.Hex("#FBFBFC"),
@@ -33,11 +33,11 @@ var (
 		Plus: ui.Hex("#3B7356"), Minus: ui.Hex("#A8474B"),
 	}
 	dark = &Palette{
-		Bg: ui.Hex("#0E0F14"), Side: ui.RGBA(22, 24, 32, .9), Pane: ui.Hex("#15161E"), Card: ui.Hex("#1C1E28"), Sheet: ui.Hex("#15161E"),
-		Fg: mist, Fg2: ui.Hex("#A9B1C1"), Mute: ui.Hex("#6E7587"), Faint: ui.Hex("#454A58"),
-		Edge: haze.Alpha(.10), Edge2: haze.Alpha(.16), Sel: haze.Alpha(.09), Hover: haze.Alpha(.05), Chip: haze.Alpha(.08), Bubble: haze.Alpha(.12),
-		Acc: mist, OnAcc: ui.Hex("#12131A"),
-		Live: ui.Hex("#7AA8EA"), LiveBg: ui.Hex("#7AA8EA").Alpha(.10),
+		Bg: ui.Hex("#09090A"), Side: ui.RGBA(18, 18, 19, .90), Pane: ui.Hex("#111112"), Card: ui.Hex("#18181A"), Sheet: ui.Hex("#0D0D0E"),
+		Fg: pureWhite, Fg2: ui.Hex("#A1A1AA"), Mute: ui.Hex("#71717A"), Faint: ui.Hex("#3F3F46"),
+		Edge: neutralAsh.Alpha(.11), Edge2: neutralAsh.Alpha(.18), Sel: neutralAsh.Alpha(.10), Hover: neutralAsh.Alpha(.055), Chip: neutralAsh.Alpha(.08), Bubble: neutralAsh.Alpha(.12),
+		Acc: pureWhite, OnAcc: ui.Hex("#09090A"),
+		Live: ui.Hex("#E4E4E7"), LiveBg: ui.Hex("#E4E4E7").Alpha(.10),
 		Plus: ui.Hex("#7DB89A"), Minus: ui.Hex("#DD878B"),
 	}
 )
@@ -86,7 +86,7 @@ func Theme(p *Palette, isDark bool) *ui.Theme {
 // a soft shadow, deeper in the dark.
 func raise(e ui.Element, p *Palette) ui.Element {
 	if p == dark {
-		return e.Shadow(0, 0, 0, .5, haze.Alpha(.12)).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 8, 24, -10, ui.RGBA(0, 0, 0, .5))
+		return e.Shadow(0, 0, 0, .5, neutralAsh.Alpha(.12)).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 8, 24, -10, ui.RGBA(0, 0, 0, .5))
 	}
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.10)).Shadow(0, 1, 2, 0, ink.Alpha(.05)).Shadow(0, 6, 20, -8, ink.Alpha(.10))
 }
@@ -95,7 +95,7 @@ func raise(e ui.Element, p *Palette) ui.Element {
 // waits on the user, a layer higher than raise.
 func lift(e ui.Element, p *Palette) ui.Element {
 	if p == dark {
-		return e.Shadow(0, 0, 0, .5, haze.Alpha(.16)).Shadow(0, 2, 6, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 20, 44, -16, ui.RGBA(0, 0, 0, .6))
+		return e.Shadow(0, 0, 0, .5, neutralAsh.Alpha(.16)).Shadow(0, 2, 6, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 20, 44, -16, ui.RGBA(0, 0, 0, .6))
 	}
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.12)).Shadow(0, 2, 6, 0, ink.Alpha(.06)).Shadow(0, 18, 40, -16, ink.Alpha(.22))
 }
