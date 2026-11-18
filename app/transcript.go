@@ -469,21 +469,17 @@ func (a *App) empty(c *ui.Context) {
 	})
 }
 
-// heroEmblem draws the Welcome Talos crest with a soft ambient aura, specular
-// metallic finish, contact shadow, and subtle hover lift.
+// heroEmblem draws the Welcome Talos crest with a specular metallic finish,
+// subtle contact shadow, and spring hover lift.
 func (a *App) heroEmblem(c *ui.Context, size float32) {
 	p := a.p
 	isDark := p == dark
-	glow := ui.RGBA(120, 145, 190, .09)
-	shadow := ui.RGBA(12, 14, 22, .16)
+	shadow := ui.RGBA(12, 14, 22, .08)
 	if isDark {
-		glow = ui.RGBA(210, 224, 255, .07)
-		shadow = ui.RGBA(0, 0, 0, .38)
+		shadow = ui.RGBA(0, 0, 0, .28)
 	}
-	stage := ui.Column(c.Key("hero-emblem")).AlignItems(ui.Center).Justify(ui.Center).
-		Width(size + 56).Height(size + 36).Children(func() {
-		ui.Box(c).Absolute().Top(-12).Left(0).Width(size + 56).Height(size + 44).
-			Radius((size + 56) / 2).Background(glow).Blur(26)
+	ui.Column(c.Key("hero-emblem")).AlignItems(ui.Center).Justify(ui.Center).
+		Width(size + 24).Height(size + 18).Children(func() {
 		emblem := ui.Box(c.Key("hero-mark")).Size(size, size).AlignItems(ui.Center).Justify(ui.Center).
 			Children(func() { heroMark(c, size, isDark) })
 		target := float32(0)
@@ -493,10 +489,9 @@ func (a *App) heroEmblem(c *ui.Context, size float32) {
 		lift := emblem.Spring("hero-lift", target, ui.SpringOptions{Stiffness: 340, Damping: 26})
 		scale := 1 - lift*.016
 		emblem.Translate(0, lift).Scale(scale, scale)
-		ui.Box(c).Width(size * .62).Height(5).Radius(3).Margin(6, 0, 0, 0).
+		ui.Box(c).Width(size * .54).Height(4).Radius(2).Margin(5, 0, 0, 0).
 			Background(shadow).Blur(5)
 	})
-	_ = stage
 }
 
 // hello is a new session: what it works on in the center while the composer
