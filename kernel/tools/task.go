@@ -16,6 +16,7 @@ var Task = &Tool{
 		"You get back only its final report. Several task calls in one reply run at the same time.",
 	Schema: schema(`{"type":"object","properties":{
 		"description":{"type":"string","description":"A few words on what it does, shown to the user."},
+		"agent":{"type":"string","description":"Optional subagent name (e.g. explore, general, or a custom agent)."},
 		"prompt":{"type":"string","description":"The whole task."}},
 		"required":["description","prompt"]}`),
 	Access: func(env Env, args json.RawMessage) (perm.Request, error) {
@@ -36,6 +37,7 @@ var RunTasks = &Tool{
 		"tasks":{"type":"array","items":{"type":"object","properties":{
 			"id":{"type":"string","description":"Short and unique, as a name for after."},
 			"description":{"type":"string","description":"A few words on what it does, shown to the user."},
+			"agent":{"type":"string","description":"Optional subagent name (e.g. explore, general, or a custom agent)."},
 			"prompt":{"type":"string"},
 			"after":{"type":"array","items":{"type":"string"},"description":"Ids of tasks that must finish first."}},
 			"required":["id","description","prompt"]}}},

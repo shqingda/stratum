@@ -125,6 +125,7 @@ func (a *App) box(c *ui.Context) {
 	svc := c.Services()
 	box.Children(func() {
 		a.attachments(c)
+		a.mentionChips(c)
 		if a.recall != "" {
 			a.draft, a.recall, a.toEnd = a.recall, "", true
 		}

@@ -169,19 +169,41 @@ func Open(store Store, account string) (llm.Provider, error) {
 	if method == "copilot" {
 		headers = CopilotHeaders
 	}
+	hc := quotaHTTPClient(account)
 	switch api {
 	case APIAnthropic:
-		return &llm.Anthropic{BaseURL: base, Auth: s.Auth(headers)}, nil
+		return &llm.Anthropic{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
 	case APIResponses:
-		return &llm.OpenAI{BaseURL: base, Auth: s.Auth(headers)}, nil
+		return &llm.OpenAI{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
 	case APICodex:
-		return &llm.OpenAI{BaseURL: base, Codex: true, Auth: s.Auth(CodexHeaders)}, nil
+		return &llm.OpenAI{BaseURL: base, HTTP: hc, Codex: true, Auth: s.Auth(CodexHeaders)}, nil
 	case APIGemini:
-		return &llm.Gemini{BaseURL: base, Auth: s.Auth(headers)}, nil
+		return &llm.Gemini{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
 	case APIChat:
-		return &llm.Chat{BaseURL: base, Compat: p.Compat, Auth: s.Auth(headers)}, nil
+		return &llm.Chat{BaseURL: base, HTTP: hc, Compat: p.Compat, Auth: s.Auth(headers)}, nil
 	}
 	return nil, fmt.Errorf("auth: %s: unknown protocol %q", account, api)
+}
+
+type quotaTransport struct {
+	account string
+	base    http.RoundTripper
+}
+
+func (t *quotaTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	resp, err := base.RoundTrip(req)
+	if err == nil && resp != nil {
+		Quotas.RecordResponseHeaders(t.account, resp.Header)
+	}
+	return resp, err
+}
+
+func quotaHTTPClient(account string) *http.Client {
+	return &http.Client{Transport: &quotaTransport{account: account}}
 }
 
 // CatalogNames maps models.dev's provider ids to Talos's, for

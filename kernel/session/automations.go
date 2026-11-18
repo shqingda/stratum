@@ -205,6 +205,7 @@ func (m *Manager) executeAutomation(ctx context.Context, items []proto.Automatio
 	}
 	items[idx] = it
 	_ = m.saveAutomations(ctx, items)
+	m.Broadcast(proto.EventAutomation, it)
 	return it, nil
 }
 

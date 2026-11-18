@@ -493,5 +493,9 @@
   "handoffToWorktree": "Hand off to Worktree",
   "handoffToLocal": "Hand off to Local",
   "emptySessionsTitle": "No conversations yet",
-  "emptySessionsHint": "Press ⌘N or type below to start."
+  "emptySessionsHint": "Press ⌘N or type below to start.",
+  "quotaRemaining": "{pct}% left",
+  "quotaResetsIn": "resets in {time}",
+  "automationDone": "Automation finished",
+  "automationFailed": "Automation failed: {error}"
 }

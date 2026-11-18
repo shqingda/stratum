@@ -5,6 +5,7 @@ import (
 	"runtime/debug"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/plugins/glass"
@@ -439,12 +440,43 @@ func (a *App) accountRow(c *ui.Context, acc proto.Account) {
 			ui.Text(c, name).FontSize(13).TextColor(p.Fg).SingleLine()
 			ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
 		})
+		if qText, qCol := formatQuota(a.now(), p, acc.Quota); qText != "" {
+			ui.Text(c, qText).FontSize(11.5).FontWeight(500).TextColor(qCol).
+				Background(p.Chip).Padding(2, 7).Radius(5).SingleLine()
+		}
 		a.iconButton(c, "account:"+acc.ID, "dots", locales.AccountOptions(name)).PopoverMenuButton(func(m *ui.Menu) {
 			if m.Item(locales.SignOut()).ID("logout:" + acc.ID).Danger().Chosen() {
 				a.do(a.C.Logout(acc.ID))
 			}
 		}, a.menuOptions(nil))
 	})
+}
+
+func formatQuota(now time.Time, p *Palette, q *proto.AccountQuota) (string, ui.Color) {
+	if q == nil || q.RemainingPct < 0 {
+		return "", p.Mute
+	}
+	col := p.Plus
+	if q.RemainingPct < 15 {
+		col = p.Minus
+	} else if q.RemainingPct < 35 {
+		col = p.Live
+	}
+	text := locales.QuotaRemaining(q.RemainingPct)
+	if !q.ResetAt.IsZero() && q.ResetAt.After(now) {
+		d := q.ResetAt.Sub(now)
+		var dur string
+		switch {
+		case d >= 24*time.Hour:
+			dur = q.ResetAt.Local().Format("01-02")
+		case d >= time.Hour:
+			dur = locales.AgoHours(int(d / time.Hour))
+		default:
+			dur = locales.AgoMinutes(max(1, int(d/time.Minute)))
+		}
+		text += " · " + locales.QuotaResetsIn(dur)
+	}
+	return text, col
 }
 
 func (a *App) modelsPage(c *ui.Context) {

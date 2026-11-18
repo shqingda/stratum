@@ -341,7 +341,9 @@ func (a *App) footer(c *ui.Context) {
 				name = curAcc.ID
 			}
 			sub = curAcc.Email
-			if curAcc.Subscription && sub == "" {
+			if qText, _ := formatQuota(a.now(), p, curAcc.Quota); qText != "" {
+				sub = qText
+			} else if curAcc.Subscription && sub == "" {
 				sub = locales.Subscription()
 			}
 		}

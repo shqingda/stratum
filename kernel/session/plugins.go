@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/shqingda/talos/kernel/mcp"
+	"github.com/shqingda/talos/kernel/skills"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -153,6 +155,41 @@ func (m *Manager) pluginHookFiles(cwd string) []string {
 		}
 	}
 	return files
+}
+
+func (m *Manager) pluginSkillDirs(cwd string) []skills.SkillDir {
+	disabled := m.disabledPlugins(context.Background())
+	var out []skills.SkillDir
+	for _, p := range m.scanPluginDirs(cwd) {
+		man, ok := readPluginManifest(p.dir)
+		if !ok || disabled[man.Name] {
+			continue
+		}
+		roots := man.Skills
+		if len(roots) == 0 {
+			roots = []string{"skills"}
+		}
+		for _, r := range roots {
+			sd := filepath.Join(p.dir, r)
+			if info, err := os.Stat(sd); err == nil && info.IsDir() {
+				out = append(out, skills.SkillDir{Dir: sd, Project: p.project})
+			}
+		}
+	}
+	return out
+}
+
+func (m *Manager) pluginMCPEntries(cwd string) []mcp.Entry {
+	disabled := m.disabledPlugins(context.Background())
+	var out []mcp.Entry
+	for _, p := range m.scanPluginDirs(cwd) {
+		man, ok := readPluginManifest(p.dir)
+		if !ok || disabled[man.Name] || len(man.MCPServers) == 0 {
+			continue
+		}
+		out = append(out, mcp.EntriesFromRaw(p.project, man.MCPServers)...)
+	}
+	return out
 }
 
 // ListPlugins lists installed global and project plugins.

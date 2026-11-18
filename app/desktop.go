@@ -120,6 +120,21 @@ func (a *App) watch() {
 	if quiet("badge") {
 		waiting = 0
 	}
+	if len(a.C.AutomationAlerts) > 0 {
+		for _, it := range a.C.AutomationAlerts {
+			if set.NotifyWhen == "never" {
+				continue
+			}
+			body := locales.AutomationDone()
+			if it.LastStatus == "error" && !quiet("fail") {
+				body = locales.AutomationFailed(it.LastError)
+			} else if quiet("done") {
+				continue
+			}
+			a.desk.Notify("auto:"+it.ID, it.Name, body)
+		}
+		a.C.AutomationAlerts = nil
+	}
 	if waiting != a.badge {
 		a.badge = waiting
 		a.desk.Badge(waiting)

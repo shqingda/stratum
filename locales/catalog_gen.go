@@ -4985,3 +4985,43 @@ func EmptySessionsHint() string { return In(i18n.Locale()).EmptySessionsHint() }
 func (msgs Messages) EmptySessionsHint() string {
 	return Catalog.Format(msgs.locale, "emptySessionsHint", nil)
 }
+
+// QuotaRemaining says "还剩 {pct}%"
+// in the language the app shows.
+func QuotaRemaining(pct int) string { return In(i18n.Locale()).QuotaRemaining(pct) }
+
+// QuotaRemaining says "还剩 {pct}%"
+// in the language of msgs.
+func (msgs Messages) QuotaRemaining(pct int) string {
+	return Catalog.Format(msgs.locale, "quotaRemaining", map[string]any{"pct": pct})
+}
+
+// QuotaResetsIn says "{time}后重置"
+// in the language the app shows.
+func QuotaResetsIn(time_ string) string { return In(i18n.Locale()).QuotaResetsIn(time_) }
+
+// QuotaResetsIn says "{time}后重置"
+// in the language of msgs.
+func (msgs Messages) QuotaResetsIn(time_ string) string {
+	return Catalog.Format(msgs.locale, "quotaResetsIn", map[string]any{"time": time_})
+}
+
+// AutomationDone says "定时任务已完成"
+// in the language the app shows.
+func AutomationDone() string { return In(i18n.Locale()).AutomationDone() }
+
+// AutomationDone says "定时任务已完成"
+// in the language of msgs.
+func (msgs Messages) AutomationDone() string {
+	return Catalog.Format(msgs.locale, "automationDone", nil)
+}
+
+// AutomationFailed says "定时任务失败：{error}"
+// in the language the app shows.
+func AutomationFailed(error string) string { return In(i18n.Locale()).AutomationFailed(error) }
+
+// AutomationFailed says "定时任务失败：{error}"
+// in the language of msgs.
+func (msgs Messages) AutomationFailed(error string) string {
+	return Catalog.Format(msgs.locale, "automationFailed", map[string]any{"error": error})
+}

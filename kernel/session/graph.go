@@ -17,8 +17,8 @@ const (
 )
 
 type graphTask struct {
-	ID, Description, Prompt string
-	After                   []string
+	ID, Description, Prompt, Agent string
+	After                          []string
 }
 
 // parseGraph reads run_tasks' arguments and checks they make a graph:
@@ -112,7 +112,7 @@ func (r *runner) graph(ctx context.Context, call llm.ToolCall) (llm.ToolResult, 
 				set(t.ID, "run")
 				running++
 				go func(id, prompt string) {
-					report, err := r.task(ctx, call.ID, id, prompt)
+					report, err := r.task(ctx, call.ID, id, prompt, t.Agent)
 					finished <- result{id, report, err}
 				}(t.ID, prompt)
 			}

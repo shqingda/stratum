@@ -96,7 +96,10 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 	account := func(id string) proto.Account {
 		a := proto.Account{ID: id}
 		if o.Demo {
-			return proto.Account{ID: id, Provider: "demo", Name: "Demo", Model: "demo"}
+			return proto.Account{
+				ID: id, Provider: "demo", Name: "Demo", Model: "demo", Subscription: true,
+				Quota: &proto.AccountQuota{RemainingPct: 74, ResetAt: time.Now().Add(4 * time.Hour), Window: "5h", Plan: "pro"},
+			}
 		}
 		if p, ok := auth.Lookup(id); ok {
 			a.Provider, a.Name, a.Model = p.ID, p.Name, llm.DefaultModel(p.ID)
@@ -104,14 +107,33 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 		if c, err := o.Creds.Get(id); err == nil {
 			a.Email, a.Subscription = c.Email, auth.Subscription(c)
 		}
+		if a.Subscription {
+			if q, ok := auth.Quotas.Get(id); ok {
+				a.Quota = q
+			}
+		}
 		return a
+	}
+	buildAccounts := func() []proto.Account {
+		ids := accounts()
+		out := make([]proto.Account, 0, len(ids))
+		for _, id := range ids {
+			out = append(out, account(id))
+		}
+		return out
 	}
 	srv := &rpc.Server{
 		Sessions: m,
 		Accounts: func(context.Context) ([]proto.Account, error) {
-			out := []proto.Account{}
-			for _, id := range accounts() {
+			ids := accounts()
+			out := make([]proto.Account, 0, len(ids))
+			for _, id := range ids {
 				out = append(out, account(id))
+			}
+			if !o.Demo && o.Creds != nil {
+				auth.Quotas.RefreshAsync(context.Background(), ids, o.Creds, func() {
+					m.Broadcast(proto.EventAccounts, buildAccounts())
+				})
 			}
 			return out, nil
 		},

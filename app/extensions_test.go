@@ -2,9 +2,11 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -78,5 +80,32 @@ func TestPreviewPaneAndAutomationsAndHooksPlugins(t *testing.T) {
 	}
 	if !foundWT {
 		t.Fatalf("expected /worktree handoff item for started session")
+	}
+
+	// 5. Subscription quota display & automation desktop notification
+	a.C.Accounts = []proto.Account{{
+		ID:           "codex",
+		Provider:     "codex",
+		Name:         "ChatGPT (Codex)",
+		Subscription: true,
+		Quota: &proto.AccountQuota{
+			RemainingPct: 74,
+			ResetAt:      a.now().Add(4 * time.Hour),
+			Window:       "5h",
+		},
+	}}
+	a.settingsOpen, a.settingsPage = true, "accounts"
+	tt.Frame()
+	if !tt.HasText("还剩 74%") {
+		t.Fatalf("expected quota badge in accounts settings")
+	}
+	a.settingsOpen = false
+
+	d := &fakeDesk{}
+	a.desk = d
+	a.C.AutomationAlerts = []proto.Automation{{ID: "a1", Name: "Nightly Vet", LastStatus: "ok"}}
+	a.watch()
+	if len(d.notes) == 0 || d.notes[0] != "auto:a1 "+locales.AutomationDone() {
+		t.Fatalf("expected automation desktop notification, got %+v", d.notes)
 	}
 }

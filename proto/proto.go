@@ -403,13 +403,23 @@ type ApprovalAnswer struct {
 
 // Account is a signed-in provider account.
 type Account struct {
-	ID           string `json:"id"` // provider or provider/label
-	Provider     string `json:"provider"`
-	Name         string `json:"name"`
-	Email        string `json:"email,omitempty"`
-	Subscription bool   `json:"subscription"`
+	ID           string        `json:"id"` // provider or provider/label
+	Provider     string        `json:"provider"`
+	Name         string        `json:"name"`
+	Email        string        `json:"email,omitempty"`
+	Subscription bool          `json:"subscription"`
 	// Model is the provider's default model.
-	Model string `json:"model,omitempty"`
+	Model string        `json:"model,omitempty"`
+	Quota *AccountQuota `json:"quota,omitempty"`
+}
+
+// AccountQuota holds remaining plan quota and reset timing for a subscription account.
+type AccountQuota struct {
+	RemainingPct int       `json:"remainingPct"` // 0..100, -1 if unknown
+	ResetAt      time.Time `json:"resetAt,omitempty"`
+	Window       string    `json:"window,omitempty"` // e.g. "5h", "7d", "monthly"
+	Plan         string    `json:"plan,omitempty"`
+	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
 }
 
 // ModelsQuery lists an account's models.
@@ -578,6 +588,10 @@ const (
 	MethodLoginCancel = "auth.cancel" // → {}; ends the sign-in under way
 	// EventLogin is a sign-in's progress, of no session; not kept.
 	EventLogin = "auth.progress" // LoginProgress
+	// EventAccounts pushes refreshed subscription quota data to clients.
+	EventAccounts = "accounts.updated" // []Account
+	// EventAutomation notifies clients when a scheduled automation finishes or fails.
+	EventAutomation = "automation.done" // Automation
 )
 
 // Login signs in to a provider with one of its Methods, or with Key when

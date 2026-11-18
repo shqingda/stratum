@@ -22,7 +22,7 @@ type runner struct {
 	env       tools.Env
 	tools     tools.Set
 	// task runs a sub-agent for a task call; nil in a sub-agent.
-	task func(ctx context.Context, callID, taskID, prompt string) (string, error)
+	task func(ctx context.Context, callID, taskID, prompt, agentName string) (string, error)
 }
 
 func (r *runner) Specs() []llm.Tool { return r.tools.Specs() }
@@ -41,11 +41,11 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	case tool == tools.RunTasks && r.task != nil:
 		return r.graph(ctx, call)
 	case tool == tools.Task && r.task != nil:
-		var t struct{ Prompt string }
+		var t struct{ Prompt, Agent string }
 		if json.Unmarshal(call.Args, &t) != nil || strings.TrimSpace(t.Prompt) == "" {
 			return fail("task: prompt is required.")
 		}
-		report, err := r.task(ctx, call.ID, "", t.Prompt)
+		report, err := r.task(ctx, call.ID, "", t.Prompt, strings.TrimSpace(t.Agent))
 		if ctx.Err() != nil {
 			return llm.ToolResult{}, ctx.Err()
 		}
@@ -106,6 +106,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	}
 	if err != nil {
 		return fail("%v", err)
+	}
+	if call.Name == "write_file" || call.Name == "edit_file" {
+		r.m.runFormatter(ctx, r.env.Root, string(call.Args))
 	}
 	if note := r.m.runPostToolHooks(ctx, r.env.Root, r.sessionID, call.Name, call.Args, out); note != "" {
 		out += "\n\n[PostToolUse hook]\n" + note

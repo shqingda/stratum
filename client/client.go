@@ -153,8 +153,9 @@ type Client struct {
 	MCP         *proto.MCPList
 	MCPFor      string
 	Preview     *proto.PreviewSnapshot
-	Automations *proto.AutomationList
-	Hooks       *proto.HooksList
+	Automations      *proto.AutomationList
+	AutomationAlerts []proto.Automation
+	Hooks            *proto.HooksList
 	Plugins     *proto.PluginList
 	// Hits are the messages matching HitsFor, nil before an answer.
 	Hits      []proto.SearchHit
@@ -259,6 +260,26 @@ func (c *Client) Receive(f proto.Frame) []proto.Command {
 		switch f.Event.Type {
 		case proto.EventLogin:
 			c.loginProgress(*f.Event)
+			return nil
+		case proto.EventAccounts:
+			var accs []proto.Account
+			if json.Unmarshal(f.Event.Data, &accs) == nil {
+				c.Accounts = accs
+			}
+			return nil
+		case proto.EventAutomation:
+			var it proto.Automation
+			if json.Unmarshal(f.Event.Data, &it) == nil && it.ID != "" {
+				c.AutomationAlerts = append(c.AutomationAlerts, it)
+				if c.Automations != nil {
+					for i := range c.Automations.Items {
+						if c.Automations.Items[i].ID == it.ID {
+							c.Automations.Items[i] = it
+							break
+						}
+					}
+				}
+			}
 			return nil
 		case proto.EventMCP:
 			if c.MCP != nil && c.Phase == Ready {

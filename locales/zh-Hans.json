@@ -743,5 +743,16 @@
   "handoffToWorktree": "迁移到 Worktree",
   "handoffToLocal": "迁回本地工作区",
   "emptySessionsTitle": "暂无会话",
-  "emptySessionsHint": "按 ⌘N 或在下方输入开始新对话。"
+  "emptySessionsHint": "按 ⌘N 或在下方输入开始新对话。",
+  "quotaRemaining": "还剩 {pct}%",
+  "@quotaRemaining": {
+    "placeholders": {
+      "pct": {
+        "type": "int"
+      }
+    }
+  },
+  "quotaResetsIn": "{time}后重置",
+  "automationDone": "定时任务已完成",
+  "automationFailed": "定时任务失败：{error}"
 }

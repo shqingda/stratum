@@ -89,8 +89,8 @@ func modeName(mode string) string {
 func (a *App) bar(c *ui.Context) {
 	p := a.p
 	// Past the sidebar the title starts at 20; with the sidebar in, past
-	// its toggle; in between, as far as the sidebar is.
-	shut := toggleLeft(c) + 32 + 12
+	// its 74-point toggle pill; in between, as far as the sidebar is.
+	shut := toggleLeft(c) + 74 + 12
 	left := 22*a.sideOpen + shut*(1-a.sideOpen)
 	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 10, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		cur := a.C.Current
@@ -509,24 +509,26 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	p := a.p
 	switch e.Role {
 	case client.User:
-		// The user's words sit on the right in a bubble, as in every chat;
-		// the agent's work runs down the left.
-		// Its copy button comes up beside the bubble, on its left, so it
-		// takes no line of its own.
-		msg := ui.Row(c).Margin(4, 0, 18, 0).Justify(ui.End).AlignItems(ui.End).Gap(4)
+		// Left-aligned blockquote style (matching design-1/design-2): a subtle
+		// vertical quote bar on the left, attachments below, and hover actions
+		// (rewind / copy) on the trailing edge.
+		msg := ui.Row(c).Margin(6, 0, 18, 0).Gap(10).AlignItems(ui.Stretch)
 		msg.Children(func() {
-			if a.rewindable(e) {
-				a.rewindButton(c, e, msg.Hovered())
-			}
-			if e.Text != "" {
-				a.copyButton(c, e.Text, msg.Hovered())
-			}
-			ui.Column(c).MaxWidthPercent(80).Padding(9, 14).Radius(18).Background(p.Bubble).Gap(8).Children(func() {
+			ui.Box(c).Width(2.5).Shrink(0).Radius(1.5).Background(p.Edge2)
+			ui.Column(c).Grow(1).MinWidth(0).Gap(8).Children(func() {
 				if e.Text != "" {
-					ui.Text(c, e.Text).TextColor(p.Fg).LineHeight(1.55).Selectable()
+					ui.Text(c, e.Text).FontSize(15).TextColor(p.Fg).LineHeight(1.55).Selectable()
 				}
 				if len(e.Images) > 0 {
 					a.sentImages(c, e)
+				}
+			})
+			ui.Row(c).Gap(2).Shrink(0).AlignItems(ui.Start).Children(func() {
+				if a.rewindable(e) {
+					a.rewindButton(c, e, msg.Hovered())
+				}
+				if e.Text != "" {
+					a.copyButton(c, e.Text, msg.Hovered())
 				}
 			})
 		})

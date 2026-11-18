@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/shqingda/talos/kernel/agent"
+	"github.com/shqingda/talos/kernel/agents"
 	"github.com/shqingda/talos/kernel/changes"
 	"github.com/shqingda/talos/kernel/lsp"
 	"github.com/shqingda/talos/kernel/perm"
@@ -66,6 +67,7 @@ type Manager struct {
 func New(st *store.Store, open func(string) (llm.Provider, error)) *Manager {
 	m := &Manager{Store: st, changes: changes.New(st), Open: open, Tools: tools.Default(), Sandboxed: sandbox.Available()}
 	m.Skills.Disabled = func(name string) bool { return m.skillDisabled(context.Background(), name) }
+	m.Skills.ExtraSkillDirs = m.pluginSkillDirs
 	return m
 }
 
@@ -676,7 +678,7 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	if m.MCP != nil {
 		turnTools = append(turnTools, m.MCP.Tools(ctx, x.Cwd)...)
 	}
-	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt
+	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt + agentsPrompt(m.Skills.GlobalRoot(), x.Cwd)
 	var used llm.Usage
 	if at := m.compactAt(x.Account, x.Model); p.Compact && len(history) > 0 || at > 0 && tokens(history) > at {
 		req := llm.Request{Model: x.Model, System: system, Messages: history, Tools: turnTools.Specs(), Effort: x.Effort, SessionID: x.ID}
@@ -702,15 +704,30 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
 	}}
 	var subMu sync.Mutex
-	task := func(ctx context.Context, callID, taskID, prompt string) (string, error) {
+	task := func(ctx context.Context, callID, taskID, prompt, agentName string) (string, error) {
 		s := &subSink{m: m, sessionID: x.ID, callID: callID, task: taskID}
+		subTools := turnTools.Without(tools.Task.Name, tools.RunTasks.Name, tools.AskUser.Name)
+		subSys := system + subPrompt
+		maxSteps := 0
+		model := subModel
+		if agentName != "" {
+			if custom, ok := agents.Find(m.Skills.GlobalRoot(), x.Cwd, agentName); ok {
+				subTools = agents.FilterTools(subTools, custom)
+				if custom.Prompt != "" {
+					subSys = subSys + "\n\n" + custom.Prompt
+				}
+				if custom.MaxSteps > 0 {
+					maxSteps = custom.MaxSteps
+				}
+			}
+		}
 		sa := &agent.Agent{
 			Provider: subProvider,
-			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: turnTools.Without(tools.Task.Name, tools.RunTasks.Name, tools.AskUser.Name), env: env},
+			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: subTools, env: env},
 			Sink:     s,
 			Clock:    m.Clock,
 		}
-		u, err := sa.Run(ctx, agent.Config{Model: subModel, Effort: subEffort, SessionID: x.ID, System: system + subPrompt}, nil, llm.Text(llm.User, prompt))
+		u, err := sa.Run(ctx, agent.Config{Model: model, Effort: subEffort, SessionID: x.ID, System: subSys, MaxSteps: maxSteps}, nil, llm.Text(llm.User, prompt))
 		subMu.Lock()
 		used = used.Add(u)
 		subMu.Unlock()
@@ -923,4 +940,19 @@ func promptParts(p proto.Prompt) []llm.Part {
 		parts = append(parts, llm.Part{Image: &p.Images[i]})
 	}
 	return parts
+}
+
+func agentsPrompt(globalDir, cwd string) string {
+	list := agents.Load(globalDir, cwd)
+	var b strings.Builder
+	for _, a := range list {
+		if a.Hidden || (a.Mode != "subagent" && a.Mode != "all") {
+			continue
+		}
+		if b.Len() == 0 {
+			b.WriteString("\nAvailable subagents for task/run_tasks (pass via the `agent` field):\n")
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", a.Name, a.Description)
+	}
+	return b.String()
 }

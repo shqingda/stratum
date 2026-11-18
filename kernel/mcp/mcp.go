@@ -101,11 +101,33 @@ func Load(userFile, cwd string) ([]Entry, error) {
 	return out, errors.Join(errs...)
 }
 
+// EntriesFromRaw builds sorted Entry values from a raw JSON map of mcpServers.
+func EntriesFromRaw(project bool, raw map[string]json.RawMessage) []Entry {
+	names := make([]string, 0, len(raw))
+	for name := range raw {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var out []Entry
+	for _, name := range names {
+		var s Server
+		if json.Unmarshal(raw[name], &s) != nil {
+			continue
+		}
+		fp, _ := json.Marshal(s)
+		sum := sha256.Sum256(fp)
+		out = append(out, Entry{Name: name, Server: s, Project: project, Fingerprint: hex.EncodeToString(sum[:8])})
+	}
+	return out
+}
+
 // Hub keeps the connections, one for each server and folder it runs in.
 type Hub struct {
 	UserFile string
 	// Trusted tells whether the user let a project server run in cwd.
 	Trusted func(cwd string, e Entry) bool
+	// ExtraEntries optionally supplies additional MCP entries (e.g. from plugins).
+	ExtraEntries func(cwd string) []Entry
 	// Changed is told when a server connects or fails.
 	Changed func()
 
@@ -171,8 +193,20 @@ func key(cwd string, e Entry) string {
 	return cwd + "\x00" + e.Name + "\x00" + e.Fingerprint
 }
 
-func (h *Hub) entries(cwd string) ([]Entry, error) {
+func (h *Hub) loadAll(cwd string) ([]Entry, error) {
 	es, err := Load(h.UserFile, cwd)
+	if h.ExtraEntries != nil {
+		for _, e := range h.ExtraEntries(cwd) {
+			if !slices.ContainsFunc(es, func(x Entry) bool { return x.Name == e.Name }) {
+				es = append(es, e)
+			}
+		}
+	}
+	return es, err
+}
+
+func (h *Hub) entries(cwd string) ([]Entry, error) {
+	es, err := h.loadAll(cwd)
 	return slices.DeleteFunc(es, func(e Entry) bool {
 		return e.Project && (h.Trusted == nil || !h.Trusted(cwd, e))
 	}), err
@@ -308,7 +342,7 @@ func (h headerTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 // Status says how each configured server is for cwd, without waiting:
 // servers not tried yet start connecting.
 func (h *Hub) Status(cwd string) ([]Status, error) {
-	all, err := Load(h.UserFile, cwd)
+	all, err := h.loadAll(cwd)
 	out := make([]Status, 0, len(all))
 	for _, e := range all {
 		st := Status{Entry: e, State: "untrusted"}

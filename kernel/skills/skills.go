@@ -41,11 +41,18 @@ func (c *Catalog) Find(name string) (Skill, bool) {
 	return Skill{}, false
 }
 
+// SkillDir names an extra skills directory (e.g. from an enabled plugin).
+type SkillDir struct {
+	Dir     string
+	Project bool
+}
+
 type Loader struct {
-	GlobalDir string // ~/.talos when empty
-	Disabled  func(name string) bool
-	mu        sync.Mutex
-	cache     map[string]cached
+	GlobalDir      string // ~/.talos when empty
+	Disabled       func(name string) bool
+	ExtraSkillDirs func(cwd string) []SkillDir
+	mu             sync.Mutex
+	cache          map[string]cached
 }
 
 // GlobalRoot returns the resolved global Talos directory (~/.talos by default).
@@ -144,10 +151,23 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 		memory(filepath.Join(global, "MEMORY.md"))
 	}
 	memory(filepath.Join(cwd, ".talos", "MEMORY.md"))
+	if l.GlobalDir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			files = append(files, skillFiles(false, home, ".agents", "skills")...)
+			files = append(files, skillFiles(false, home, ".claude", "skills")...)
+		}
+	}
 	if global != "" {
 		files = append(files, skillFiles(false, global, "skills")...)
 	}
+	files = append(files, skillFiles(true, cwd, ".agents", "skills")...)
+	files = append(files, skillFiles(true, cwd, ".claude", "skills")...)
 	files = append(files, skillFiles(true, cwd, ".talos", "skills")...)
+	if l.ExtraSkillDirs != nil {
+		for _, sd := range l.ExtraSkillDirs(cwd) {
+			files = append(files, skillFiles(sd.Project, sd.Dir)...)
+		}
+	}
 	hash := sha256.New()
 	for _, file := range files {
 		fmt.Fprintf(hash, "%t:%t:%t:%d:%s:%d:", file.agents, file.memory, file.project, len(file.path), file.path, len(file.data))

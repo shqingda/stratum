@@ -54,7 +54,8 @@ func (m *Manager) UseMCP(userFile string) {
 		Trusted: func(cwd string, e mcp.Entry) bool {
 			return slices.Contains(m.trusted(context.Background()), trustID(cwd, e))
 		},
-		Changed: func() { m.Broadcast(proto.EventMCP, struct{}{}) },
+		ExtraEntries: m.pluginMCPEntries,
+		Changed:      func() { m.Broadcast(proto.EventMCP, struct{}{}) },
 	}
 }
 

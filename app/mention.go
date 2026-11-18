@@ -3,6 +3,7 @@ package app
 import (
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -321,4 +322,97 @@ func (a *App) mentionList() []string {
 		add(f)
 	}
 	return list
+}
+
+var mentionTokenRe = regexp.MustCompile(`(?:^|\s)(@[^\s@]+)`)
+
+type mentionChip struct {
+	raw   string
+	icon  string
+	label string
+}
+
+func (a *App) extractMentionChips() []mentionChip {
+	if !strings.Contains(a.draft, "@") {
+		return nil
+	}
+	matches := mentionTokenRe.FindAllStringSubmatchIndex(a.draft, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	activeAt := -1
+	if a.mention.open && a.mention.at >= 0 {
+		activeAt = len(string([]rune(a.draft)[:a.mention.at]))
+	}
+	seen := map[string]bool{}
+	var out []mentionChip
+	for _, m := range matches {
+		start, end := m[2], m[3]
+		if start == activeAt {
+			continue
+		}
+		tok := a.draft[start:end]
+		if len(tok) < 2 || seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		body := tok[1:]
+		icon, label := "file-text", path.Base(body)
+		switch {
+		case strings.HasPrefix(body, "session:"):
+			icon = "message"
+			id := strings.TrimPrefix(body, "session:")
+			label = id
+			for _, s := range a.C.Sessions {
+				if s.ID == id && title(s) != "" {
+					label = title(s)
+					break
+				}
+			}
+		case strings.Contains(body, "://") || strings.Contains(body, ":"):
+			icon = "plug"
+			label = body
+		case strings.HasSuffix(body, "/"):
+			icon = "folder"
+			label = strings.TrimSuffix(body, "/")
+			if base := path.Base(label); base != "" && base != "." {
+				label = base + "/"
+			}
+		}
+		out = append(out, mentionChip{raw: tok, icon: icon, label: label})
+	}
+	return out
+}
+
+// mentionChips renders @mentions in the draft as removable Apple-style pills.
+func (a *App) mentionChips(c *ui.Context) {
+	chips := a.extractMentionChips()
+	if len(chips) == 0 {
+		return
+	}
+	p := a.p
+	ui.Row(c).Wrap().Gap(6).Margin(0, 0, 8, 0).Children(func() {
+		for _, ch := range chips {
+			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 6, 0, 8).Gap(5).Radius(7).
+				Background(p.Chip).Border(.5, p.Edge).AlignItems(ui.Center)
+			pill.Children(func() {
+				sym(c, ch.icon, 12, p.Mute)
+				ui.Text(c, ch.label).FontSize(12).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				rm := ui.ButtonBase(c.Key("mchip-rm:"+ch.raw)).Size(16, 16).Radius(8).Center().Label(locales.Remove())
+				press(rm)
+				if rm.Hovered() {
+					rm.Background(p.Hover)
+				}
+				rm.Children(func() { sym(c, "x", 10, p.Mute) })
+				if rm.Clicked() {
+					next := strings.Replace(a.draft, ch.raw+" ", "", 1)
+					if next == a.draft {
+						next = strings.Replace(a.draft, ch.raw, "", 1)
+					}
+					a.draft = strings.TrimLeft(next, " ")
+					a.toEnd = true
+				}
+			})
+		}
+	})
 }
