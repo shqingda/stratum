@@ -20,6 +20,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			for _, t := range []struct{ id, label string }{
 				{"", locales.Changes()},
 				{"files", locales.Files()},
+				{"preview", locales.Preview()},
 				{"term", locales.Terminal()},
 				{"plan", locales.Plan()},
 			} {

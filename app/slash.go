@@ -75,10 +75,15 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			a.openRewind()
 		}})
 	}
-	if !a.C.Busy && len(a.C.Entries) == 0 && (a.C.Workspace.Branch != "" || a.C.Current.Worktree) {
+	if !a.C.Busy && (a.C.Workspace.Branch != "" || a.C.Current.Worktree) {
 		wt := !a.C.Current.Worktree
 		note := locales.WorktreeSub()
-		if !wt {
+		if len(a.C.Entries) > 0 {
+			note = locales.HandoffToWorktree()
+			if !wt {
+				note = locales.HandoffToLocal()
+			}
+		} else if !wt {
 			note = locales.LocalSub()
 		}
 		all = append(all, slashItem{"worktree", "git-branch", note, func(*ui.Context) {

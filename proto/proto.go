@@ -81,6 +81,18 @@ const (
 	MethodAccounts        = "accounts.list"    // → []Account
 	MethodModels          = "models.list"      // ModelsQuery → []Model
 	MethodReceipt         = "receipt.get"      // ReceiptRef → Receipt
+	MethodPreviewOpen     = "preview.open"     // PreviewRequest → PreviewSnapshot
+	MethodPreviewState    = "preview.state"    // {} → PreviewSnapshot
+	MethodAutomationList  = "automation.list"  // {} → AutomationList
+	MethodAutomationUpsert = "automation.upsert" // Automation → Automation
+	MethodAutomationDelete = "automation.delete" // AutomationID → {}
+	MethodAutomationRun   = "automation.run"   // AutomationID → Automation
+	MethodHooksList       = "hooks.list"       // HooksQuery → HooksList
+	MethodHooksSave       = "hooks.save"       // HooksSave → HooksList
+	MethodPluginList      = "plugin.list"      // HooksQuery → PluginList
+	MethodPluginInstall   = "plugin.install"   // PluginInstall → PluginList
+	MethodPluginToggle    = "plugin.toggle"    // PluginToggle → PluginList
+	MethodPluginRemove    = "plugin.remove"    // PluginRemove → PluginList
 )
 
 // Hello answers initialize.
@@ -813,4 +825,122 @@ type MCPServer struct {
 	Error   string   `json:"error,omitempty"`
 	Tools   []string `json:"tools,omitempty"`
 	Logs    []string `json:"logs,omitempty"`
+}
+
+// PreviewRequest opens or refreshes a URL in the built-in browser preview.
+type PreviewRequest struct {
+	URL string `json:"url"`
+}
+
+// PreviewConsoleEntry is one console message or uncaught exception.
+type PreviewConsoleEntry struct {
+	Level  string `json:"level"`
+	Text   string `json:"text"`
+	Source string `json:"source,omitempty"`
+	Line   int    `json:"line,omitempty"`
+}
+
+// PreviewNetworkEntry is one failed HTTP request or >=400 response.
+type PreviewNetworkEntry struct {
+	URL    string `json:"url"`
+	Status int    `json:"status,omitempty"`
+	Method string `json:"method,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// PreviewSnapshot is the state of the built-in browser preview.
+type PreviewSnapshot struct {
+	URL        string                `json:"url"`
+	Title      string                `json:"title,omitempty"`
+	Status     int                   `json:"status,omitempty"`
+	Screenshot []byte                `json:"screenshot,omitempty"`
+	Console    []PreviewConsoleEntry `json:"console,omitempty"`
+	Network    []PreviewNetworkEntry `json:"network,omitempty"`
+	Error      string                `json:"error,omitempty"`
+	UpdatedAt  time.Time             `json:"updatedAt,omitempty"`
+}
+
+// Automation is a background scheduled task (cron or interval).
+type Automation struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Prompt        string    `json:"prompt"`
+	Cwd           string    `json:"cwd"`
+	Schedule      string    `json:"schedule"` // cron expression, @hourly, @daily, or @every 30m
+	Mode          string    `json:"mode,omitempty"`
+	Enabled       bool      `json:"enabled"`
+	LastRunAt     time.Time `json:"lastRunAt,omitempty"`
+	NextRunAt     time.Time `json:"nextRunAt,omitempty"`
+	LastSessionID string    `json:"lastSessionId,omitempty"`
+	LastStatus    string    `json:"lastStatus,omitempty"` // running, ok, error
+	LastError     string    `json:"lastError,omitempty"`
+}
+
+type AutomationList struct {
+	Items []Automation `json:"items"`
+}
+
+type AutomationID struct {
+	ID string `json:"id"`
+}
+
+// HookEntry is one hook rule shown and edited in the Hooks UI.
+type HookEntry struct {
+	Event    string `json:"event"` // PreToolUse, PostToolUse, Stop
+	Matcher  string `json:"matcher,omitempty"`
+	Command  string `json:"command"`
+	Project  bool   `json:"project,omitempty"`
+	Source   string `json:"source,omitempty"`
+	Editable bool   `json:"editable,omitempty"`
+}
+
+type HooksQuery struct {
+	Cwd string `json:"cwd"`
+}
+
+type HooksList struct {
+	Hooks []HookEntry `json:"hooks"`
+	Error string      `json:"error,omitempty"`
+}
+
+type HooksSave struct {
+	Cwd     string      `json:"cwd"`
+	Project bool        `json:"project"`
+	Hooks   []HookEntry `json:"hooks"`
+}
+
+// PluginInfo is an installed plugin package bundling skills, hooks, commands, or MCP servers.
+type PluginInfo struct {
+	Name        string   `json:"name"`
+	Version     string   `json:"version,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Author      string   `json:"author,omitempty"`
+	Dir         string   `json:"dir,omitempty"`
+	Project     bool     `json:"project,omitempty"`
+	Enabled     bool     `json:"enabled"`
+	Skills      int      `json:"skills,omitempty"`
+	Hooks       int      `json:"hooks,omitempty"`
+	MCPServers  []string `json:"mcpServers,omitempty"`
+}
+
+type PluginList struct {
+	Plugins []PluginInfo `json:"plugins"`
+	Error   string       `json:"error,omitempty"`
+}
+
+type PluginInstall struct {
+	Cwd     string `json:"cwd"`
+	Source  string `json:"source"`
+	Project bool   `json:"project,omitempty"`
+}
+
+type PluginToggle struct {
+	Cwd     string `json:"cwd"`
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
+type PluginRemove struct {
+	Cwd  string `json:"cwd"`
+	Name string `json:"name"`
 }

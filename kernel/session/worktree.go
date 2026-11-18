@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -60,12 +61,20 @@ func (m *Manager) hasStarted(ctx context.Context, sessionID string) bool {
 	return err == nil && len(evs) > 0
 }
 
+func (m *Manager) isRunning(sessionID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.runs[sessionID]
+	return ok
+}
+
 func (m *Manager) enableWorktree(ctx context.Context, x *store.Session) error {
 	if _, ok := m.worktreeMetaOf(ctx, x.ID); ok {
 		return nil
 	}
-	if m.hasStarted(ctx, x.ID) {
-		return proto.Errorf("bad_request", "cannot switch to worktree after a session has started")
+	started := m.hasStarted(ctx, x.ID)
+	if started && m.isRunning(x.ID) {
+		return proto.Errorf("bad_request", "cannot hand off to worktree while a turn is running")
 	}
 	repoTop, err := gitExec(ctx, x.Cwd, "rev-parse", "--show-toplevel")
 	if err != nil || repoTop == "" {
@@ -93,6 +102,14 @@ func (m *Manager) enableWorktree(ctx context.Context, x *store.Session) error {
 		return proto.Errorf("internal", "git worktree add: %s", out)
 	}
 	copyWorktreeIncludes(repoTop, wtPath)
+	if started {
+		if err := migrateWorkingTree(ctx, repoTop, wtPath); err != nil {
+			_, _ = gitExec(ctx, repoTop, "worktree", "remove", "--force", wtPath)
+			_, _ = gitExec(ctx, repoTop, "branch", "-D", branch)
+			_ = os.RemoveAll(wtBase)
+			return err
+		}
+	}
 	meta := worktreeMeta{Repo: repoTop, Path: wtPath, Branch: branch}
 	b, _ := json.Marshal(meta)
 	if err := m.Store.SetSetting(ctx, worktreeKey(x.ID), b); err != nil {
@@ -111,7 +128,12 @@ func (m *Manager) disableWorktree(ctx context.Context, x *store.Session, restore
 		return nil
 	}
 	if restoreCwd && m.hasStarted(ctx, x.ID) {
-		return proto.Errorf("bad_request", "cannot leave worktree after a session has started")
+		if m.isRunning(x.ID) {
+			return proto.Errorf("bad_request", "cannot hand off to local while a turn is running")
+		}
+		if err := handoffWorktreeToLocal(ctx, meta); err != nil {
+			return err
+		}
 	}
 	_, _ = gitExec(ctx, meta.Repo, "worktree", "remove", "--force", meta.Path)
 	_ = os.RemoveAll(meta.Path)
@@ -207,4 +229,50 @@ func copySingleFile(src, dst string, mode fs.FileMode) error {
 		return copyErr
 	}
 	return closeErr
+}
+
+// migrateWorkingTree copies uncommitted tracked diffs and untracked non-ignored
+// files from srcDir into dstDir so an active session can hand off cleanly.
+func migrateWorkingTree(ctx context.Context, srcDir, dstDir string) error {
+	diffCmd := exec.CommandContext(ctx, "git", "-C", srcDir, "--no-optional-locks", "diff", "--binary", "HEAD")
+	diffOut, err := diffCmd.Output()
+	if err == nil && len(bytes.TrimSpace(diffOut)) > 0 {
+		apply := exec.CommandContext(ctx, "git", "-C", dstDir, "--no-optional-locks", "apply", "--whitespace=nowarn", "-")
+		apply.Stdin = bytes.NewReader(diffOut)
+		if out, err := apply.CombinedOutput(); err != nil {
+			return proto.Errorf("conflict", "handoff diff apply failed: %s", strings.TrimSpace(string(out)))
+		}
+	}
+	untracked, err := exec.CommandContext(ctx, "git", "-C", srcDir, "--no-optional-locks", "ls-files", "--others", "--exclude-standard", "-z").Output()
+	if err == nil && len(untracked) > 0 {
+		for _, rec := range strings.Split(string(untracked), "\x00") {
+			if rec == "" {
+				continue
+			}
+			src := filepath.Join(srcDir, rec)
+			dst := filepath.Join(dstDir, rec)
+			if err := copyIncludePath(src, dst); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func handoffWorktreeToLocal(ctx context.Context, meta worktreeMeta) error {
+	if status, err := gitExec(ctx, meta.Repo, "status", "--porcelain"); err == nil && status != "" {
+		// Only block if tracked/untracked files conflict with worktree changes;
+		// check if worktree actually has commits or uncommitted changes first.
+		wtStatus, _ := gitExec(ctx, meta.Path, "status", "--porcelain")
+		ahead, _ := gitExec(ctx, meta.Repo, "rev-list", "--count", "HEAD.."+meta.Branch)
+		if wtStatus != "" || (ahead != "" && ahead != "0") {
+			return proto.Errorf("conflict", "local repository has uncommitted changes; commit or stash them before handing off from worktree")
+		}
+	}
+	if ahead, err := gitExec(ctx, meta.Repo, "rev-list", "--count", "HEAD.."+meta.Branch); err == nil && ahead != "" && ahead != "0" {
+		if out, err := gitExec(ctx, meta.Repo, "merge", "--ff-only", meta.Branch); err != nil {
+			return proto.Errorf("conflict", "handoff merge failed: %s", out)
+		}
+	}
+	return migrateWorkingTree(ctx, meta.Path, meta.Repo)
 }

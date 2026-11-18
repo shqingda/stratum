@@ -150,8 +150,12 @@ type Client struct {
 	Older, LoadingOlder bool
 	// MCP is how the MCP servers are for the folder MCPFor, nil until
 	// read.
-	MCP    *proto.MCPList
-	MCPFor string
+	MCP         *proto.MCPList
+	MCPFor      string
+	Preview     *proto.PreviewSnapshot
+	Automations *proto.AutomationList
+	Hooks       *proto.HooksList
+	Plugins     *proto.PluginList
 	// Hits are the messages matching HitsFor, nil before an answer.
 	Hits      []proto.SearchHit
 	HitsFor   string

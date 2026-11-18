@@ -35,9 +35,10 @@ type Options struct {
 
 // Kernel is an assembled kernel.
 type Kernel struct {
-	Server   *rpc.Server
-	Sessions *session.Manager
-	store    *store.Store
+	Server     *rpc.Server
+	Sessions   *session.Manager
+	store      *store.Store
+	autoCancel context.CancelFunc
 }
 
 // LoadCatalog reads the model catalog (models.dev), cached in Talos's data
@@ -144,11 +145,16 @@ func Start(ctx context.Context, o Options) (*Kernel, error) {
 			return out, nil
 		},
 	}
-	return &Kernel{Server: srv, Sessions: m, store: st}, nil
+	autoCtx, autoCancel := context.WithCancel(context.Background())
+	m.StartAutomations(autoCtx)
+	return &Kernel{Server: srv, Sessions: m, store: st, autoCancel: autoCancel}, nil
 }
 
 // Close stops running turns and closes the store.
 func (k *Kernel) Close() error {
+	if k.autoCancel != nil {
+		k.autoCancel()
+	}
 	k.Sessions.Close()
 	return k.store.Close()
 }

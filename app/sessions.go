@@ -37,6 +37,16 @@ func (a *App) sessionMenu(m *ui.Menu, s proto.Session) {
 	if m.Item(locales.ForkSession()).Chosen() {
 		a.do(a.C.Fork(s.ID))
 	}
+	if a.C.Current != nil && a.C.Current.ID == s.ID && !a.C.Busy && (a.C.Workspace.Branch != "" || s.Worktree) {
+		wt := !s.Worktree
+		lbl := locales.HandoffToWorktree()
+		if !wt {
+			lbl = locales.HandoffToLocal()
+		}
+		if m.Item(lbl).Chosen() {
+			a.do(a.C.Update(proto.SessionUpdate{Worktree: &wt}))
+		}
+	}
 	m.Separator()
 	if s.Archived {
 		if m.Item(locales.Unarchive()).Chosen() {

@@ -11,6 +11,7 @@ import (
 )
 
 type mcpState struct {
+	tab              int // 0: MCP & Skills, 1: Hooks, 2: Plugins
 	mcpFormOpen      bool
 	mcpProject       bool
 	mcpName          string
@@ -23,11 +24,31 @@ type mcpState struct {
 	skillBody        string
 	skillSource      string
 	mcpLogsOpen      map[string]bool
+	hookFormOpen     bool
+	hookProject      bool
+	hookEventIdx     int // 0: PreToolUse, 1: PostToolUse, 2: Stop
+	hookMatcher      string
+	hookCommand      string
+	pluginFormOpen   bool
+	pluginProject    bool
+	pluginSource     string
 }
 
-// mcpPage lists the MCP servers and skills of the current session's folder.
+// mcpPage lists the MCP servers, skills, hooks, and plugins of the current session's folder.
 func (a *App) mcpPage(c *ui.Context) {
 	p := a.p
+	st := &a.mcpUI
+	ui.Row(c).Margin(0, 0, 12, 0).AlignItems(ui.Center).Children(func() {
+		ui.Segmented(c, &st.tab, locales.McpServers(), locales.Hooks(), locales.Plugins()).Label(locales.SettingsMcp())
+	})
+	switch st.tab {
+	case 1:
+		a.hooksSection(c)
+		return
+	case 2:
+		a.pluginsSection(c)
+		return
+	}
 	l := a.C.MCP
 	ui.Row(c).Margin(6, 0, 7, 2).Gap(10).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, locales.McpServers()).FontSize(13).FontWeight(600).TextColor(p.Fg).Shrink(0)
@@ -360,6 +381,225 @@ func (a *App) skillRow(c *ui.Context, sk proto.SkillInfo) {
 		if open && strings.TrimSpace(sk.Body) != "" {
 			ui.Text(c, strings.TrimSpace(sk.Body)).Font("monospace").FontSize(12).LineHeight(1.5).TextColor(p.Fg2).
 				Padding(9, 11).Radius(8).Background(p.Chip).Margin(0, 12, 10, 56).Selectable()
+		}
+	})
+}
+
+func (a *App) hooksSection(c *ui.Context) {
+	p := a.p
+	st := &a.mcpUI
+	if a.C.Hooks == nil {
+		a.quiet(a.C.ReadHooks())
+	}
+	ui.Row(c).Margin(6, 0, 7, 2).Gap(10).AlignItems(ui.Center).Children(func() {
+		ui.Text(c, locales.Hooks()).FontSize(13).FontWeight(600).TextColor(p.Fg).Shrink(0)
+		ui.Spacer(c)
+		if a.pushButton(c, "hook-add", locales.AddHook()).Clicked() {
+			st.hookFormOpen = !st.hookFormOpen
+		}
+	})
+	if st.hookFormOpen {
+		a.hookAddForm(c)
+	}
+	hl := a.C.Hooks
+	if hl != nil && hl.Error != "" {
+		ui.Text(c, hl.Error).FontSize(12.5).TextColor(p.Minus).Margin(0, 0, 8, 0).Selectable()
+	}
+	switch {
+	case hl == nil:
+		ui.Text(c, locales.Reading()).FontSize(12.5).TextColor(p.Mute)
+	case len(hl.Hooks) == 0:
+		group(c, p, func() {
+			ui.Column(c).Padding(16).Gap(8).Children(func() {
+				ui.Text(c, locales.HooksEmpty()).FontSize(12.5).TextColor(p.Fg2)
+			})
+		})
+	default:
+		group(c, p, func() {
+			for i, h := range hl.Hooks {
+				if i > 0 {
+					ui.Box(c.Key(fmt.Sprint("hook-sep:", i))).Height(.5).Shrink(0).Background(p.Edge)
+				}
+				a.hookRow(c, i, h)
+			}
+		})
+	}
+}
+
+func (a *App) hookAddForm(c *ui.Context) {
+	p := a.p
+	st := &a.mcpUI
+	events := []string{"PreToolUse", "PostToolUse", "Stop"}
+	ui.Column(c).Margin(0, 0, 10, 0).Children(func() {
+		group(c, p, func() {
+			ui.Column(c).Padding(12).Gap(10).Children(func() {
+				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Segmented(c, &st.hookEventIdx, events...).Label(locales.Hooks())
+					if st.hookEventIdx < 2 {
+						ui.TextInputBase(c.Key("hook-matcher"), &st.hookMatcher).
+							Label(locales.HookMatcher()).Placeholder(locales.HookMatcher()).PlaceholderColor(p.Mute).
+							Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().Height(30).Padding(0, 10).Radius(7).Background(p.Chip).Grow(1).MinWidth(0)
+					} else {
+						ui.Spacer(c)
+					}
+				})
+				ui.TextInputBase(c.Key("hook-cmd"), &st.hookCommand).
+					Label(locales.HookCommand()).Placeholder(locales.HookCommand()).PlaceholderColor(p.Mute).
+					Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().Height(30).Padding(0, 10).Radius(7).Background(p.Chip)
+				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					scope := map[bool]int{false: 0, true: 1}[st.hookProject]
+					if ui.Segmented(c, &scope, locales.Global(), locales.Project()).Label(locales.Hooks()).Changed() {
+						st.hookProject = scope == 1
+					}
+					ui.Spacer(c)
+					if a.button(c, "hook-cancel", locales.Cancel(), "", false).Clicked() {
+						st.hookFormOpen = false
+					}
+					canSave := strings.TrimSpace(st.hookCommand) != ""
+					if a.button(c, "hook-save", locales.Save(), "", true).Disabled(!canSave).Clicked() {
+						var next []proto.HookEntry
+						if a.C.Hooks != nil {
+							for _, existing := range a.C.Hooks.Hooks {
+								if existing.Editable && existing.Project == st.hookProject {
+									next = append(next, existing)
+								}
+							}
+						}
+						matcher := strings.TrimSpace(st.hookMatcher)
+						if st.hookEventIdx == 2 {
+							matcher = ""
+						}
+						next = append(next, proto.HookEntry{
+							Event:   events[st.hookEventIdx],
+							Matcher: matcher,
+							Command: strings.TrimSpace(st.hookCommand),
+							Project: st.hookProject,
+						})
+						a.do(a.C.SaveHooks(st.hookProject, next))
+						st.hookFormOpen, st.hookMatcher, st.hookCommand = false, "", ""
+					}
+				})
+			})
+		})
+	})
+}
+
+func (a *App) hookRow(c *ui.Context, idx int, h proto.HookEntry) {
+	p := a.p
+	ui.Row(c.Key(fmt.Sprint("hook:", idx))).Padding(10, 14).Gap(10).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, h.Event).FontSize(12.5).FontWeight(600).TextColor(p.Fg)
+				if h.Matcher != "" {
+					ui.Text(c, h.Matcher).Font("monospace").FontSize(11.5).TextColor(p.Fg2).Padding(1, 6).Radius(5).Background(p.Chip)
+				}
+				ui.Text(c, map[bool]string{true: locales.Project(), false: locales.Global()}[h.Project]).
+					FontSize(11).FontWeight(500).TextColor(p.Fg2).Background(p.Chip).Padding(1, 6).Radius(5)
+			})
+			ui.Text(c, h.Command).Font("monospace").FontSize(12).TextColor(p.Fg2).SingleLine().Ellipsis("…")
+		})
+		if h.Editable {
+			if a.iconButton(c, fmt.Sprint("hook-del:", idx), "trash", locales.Delete()).Clicked() && a.C.Hooks != nil {
+				var next []proto.HookEntry
+				for i, existing := range a.C.Hooks.Hooks {
+					if i != idx && existing.Editable && existing.Project == h.Project {
+						next = append(next, existing)
+					}
+				}
+				a.do(a.C.SaveHooks(h.Project, next))
+			}
+		}
+	})
+}
+
+func (a *App) pluginsSection(c *ui.Context) {
+	p := a.p
+	st := &a.mcpUI
+	if a.C.Plugins == nil {
+		a.quiet(a.C.ReadPlugins())
+	}
+	ui.Row(c).Margin(6, 0, 7, 2).Gap(10).AlignItems(ui.Center).Children(func() {
+		ui.Text(c, locales.Plugins()).FontSize(13).FontWeight(600).TextColor(p.Fg).Shrink(0)
+		ui.Spacer(c)
+		if a.pushButton(c, "plugin-add", locales.InstallPlugin()).Clicked() {
+			st.pluginFormOpen = !st.pluginFormOpen
+		}
+	})
+	if st.pluginFormOpen {
+		ui.Column(c).Margin(0, 0, 10, 0).Children(func() {
+			group(c, p, func() {
+				ui.Column(c).Padding(12).Gap(10).Children(func() {
+					ui.TextInputBase(c.Key("plugin-src"), &st.pluginSource).
+						Label(locales.PluginSource()).Placeholder(locales.PluginSource()).PlaceholderColor(p.Mute).
+						Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().Height(30).Padding(0, 10).Radius(7).Background(p.Chip)
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						scope := map[bool]int{false: 0, true: 1}[st.pluginProject]
+						if ui.Segmented(c, &scope, locales.Global(), locales.Project()).Label(locales.Plugins()).Changed() {
+							st.pluginProject = scope == 1
+						}
+						ui.Spacer(c)
+						if a.button(c, "plugin-cancel", locales.Cancel(), "", false).Clicked() {
+							st.pluginFormOpen = false
+						}
+						canSave := strings.TrimSpace(st.pluginSource) != ""
+						if a.button(c, "plugin-save", locales.Install(), "", true).Disabled(!canSave).Clicked() {
+							a.do(a.C.InstallPlugin(strings.TrimSpace(st.pluginSource), st.pluginProject))
+							st.pluginFormOpen, st.pluginSource = false, ""
+						}
+					})
+				})
+			})
+		})
+	}
+	pl := a.C.Plugins
+	switch {
+	case pl == nil:
+		ui.Text(c, locales.Reading()).FontSize(12.5).TextColor(p.Mute)
+	case len(pl.Plugins) == 0:
+		group(c, p, func() {
+			ui.Column(c).Padding(16).Gap(8).Children(func() {
+				ui.Text(c, locales.PluginsEmpty()).FontSize(12.5).TextColor(p.Fg2)
+			})
+		})
+	default:
+		group(c, p, func() {
+			for i, pk := range pl.Plugins {
+				if i > 0 {
+					ui.Box(c.Key(fmt.Sprint("plug-sep:", i))).Height(.5).Shrink(0).Background(p.Edge)
+				}
+				a.pluginRow(c, pk)
+			}
+		})
+	}
+}
+
+func (a *App) pluginRow(c *ui.Context, pk proto.PluginInfo) {
+	p := a.p
+	ui.Row(c.Key("plug:"+pk.Name)).Padding(10, 14).Gap(10).AlignItems(ui.Center).Children(func() {
+		ui.Box(c).Size(32, 32).Radius(8).Background(p.Chip).Center().Children(func() {
+			sym(c, "puzzle", 16, p.Fg)
+		})
+		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, pk.Name).FontSize(13).FontWeight(600).TextColor(p.Fg).SingleLine()
+				if pk.Version != "" {
+					ui.Text(c, "v"+pk.Version).FontSize(11).TextColor(p.Mute).SingleLine()
+				}
+				ui.Text(c, map[bool]string{true: locales.Project(), false: locales.Global()}[pk.Project]).
+					FontSize(11).FontWeight(500).TextColor(p.Fg2).Background(p.Chip).Padding(1, 6).Radius(5)
+			})
+			sub := pk.Description
+			if sub == "" {
+				sub = fmt.Sprintf("%d skills · %d hooks · %d MCP", pk.Skills, pk.Hooks, len(pk.MCPServers))
+			}
+			ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+		})
+		en := pk.Enabled
+		if ui.Switch(c.Key("plug-sw:"+pk.Name), &en).Label(pk.Name).Changed() {
+			a.do(a.C.TogglePlugin(pk.Name, en))
+		}
+		if a.iconButton(c, "plug-del:"+pk.Name, "trash", locales.Remove()).Clicked() {
+			a.do(a.C.RemovePlugin(pk.Name))
 		}
 	})
 }

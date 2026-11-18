@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/shqingda/talos/proto"
 )
 
 const hookTimeout = 30 * time.Second
@@ -64,6 +66,7 @@ func (m *Manager) hookFiles(cwd string) []string {
 	if global != "" {
 		files = append(files, filepath.Join(global, "hooks.json"))
 	}
+	files = append(files, m.pluginHookFiles(cwd)...)
 	return files
 }
 
@@ -218,4 +221,138 @@ func (m *Manager) runStopHooks(ctx context.Context, cwd, sessionID string) {
 	for _, s := range specs {
 		runHookCommand(ctx, cwd, sessionID, s.command, payload)
 	}
+}
+
+// ListHooks returns all configured hooks across project, global, Claude settings,
+// and enabled plugins, indicating which entries are directly editable.
+func (m *Manager) ListHooks(ctx context.Context, cwd string) (proto.HooksList, error) {
+	var out proto.HooksList
+	global := m.Skills.GlobalDir
+	if global == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			global = filepath.Join(home, ".talos")
+		}
+	}
+	type sourceFile struct {
+		path     string
+		project  bool
+		editable bool
+	}
+	var sources []sourceFile
+	if cwd != "" {
+		sources = append(sources,
+			sourceFile{filepath.Join(cwd, ".talos", "hooks.json"), true, true},
+			sourceFile{filepath.Join(cwd, ".claude", "settings.json"), true, false},
+		)
+	}
+	if global != "" {
+		sources = append(sources, sourceFile{filepath.Join(global, "hooks.json"), false, true})
+	}
+	for _, pf := range m.pluginHookFiles(cwd) {
+		sources = append(sources, sourceFile{pf, strings.HasPrefix(pf, cwd), false})
+	}
+
+	events := []string{"PreToolUse", "PostToolUse", "Stop"}
+	for _, src := range sources {
+		b, err := os.ReadFile(src.path)
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		var doc hookDoc
+		if err := json.Unmarshal(b, &doc); err != nil {
+			out.Error = src.path + ": " + err.Error()
+			continue
+		}
+		for _, ev := range events {
+			var groups []hookMatcher
+			switch ev {
+			case "PreToolUse":
+				groups = append(groups, doc.PreToolUse...)
+			case "PostToolUse":
+				groups = append(groups, doc.PostToolUse...)
+			case "Stop":
+				groups = append(groups, doc.Stop...)
+			}
+			if doc.Hooks != nil {
+				groups = append(groups, doc.Hooks[ev]...)
+			}
+			for _, g := range groups {
+				if cmd := strings.TrimSpace(g.Command); cmd != "" {
+					out.Hooks = append(out.Hooks, proto.HookEntry{
+						Event:    ev,
+						Matcher:  g.Matcher,
+						Command:  cmd,
+						Project:  src.project,
+						Source:   src.path,
+						Editable: src.editable,
+					})
+				}
+				for _, h := range g.Hooks {
+					if (h.Type == "" || h.Type == "command") && strings.TrimSpace(h.Command) != "" {
+						out.Hooks = append(out.Hooks, proto.HookEntry{
+							Event:    ev,
+							Matcher:  g.Matcher,
+							Command:  strings.TrimSpace(h.Command),
+							Project:  src.project,
+							Source:   src.path,
+							Editable: src.editable,
+						})
+					}
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
+// SaveHooks writes the editable hooks for project (.talos/hooks.json) or
+// global (~/.talos/hooks.json) scope and returns the updated hook list.
+func (m *Manager) SaveHooks(ctx context.Context, s proto.HooksSave) (proto.HooksList, error) {
+	var target string
+	if s.Project {
+		if strings.TrimSpace(s.Cwd) == "" {
+			return proto.HooksList{}, proto.Errorf("bad_request", "cwd is required for project hooks")
+		}
+		target = filepath.Join(s.Cwd, ".talos", "hooks.json")
+	} else {
+		global := m.Skills.GlobalDir
+		if global == "" {
+			if home, err := os.UserHomeDir(); err == nil {
+				global = filepath.Join(home, ".talos")
+			}
+		}
+		if global == "" {
+			return proto.HooksList{}, proto.Errorf("internal", "cannot determine global talos dir")
+		}
+		target = filepath.Join(global, "hooks.json")
+	}
+
+	doc := hookDoc{
+		Hooks: make(map[string][]hookMatcher),
+	}
+	for _, h := range s.Hooks {
+		cmd := strings.TrimSpace(h.Command)
+		if cmd == "" {
+			continue
+		}
+		ev := h.Event
+		if ev != "PreToolUse" && ev != "PostToolUse" && ev != "Stop" {
+			return proto.HooksList{}, proto.Errorf("bad_request", "unsupported hook event %q", ev)
+		}
+		doc.Hooks[ev] = append(doc.Hooks[ev], hookMatcher{
+			Matcher: strings.TrimSpace(h.Matcher),
+			Hooks:   []hookCommand{{Type: "command", Command: cmd}},
+		})
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return proto.HooksList{}, err
+	}
+	b, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return proto.HooksList{}, err
+	}
+	if err := os.WriteFile(target, append(b, '\n'), 0o644); err != nil {
+		return proto.HooksList{}, err
+	}
+	return m.ListHooks(ctx, s.Cwd)
 }

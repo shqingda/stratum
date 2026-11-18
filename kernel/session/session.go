@@ -21,6 +21,7 @@ import (
 
 	"github.com/shqingda/talos/kernel/agent"
 	"github.com/shqingda/talos/kernel/changes"
+	"github.com/shqingda/talos/kernel/lsp"
 	"github.com/shqingda/talos/kernel/perm"
 	"github.com/shqingda/talos/kernel/sandbox"
 	"github.com/shqingda/talos/kernel/skills"
@@ -823,6 +824,7 @@ func (m *Manager) Close() {
 	if m.MCP != nil {
 		m.MCP.Close()
 	}
+	lsp.Default.Close()
 }
 
 // Recover tidies sessions a previous kernel left mid-turn: it ends their

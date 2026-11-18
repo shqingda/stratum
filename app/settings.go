@@ -48,6 +48,8 @@ func (a *App) openSettings() {
 func (a *App) openMCP() {
 	a.settingsOpen, a.settingsPage = true, "mcp"
 	a.quiet(a.C.ReadMCP())
+	a.quiet(a.C.ReadHooks())
+	a.quiet(a.C.ReadPlugins())
 }
 
 func (a *App) openSettingsPage(id string) {

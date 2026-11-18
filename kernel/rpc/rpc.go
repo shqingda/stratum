@@ -13,6 +13,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/shqingda/talos/kernel/preview"
 	"github.com/shqingda/talos/kernel/session"
 	"github.com/shqingda/talos/kernel/store"
 	ws "github.com/shqingda/talos/kernel/workspace"
@@ -421,8 +422,110 @@ func (s *Server) handleChanges(ctx context.Context, cmd proto.Command) (any, err
 		}
 		result, err := s.Sessions.ChangesRevertHunk(ctx, p)
 		return result, err, true
+	case proto.MethodPreviewOpen:
+		p, err := params[proto.PreviewRequest](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		snap, err := preview.Default.Open(ctx, p.URL)
+		return toPreviewProto(snap), err, true
+	case proto.MethodPreviewState:
+		return toPreviewProto(preview.Default.State()), nil, true
+	case proto.MethodAutomationList:
+		res, err := s.Sessions.ListAutomations(ctx)
+		return res, err, true
+	case proto.MethodAutomationUpsert:
+		p, err := params[proto.Automation](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.UpsertAutomation(ctx, p)
+		return res, err, true
+	case proto.MethodAutomationDelete:
+		p, err := params[proto.AutomationID](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		return nil, s.Sessions.DeleteAutomation(ctx, p.ID), true
+	case proto.MethodAutomationRun:
+		p, err := params[proto.AutomationID](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.RunAutomationNow(ctx, p.ID)
+		return res, err, true
+	case proto.MethodHooksList:
+		p, err := params[proto.HooksQuery](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.ListHooks(ctx, p.Cwd)
+		return res, err, true
+	case proto.MethodHooksSave:
+		p, err := params[proto.HooksSave](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.SaveHooks(ctx, p)
+		return res, err, true
+	case proto.MethodPluginList:
+		p, err := params[proto.HooksQuery](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.ListPlugins(ctx, p.Cwd)
+		return res, err, true
+	case proto.MethodPluginInstall:
+		p, err := params[proto.PluginInstall](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.InstallPlugin(ctx, p)
+		return res, err, true
+	case proto.MethodPluginToggle:
+		p, err := params[proto.PluginToggle](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.TogglePlugin(ctx, p)
+		return res, err, true
+	case proto.MethodPluginRemove:
+		p, err := params[proto.PluginRemove](cmd)
+		if err != nil {
+			return nil, err, true
+		}
+		res, err := s.Sessions.RemovePlugin(ctx, p)
+		return res, err, true
 	}
 	return nil, nil, false
+}
+
+func toPreviewProto(s preview.Snapshot) proto.PreviewSnapshot {
+	out := proto.PreviewSnapshot{
+		URL:        s.URL,
+		Title:      s.Title,
+		Status:     s.Status,
+		Screenshot: s.Screenshot,
+		Error:      s.Error,
+		UpdatedAt:  s.UpdatedAt,
+	}
+	for _, c := range s.Console {
+		out.Console = append(out.Console, proto.PreviewConsoleEntry{
+			Level:  c.Level,
+			Text:   c.Text,
+			Source: c.Source,
+			Line:   c.Line,
+		})
+	}
+	for _, n := range s.Network {
+		out.Network = append(out.Network, proto.PreviewNetworkEntry{
+			URL:    n.URL,
+			Status: n.Status,
+			Method: n.Method,
+			Error:  n.Error,
+		})
+	}
+	return out
 }
 
 // --- 任务4 ---

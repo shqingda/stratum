@@ -52,6 +52,8 @@ var tools = map[string]struct {
 	"web_search":  {"world", locales.ToolWebSearch},
 	"memory":      {"brain", locales.ToolMemory},
 	"diagnostics": {"alert-circle", locales.ToolDiagnostics},
+	"lsp":         {"file-search", locales.ToolLsp},
+	"preview":     {"world", locales.ToolPreview},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},

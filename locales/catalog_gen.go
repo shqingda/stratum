@@ -4705,3 +4705,283 @@ func CommitFailed(error string) string { return In(i18n.Locale()).CommitFailed(e
 func (msgs Messages) CommitFailed(error string) string {
 	return Catalog.Format(msgs.locale, "commitFailed", map[string]any{"error": error})
 }
+
+// ToolLsp says "语言服务"
+// in the language the app shows.
+func ToolLsp() string { return In(i18n.Locale()).ToolLsp() }
+
+// ToolLsp says "语言服务"
+// in the language of msgs.
+func (msgs Messages) ToolLsp() string {
+	return Catalog.Format(msgs.locale, "toolLsp", nil)
+}
+
+// ToolPreview says "预览"
+// in the language the app shows.
+func ToolPreview() string { return In(i18n.Locale()).ToolPreview() }
+
+// ToolPreview says "预览"
+// in the language of msgs.
+func (msgs Messages) ToolPreview() string {
+	return Catalog.Format(msgs.locale, "toolPreview", nil)
+}
+
+// Preview says "预览"
+// in the language the app shows.
+func Preview() string { return In(i18n.Locale()).Preview() }
+
+// Preview says "预览"
+// in the language of msgs.
+func (msgs Messages) Preview() string {
+	return Catalog.Format(msgs.locale, "preview", nil)
+}
+
+// PreviewUrlPlaceholder says "http://localhost:3000"
+// in the language the app shows.
+func PreviewUrlPlaceholder() string { return In(i18n.Locale()).PreviewUrlPlaceholder() }
+
+// PreviewUrlPlaceholder says "http://localhost:3000"
+// in the language of msgs.
+func (msgs Messages) PreviewUrlPlaceholder() string {
+	return Catalog.Format(msgs.locale, "previewUrlPlaceholder", nil)
+}
+
+// PreviewEmpty says "输入 localhost 地址，或让 Talos 打开本地应用预览。"
+// in the language the app shows.
+func PreviewEmpty() string { return In(i18n.Locale()).PreviewEmpty() }
+
+// PreviewEmpty says "输入 localhost 地址，或让 Talos 打开本地应用预览。"
+// in the language of msgs.
+func (msgs Messages) PreviewEmpty() string {
+	return Catalog.Format(msgs.locale, "previewEmpty", nil)
+}
+
+// PreviewConsole says "控制台与网络"
+// in the language the app shows.
+func PreviewConsole() string { return In(i18n.Locale()).PreviewConsole() }
+
+// PreviewConsole says "控制台与网络"
+// in the language of msgs.
+func (msgs Messages) PreviewConsole() string {
+	return Catalog.Format(msgs.locale, "previewConsole", nil)
+}
+
+// PreviewNoErrors says "无控制台或网络报错。"
+// in the language the app shows.
+func PreviewNoErrors() string { return In(i18n.Locale()).PreviewNoErrors() }
+
+// PreviewNoErrors says "无控制台或网络报错。"
+// in the language of msgs.
+func (msgs Messages) PreviewNoErrors() string {
+	return Catalog.Format(msgs.locale, "previewNoErrors", nil)
+}
+
+// OpenInBrowser says "在浏览器中打开"
+// in the language the app shows.
+func OpenInBrowser() string { return In(i18n.Locale()).OpenInBrowser() }
+
+// OpenInBrowser says "在浏览器中打开"
+// in the language of msgs.
+func (msgs Messages) OpenInBrowser() string {
+	return Catalog.Format(msgs.locale, "openInBrowser", nil)
+}
+
+// Automations says "定时任务"
+// in the language the app shows.
+func Automations() string { return In(i18n.Locale()).Automations() }
+
+// Automations says "定时任务"
+// in the language of msgs.
+func (msgs Messages) Automations() string {
+	return Catalog.Format(msgs.locale, "automations", nil)
+}
+
+// NewAutomation says "新建定时任务"
+// in the language the app shows.
+func NewAutomation() string { return In(i18n.Locale()).NewAutomation() }
+
+// NewAutomation says "新建定时任务"
+// in the language of msgs.
+func (msgs Messages) NewAutomation() string {
+	return Catalog.Format(msgs.locale, "newAutomation", nil)
+}
+
+// AutomationName says "名称"
+// in the language the app shows.
+func AutomationName() string { return In(i18n.Locale()).AutomationName() }
+
+// AutomationName says "名称"
+// in the language of msgs.
+func (msgs Messages) AutomationName() string {
+	return Catalog.Format(msgs.locale, "automationName", nil)
+}
+
+// AutomationSchedule says "调度（cron、@hourly、@daily 或 @every 30m）"
+// in the language the app shows.
+func AutomationSchedule() string { return In(i18n.Locale()).AutomationSchedule() }
+
+// AutomationSchedule says "调度（cron、@hourly、@daily 或 @every 30m）"
+// in the language of msgs.
+func (msgs Messages) AutomationSchedule() string {
+	return Catalog.Format(msgs.locale, "automationSchedule", nil)
+}
+
+// AutomationPrompt says "任务指令"
+// in the language the app shows.
+func AutomationPrompt() string { return In(i18n.Locale()).AutomationPrompt() }
+
+// AutomationPrompt says "任务指令"
+// in the language of msgs.
+func (msgs Messages) AutomationPrompt() string {
+	return Catalog.Format(msgs.locale, "automationPrompt", nil)
+}
+
+// AutomationsEmpty says "按 cron 或固定周期在后台自动执行任务。"
+// in the language the app shows.
+func AutomationsEmpty() string { return In(i18n.Locale()).AutomationsEmpty() }
+
+// AutomationsEmpty says "按 cron 或固定周期在后台自动执行任务。"
+// in the language of msgs.
+func (msgs Messages) AutomationsEmpty() string {
+	return Catalog.Format(msgs.locale, "automationsEmpty", nil)
+}
+
+// RunNow says "立即运行"
+// in the language the app shows.
+func RunNow() string { return In(i18n.Locale()).RunNow() }
+
+// RunNow says "立即运行"
+// in the language of msgs.
+func (msgs Messages) RunNow() string {
+	return Catalog.Format(msgs.locale, "runNow", nil)
+}
+
+// Hooks says "Hooks"
+// in the language the app shows.
+func Hooks() string { return In(i18n.Locale()).Hooks() }
+
+// Hooks says "Hooks"
+// in the language of msgs.
+func (msgs Messages) Hooks() string {
+	return Catalog.Format(msgs.locale, "hooks", nil)
+}
+
+// AddHook says "添加 Hook"
+// in the language the app shows.
+func AddHook() string { return In(i18n.Locale()).AddHook() }
+
+// AddHook says "添加 Hook"
+// in the language of msgs.
+func (msgs Messages) AddHook() string {
+	return Catalog.Format(msgs.locale, "addHook", nil)
+}
+
+// HookMatcher says "工具匹配（如 shell、write_file、*）"
+// in the language the app shows.
+func HookMatcher() string { return In(i18n.Locale()).HookMatcher() }
+
+// HookMatcher says "工具匹配（如 shell、write_file、*）"
+// in the language of msgs.
+func (msgs Messages) HookMatcher() string {
+	return Catalog.Format(msgs.locale, "hookMatcher", nil)
+}
+
+// HookCommand says "Shell 命令"
+// in the language the app shows.
+func HookCommand() string { return In(i18n.Locale()).HookCommand() }
+
+// HookCommand says "Shell 命令"
+// in the language of msgs.
+func (msgs Messages) HookCommand() string {
+	return Catalog.Format(msgs.locale, "hookCommand", nil)
+}
+
+// HooksEmpty says "暂无 Hook。Hook 可在工具调用前后或轮次结束时运行命令。"
+// in the language the app shows.
+func HooksEmpty() string { return In(i18n.Locale()).HooksEmpty() }
+
+// HooksEmpty says "暂无 Hook。Hook 可在工具调用前后或轮次结束时运行命令。"
+// in the language of msgs.
+func (msgs Messages) HooksEmpty() string {
+	return Catalog.Format(msgs.locale, "hooksEmpty", nil)
+}
+
+// Plugins says "插件包"
+// in the language the app shows.
+func Plugins() string { return In(i18n.Locale()).Plugins() }
+
+// Plugins says "插件包"
+// in the language of msgs.
+func (msgs Messages) Plugins() string {
+	return Catalog.Format(msgs.locale, "plugins", nil)
+}
+
+// InstallPlugin says "安装插件"
+// in the language the app shows.
+func InstallPlugin() string { return In(i18n.Locale()).InstallPlugin() }
+
+// InstallPlugin says "安装插件"
+// in the language of msgs.
+func (msgs Messages) InstallPlugin() string {
+	return Catalog.Format(msgs.locale, "installPlugin", nil)
+}
+
+// PluginSource says "本地目录或 Git 地址"
+// in the language the app shows.
+func PluginSource() string { return In(i18n.Locale()).PluginSource() }
+
+// PluginSource says "本地目录或 Git 地址"
+// in the language of msgs.
+func (msgs Messages) PluginSource() string {
+	return Catalog.Format(msgs.locale, "pluginSource", nil)
+}
+
+// PluginsEmpty says "暂无已安装插件。插件可打包技能、Hooks 与 MCP 服务。"
+// in the language the app shows.
+func PluginsEmpty() string { return In(i18n.Locale()).PluginsEmpty() }
+
+// PluginsEmpty says "暂无已安装插件。插件可打包技能、Hooks 与 MCP 服务。"
+// in the language of msgs.
+func (msgs Messages) PluginsEmpty() string {
+	return Catalog.Format(msgs.locale, "pluginsEmpty", nil)
+}
+
+// HandoffToWorktree says "迁移到 Worktree"
+// in the language the app shows.
+func HandoffToWorktree() string { return In(i18n.Locale()).HandoffToWorktree() }
+
+// HandoffToWorktree says "迁移到 Worktree"
+// in the language of msgs.
+func (msgs Messages) HandoffToWorktree() string {
+	return Catalog.Format(msgs.locale, "handoffToWorktree", nil)
+}
+
+// HandoffToLocal says "迁回本地工作区"
+// in the language the app shows.
+func HandoffToLocal() string { return In(i18n.Locale()).HandoffToLocal() }
+
+// HandoffToLocal says "迁回本地工作区"
+// in the language of msgs.
+func (msgs Messages) HandoffToLocal() string {
+	return Catalog.Format(msgs.locale, "handoffToLocal", nil)
+}
+
+// EmptySessionsTitle says "暂无会话"
+// in the language the app shows.
+func EmptySessionsTitle() string { return In(i18n.Locale()).EmptySessionsTitle() }
+
+// EmptySessionsTitle says "暂无会话"
+// in the language of msgs.
+func (msgs Messages) EmptySessionsTitle() string {
+	return Catalog.Format(msgs.locale, "emptySessionsTitle", nil)
+}
+
+// EmptySessionsHint says "按 ⌘N 或在下方输入开始新对话。"
+// in the language the app shows.
+func EmptySessionsHint() string { return In(i18n.Locale()).EmptySessionsHint() }
+
+// EmptySessionsHint says "按 ⌘N 或在下方输入开始新对话。"
+// in the language of msgs.
+func (msgs Messages) EmptySessionsHint() string {
+	return Catalog.Format(msgs.locale, "emptySessionsHint", nil)
+}

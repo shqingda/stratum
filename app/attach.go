@@ -172,7 +172,7 @@ func (a *App) noImages() bool {
 
 // sentImages are the pictures of a user message, small.
 func (a *App) sentImages(c *ui.Context, e *client.Entry) {
-	if a.thumbs == nil {
+	if a.thumbs == nil || len(a.thumbs) > 64 {
 		a.thumbs = map[string]ui.ImageSource{}
 	}
 	ui.Row(c).Wrap().Gap(6).Children(func() {

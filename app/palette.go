@@ -85,6 +85,17 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	if cur != nil {
 		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: func() { a.rv.open, a.rv.tab = true, "term" }})
 		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
+		add(opt{icon: "world", label: locales.Preview(), run: func() { a.rv.open, a.rv.tab = true, "preview" }})
+		if !a.C.Busy && (a.C.Workspace.Branch != "" || cur.Worktree) {
+			wt := !cur.Worktree
+			lbl := locales.HandoffToWorktree()
+			if !wt {
+				lbl = locales.HandoffToLocal()
+			}
+			add(opt{icon: "git-branch", label: lbl, run: func() {
+				a.do(a.C.Update(proto.SessionUpdate{Worktree: &wt}))
+			}})
+		}
 		if a.C.Workspace.Dirty {
 			add(opt{icon: "git-commit", label: locales.CommitChanges(), run: func() {
 				a.rv.open, a.rv.tab = true, ""
@@ -129,6 +140,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 		a.settingsPage, a.addingAccount = "accounts", true
 	}})
 	add(opt{icon: "puzzle", label: locales.SettingsMcp(), run: a.openMCP})
+	add(opt{icon: "clock-play", label: locales.Automations(), run: a.openAutomations})
 	return sessions, actions
 }
 

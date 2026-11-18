@@ -109,6 +109,9 @@ type App struct {
 	subMenu, lightMenu                        bool
 	accountsSeen                              int
 	mcpUI                                     mcpState
+	previewUI                                 previewState
+	automationsOpen                           bool
+	automationsUI                             automationsState
 	locale                                    Locale
 	theme                                     string // the appearance last applied
 
@@ -220,6 +223,11 @@ func (a *App) View(c *ui.Context) {
 	a.markSeen(c)
 	if a.settingsOpen {
 		a.settingsView(c, vibrant)
+		a.keys(c)
+		return
+	}
+	if a.automationsOpen {
+		a.automationsView(c, vibrant)
 		a.keys(c)
 		return
 	}

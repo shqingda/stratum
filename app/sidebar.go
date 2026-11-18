@@ -58,6 +58,9 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
 				a.openMCP()
 			}
+			if a.navItem(c, "automations", "clock-play", locales.Automations(), "").Clicked() {
+				a.openAutomations()
+			}
 		})
 		list := ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
 		// The list fades into the footer rather than being cut at it.
@@ -145,6 +148,15 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 // the rest by workspace, each newest first.
 func (a *App) sessions(c *ui.Context) {
 	a.visibleSessions = a.visibleSessions[:0]
+	if len(a.C.Sessions) == 0 {
+		p := a.p
+		ui.Column(c).Padding(24, 16).Gap(6).Center().Children(func() {
+			sym(c, "message-plus", 22, p.Mute)
+			ui.Text(c, locales.EmptySessionsTitle()).FontSize(13).FontWeight(500).TextColor(p.Fg2)
+			ui.Text(c, locales.EmptySessionsHint()).FontSize(12).TextColor(p.Mute)
+		})
+		return
+	}
 	var waiting, pinned, archived []proto.Session
 	var folders []string
 	byFolder := map[string][]proto.Session{}
@@ -188,6 +200,7 @@ func (a *App) sessions(c *ui.Context) {
 		p := a.p
 		b := ui.ButtonBase(c.Key("archived")).Row().Height(24).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).
 			Label(locales.Archived()).Expanded(a.showArchived)
+		press(b)
 		if b.Clicked() {
 			a.showArchived = !a.showArchived
 		}
@@ -258,6 +271,7 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		a.do(a.C.Open(s.ID))
 	}
 	row.ContextMenu(func(m *ui.Menu) { a.sessionMenu(m, s) })
+	press(row)
 	if a.renaming == s.ID && a.renameIn == "side" {
 		row.Children(func() {
 			slot(c, p, st)
