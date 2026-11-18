@@ -75,7 +75,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		}
 	}
 	title, lede := "", ""
-	stageBg := p.Sheet.Mix(p.Bg, .45)
+	stageBg := p.Sheet
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 		topGap := float32(barHeight)
@@ -141,9 +141,9 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		})
 		ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(stageBg).Clip().Children(func() {
 			ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
-				ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(barHeight+8, 28, 48, 28).Children(func() {
+				ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(barHeight+12, 28, 52, 28).Children(func() {
 					if lede != "" {
-						ui.Text(c, lede).FontSize(13.5).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 18, 4)
+						ui.Text(c, lede).FontSize(13.5).LineHeight(1.5).TextColor(p.Mute).Margin(0, 0, 18, 0)
 					}
 					switch curPage {
 					case "accounts":
@@ -164,16 +164,15 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight+8).PassThrough().
 				Material(glass.ScrollEdge{Background: stageBg})
 			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
-				ui.Text(c, title).FontSize(16).FontWeight(650).LetterSpacing(-.2).TextColor(p.Fg).SingleLine()
+				ui.Text(c, title).FontSize(17).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg).SingleLine()
 				ui.Spacer(c)
-				done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 12).Radius(8).AlignItems(ui.Center).
-					Background(p.Chip).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
-				rim(done, p)
+				done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Size(28, 28).Radius(8).Center().
+					Label(locales.CloseSettings()).Tooltip(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
 				press(done)
 				if done.Hovered() {
-					done.Background(p.Sel)
+					done.Background(p.Hover)
 				}
-				done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.Fg).SingleLine() })
+				done.Children(func() { sym(c, "x", 15, p.Fg2) })
 				if done.Clicked() {
 					a.settingsOpen = false
 				}
@@ -192,23 +191,20 @@ func (a *App) settings() proto.Settings {
 
 // section is the bold name over a group of rows; the first sits higher.
 func section(c *ui.Context, p *Palette, label string, first bool) {
-	top := float32(22)
+	top := float32(28)
 	if first {
-		top = 4
+		top = 2
 	}
-	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(top, 0, 6, 4)
+	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(top, 0, 6, 0)
 }
 
 // note is the small text under a group.
 func note(c *ui.Context, p *Palette, text string) {
-	ui.Text(c, text).FontSize(12).LineHeight(1.45).TextColor(p.Mute).Margin(8, 4, 0, 4)
+	ui.Text(c, text).FontSize(12).LineHeight(1.45).TextColor(p.Mute).Margin(10, 0, 0, 0)
 }
 
 func group(c *ui.Context, p *Palette, children func()) {
-	g := ui.Column(c).Radius(12).Background(p.Card).Border(.5, p.Edge).Clip()
-	raise(g, p)
-	rim(g, p)
-	g.Children(children)
+	ui.Column(c).BorderWidth(.5, 0, .5, 0).BorderColor(p.Edge).Children(children)
 }
 
 // rows draws the rows of a group, with a hairline between two.
@@ -220,7 +216,7 @@ type rows struct {
 
 func (r *rows) sep() {
 	if r.n > 0 {
-		ui.Box(r.c).Height(.5).Shrink(0).Margin(0, 0, 0, 12).Background(r.p.Edge)
+		ui.Box(r.c).Height(.5).Shrink(0).Background(r.p.Edge)
 	}
 	r.n++
 }
@@ -230,11 +226,11 @@ func (r *rows) sep() {
 func (r *rows) row(key, label, sub string, control func()) {
 	r.sep()
 	c, p := r.c, r.p
-	ui.Row(c.Key(key)).MinHeight(42).Padding(8, 10, 8, 12).Gap(14).AlignItems(ui.Center).Children(func() {
-		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Text(c, label).FontSize(13.5).TextColor(p.Fg)
+	ui.Row(c.Key(key)).MinHeight(46).Padding(11, 10, 11, 12).Gap(16).AlignItems(ui.Center).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
+			ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg)
 			if sub != "" {
-				ui.Text(c, sub).FontSize(12).LineHeight(1.4).TextColor(p.Mute)
+				ui.Text(c, sub).FontSize(12.5).LineHeight(1.45).TextColor(p.Mute)
 			}
 		})
 		control()
