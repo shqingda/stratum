@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="82 120 800 800">
+  <defs>
+    <linearGradient id="metalL" x1="0.12" y1="0.08" x2="0.88" y2="0.95">
+      <stop offset="0" stop-color="#4A4A52"/>
+      <stop offset="0.32" stop-color="#1E1E22"/>
+      <stop offset="0.62" stop-color="#36363D"/>
+      <stop offset="1" stop-color="#101012"/>
+    </linearGradient>
+    <linearGradient id="plumeL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60606A"/>
+      <stop offset="0.55" stop-color="#27272C"/>
+      <stop offset="1" stop-color="#141417"/>
+    </linearGradient>
+    <linearGradient id="shineL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.38" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.48"/>
+      <stop offset="0.56" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rimL" x1="0.2" y1="0" x2="0.8" y2="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="helmClipL">
+      <path fill-rule="evenodd" d="M520 296 C620 292 690 350 698 432 L704 590 L700 700 C680 704 650 696 630 684 C600 664 580 642 566 640 C540 640 520 664 470 690 C440 704 400 712 366 704 C352 640 340 560 344 480 C350 370 420 300 520 296 Z M588 458 C602 446 646 446 686 452 L686 506 L678 508 L678 632 C672 640 660 640 654 632 L652 508 C628 510 602 508 592 498 C580 490 578 468 588 458 Z"/>
+    </clipPath>
+    <clipPath id="bodyClipL">
+      <path d="M176 896 C198 810 268 772 366 762 C436 754 592 754 652 762 C750 776 810 814 838 896 Z"/>
+    </clipPath>
+  </defs>
+  <path d="M418 358 L136 240 L128 302 L374 444 Z" fill="url(#plumeL)"/>
+  <path d="M512 300 L292 146 L270 206 L448 374 Z" fill="url(#plumeL)"/>
+  <path d="M624 318 L468 150 L432 204 L544 378 Z" fill="url(#plumeL)"/>
+  <path d="M466 650 L612 650 L612 768 L466 768 Z" fill="#18181B"/>
+  <path d="M176 896 C198 810 268 772 366 762 C436 754 592 754 652 762 C750 776 810 814 838 896 Z" fill="url(#metalL)"/>
+  <g clip-path="url(#bodyClipL)">
+    <path d="M140 740 L540 740 L380 920 L140 920 Z" fill="url(#shineL)"/>
+    <path d="M220 790 C340 762 560 760 720 784" stroke="url(#rimL)" stroke-width="10" fill="none" stroke-linecap="round"/>
+  </g>
+  <path fill-rule="evenodd" d="M520 296 C620 292 690 350 698 432 L704 590 L700 700 C680 704 650 696 630 684 C600 664 580 642 566 640 C540 640 520 664 470 690 C440 704 400 712 366 704 C352 640 340 560 344 480 C350 370 420 300 520 296 Z M588 458 C602 446 646 446 686 452 L686 506 L678 508 L678 632 C672 640 660 640 654 632 L652 508 C628 510 602 508 592 498 C580 490 578 468 588 458 Z" fill="url(#metalL)"/>
+  <g clip-path="url(#helmClipL)">
+    <path d="M310 470 L640 240 L740 340 L410 690 Z" fill="url(#shineL)"/>
+    <path d="M396 368 C450 318 548 302 638 336" stroke="url(#rimL)" stroke-width="14" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
