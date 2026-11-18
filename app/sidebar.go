@@ -35,14 +35,15 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 	topGap := float32(barHeight)
 	if vibrant {
-		// Tinted Liquid Glass: higher opacity and contrast than Clear so
-		// sidebar items stay legible above any desktop wallpaper.
-		side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
-			Material(tintedGlass(p)).Border(.5, p.Edge).Clip()
-		rim(side, p)
-		topGap = barHeight - 8
+		// Window VibrancyGlass provides the single native glass layer; add a
+		// Tinted frost wash and one right hairline so there are no nested frames.
+		tint := ui.RGBA(244, 245, 248, .38)
+		if p == dark {
+			tint = ui.RGBA(18, 18, 20, .48)
+		}
+		side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 	} else {
-		side.Background(p.Side)
+		side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 	}
 	side.Children(func() {
 		ui.Box(c).Height(topGap).Shrink(0).DragWindow()
@@ -79,41 +80,40 @@ func (a *App) sideToggle(c *ui.Context) {
 	if a.noSide {
 		tip = locales.ShowSidebar()
 	}
-	const pillW, pillH = float32(76), float32(34)
+	const pillW, pillH = float32(74), float32(32)
 	leftClosed := toggleLeft(c)
-	leftOpen := float32(sidebarWidth) - 18 - pillW
+	leftOpen := float32(sidebarWidth) - 14 - pillW
 	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
-	bg := ui.RGBA(255, 255, 255, .92)
+	bg := ui.RGBA(255, 255, 255, .94)
 	shadow := ui.RGBA(0, 0, 0, .08)
 	if p == dark {
-		bg = ui.RGBA(38, 38, 42, .88)
+		bg = ui.RGBA(38, 38, 42, .90)
 		shadow = ui.RGBA(0, 0, 0, .36)
 	}
-	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2+1).
+	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2).
 		Size(pillW, pillH).Radius(pillH/2).Padding(0, 5).Gap(4).AlignItems(ui.Center).Justify(ui.Center).
-		Background(bg).Border(.5, p.Edge).Shadow(0, 1, 4, 0, shadow).ZIndex(10)
-	rim(pill, p)
+		Background(bg).Border(.5, p.Edge).Shadow(0, 2, 6, -1, shadow).ZIndex(10)
 	pill.Children(func() {
-		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(31, 28).Radius(14).Center().
+		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(30, 26).Radius(13).Center().
 			Label(locales.NewSession()).Tooltip(locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN)
 		press(newBtn)
 		newCol := p.Fg
 		if newBtn.Hovered() {
 			newBtn.Background(p.Hover)
 		}
-		newBtn.Children(func() { sym(c, "edit", 18, newCol) })
+		newBtn.Children(func() { sym(c, "edit", 17, newCol) })
 		if newBtn.Clicked() {
 			a.do(a.C.NewSession())
 		}
 
-		togBtn := ui.ButtonBase(c.Key("side")).Size(31, 28).Radius(14).Center().
+		togBtn := ui.ButtonBase(c.Key("side")).Size(30, 26).Radius(13).Center().
 			Label(tip).Tooltip(tip)
 		press(togBtn)
 		togCol := p.Fg
 		if togBtn.Hovered() {
 			togBtn.Background(p.Hover)
 		}
-		togBtn.Children(func() { sym(c, "layout-sidebar", 19, togCol) })
+		togBtn.Children(func() { sym(c, "layout-sidebar", 18, togCol) })
 		if togBtn.Clicked() {
 			a.toggleSide()
 		}
