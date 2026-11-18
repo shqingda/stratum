@@ -120,3 +120,31 @@ func specular(p *Palette) ui.Color {
 func rim(e ui.Element, p *Palette) ui.Element {
 	return e.InsetShadow(0, .5, 0, 0, specular(p))
 }
+
+// folderColor picks a calm, deterministic Apple accent color for a project name.
+func folderColor(name string, isDark bool) ui.Color {
+	lightColors := []ui.Color{
+		ui.Hex("#2B5FA6"), ui.Hex("#3B7356"), ui.Hex("#5856D6"),
+		ui.Hex("#C67D1A"), ui.Hex("#1D7D8C"), ui.Hex("#A8474B"),
+	}
+	darkColors := []ui.Color{
+		ui.Hex("#5AA9FF"), ui.Hex("#5CC892"), ui.Hex("#8E8DF0"),
+		ui.Hex("#F0AD4E"), ui.Hex("#4FC3D4"), ui.Hex("#E07A7E"),
+	}
+	var h uint32
+	for i := 0; i < len(name); i++ {
+		h = h*31 + uint32(name[i])
+	}
+	if isDark {
+		return darkColors[int(h)%len(darkColors)]
+	}
+	return lightColors[int(h)%len(lightColors)]
+}
+
+// folderDot draws a soft colored halo dot representing a project folder.
+func folderDot(c *ui.Context, p *Palette, name string) {
+	col := folderColor(name, p == dark)
+	ui.Box(c).Size(15, 15).Radius(7.5).Background(col.Alpha(.15)).Center().Shrink(0).Children(func() {
+		ui.Box(c).Size(6.5, 6.5).Radius(3.25).Background(col)
+	})
+}

@@ -340,7 +340,11 @@ func (a *App) status(c *ui.Context) {
 			if cur.Repo != "" {
 				dir = cur.Repo
 			}
-			item("folder", filepath.Base(dir))
+			name := filepath.Base(dir)
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+				folderDot(c, p, name)
+				ui.Text(c, name).FontSize(13).TextColor(p.Fg2).SingleLine()
+			})
 			if cur.Worktree {
 				item("git-branch", locales.Worktree())
 			}

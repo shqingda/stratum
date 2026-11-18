@@ -223,11 +223,23 @@ func phaseText(phase client.Phase) string {
 // folderPill moves a session not yet begun to another folder: one the
 // sidebar knows, or one chosen with the open panel.
 func (a *App) folderPill(c *ui.Context, cur *proto.Session) {
+	p := a.p
 	curDir := cur.Cwd
 	if cur.Repo != "" {
 		curDir = cur.Repo
 	}
-	a.pill(c, "folder", "folder", filepath.Base(curDir), true).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	name := filepath.Base(curDir)
+	b := ui.ButtonBase(c.Key("pill:folder")).Row().Height(28).Padding(0, 9).Gap(6).Radius(14).AlignItems(ui.Center).
+		Label(name).Disabled(!a.C.CanAct())
+	press(b)
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() {
+		folderDot(c, p, name)
+		ui.Text(c, name).FontSize(13).TextColor(p.Fg2).SingleLine()
+	})
+	b.PopoverMenuButton(func(m *ui.Menu) {
 		seen := map[string]bool{}
 		for _, s := range a.C.Sessions {
 			dirPath := s.Cwd
