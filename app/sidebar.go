@@ -35,15 +35,10 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 	topGap := float32(barHeight)
 	if vibrant {
-		// Window VibrancyGlass already provides the native Liquid Glass
-		// surface behind the transparent root; add only a light tint and
-		// specular rim so sidebar text stays sharp above the glass.
-		tint := ui.RGBA(255, 255, 255, .18)
-		if p == dark {
-			tint = ui.RGBA(16, 16, 17, .36)
-		}
+		// Tinted Liquid Glass: higher opacity and contrast than Clear so
+		// sidebar items stay legible above any desktop wallpaper.
 		side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
-			Background(tint).Border(.5, p.Edge).Clip()
+			Material(tintedGlass(p)).Border(.5, p.Edge).Clip()
 		rim(side, p)
 		topGap = barHeight - 8
 	} else {
@@ -86,15 +81,16 @@ func (a *App) sideToggle(c *ui.Context) {
 	if a.noSide {
 		tip = locales.ShowSidebar()
 	}
-	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-32)/2).Size(32, 32).ZIndex(10).Children(func() {
-		b := ui.ButtonBase(c.Key("side")).Size(32, 32).Radius(8).Center().Label(tip).Tooltip(tip)
+	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-30)/2).Size(30, 30).ZIndex(10).Children(func() {
+		b := ui.ButtonBase(c.Key("side")).Size(30, 30).Radius(15).Center().
+			Material(glassButton(a.p)).Border(.5, a.p.Edge).Label(tip).Tooltip(tip)
+		rim(b, a.p)
 		press(b)
 		color := a.p.Fg2
 		if b.Hovered() {
-			b.Background(a.p.Hover)
 			color = a.p.Fg
 		}
-		b.Children(func() { sym(c, "layout-sidebar", 17, color) })
+		b.Children(func() { sym(c, "layout-sidebar", 16, color) })
 		if b.Clicked() {
 			a.toggleSide()
 		}
@@ -102,7 +98,7 @@ func (a *App) sideToggle(c *ui.Context) {
 }
 
 // toggleLeft is where the sidebar's toggle sits: past the window controls.
-func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+8, 12) }
+func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+10, 14) }
 
 func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
 	p := a.p
@@ -299,27 +295,62 @@ func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
 
 func (a *App) footer(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 14).Gap(9).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10, 0, 10).Gap(6).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
 		name, sub := locales.NotSignedIn(), locales.AddAccountInSettings()
-		if acc := a.account(); acc != nil {
-			name = acc.Name
+		curAcc := a.account()
+		if curAcc != nil {
+			name = curAcc.Name
 			if name == "" {
-				name = acc.ID
+				name = curAcc.ID
 			}
-			sub = acc.Email
-			if acc.Subscription && sub == "" {
+			sub = curAcc.Email
+			if curAcc.Subscription && sub == "" {
 				sub = locales.Subscription()
 			}
 		}
-		ui.Box(c).Size(24, 24).Shrink(0).Radius(6).Background(p.Acc).Center().Children(func() {
-			ui.Text(c, initials(name)).TextColor(p.OnAcc).FontSize(12).FontWeight(600).SingleLine()
-		})
-		ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-			ui.Text(c, name).FontSize(13.5).TextColor(p.Fg).SingleLine().Ellipsis("…")
-			if sub != "" {
-				ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+		profile := ui.ButtonBase(c.Key("profile-card")).Row().Grow(1).MinWidth(0).Height(38).Padding(0, 6).Gap(9).Radius(9).
+			AlignItems(ui.Center).Justify(ui.Start).Label(name)
+		press(profile)
+		if profile.Hovered() {
+			profile.Background(p.Hover)
+		}
+		profile.Children(func() {
+			ui.Box(c).Size(24, 24).Shrink(0).Radius(6).Background(p.Acc).Center().Children(func() {
+				ui.Text(c, initials(name)).TextColor(p.OnAcc).FontSize(12).FontWeight(600).SingleLine()
+			})
+			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+				ui.Text(c, name).FontSize(13.5).TextColor(p.Fg).SingleLine().Ellipsis("…")
+				if sub != "" {
+					ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+				}
+			})
+		}).PopoverMenuButton(func(m *ui.Menu) {
+			if len(a.C.Accounts) > 0 {
+				for _, acc := range a.C.Accounts {
+					accName := acc.Name
+					if accName == "" {
+						accName = acc.ID
+					}
+					id := acc.ID
+					checked := curAcc != nil && curAcc.ID == id
+					item := m.Item(accName).Checked(checked)
+					if a.C.Current != nil && item.Chosen() {
+						a.do(a.C.Update(proto.SessionUpdate{Account: &id}))
+						a.flash("sparkles", accName)
+					}
+				}
+				m.Separator()
 			}
-		})
+			if m.Item(locales.SettingsAccounts()).Chosen() {
+				a.openSettingsPage("accounts")
+			}
+			if m.Item(locales.SettingsMcp()).Chosen() {
+				a.openMCP()
+			}
+			if m.Item(locales.Settings()).Chosen() {
+				a.openSettings()
+			}
+		}, a.menuOptions(nil))
 		if a.iconButton(c, "settings", "settings", locales.Settings()).Clicked() {
 			a.openSettings()
 		}

@@ -80,12 +80,8 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 		topGap := float32(barHeight)
 		if vibrant {
-			tint := ui.RGBA(255, 255, 255, .18)
-			if p == dark {
-				tint = ui.RGBA(16, 16, 17, .36)
-			}
 			side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
-				Background(tint).Border(.5, p.Edge).Clip()
+				Material(tintedGlass(p)).Border(.5, p.Edge).Clip()
 			rim(side, p)
 			topGap = barHeight - 8
 		} else {

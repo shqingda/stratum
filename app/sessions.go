@@ -117,7 +117,7 @@ func (a *App) toastHUD(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Absolute().Top(barHeight+8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
 		pill := ui.Row(c.Key("toast-hud")).Height(32).Padding(0, 12).Gap(7).Radius(16).
-			Background(p.Card).Border(.5, p.Edge2).AlignItems(ui.Center).
+			Material(tintedGlass(p)).Border(.5, p.Edge2).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Opacity: 0}, Exit: &ui.Motion{Y: -4, Opacity: 0}})
 		lift(pill, p).Children(func() {
 			if t.icon != "" {

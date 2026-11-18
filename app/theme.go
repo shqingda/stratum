@@ -1,8 +1,7 @@
 package app
 
 import (
-	"time"
-
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -100,13 +99,35 @@ func lift(e ui.Element, p *Palette) ui.Element {
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.12)).Shadow(0, 2, 6, 0, ink.Alpha(.06)).Shadow(0, 18, 40, -16, ink.Alpha(.22))
 }
 
-// press shrinks a control a little while it is held, as a key gives.
+// press shrinks a control a little while it is held, using a critically
+// damped spring so the feedback is interruptible on rapid taps.
 func press(e ui.Element) ui.Element {
-	s := float32(1)
+	target := float32(1)
 	if e.Pressed() {
-		s = .97
+		target = .965
 	}
-	return e.AnimatePose(ui.Pose{Scale: s}, ui.Animation{Duration: 100 * time.Millisecond})
+	s := e.Spring("press", target, ui.SpringOptions{Stiffness: 650, Damping: 51})
+	return e.Scale(s, s)
+}
+
+// tintedGlass returns macOS Tinted Liquid Glass: higher opacity and contrast
+// than Clear so sidebar and HUD text stays crisp without background bleed.
+func tintedGlass(p *Palette) glass.Glass {
+	tint := ui.RGBA(244, 245, 248, .62)
+	if p == dark {
+		tint = ui.RGBA(20, 20, 22, .68)
+	}
+	return glass.Glass{Tint: tint, Native: true}
+}
+
+// glassButton returns an interactive Tinted Liquid Glass material for
+// floating toolbar and sidebar toggle controls.
+func glassButton(p *Palette) glass.Glass {
+	tint := ui.RGBA(250, 250, 252, .68)
+	if p == dark {
+		tint = ui.RGBA(32, 32, 35, .64)
+	}
+	return glass.Glass{Tint: tint, Interactive: true}
 }
 
 func specular(p *Palette) ui.Color {
