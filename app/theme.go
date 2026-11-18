@@ -120,10 +120,14 @@ func tintedGlass(p *Palette) glass.Glass {
 	return glass.Glass{Tint: tint, Native: true}
 }
 
-// glassButton returns an interactive Liquid Glass material for floating
-// toolbar and sidebar toggle controls without an opaque tint wash.
+// glassButton returns an interactive Tinted Liquid Glass material that samples
+// the app surface beneath it (Native: false) like Safari's luminous toolbar pill.
 func glassButton(p *Palette) glass.Glass {
-	return glass.Glass{Interactive: true, Native: true}
+	tint := ui.RGBA(255, 255, 255, .52)
+	if p == dark {
+		tint = ui.RGBA(48, 48, 52, .48)
+	}
+	return glass.Glass{Tint: tint, Interactive: true}
 }
 
 func specular(p *Palette) ui.Color {

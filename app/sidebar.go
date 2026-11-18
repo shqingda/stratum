@@ -81,15 +81,15 @@ func (a *App) sideToggle(c *ui.Context) {
 	if a.noSide {
 		tip = locales.ShowSidebar()
 	}
-	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-30)/2).Size(30, 30).ZIndex(10).Children(func() {
-		b := ui.ButtonBase(c.Key("side")).Size(30, 30).Radius(15).Center().
-			Material(glassButton(a.p)).Label(tip).Tooltip(tip)
+	ui.Box(c).Absolute().Left(toggleLeft(c)).Top((barHeight-28)/2+2).Size(28, 28).ZIndex(10).Children(func() {
+		b := ui.ButtonBase(c.Key("side")).Size(28, 28).Radius(14).Center().
+			Material(glassButton(a.p)).Shadow(0, 1, 3, 0, ui.RGBA(0, 0, 0, .10)).Label(tip).Tooltip(tip)
 		press(b)
 		color := a.p.Fg2
 		if b.Hovered() {
 			color = a.p.Fg
 		}
-		b.Children(func() { sym(c, "layout-sidebar", 16, color) })
+		b.Children(func() { sym(c, "layout-sidebar", 15, color) })
 		if b.Clicked() {
 			a.toggleSide()
 		}
