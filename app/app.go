@@ -227,12 +227,12 @@ func (a *App) View(c *ui.Context) {
 	a.runMenu(c)
 	a.syncDraft(c)
 	a.markSeen(c)
-	a.fitPanel(c)
-	sTarget := float32(0)
 	if a.settingsOpen {
-		sTarget = 1
+		a.settingsView(c, vibrant)
+		a.keys(c)
+		return
 	}
-	a.settingsAnim = c.Root().Spring("settings", sTarget, ui.SpringOptions{Stiffness: 420, Damping: 40})
+	a.fitPanel(c)
 	rvTarget := float32(0)
 	if a.rv.open {
 		rvTarget = 1
@@ -249,11 +249,6 @@ func (a *App) View(c *ui.Context) {
 		target = 0
 	}
 	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 380, Damping: 39})
-	if a.settingsAnim > 0.001 {
-		// Push the live workspace subtly back while a sheet sits above it.
-		s := 1 - 0.015*a.settingsAnim
-		shell.Scale(s, s)
-	}
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
 			ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.sidebar(c, vibrant) })
@@ -261,12 +256,7 @@ func (a *App) View(c *ui.Context) {
 		a.main(c)
 		a.sideToggle(c)
 	})
-	if !a.settingsOpen {
-		a.palette(c)
-	}
-	if a.settingsOpen {
-		a.settingsSheet(c, vibrant)
-	}
+	a.palette(c)
 	a.keys(c)
 }
 

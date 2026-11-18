@@ -64,9 +64,9 @@ func (a *App) openSettingsPage(id string) {
 	}
 }
 
-// settingsSheet renders Settings as a centered floating macOS Sheet over
-// the pushed-back live workspace so spatial context is never lost.
-func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
+// settingsView shares the main window's Liquid Glass sidebar and calm
+// paper stage so Settings feels like part of the same macOS app.
+func (a *App) settingsView(c *ui.Context, vibrant bool) {
 	p := a.p
 	curPage := a.settingsPage
 	if curPage == "models" || curPage == "" {
@@ -76,101 +76,108 @@ func (a *App) settingsSheet(c *ui.Context, vibrant bool) {
 		}
 	}
 	title, lede := "", ""
-	ui.DialogBase(c, &a.settingsOpen, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 13, 18, .24)
-		if p == dark {
-			scrim = ui.RGBA(6, 7, 10, .48)
+	stageBg := p.Sheet.Mix(p.Bg, .45)
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
+		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
+		topGap := float32(barHeight)
+		if vibrant {
+			tint := ui.RGBA(255, 255, 255, .18)
+			if p == dark {
+				tint = ui.RGBA(22, 24, 32, .24)
+			}
+			side.Width(sidebarWidth-12).Margin(8, 4, 8, 8).Radius(16).
+				Background(tint).Border(.5, p.Edge).Clip()
+			rim(side, p)
+			topGap = barHeight - 8
+		} else {
+			side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 		}
-		backdrop.Background(scrim).Padding(24)
-		panel.Row().AlignItems(ui.Stretch).Width(800).Height(660).MaxWidthPercent(94).MaxHeightPercent(90).Radius(16).Background(p.Sheet).Clip().
-			Label(locales.Settings())
-		lift(panel, p)
-		rim(panel, p)
-		panel.Children(func() {
-			_ = vibrant
-			ui.Column(c).Width(204).Shrink(0).Material(glass.Glass{Clarity: .35}).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge).Children(func() {
-				ui.Row(c).Padding(14, 14, 10, 16).AlignItems(ui.Center).Gap(8).Children(func() {
-					ui.Text(c, locales.Settings()).FontSize(15).FontWeight(650).TextColor(p.Fg)
-				})
-				ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 10, 12)
-				ui.Column(c).Grow(1).Padding(0, 10, 8, 10).Gap(2).Children(func() {
-					q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
-					for _, pg := range settingsPages {
-						label := pg.label(locales.In(i18n.Locale()))
-						if pg.id == curPage {
-							title = label
-							if pg.lede != nil {
-								lede = pg.lede(locales.In(i18n.Locale()))
-							}
-						}
-						if q != "" && !finds(pg.label, pg.words, q) {
-							continue
-						}
-						active := pg.id == curPage
-						it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
-							Height(32).Padding(0, 8).Gap(9).Radius(8).AlignItems(ui.Center).Label(label)
-						press(it)
-						switch {
-						case active:
-							it.Background(p.Sel)
-							rim(it, p)
-						case it.Hovered():
-							it.Background(p.Hover)
-						}
-						if it.Clicked() {
-							a.openSettingsPage(pg.id)
-						}
-						textColor, weight := p.Fg2, 450
-						if active {
-							textColor, weight = p.Fg, 600
-						} else if it.Hovered() {
-							textColor = p.Fg
-						}
-						it.Children(func() {
-							ui.Box(c).Size(20, 20).Radius(5).Background(pg.badge).Center().Shrink(0).Children(func() {
-								sym(c, pg.symbol, 12, ui.Hex("#FFFFFF"))
-							})
-							ui.Text(c, label).FontSize(13).FontWeight(weight).TextColor(textColor).SingleLine().Ellipsis("…").MinWidth(0)
-						})
-					}
-				})
-				a.settingsBuildFoot(c)
+		side.Children(func() {
+			ui.Box(c).Height(topGap).Shrink(0).DragWindow()
+			ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
+				ui.Image(c, mark).Size(24, 24)
+				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).TextColor(p.Fg)
 			})
-			ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(p.Sheet).Clip().Children(func() {
-				ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
-					ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(56, 28, 40, 28).Children(func() {
-						if lede != "" {
-							ui.Text(c, lede).FontSize(13).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 14, 2)
+			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)
+			ui.Column(c).Grow(1).Padding(0, 12, 8, 12).Gap(2).Children(func() {
+				q := strings.ToLower(strings.TrimSpace(a.settingsQuery))
+				for _, pg := range settingsPages {
+					label := pg.label(locales.In(i18n.Locale()))
+					if pg.id == curPage {
+						title = label
+						if pg.lede != nil {
+							lede = pg.lede(locales.In(i18n.Locale()))
 						}
-						switch curPage {
-						case "accounts":
-							a.accountsAndModelsPage(c)
-						case "permissions":
-							a.permissionsPage(c)
-						case "appearance":
-							a.appearancePage(c)
-						case "shortcuts":
-							a.shortcutsPage(c)
-						case "mcp":
-							a.mcpPage(c)
-						default:
-							a.generalPage(c)
-						}
+					}
+					if q != "" && !finds(pg.label, pg.words, q) {
+						continue
+					}
+					active := pg.id == curPage
+					it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
+						Height(32).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
+					press(it)
+					switch {
+					case active:
+						it.Background(p.Sel)
+						rim(it, p)
+					case it.Hovered():
+						it.Background(p.Hover)
+					}
+					if it.Clicked() {
+						a.openSettingsPage(pg.id)
+					}
+					iconColor, textColor, weight := p.Fg2, p.Fg2, 450
+					if active {
+						iconColor, textColor, weight = p.Fg, p.Fg, 600
+					} else if it.Hovered() {
+						textColor = p.Fg
+					}
+					it.Children(func() {
+						ui.Box(c).Width(16).Center().Children(func() { sym(c, pg.symbol, 16, iconColor) })
+						ui.Text(c, label).FontSize(13.5).FontWeight(weight).TextColor(textColor).SingleLine().Ellipsis("…").MinWidth(0)
 					})
-				})
-				ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(58).PassThrough().
-					Material(glass.ScrollEdge{Background: p.Sheet})
-				ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(50).Padding(0, 24).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, title).FontSize(16).FontWeight(650).LetterSpacing(-.2).TextColor(p.Fg).SingleLine()
-					ui.Spacer(c)
-					done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 14).Radius(14).AlignItems(ui.Center).
-						Background(p.Acc).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
-					press(done)
-					done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.OnAcc).SingleLine() })
-					if done.Clicked() {
-						a.settingsOpen = false
+				}
+			})
+			a.settingsBuildFoot(c)
+		})
+		ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(stageBg).Clip().Children(func() {
+			ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
+				ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(barHeight+8, 28, 48, 28).Children(func() {
+					if lede != "" {
+						ui.Text(c, lede).FontSize(13.5).LineHeight(1.45).TextColor(p.Fg2).Margin(0, 0, 18, 4)
+					}
+					switch curPage {
+					case "accounts":
+						a.accountsAndModelsPage(c)
+					case "permissions":
+						a.permissionsPage(c)
+					case "appearance":
+						a.appearancePage(c)
+					case "shortcuts":
+						a.shortcutsPage(c)
+					case "mcp":
+						a.mcpPage(c)
+					default:
+						a.generalPage(c)
 					}
 				})
+			})
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight+8).PassThrough().
+				Material(glass.ScrollEdge{Background: stageBg})
+			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
+				ui.Text(c, title).FontSize(16).FontWeight(650).LetterSpacing(-.2).TextColor(p.Fg).SingleLine()
+				ui.Spacer(c)
+				done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Height(28).Padding(0, 12).Radius(8).AlignItems(ui.Center).
+					Background(p.Chip).Label(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
+				rim(done, p)
+				press(done)
+				if done.Hovered() {
+					done.Background(p.Sel)
+				}
+				done.Children(func() { ui.Text(c, locales.Done()).FontSize(13).FontWeight(550).TextColor(p.Fg).SingleLine() })
+				if done.Clicked() {
+					a.settingsOpen = false
+				}
 			})
 		})
 	})
