@@ -22,23 +22,93 @@ func StaticHeader(name, value string) Auth {
 
 // Anthropic speaks the Messages API.
 type Anthropic struct {
-	BaseURL string // https://api.anthropic.com when empty
-	Auth    Auth   // e.g. StaticHeader("x-api-key", key)
-	HTTP    *http.Client
+	BaseURL             string // https://api.anthropic.com when empty
+	Auth                Auth   // e.g. StaticHeader("x-api-key", key)
+	HTTP                *http.Client
+	Provider            string
+	Headers             map[string]string
+	SessionHeader       string
+	NoToolCache         bool
+	AllowEmptySignature bool
+	ForceAdaptive       *bool
+}
+
+type anthropicOpts struct {
+	noToolCache   bool
+	allowEmptySig bool
+	forceAdaptive *bool
 }
 
 const anthropicName = "anthropic"
 
 func (p *Anthropic) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
 	return func(yield func(Event, error) bool) {
-		body := anthropicBody(req)
+		opts := anthropicOpts{
+			noToolCache:   p.NoToolCache,
+			allowEmptySig: p.AllowEmptySignature,
+			forceAdaptive: p.ForceAdaptive,
+		}
+		sendAffinity := p.Provider == "openrouter" || strings.Contains(p.BaseURL, "openrouter.ai")
+		affinityFormat := ""
+		if sendAffinity {
+			affinityFormat = "openrouter"
+		}
+		var modelHeaders map[string]string
+		if p.Provider != "" {
+			if m, ok := FindModel(p.Provider, req.Model); ok {
+				modelHeaders = m.Headers
+				if !m.Reasoning {
+					req.Effort = ""
+				} else if req.Effort != "" && len(m.ThinkingLevelMap) > 0 {
+					req.Effort = ResolveEffort(req.Effort, m.ThinkingLevelMap)
+				}
+				if mc := m.Compat; mc != nil {
+					if mc.SupportsCacheControlOnTools != nil {
+						opts.noToolCache = !*mc.SupportsCacheControlOnTools
+					}
+					if mc.AllowEmptySignature {
+						opts.allowEmptySig = true
+					}
+					if mc.ForceAdaptiveThinking != nil {
+						opts.forceAdaptive = mc.ForceAdaptiveThinking
+					}
+					if mc.SendSessionAffinityHeaders {
+						sendAffinity = true
+					}
+					if mc.SessionAffinityFormat != "" {
+						affinityFormat = mc.SessionAffinityFormat
+					}
+				}
+			}
+		}
+		body := anthropicBody(req, opts)
 		header, err := p.Auth(ctx)
 		if err != nil {
 			yield(Event{}, err)
 			return
 		}
-		header = header.Clone()
+		if header == nil {
+			header = http.Header{}
+		} else {
+			header = header.Clone()
+		}
 		header.Set("anthropic-version", "2023-06-01")
+		for k, v := range p.Headers {
+			header.Set(k, v)
+		}
+		for k, v := range modelHeaders {
+			header.Set(k, v)
+		}
+		if p.SessionHeader != "" && req.SessionID != "" {
+			header.Set(p.SessionHeader, req.SessionID)
+		}
+		if sendAffinity && req.SessionID != "" {
+			if affinityFormat == "openrouter" {
+				header.Set("x-session-id", req.SessionID)
+			} else {
+				header.Set("x-session-affinity", req.SessionID)
+			}
+		}
 		base := p.BaseURL
 		if base == "" {
 			base = "https://api.anthropic.com"
@@ -71,7 +141,7 @@ func adaptiveThinking(model string) bool {
 	return true
 }
 
-func anthropicBody(req Request) map[string]any {
+func anthropicBody(req Request, opts anthropicOpts) map[string]any {
 	maxTokens := req.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = 32000
@@ -80,7 +150,7 @@ func anthropicBody(req Request) map[string]any {
 		"model":      req.Model,
 		"max_tokens": maxTokens,
 		"stream":     true,
-		"messages":   anthropicMessages(req.Messages),
+		"messages":   anthropicMessages(req.Messages, opts.allowEmptySig),
 	}
 	cache := map[string]any{"type": "ephemeral"}
 	if req.System != "" {
@@ -90,7 +160,7 @@ func anthropicBody(req Request) map[string]any {
 		tools := make([]any, len(req.Tools))
 		for i, t := range req.Tools {
 			tool := map[string]any{"name": t.Name, "description": t.Description, "input_schema": toolSchema(t)}
-			if i == len(req.Tools)-1 {
+			if !opts.noToolCache && i == len(req.Tools)-1 {
 				tool["cache_control"] = cache
 			}
 			tools[i] = tool
@@ -98,11 +168,15 @@ func anthropicBody(req Request) map[string]any {
 		body["tools"] = tools
 	}
 	if req.Effort != "" {
-		if adaptiveThinking(req.Model) {
+		adaptive := adaptiveThinking(req.Model)
+		if opts.forceAdaptive != nil {
+			adaptive = *opts.forceAdaptive
+		}
+		if adaptive {
 			body["thinking"] = map[string]any{"type": "adaptive", "display": "summarized"}
 			body["output_config"] = map[string]any{"effort": req.Effort}
 		} else {
-			budget := map[string]int{"low": 2048, "medium": 8192, "high": 16384}[req.Effort]
+			budget := map[string]int{"minimal": 1024, "low": 2048, "medium": 8192, "high": 16384, "xhigh": 16384}[req.Effort]
 			if budget == 0 {
 				budget = 4096
 			}
@@ -115,7 +189,7 @@ func anthropicBody(req Request) map[string]any {
 	return body
 }
 
-func anthropicMessages(msgs []Message) []any {
+func anthropicMessages(msgs []Message, allowEmptySig bool) []any {
 	out := make([]any, 0, len(msgs))
 	for _, m := range msgs {
 		var blocks []map[string]any
@@ -132,7 +206,7 @@ func anthropicMessages(msgs []Message) []any {
 				}
 				if t.Opaque != "" {
 					blocks = append(blocks, map[string]any{"type": "redacted_thinking", "data": t.Opaque})
-				} else if t.Signature != "" {
+				} else if t.Signature != "" || (allowEmptySig && t.Text != "") {
 					blocks = append(blocks, map[string]any{"type": "thinking", "thinking": t.Text, "signature": t.Signature})
 				}
 			case p.ToolCall != nil:

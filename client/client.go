@@ -194,6 +194,7 @@ type Client struct {
 	thought   *Entry // the streamed thinking entry its message has not yet sent whole
 	want      string // session to show on (re)connect
 	modelsReq string
+	afterSync func() []proto.Command
 }
 
 // New returns a client for the workspace at cwd that has not connected
@@ -488,6 +489,7 @@ func (c *Client) resetTranscript() {
 	c.log, c.first, c.Older, c.LoadingOlder, c.trim = nil, 0, false, false, false
 	c.resetChanges()
 	c.Workspace = Workspace{BranchStale: true}
+	c.afterSync = nil
 }
 
 // catchUp reads the current session's log after the cursor, page by page,
@@ -538,6 +540,11 @@ func (c *Client) catchUp() proto.Command {
 			if c.Phase != Ready {
 				break // a gap asked for the log again
 			}
+		}
+		if c.Phase == Ready && c.afterSync != nil {
+			fn := c.afterSync
+			c.afterSync = nil
+			cmds = append(cmds, fn()...)
 		}
 		return cmds
 	})
@@ -1022,6 +1029,30 @@ func (c *Client) Rewind(turn int64, action string) ([]proto.Command, error) {
 			c.Draft = out.Prompt
 		}
 		return []proto.Command{c.bind(id)}
+	})
+}
+
+// Retry rewinds the current session to turn (restoring code too when action
+// is "both") and immediately re-sends that turn's prompt.
+func (c *Client) Retry(turn int64, action string) ([]proto.Command, error) {
+	id := sessionID(c.Current)
+	return c.mutation(proto.MethodRewind, proto.Rewind{SessionID: id, TurnSeq: turn, Action: action}, func(r json.RawMessage) []proto.Command {
+		var out proto.RewindResult
+		if json.Unmarshal(r, &out) != nil {
+			return nil
+		}
+		if len(out.Conflicts) > 0 {
+			c.notice("rewind", "%s", locales.RewindConflict(strings.Join(out.Conflicts, locales.ListSeparator())))
+			return nil
+		}
+		cmds := []proto.Command{c.bind(id)}
+		if prompt := out.Prompt; strings.TrimSpace(prompt) != "" {
+			c.afterSync = func() []proto.Command {
+				next, _ := c.Prompt(prompt)
+				return next
+			}
+		}
+		return cmds
 	})
 }
 

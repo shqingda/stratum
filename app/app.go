@@ -71,12 +71,14 @@ type App struct {
 	panelWas, sideMoved bool
 	sideOpen            float32 // how far the sidebar is out, 0 to 1, on its way
 	rvOpen              float32 // how far the review inspector is out, 0 to 1
-	settingsAnim        float32 // how far the settings sheet is out, 0 to 1
+	sideW               float32 // user-adjusted sidebar width, 0 means default
+	rvW                 float32 // user-adjusted review width, 0 means default
 	dockH               float32 // how tall the composer floating on the transcript was
 	pal                 bool    // the ⌘K palette shows
 	jump                int64   // a message to scroll to, from a search
 	jumpIn              string  // the session it is in
 	palSel              int     // its row chosen by the arrow keys
+	palScroll           bool    // scroll palette selection into view once after ↑/↓
 	stats               map[string][2]int
 	rv                  review
 	seen                map[string]time.Time // when approvals first showed
@@ -92,6 +94,8 @@ type App struct {
 	commitInput ui.Handle
 
 	searchInput                                             ui.Handle
+	composerInput                                           ui.Handle
+	closeWindow                                             func()
 	keyRepeat                                               bool
 	visibleSessions                                         []string
 	menuSession                                             string
@@ -209,6 +213,9 @@ func (a *App) View(c *ui.Context) {
 	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
 		c.SetZoom(z)
 	}
+	if a.reduceMotion() {
+		c.DisableAnimations()
+	}
 	vibrant := c.Vibrancy()
 	if vibrant {
 		c.Root().Background(ui.Transparent)
@@ -222,12 +229,16 @@ func (a *App) View(c *ui.Context) {
 	a.syncDraft(c)
 	a.markSeen(c)
 	if a.settingsOpen {
-		a.settingsView(c, vibrant)
+		ui.Box(c.Key("view-settings")).Fill().
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
+			Children(func() { a.settingsView(c, vibrant) })
 		a.keys(c)
 		return
 	}
 	if a.automationsOpen {
-		a.automationsView(c, vibrant)
+		ui.Box(c.Key("view-automations")).Fill().
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
+			Children(func() { a.automationsView(c, vibrant) })
 		a.keys(c)
 		return
 	}
@@ -248,20 +259,90 @@ func (a *App) View(c *ui.Context) {
 		target = 0
 	}
 	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 300, Damping: 34.6})
+	sw := a.sideWidth()
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
-			sideWrap := ui.Row(c).Width(a.sideOpen * sidebarWidth).Shrink(0).AlignItems(ui.Stretch).Clip()
+			sideWrap := ui.Row(c).Width(a.sideOpen * sw).Shrink(0).AlignItems(ui.Stretch).Clip()
 			if a.sideOpen < 0.999 {
 				sideWrap.Translate(-(1-a.sideOpen)*10, 0).Opacity(min(1, a.sideOpen*1.35))
 			}
 			sideWrap.Children(func() { a.sidebar(c, vibrant) })
 		}
 		a.main(c)
+		if a.sideOpen > 0.99 {
+			a.splitHandle(c, "split-side", sw, func(dx float32) { a.resizeSide(dx) }, a.resetSideWidth)
+		}
 		a.sideToggle(c)
 	})
 	a.palette(c)
 	a.toastHUD(c)
 	a.keys(c)
+}
+
+func (a *App) reduceMotion() bool {
+	return a.settings().ReduceMotion
+}
+
+const (
+	sideMinWidth   = 220
+	sideMaxWidth   = 360
+	reviewMinWidth = 360
+	reviewMaxWidth = 680
+)
+
+func (a *App) sideWidth() float32 {
+	if a.sideW <= 0 {
+		return sidebarWidth
+	}
+	return max(sideMinWidth, min(sideMaxWidth, a.sideW))
+}
+
+func (a *App) reviewWidth() float32 {
+	if a.rvW <= 0 {
+		return reviewWidth
+	}
+	return max(reviewMinWidth, min(reviewMaxWidth, a.rvW))
+}
+
+func (a *App) resizeSide(dx float32) {
+	a.sideW = max(sideMinWidth, min(sideMaxWidth, a.sideWidth()+dx))
+}
+
+func (a *App) resetSideWidth() {
+	a.sideW = sidebarWidth
+}
+
+func (a *App) resizeReview(dx float32) {
+	a.rvW = max(reviewMinWidth, min(reviewMaxWidth, a.reviewWidth()-dx))
+}
+
+func (a *App) resetReviewWidth() {
+	a.rvW = reviewWidth
+}
+
+// splitHandle draws an 8pt ergonomic resize target centered on a pane seam.
+// Hovering reveals a subtle accent hairline; double-clicking resets to default.
+func (a *App) splitHandle(c *ui.Context, key string, x float32, onDrag func(dx float32), onReset func()) {
+	p := a.p
+	h := ui.Box(c.Key(key)).Absolute().Top(0).Bottom(0).Left(x - 4).Width(8).Cursor(ui.CursorResizeColumn).Center().ZIndex(12)
+	if dx, _, ok := h.Dragged(); ok && dx != 0 {
+		onDrag(dx)
+	}
+	if h.DoubleClicked() {
+		onReset()
+	}
+	target := float32(0)
+	if h.Pressed() {
+		target = .85
+	} else if h.Hovered() {
+		target = .4
+	}
+	op := h.AnimateTo("line", target, ui.Animation{Duration: 140 * time.Millisecond})
+	if op > 0.01 {
+		h.Children(func() {
+			ui.Box(c).Width(1.5).FillHeight().Background(p.Live.Alpha(op))
+		})
+	}
 }
 
 // helloShown is an empty session, whose composer sits in the middle.
@@ -286,7 +367,17 @@ func (a *App) main(c *ui.Context) {
 		a.findBar(c)
 	})
 	if a.rvOpen > 0.001 {
-		ui.Row(c).Width(a.rvOpen * reviewWidth).Shrink(0).AlignItems(ui.Stretch).Clip().Children(func() { a.reviewPanel(c) })
+		rw := a.reviewWidth()
+		rvWrap := ui.Row(c).Width(a.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
+		if a.rvOpen < 0.999 {
+			rvWrap.Translate((1-a.rvOpen)*10, 0).Opacity(min(1, a.rvOpen*1.35))
+		}
+		rvWrap.Children(func() {
+			a.reviewPanel(c)
+			if a.rvOpen > 0.99 {
+				a.splitHandle(c, "split-review", 0, func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
+			}
+		})
 	}
 }
 
@@ -314,10 +405,37 @@ func (a *App) fitPanel(c *ui.Context) {
 	a.panelWas = a.rv.open
 	w, _ := c.Size()
 	switch {
-	case a.rv.open && !a.noSide && w < sidebarWidth+reviewWidth+minMain:
+	case a.rv.open && !a.noSide && w < a.sideWidth()+a.reviewWidth()+minMain:
 		a.noSide, a.sideMoved = true, true
 	case !a.rv.open && a.sideMoved:
 		a.noSide, a.sideMoved = false, false
+	}
+}
+
+// SetCloseWindow registers the host window close callback used by ⌘W
+// once no modal sheet or overlay is open.
+func (a *App) SetCloseWindow(fn func()) {
+	a.closeWindow = fn
+}
+
+// closeOrDismiss handles ⌘W in layers: close active overlay/sheet first
+// (Command Palette, Settings, Automations, Find bar), then close the main window.
+func (a *App) closeOrDismiss() {
+	switch {
+	case a.pal:
+		a.pal, a.query = false, ""
+	case a.settingsOpen:
+		a.settingsOpen = false
+	case a.automationsOpen:
+		if a.automationsUI.deletingID != "" {
+			a.automationsUI.deletingID, a.automationsUI.deletingName = "", ""
+		} else {
+			a.automationsOpen = false
+		}
+	case a.find.on:
+		a.closeFind()
+	case a.closeWindow != nil:
+		a.closeWindow()
 	}
 }
 

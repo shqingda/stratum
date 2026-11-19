@@ -87,6 +87,8 @@ func chat(ctx context.Context, store auth.Store, args []string) (err error) {
 			p.HTTP = &h
 		case *llm.Gemini:
 			p.HTTP = &h
+		case interface{ SetHTTP(*http.Client) }:
+			p.SetHTTP(&h)
 		default:
 			return errors.New("this provider has no HTTP stream to record")
 		}

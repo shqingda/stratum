@@ -58,16 +58,22 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 		h.Write([]byte(b.Code()))
 		key := h.Sum64()
 		done := c.Now().Sub(copied[key]) < 2*time.Second
-		btn := ui.ButtonBase(c).Size(24, 24).Radius(6).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
+		btn := ui.ButtonBase(c).Size(26, 26).Radius(7).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
+		press(btn)
+		focusRing(btn, p)
 		if btn.Hovered() {
 			btn.Background(p.Hover)
 		}
 		btn.Children(func() {
-			if done {
-				sym(c, "check", 12, p.Fg2)
-			} else {
-				sym(c, "copy", 12, p.Mute)
-			}
+			ui.Box(c).Absolute().Fill().Center().
+				Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .6, Opacity: 0}, Exit: &ui.Motion{Scale: .6, Opacity: 0}}).
+				Key(done).Children(func() {
+				if done {
+					sym(c, "check", 13, p.Plus)
+				} else {
+					sym(c, "copy", 13, p.Mute)
+				}
+			})
 		})
 		if btn.Clicked() {
 			c.WriteClipboard(b.Code())

@@ -52,9 +52,7 @@ func (a *App) previewPane(c *ui.Context) {
 
 	snap := a.C.Preview
 	if snap == nil || snap.URL == "" {
-		ui.Column(c).Grow(1).Padding(24).Gap(10).Center().Children(func() {
-			sym(c, "world", 28, p.Mute)
-			ui.Text(c, locales.PreviewEmpty()).FontSize(13).TextColor(p.Fg2)
+		emptyState(c, p, "world", locales.Preview(), locales.PreviewEmpty(), func() {
 			if a.button(c, "preview-open-default", locales.Preview(), "", true).Clicked() {
 				a.do(a.C.OpenPreview(st.url))
 			}
@@ -91,7 +89,7 @@ func (a *App) previewPane(c *ui.Context) {
 			}
 			if st.img != nil {
 				w, h := ui.ImageSize(st.img)
-				dispW := float32(reviewWidth - 28)
+				dispW := max(200, a.reviewWidth()-28)
 				dispH := dispW * 0.62
 				if w > 0 && h > 0 {
 					dispH = dispW * float32(h) / float32(w)

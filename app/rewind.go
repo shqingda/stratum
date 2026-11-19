@@ -18,7 +18,8 @@ type rewind struct {
 	sel    int
 	seq    int64
 	prompt string
-	bubble bool // opened from a message, so Esc closes
+	bubble    bool // opened from a message, so Esc closes
+	scrollSel bool // scroll selected row into view once after ↑/↓
 }
 
 type rewindPrompt struct {
@@ -121,6 +122,8 @@ func (a *App) rewindButton(c *ui.Context, e *client.Entry, shown bool) {
 	p := a.p
 	seq := a.C.Turns[e.Turn].Seq
 	b := ui.ButtonBase(c.Key("rewind-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.RewindTo()).Tooltip(locales.RewindTo())
+	press(b)
+	focusRing(b, p)
 	target := float32(0)
 	if shown || b.Focused() || a.rewind.open && a.rewind.seq == seq {
 		target = 1
@@ -192,10 +195,12 @@ func (a *App) rewindMenu(c *ui.Context) {
 		return
 	}
 	p := a.p
-	list := ui.Column(c).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card)
+	list := ui.Column(c.Key("rewind-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
+	rim(list, p)
 	lift(list, p)
 	list.Children(func() {
-		ui.Text(c, locales.Rewind()).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 2, 10)
+		ui.Text(c, locales.Rewind()).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 2, 10)
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			if w.step == "actions" {
 				a.rewindActionRows(c)
@@ -209,7 +214,16 @@ func (a *App) rewindMenu(c *ui.Context) {
 			w.sel = min(w.sel, len(prompts)-1)
 			for i, pr := range prompts {
 				row := ui.ButtonBase(c.Key("rewind:"+strings.TrimSpace(pr.text))).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(pr.text)
-				if i == w.sel || row.Hovered() {
+				press(row)
+				focusRing(row, p)
+				switch {
+				case i == w.sel:
+					row.Background(p.Sel)
+					if w.scrollSel {
+						row.ScrollIntoView()
+						w.scrollSel = false
+					}
+				case row.Hovered():
 					row.Background(p.Hover)
 				}
 				row.Children(func() {
@@ -234,7 +248,16 @@ func (a *App) rewindActionRows(c *ui.Context) {
 	ui.Text(c, w.prompt).FontSize(12.5).TextColor(p.Mute).Margin(2, 10, 4, 10).SingleLine().Ellipsis("…")
 	for i, act := range acts {
 		row := ui.ButtonBase(c.Key("rewind-act:"+act.action)).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(act.label)
-		if i == w.sel || row.Hovered() {
+		press(row)
+		focusRing(row, p)
+		switch {
+		case i == w.sel:
+			row.Background(p.Sel)
+			if w.scrollSel {
+				row.ScrollIntoView()
+				w.scrollSel = false
+			}
+		case row.Hovered():
 			row.Background(p.Hover)
 		}
 		row.Children(func() {
@@ -259,10 +282,12 @@ func (a *App) rewindKey(k ui.TextKey) bool {
 	case ui.KeyUp:
 		if n > 0 {
 			a.rewind.sel = (a.rewind.sel + n - 1) % n
+			a.rewind.scrollSel = true
 		}
 	case ui.KeyDown:
 		if n > 0 {
 			a.rewind.sel = (a.rewind.sel + 1) % n
+			a.rewind.scrollSel = true
 		}
 	case ui.KeyEnter:
 		a.rewindPick()

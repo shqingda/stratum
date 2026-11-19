@@ -15,24 +15,54 @@ import (
 // commands the agent ran, its plan, and the workspace's files.
 func (a *App) reviewTabs(c *ui.Context, files int) {
 	p := a.p
+	tabs := []struct{ id, label string }{
+		{"", locales.Changes()},
+		{"files", locales.Files()},
+		{"preview", locales.Preview()},
+		{"term", locales.Terminal()},
+		{"plan", locales.Plan()},
+	}
+	activeIdx := 0
+	for i, t := range tabs {
+		if a.rv.tab == t.id {
+			activeIdx = i
+			break
+		}
+	}
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
-		ui.Row(c).Grow(1).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center).Children(func() {
-			for _, t := range []struct{ id, label string }{
-				{"", locales.Changes()},
-				{"files", locales.Files()},
-				{"preview", locales.Preview()},
-				{"term", locales.Terminal()},
-				{"plan", locales.Plan()},
-			} {
+		track := ui.Row(c.Key("rv-tabs")).Grow(1).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center)
+		trackW := track.Bounds().W
+		pos := track.Spring("tab-pos", float32(activeIdx), ui.SpringOptions{Stiffness: 420, Damping: 36})
+		track.Children(func() {
+			thumbBg := p.Card
+			if p == dark {
+				thumbBg = ui.Hex("#2C2C31")
+			}
+			if trackW > 4 {
+				segW := (trackW - 4) / float32(len(tabs))
+				thumb := ui.Box(c.Key("rv-thumb")).Absolute().Top(2).Bottom(2).Left(2 + pos*segW).Width(segW).Radius(7).Background(thumbBg).PassThrough().ZIndex(0)
+				if p == dark {
+					thumb.Border(.5, ui.RGBA(255, 255, 255, .14))
+				}
+				rim(thumb, p)
+				raise(thumb, p)
+			}
+			for _, t := range tabs {
 				on := a.rv.tab == t.id
 				b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).
-					Height(26).Padding(0, 8).Gap(4).Radius(7).AlignItems(ui.Center).Label(t.label)
+					Height(26).Padding(0, 8).Gap(4).Radius(7).AlignItems(ui.Center).Label(t.label).ZIndex(1)
 				press(b)
+				focusRing(b, p)
 				fg, weight := p.Fg2, 500
 				if on {
-					b.Background(p.Card)
-					rim(b, p)
-					raise(b, p)
+					if trackW <= 4 {
+						b.Background(thumbBg)
+						if p == dark {
+							b.Border(.5, ui.RGBA(255, 255, 255, .14))
+						}
+						rim(b, p)
+						raise(b, p)
+					}
 					fg, weight = p.Fg, 600
 				} else if b.Hovered() {
 					b.Background(p.Hover)
@@ -197,9 +227,24 @@ func (a *App) filesPane(c *ui.Context) {
 			}
 			row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
 			press(row)
+			focusRing(row, p)
 			if row.Hovered() {
 				row.Background(p.Hover)
 			}
+			file := f
+			row.ContextMenu(func(m *ui.Menu) {
+				if !isDir && a.openIn != nil {
+					if m.Item(locales.Open()).Chosen() {
+						if err := a.openIn("", filepath.Join(cur.Cwd, file)); err != nil {
+							a.err = locales.CouldntOpen(file, err.Error())
+						}
+					}
+				}
+				if m.Item(locales.CopyPath()).Chosen() {
+					c.WriteClipboard(file)
+					a.flash("check", locales.CopyPath())
+				}
+			})
 			row.Children(func() {
 				sym(c, icon, 14, p.Mute)
 				ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)

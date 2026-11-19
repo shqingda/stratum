@@ -110,6 +110,44 @@ func press(e ui.Element) ui.Element {
 	return e.Scale(s, s)
 }
 
+// focusRing gives keyboard-navigated controls a restrained Apple focus ring
+// without showing a box on pointer clicks.
+func focusRing(e ui.Element, p *Palette) ui.Element {
+	return e.FocusRing(true).FocusRingColor(p.Live.Alpha(.45)).FocusRingOffset(1)
+}
+
+// disclosureChevron draws a chevron that smoothly rotates 0°↔90° with a
+// critically damped spring instead of snapping between two glyphs.
+func disclosureChevron(c *ui.Context, key string, open bool, size float32, col ui.Color) {
+	target := float32(0)
+	if open {
+		target = 90
+	}
+	wrap := ui.Box(c.Key("chev:"+key)).Size(size+2, size+2).Center().Shrink(0)
+	deg := wrap.Spring("deg", target, ui.SpringOptions{Stiffness: 480, Damping: 36})
+	wrap.Rotate(deg).Children(func() {
+		sym(c, "chevron-right", size, col)
+	})
+}
+
+// emptyState draws a unified, calm empty placeholder across panes and sheets.
+func emptyState(c *ui.Context, p *Palette, icon, title, subtitle string, action func()) {
+	ui.Column(c).Grow(1).Center().Padding(28, 20).Gap(8).Children(func() {
+		if icon != "" {
+			sym(c, icon, 24, p.Mute)
+		}
+		if title != "" {
+			ui.Text(c, title).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).TextAlign(ui.Center).MaxWidth(280)
+		}
+		if subtitle != "" {
+			ui.Text(c, subtitle).FontSize(12.5).LineHeight(1.45).TextColor(p.Mute).TextAlign(ui.Center).MaxWidth(280)
+		}
+		if action != nil {
+			ui.Box(c).Margin(6, 0, 0, 0).Children(action)
+		}
+	})
+}
+
 // tintedGlass returns macOS Tinted Liquid Glass: balanced frosted tint and
 // contrast over Clear so sidebar text stays sharp while preserving glass depth.
 func tintedGlass(p *Palette) glass.Glass {

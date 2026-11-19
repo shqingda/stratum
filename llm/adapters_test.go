@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 )
 
@@ -152,5 +153,143 @@ func TestGemini(t *testing.T) {
 	gen := g["generationConfig"].(map[string]any)["thinkingConfig"].(map[string]any)
 	if gen["thinkingLevel"] != "high" {
 		t.Errorf("thinking %v", gen)
+	}
+}
+
+func TestChatThinkingFormats(t *testing.T) {
+	chatSSE := sseLines(
+		`{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}`,
+		`[DONE]`,
+	)
+
+	t.Run("together", func(t *testing.T) {
+		srv, got := replay(t, 200, chatSSE)
+		p := &Chat{BaseURL: srv.URL, Auth: StaticHeader("Authorization", "Bearer k"), Compat: ChatCompat{Thinking: "together"}}
+		if _, err := Collect(p.Stream(context.Background(), toolsReq), nil); err != nil {
+			t.Fatal(err)
+		}
+		g := *got
+		if r, _ := g["reasoning"].(map[string]any); r["enabled"] != true {
+			t.Errorf("together reasoning: %v", g["reasoning"])
+		}
+		if g["reasoning_effort"] != "high" {
+			t.Errorf("together reasoning_effort: %v", g["reasoning_effort"])
+		}
+	})
+
+	t.Run("ant-ling", func(t *testing.T) {
+		srv, got := replay(t, 200, chatSSE)
+		p := &Chat{BaseURL: srv.URL, Auth: StaticHeader("Authorization", "Bearer k"), Compat: ChatCompat{Thinking: "ant-ling", NoReasoningEffort: true}}
+		if _, err := Collect(p.Stream(context.Background(), toolsReq), nil); err != nil {
+			t.Fatal(err)
+		}
+		g := *got
+		if r, _ := g["reasoning"].(map[string]any); r["effort"] != "high" {
+			t.Errorf("ant-ling reasoning: %v", g["reasoning"])
+		}
+		if _, has := g["reasoning_effort"]; has {
+			t.Errorf("unexpected reasoning_effort: %v", g["reasoning_effort"])
+		}
+	})
+
+	t.Run("baseten", func(t *testing.T) {
+		srv, got := replay(t, 200, chatSSE)
+		p := &Chat{BaseURL: srv.URL, Auth: StaticHeader("Authorization", "Bearer k"), Compat: ChatCompat{
+			Thinking:         "baseten",
+			ChatTemplateArgs: map[string]any{"enable_thinking": map[string]any{"$var": "thinking.enabled"}},
+		}}
+		if _, err := Collect(p.Stream(context.Background(), toolsReq), nil); err != nil {
+			t.Fatal(err)
+		}
+		g := *got
+		if cta, _ := g["chat_template_args"].(map[string]any); cta["enable_thinking"] != true {
+			t.Errorf("baseten chat_template_args: %v", g["chat_template_args"])
+		}
+		if g["reasoning_effort"] != "high" {
+			t.Errorf("baseten reasoning_effort: %v", g["reasoning_effort"])
+		}
+	})
+
+	t.Run("zai", func(t *testing.T) {
+		srv, got := replay(t, 200, chatSSE)
+		p := &Chat{BaseURL: srv.URL, Auth: StaticHeader("Authorization", "Bearer k"), Compat: ChatCompat{
+			Thinking:      "zai",
+			ZaiToolStream: true,
+		}}
+		if _, err := Collect(p.Stream(context.Background(), toolsReq), nil); err != nil {
+			t.Fatal(err)
+		}
+		g := *got
+		if th, _ := g["thinking"].(map[string]any); th["type"] != "enabled" || th["clear_thinking"] != false {
+			t.Errorf("zai thinking: %v", g["thinking"])
+		}
+		if g["tool_stream"] != true {
+			t.Errorf("zai tool_stream: %v", g["tool_stream"])
+		}
+	})
+}
+
+func TestGeminiBaseURLAndHeaders(t *testing.T) {
+	srv, got := replay(t, 200, sseLines(
+		`{"candidates":[{"content":{"parts":[{"text":"hi"}]},"finishReason":"STOP"}]}`,
+	))
+	p := &Gemini{
+		BaseURL:       srv.URL + "/v1beta",
+		Auth:          StaticHeader("x-goog-api-key", "k"),
+		SessionHeader: "x-opencode-session",
+	}
+	req := toolsReq
+	req.Model = "gemini-4-argon"
+	req.SessionID = "sess-123"
+	if _, err := Collect(p.Stream(context.Background(), req), nil); err != nil {
+		t.Fatal(err)
+	}
+	g := *got
+	if g["_path"] != "/v1beta/models/gemini-4-argon:streamGenerateContent" {
+		t.Errorf("path duplicated or wrong: %v", g["_path"])
+	}
+	if hdr, _ := g["_hdr"].(http.Header); hdr.Get("x-opencode-session") != "sess-123" {
+		t.Errorf("missing session header: %v", hdr)
+	}
+}
+
+func TestAnthropicOptions(t *testing.T) {
+	srv, got := replay(t, 200, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	falseVal := false
+	p := &Anthropic{
+		BaseURL:             srv.URL,
+		Auth:                StaticHeader("x-api-key", "k"),
+		SessionHeader:       "x-opencode-session",
+		NoToolCache:         true,
+		AllowEmptySignature: true,
+		ForceAdaptive:       &falseVal,
+	}
+	req := Request{
+		Model:     "claude-opus-5-5",
+		Effort:    "low",
+		SessionID: "sess-a1",
+		Tools:     []Tool{{Name: "read_file", Description: "Read"}},
+		Messages: []Message{
+			Text(User, "hi"),
+			{Role: Assistant, Parts: []Part{{Thinking: &Thinking{Text: "plan", Provider: anthropicName}}, {Text: "ok"}}},
+			Text(User, "next"),
+		},
+	}
+	_, _ = Collect(p.Stream(context.Background(), req), nil)
+	g := *got
+	if hdr, _ := g["_hdr"].(http.Header); hdr.Get("x-opencode-session") != "sess-a1" {
+		t.Errorf("session header missing: %v", hdr)
+	}
+	if th, _ := g["thinking"].(map[string]any); th["type"] != "enabled" || th["budget_tokens"] != 2048.0 {
+		t.Errorf("ForceAdaptive=false ignored: %v", g["thinking"])
+	}
+	tools := g["tools"].([]any)
+	if _, hasCache := tools[0].(map[string]any)["cache_control"]; hasCache {
+		t.Errorf("NoToolCache did not omit cache_control: %v", tools[0])
+	}
+	msgs := g["messages"].([]any)
+	asst := msgs[1].(map[string]any)["content"].([]any)
+	if len(asst) != 2 || asst[0].(map[string]any)["type"] != "thinking" {
+		t.Errorf("AllowEmptySignature did not replay empty-sig thinking: %v", asst)
 	}
 }

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"iter"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,7 @@ var Methods = map[string]*Method{
 	"xai":        {ID: "xai", Label: "Sign in with SuperGrok or X Premium", Subscription: true, Flow: &XAI{}},
 	"openrouter": {ID: "openrouter", Label: "Sign in with OpenRouter", Flow: &OpenRouter{}},
 	"copilot":    {ID: "copilot", Label: "Sign in with GitHub Copilot", Subscription: true, Flow: &Copilot{}},
+	"kimi":       {ID: "kimi", Label: "Sign in with Kimi Code", Subscription: true, Flow: &Kimi{}},
 }
 
 // API is a wire protocol.
@@ -49,7 +51,11 @@ const (
 type Provider struct {
 	ID, Name string
 	API      API
-	BaseURL  string
+	// APIs lists all wire protocols when a gateway serves more than one.
+	APIs          []API
+	BaseURL       string
+	Headers       map[string]string
+	SessionHeader string
 	// Regions are other endpoints by name, such as mainland China's.
 	Regions map[string]string
 	// KeyURL is where the user makes an API key; empty when the provider
@@ -60,7 +66,8 @@ type Provider struct {
 	// Logins are the Methods the provider offers besides a key.
 	Logins []string
 	Compat llm.ChatCompat
-	// Catalog is the provider's id on models.dev, when it differs from ID.
+	// Catalog is the provider's id on models.dev, when it differs from ID,
+	// or "-" to rely solely on the embedded catalog.
 	Catalog string
 }
 
@@ -77,29 +84,105 @@ var Providers = []Provider{
 		KeyURL: "https://aistudio.google.com/apikey", KeyEnv: "GEMINI_API_KEY"},
 	{ID: "xai", Name: "xAI", API: APIResponses, BaseURL: "https://api.x.ai/v1",
 		KeyURL: "https://console.x.ai", KeyEnv: "XAI_API_KEY", Logins: []string{"xai"}},
-	{ID: "openrouter", Name: "OpenRouter", API: APIChat, BaseURL: "https://openrouter.ai/api/v1",
+
+	// Gateways serving multiple models / wire APIs.
+	{ID: "openrouter", Name: "OpenRouter", API: APIChat, APIs: []API{APIChat, APIAnthropic}, BaseURL: "https://openrouter.ai/api/v1",
 		KeyURL: "https://openrouter.ai/keys", KeyEnv: "OPENROUTER_API_KEY", Logins: []string{"openrouter"},
-		Compat: llm.ChatCompat{Thinking: "openrouter"}},
+		Compat: llm.ChatCompat{Thinking: "openrouter", SessionAffinityFormat: "openrouter"}},
+	{ID: "opencode", Name: "OpenCode Zen", API: APIAnthropic, APIs: []API{APIAnthropic, APIGemini, APIChat, APIResponses},
+		BaseURL: "https://opencode.ai/inference/anthropic", SessionHeader: "x-opencode-session",
+		KeyURL: "https://opencode.ai/auth", KeyEnv: "OPENCODE_API_KEY", Catalog: "-"},
+	{ID: "opencode-go", Name: "OpenCode Go", API: APIAnthropic, APIs: []API{APIAnthropic, APIGemini, APIChat, APIResponses},
+		BaseURL: "https://opencode.ai/inference/go/anthropic", SessionHeader: "x-opencode-session",
+		KeyURL: "https://opencode.ai/auth", KeyEnv: "OPENCODE_API_KEY", Catalog: "-"},
+	{ID: "vercel-ai-gateway", Name: "Vercel AI Gateway", API: APIAnthropic, BaseURL: "https://ai-gateway.vercel.sh",
+		KeyURL: "https://vercel.com/ai-gateway", KeyEnv: "AI_GATEWAY_API_KEY", Catalog: "-"},
+	{ID: "fireworks", Name: "Fireworks", API: APIChat, APIs: []API{APIAnthropic, APIChat}, BaseURL: "https://api.fireworks.ai/inference/v1",
+		KeyURL: "https://fireworks.ai/account/api-keys", KeyEnv: "FIREWORKS_API_KEY", Catalog: "-"},
+
+	// Fast inference and open-weight model clouds.
 	{ID: "groq", Name: "Groq", API: APIChat, BaseURL: "https://api.groq.com/openai/v1",
 		KeyURL: "https://console.groq.com/keys", KeyEnv: "GROQ_API_KEY"},
+	{ID: "cerebras", Name: "Cerebras", API: APIChat, BaseURL: "https://api.cerebras.ai/v1",
+		KeyURL: "https://cloud.cerebras.ai/", KeyEnv: "CEREBRAS_API_KEY", Catalog: "-"},
+	{ID: "together", Name: "Together", API: APIChat, BaseURL: "https://api.together.ai/v1",
+		KeyURL: "https://api.together.xyz/settings/api-keys", KeyEnv: "TOGETHER_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "together"}, Catalog: "-"},
+	{ID: "baseten", Name: "Baseten", API: APIChat, BaseURL: "https://inference.baseten.co/v1",
+		KeyURL: "https://app.baseten.co/settings/api_keys", KeyEnv: "BASETEN_API_KEY", Catalog: "-"},
+	{ID: "huggingface", Name: "Hugging Face", API: APIChat, BaseURL: "https://router.huggingface.co/v1",
+		KeyURL: "https://huggingface.co/settings/tokens", KeyEnv: "HF_TOKEN", Catalog: "-"},
+	{ID: "nvidia", Name: "NVIDIA", API: APIChat, BaseURL: "https://integrate.api.nvidia.com/v1",
+		Headers: map[string]string{"NVCF-POLL-SECONDS": "3600"},
+		KeyURL:  "https://build.nvidia.com/explore/discover", KeyEnv: "NVIDIA_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true, NoReasoningEffort: true}, Catalog: "-"},
+
+	// Global & China labs and subscription plans.
 	{ID: "deepseek", Name: "DeepSeek", API: APIChat, BaseURL: "https://api.deepseek.com",
 		KeyURL: "https://platform.deepseek.com/api_keys", KeyEnv: "DEEPSEEK_API_KEY",
 		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true}},
-	{ID: "moonshot", Name: "Kimi (Moonshot)", API: APIChat, BaseURL: "https://api.moonshot.ai/v1",
+	{ID: "kimi-coding", Name: "Kimi For Coding", API: APIChat, BaseURL: "https://api.kimi.com/coding/v1",
+		KeyURL: "https://www.kimi.com/code/console", KeyEnv: "KIMI_API_KEY", Logins: []string{"kimi"},
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true}, Catalog: "-"},
+	{ID: "kimi-coding-global", Name: "Kimi For Coding Global", API: APIChat, BaseURL: "https://api.kimi.ai/coding/v1",
+		KeyURL: "https://www.kimi.com/code/console", KeyEnv: "KIMI_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true}, Catalog: "-"},
+	{ID: "moonshotai", Name: "Moonshot AI (Kimi)", API: APIChat, BaseURL: "https://api.moonshot.ai/v1",
 		Regions: map[string]string{"cn": "https://api.moonshot.cn/v1"},
 		KeyURL:  "https://platform.moonshot.ai/console/api-keys", KeyEnv: "MOONSHOT_API_KEY",
-		Compat: llm.ChatCompat{Thinking: "none"}, Catalog: "moonshotai"},
-	{ID: "zai", Name: "Z.ai (GLM)", API: APIChat, BaseURL: "https://api.z.ai/api/paas/v4",
-		Regions: map[string]string{"cn": "https://open.bigmodel.cn/api/paas/v4"},
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true}, Catalog: "-"},
+	{ID: "moonshotai-cn", Name: "Moonshot AI CN (Kimi)", API: APIChat, BaseURL: "https://api.moonshot.cn/v1",
+		KeyURL: "https://platform.moonshot.cn/console/api-keys", KeyEnv: "MOONSHOT_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true}, Catalog: "-"},
+	{ID: "zai", Name: "Z.AI (GLM Coding)", API: APIChat, BaseURL: "https://api.z.ai/api/coding/paas/v4",
+		Regions: map[string]string{"cn": "https://open.bigmodel.cn/api/coding/paas/v4"},
 		KeyURL:  "https://z.ai/manage-apikey/apikey-list", KeyEnv: "ZAI_API_KEY",
-		Compat: llm.ChatCompat{Thinking: "zai"}},
+		Compat: llm.ChatCompat{Thinking: "zai", ZaiToolStream: true}, Catalog: "-"},
+	{ID: "zai-api", Name: "Z.AI Pay-as-you-go", API: APIChat, BaseURL: "https://api.z.ai/api/paas/v4",
+		KeyURL: "https://z.ai/manage-apikey/apikey-list", KeyEnv: "ZAI_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "zai", ZaiToolStream: true}, Catalog: "-"},
+	{ID: "zai-coding-cn", Name: "Z.AI Coding CN (GLM)", API: APIChat, BaseURL: "https://open.bigmodel.cn/api/coding/paas/v4",
+		KeyURL: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys", KeyEnv: "ZAI_CODING_CN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "zai", ZaiToolStream: true}, Catalog: "-"},
+	{ID: "zhipuai", Name: "Zhipu AI (GLM)", API: APIChat, BaseURL: "https://open.bigmodel.cn/api/paas/v4",
+		KeyURL: "https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys", KeyEnv: "ZHIPU_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "zai", ZaiToolStream: true}, Catalog: "-"},
 	{ID: "qwen", Name: "Qwen (Alibaba Cloud)", API: APIChat, BaseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 		Regions: map[string]string{"cn": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
 		KeyURL:  "https://modelstudio.console.alibabacloud.com/?tab=playground#/api-key", KeyEnv: "DASHSCOPE_API_KEY",
 		Compat: llm.ChatCompat{Thinking: "qwen"}, Catalog: "alibaba"},
+	{ID: "qwen-token-plan", Name: "Qwen Token Plan", API: APIChat, BaseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+		KeyURL: "https://modelstudio.console.alibabacloud.com/", KeyEnv: "QWEN_TOKEN_PLAN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "qwen"}, Catalog: "-"},
+	{ID: "qwen-token-plan-cn", Name: "Qwen Token Plan CN", API: APIChat, BaseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+		KeyURL: "https://bailian.console.aliyun.com/", KeyEnv: "QWEN_TOKEN_PLAN_CN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "qwen"}, Catalog: "-"},
+	{ID: "qwen-token-plan-individual", Name: "Qwen Token Plan Individual", API: APIChat, BaseURL: "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+		KeyURL: "https://modelstudio.console.alibabacloud.com/", KeyEnv: "QWEN_TOKEN_PLAN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "qwen"}, Catalog: "-"},
+	{ID: "qwen-token-plan-individual-cn", Name: "Qwen Token Plan Individual CN", API: APIChat, BaseURL: "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+		KeyURL: "https://bailian.console.aliyun.com/", KeyEnv: "QWEN_TOKEN_PLAN_CN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "qwen"}, Catalog: "-"},
 	{ID: "minimax", Name: "MiniMax", API: APIAnthropic, BaseURL: "https://api.minimax.io/anthropic",
 		Regions: map[string]string{"cn": "https://api.minimaxi.com/anthropic"},
-		KeyURL:  "https://platform.minimax.io/user-center/basic-information/interface-key", KeyEnv: "MINIMAX_API_KEY"},
+		KeyURL:  "https://platform.minimax.io/user-center/basic-information/interface-key", KeyEnv: "MINIMAX_API_KEY", Catalog: "-"},
+	{ID: "minimax-cn", Name: "MiniMax CN", API: APIAnthropic, BaseURL: "https://api.minimaxi.com/anthropic",
+		KeyURL: "https://platform.minimaxi.com/user-center/basic-information/interface-key", KeyEnv: "MINIMAX_CN_API_KEY", Catalog: "-"},
+	{ID: "xiaomi", Name: "Xiaomi MiMo", API: APIChat, BaseURL: "https://api.xiaomimimo.com/v1",
+		KeyURL: "https://platform.xiaomimimo.com/", KeyEnv: "XIAOMI_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true, NoReasoningEffort: true}, Catalog: "-"},
+	{ID: "xiaomi-token-plan-cn", Name: "Xiaomi Token Plan CN", API: APIChat, BaseURL: "https://token-plan-cn.xiaomimimo.com/v1",
+		KeyURL: "https://platform.xiaomimimo.com/", KeyEnv: "XIAOMI_TOKEN_PLAN_CN_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true, NoReasoningEffort: true}, Catalog: "-"},
+	{ID: "xiaomi-token-plan-sgp", Name: "Xiaomi Token Plan SGP", API: APIChat, BaseURL: "https://token-plan-sgp.xiaomimimo.com/v1",
+		KeyURL: "https://platform.xiaomimimo.com/", KeyEnv: "XIAOMI_TOKEN_PLAN_SGP_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true, NoReasoningEffort: true}, Catalog: "-"},
+	{ID: "xiaomi-token-plan-ams", Name: "Xiaomi Token Plan AMS", API: APIChat, BaseURL: "https://token-plan-ams.xiaomimimo.com/v1",
+		KeyURL: "https://platform.xiaomimimo.com/", KeyEnv: "XIAOMI_TOKEN_PLAN_AMS_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "deepseek", ReplayReasoning: true, NoReasoningEffort: true}, Catalog: "-"},
+	{ID: "ant-ling", Name: "Ant Ling", API: APIChat, BaseURL: "https://api.ant-ling.com/v1",
+		KeyURL: "https://ling.tbox.cn/", KeyEnv: "ANT_LING_API_KEY",
+		Compat: llm.ChatCompat{Thinking: "ant-ling", NoReasoningEffort: true}, Catalog: "-"},
 	{ID: "custom", Name: "Custom endpoint", API: APIChat},
 }
 
@@ -107,6 +190,9 @@ var Providers = []Provider{
 // for a second account.
 func Lookup(account string) (Provider, bool) {
 	id, _, _ := strings.Cut(account, "/")
+	if id == "moonshot" {
+		id = "moonshotai"
+	}
 	for _, p := range Providers {
 		if p.ID == id {
 			return p, true
@@ -165,24 +251,74 @@ func Open(store Store, account string) (llm.Provider, error) {
 	if m := Methods[method]; m != nil {
 		s.Refresh = m.Flow.Refresh
 	}
+	hc := quotaHTTPClient(account)
+	if len(p.APIs) > 1 && p.ID != "custom" {
+		return &multiProvider{
+			provider:     p,
+			source:       s,
+			method:       method,
+			explicitBase: c.BaseURL,
+			httpClient:   hc,
+		}, nil
+	}
+	return openProtocol(api, base, p, method, s, hc)
+}
+
+func openProtocol(api API, base string, p Provider, method string, s *Source, hc *http.Client) (llm.Provider, error) {
 	headers := keyHeaders(api)
 	if method == "copilot" {
 		headers = CopilotHeaders
 	}
-	hc := quotaHTTPClient(account)
 	switch api {
 	case APIAnthropic:
-		return &llm.Anthropic{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
+		return &llm.Anthropic{BaseURL: base, HTTP: hc, Auth: s.Auth(headers), Provider: p.ID, Headers: p.Headers, SessionHeader: p.SessionHeader}, nil
 	case APIResponses:
-		return &llm.OpenAI{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
+		return &llm.OpenAI{BaseURL: base, HTTP: hc, Auth: s.Auth(headers), Provider: p.ID, Headers: p.Headers, SessionHeader: p.SessionHeader}, nil
 	case APICodex:
-		return &llm.OpenAI{BaseURL: base, HTTP: hc, Codex: true, Auth: s.Auth(CodexHeaders)}, nil
+		return &llm.OpenAI{BaseURL: base, HTTP: hc, Codex: true, Auth: s.Auth(CodexHeaders), Provider: p.ID, Headers: p.Headers, SessionHeader: p.SessionHeader}, nil
 	case APIGemini:
-		return &llm.Gemini{BaseURL: base, HTTP: hc, Auth: s.Auth(headers)}, nil
+		return &llm.Gemini{BaseURL: base, HTTP: hc, Auth: s.Auth(headers), Provider: p.ID, Headers: p.Headers, SessionHeader: p.SessionHeader}, nil
 	case APIChat:
-		return &llm.Chat{BaseURL: base, HTTP: hc, Compat: p.Compat, Auth: s.Auth(headers)}, nil
+		return &llm.Chat{BaseURL: base, HTTP: hc, Compat: p.Compat, Auth: s.Auth(headers), Provider: p.ID, Headers: p.Headers, SessionHeader: p.SessionHeader}, nil
 	}
-	return nil, fmt.Errorf("auth: %s: unknown protocol %q", account, api)
+	return nil, fmt.Errorf("auth: %s: unknown protocol %q", s.Account, api)
+}
+
+// multiProvider dispatches each request to the wire API and base URL declared
+// by the selected model in the catalog, falling back to the provider defaults.
+type multiProvider struct {
+	provider     Provider
+	source       *Source
+	method       string
+	explicitBase string
+	httpClient   *http.Client
+}
+
+func (m *multiProvider) SetHTTP(hc *http.Client) {
+	m.httpClient = hc
+}
+
+func (m *multiProvider) Stream(ctx context.Context, req llm.Request) iter.Seq2[llm.Event, error] {
+	api := m.provider.API
+	base := m.explicitBase
+	if model, ok := llm.FindModel(m.provider.ID, req.Model); ok {
+		if model.API != "" {
+			api = API(model.API)
+		}
+		if base == "" && model.BaseURL != "" {
+			base = model.BaseURL
+		}
+	}
+	if base == "" {
+		base = m.provider.BaseURL
+	}
+	prov, err := openProtocol(api, base, m.provider, m.method, m.source, m.httpClient)
+	if err != nil {
+		return func(yield func(llm.Event, error) bool) {
+			yield(llm.Event{}, err)
+		}
+	}
+	return prov.Stream(ctx, req)
 }
 
 type quotaTransport struct {
@@ -211,7 +347,7 @@ func quotaHTTPClient(account string) *http.Client {
 func CatalogNames() map[string]string {
 	m := map[string]string{}
 	for _, p := range Providers {
-		if p.API == APICodex || p.ID == "custom" {
+		if p.API == APICodex || p.ID == "custom" || p.Catalog == "-" {
 			continue
 		}
 		m[cmpOr(p.Catalog, p.ID)] = p.ID

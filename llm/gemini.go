@@ -13,9 +13,12 @@ import (
 
 // Gemini speaks Google's Generative Language API.
 type Gemini struct {
-	BaseURL string // https://generativelanguage.googleapis.com when empty
-	Auth    Auth   // e.g. StaticHeader("x-goog-api-key", key)
-	HTTP    *http.Client
+	BaseURL       string // https://generativelanguage.googleapis.com when empty
+	Auth          Auth   // e.g. StaticHeader("x-goog-api-key", key)
+	HTTP          *http.Client
+	Provider      string
+	Headers       map[string]string
+	SessionHeader string
 }
 
 const geminiName = "google"
@@ -27,11 +30,38 @@ func (p *Gemini) Stream(ctx context.Context, req Request) iter.Seq2[Event, error
 			yield(Event{}, err)
 			return
 		}
+		if header == nil {
+			header = http.Header{}
+		} else {
+			header = header.Clone()
+		}
+		for k, v := range p.Headers {
+			header.Set(k, v)
+		}
+		if p.Provider != "" {
+			if m, ok := FindModel(p.Provider, req.Model); ok {
+				for k, v := range m.Headers {
+					header.Set(k, v)
+				}
+				if !m.Reasoning {
+					req.Effort = ""
+				} else if req.Effort != "" && len(m.ThinkingLevelMap) > 0 {
+					req.Effort = ResolveEffort(req.Effort, m.ThinkingLevelMap)
+				}
+			}
+		}
+		if p.SessionHeader != "" && req.SessionID != "" {
+			header.Set(p.SessionHeader, req.SessionID)
+		}
 		base := p.BaseURL
 		if base == "" {
 			base = "https://generativelanguage.googleapis.com"
 		}
-		u := strings.TrimSuffix(base, "/") + "/v1beta/models/" + url.PathEscape(req.Model) + ":streamGenerateContent?alt=sse"
+		base = strings.TrimSuffix(base, "/")
+		if !strings.HasSuffix(base, "/v1beta") && !strings.HasSuffix(base, "/v1") {
+			base += "/v1beta"
+		}
+		u := base + "/models/" + url.PathEscape(req.Model) + ":streamGenerateContent?alt=sse"
 		resp, err := client{p.HTTP}.post(ctx, u, header, geminiBody(req))
 		if err != nil {
 			yield(Event{}, err)
@@ -114,7 +144,7 @@ func geminiBody(req Request) map[string]any {
 	if req.Effort != "" {
 		thinking := map[string]any{"includeThoughts": true}
 		if strings.Contains(req.Model, "gemini-2") {
-			thinking["thinkingBudget"] = map[string]int{"low": 2048, "medium": 8192, "high": 24576}[req.Effort]
+			thinking["thinkingBudget"] = map[string]int{"minimal": 1024, "low": 2048, "medium": 8192, "high": 24576, "xhigh": 24576}[req.Effort]
 		} else {
 			level := req.Effort
 			if level == "medium" {

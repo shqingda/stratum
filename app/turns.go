@@ -109,7 +109,7 @@ func trimZero(s string) string {
 }
 
 // summary closes a finished turn: what it changed in files, with taking
-// it back and the review, and what it cost.
+// it back and the review.
 func (a *App) summary(c *ui.Context, t int) {
 	p := a.p
 	tu := a.C.Turns[t]
@@ -157,31 +157,6 @@ func (a *App) summary(c *ui.Context, t int) {
 			}
 		})
 	}
-	u := tu.Usage
-	if u.Input+u.Output == 0 {
-		return
-	}
-	ui.Row(c).Gap(12).Margin(4, 0, 10, 0).AlignItems(ui.Center).Children(func() {
-		item := func(icon, s string) {
-			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-				if icon != "" {
-					sym(c, icon, 13, p.Mute)
-				}
-				ui.Text(c, s).FontSize(12.5).TextColor(p.Mute).SingleLine()
-			})
-		}
-		if cur := a.C.Current; cur != nil && cur.Model != "" {
-			item("cpu", cur.Model)
-		}
-		item("", locales.TokensIn(tokens(u.Input)))
-		item("", locales.TokensOut(tokens(u.Output)))
-		if u.CacheRead > 0 {
-			item("", locales.TokensCached(tokens(u.CacheRead)))
-		}
-		if cost := a.turnCost(u); cost != "" {
-			item("", cost)
-		}
-	})
 }
 
 func (a *App) modelInfo() (proto.Model, bool) {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
@@ -13,9 +14,10 @@ import (
 // slash is the / menu over the composer: the app's own commands and the
 // folder's skills, for a draft that is a / word and nothing more.
 type slash struct {
-	sel  int
-	open bool
-	shut string // the draft Escape put the menu away for
+	sel       int
+	open      bool
+	shut      string // the draft Escape put the menu away for
+	scrollSel bool   // scroll selected row into view once after ↑/↓
 }
 
 type slashItem struct {
@@ -125,8 +127,8 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			}
 			name := sk.Name
 			all = append(all, slashItem{name, "sparkles", sk.Description, func(*ui.Context) {
-				// The agent takes it from here, with its skill tool.
-				a.draft, a.toEnd = locales.UseSkill(name), true
+				// Keep the clean /skill-name token in the composer like Claude.
+				a.draft, a.toEnd = "/"+name+" ", true
 			}})
 		}
 		for _, cmd := range l.Commands {
@@ -181,23 +183,36 @@ func (a *App) slashMenu(c *ui.Context) {
 	s.sel = min(s.sel, len(items)-1)
 	s.open = true
 	p := a.p
-	list := ui.Column(c).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card)
+	list := ui.Column(c.Key("slash-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
+	rim(list, p)
 	lift(list, p)
 	list.Children(func() {
-		for i, it := range items {
-			row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name)
-			if i == s.sel || row.Hovered() {
-				row.Background(p.Hover)
+		ui.Scroll(c).MaxHeight(320).Children(func() {
+			for i, it := range items {
+				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name)
+				press(row)
+				focusRing(row, p)
+				switch {
+				case i == s.sel:
+					row.Background(p.Sel)
+					if s.scrollSel {
+						row.ScrollIntoView()
+						s.scrollSel = false
+					}
+				case row.Hovered():
+					row.Background(p.Hover)
+				}
+				row.Children(func() {
+					ui.Text(c, "/"+it.name).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Width(slashName).Shrink(0)
+					ui.Text(c, it.note).FontSize(12.5).TextColor(p.Mute).SingleLine().MinWidth(0)
+				})
+				if row.Clicked() {
+					it.run(c)
+					s.sel = 0
+				}
 			}
-			row.Children(func() {
-				ui.Text(c, "/"+it.name).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Width(slashName).Shrink(0)
-				ui.Text(c, it.note).FontSize(12.5).TextColor(p.Mute).SingleLine().MinWidth(0)
-			})
-			if row.Clicked() {
-				it.run(c)
-				s.sel = 0
-			}
-		}
+		})
 	})
 	a.slashRun = func(i int) { items[i].run(c) }
 	a.slashLen = len(items)
@@ -213,8 +228,10 @@ func (a *App) slashKey(k ui.TextKey) bool {
 	switch k.Key {
 	case ui.KeyUp:
 		s.sel = (s.sel + n - 1) % n
+		s.scrollSel = true
 	case ui.KeyDown:
 		s.sel = (s.sel + 1) % n
+		s.scrollSel = true
 	case ui.KeyEnter, ui.KeyTab:
 		a.slashRun(min(s.sel, n-1))
 		s.sel = 0

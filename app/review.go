@@ -209,9 +209,10 @@ func (a *App) reviewToggle(c *ui.Context) {
 		tip = locales.HideChanges()
 	}
 	b := ui.ButtonBase(c.Key("review")).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
-		Label(tip).Tooltip(tip).Background(p.Chip)
+		Label(tip).Tooltip(tip + "  ⌘⌥I").Background(p.Chip)
 	rim(b, p)
 	press(b)
+	focusRing(b, p)
 	fg := p.Fg2
 	if a.rv.open {
 		b.Background(p.Sel)
@@ -240,7 +241,7 @@ func (a *App) reviewToggle(c *ui.Context) {
 func (a *App) reviewPanel(c *ui.Context) {
 	p := a.p
 	turns := a.shownTurns()
-	panel := ui.Column(c).Width(reviewWidth).Shrink(0).Background(p.Sheet).Clip().BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+	panel := ui.Column(c).Width(a.reviewWidth()).Shrink(0).Background(p.Sheet).Clip().BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
 	panel.Children(func() {
 		a.reviewTabs(c, fileCount(turns))
 		switch a.rv.tab {

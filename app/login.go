@@ -15,6 +15,7 @@ func signIns() []struct{ provider, method, symbol, title, sub string } {
 		{"codex", "codex", "brand-openai", "Sign in with ChatGPT", locales.SignInChatGPTSub()},
 		{"xai", "xai", "brand-x", locales.SignInXTitle(), "SuperGrok、X Premium+"},
 		{"copilot", "copilot", "brand-github", "GitHub Copilot", locales.SignInCopilotSub()},
+		{"kimi-coding", "kimi", "sparkles", "Kimi Code", locales.SignInKimiSub()},
 		{"openrouter", "openrouter", "route", "OpenRouter", locales.SignInOpenRouterSub()},
 	}
 }
@@ -39,14 +40,16 @@ func (a *App) onboarding(c *ui.Context) {
 	p := a.p
 	ui.Column(c).Fill().Background(p.Bg).Children(func() {
 		ui.Row(c).Height(barHeight).Shrink(0).DragWindow()
-		ui.Column(c).Grow(1).AlignItems(ui.Center).Padding(70, 20, 20, 20).Children(func() {
-			brandMark(c, 52, p.Fg)
-			ui.Text(c, locales.OnboardingTitle()).FontSize(24).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
-			ui.Text(c, locales.OnboardingLead()).FontSize(14).TextColor(p.Fg2).Margin(0, 0, 26, 0)
-			ui.Column(c).Width(460).MaxWidthPercent(100).Children(func() { a.loginList(c) })
-			ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(18, 0, 0, 0).Children(func() {
-				sym(c, "lock", 13, p.Mute)
-				ui.Text(c, locales.OnboardingKeychain()).FontSize(12.5).TextColor(p.Mute)
+		ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
+			ui.Column(c).AlignItems(ui.Center).Padding(24, 20, 24, 20).Children(func() {
+				brandMark(c, 52, p.Fg)
+				ui.Text(c, locales.OnboardingTitle()).FontSize(24).FontWeight(650).LetterSpacing(-.33).TextColor(p.Fg).Margin(20, 0, 6, 0)
+				ui.Text(c, locales.OnboardingLead()).FontSize(14).TextColor(p.Fg2).Margin(0, 0, 26, 0)
+				ui.Column(c).Width(460).MaxWidthPercent(100).Children(func() { a.loginList(c) })
+				ui.Row(c).Gap(5).AlignItems(ui.Center).Margin(18, 0, 0, 0).Children(func() {
+					sym(c, "lock", 13, p.Mute)
+					ui.Text(c, locales.OnboardingKeychain()).FontSize(12.5).TextColor(p.Mute)
+				})
 			})
 		})
 	})

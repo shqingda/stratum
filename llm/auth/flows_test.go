@@ -184,3 +184,177 @@ func TestOpen(t *testing.T) {
 		t.Error("opened an unknown provider")
 	}
 }
+
+func TestMultiProviderDispatch(t *testing.T) {
+	type hit struct {
+		path string
+		h    http.Header
+		body map[string]any
+	}
+	var last hit
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		last = hit{path: r.URL.Path, h: r.Header.Clone()}
+		json.NewDecoder(r.Body).Decode(&last.body)
+		w.WriteHeader(400)
+	}))
+	defer srv.Close()
+
+	store := &Memory{}
+	for _, id := range []string{"openrouter", "fireworks", "opencode", "opencode-go"} {
+		store.Set(id, Credential{Kind: KindAPIKey, Key: "k-"+id, BaseURL: srv.URL})
+	}
+
+	// OpenRouter: Anthropic model vs Chat Completions model.
+	orProv, err := Open(store, "openrouter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(orProv.Stream(context.Background(), llm.Request{
+		Model: "anthropic/claude-sonnet-5.5", SessionID: "s-or", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if last.path != "/v1/messages" || last.h.Get("x-api-key") != "k-openrouter" || last.h.Get("x-session-id") != "s-or" {
+		t.Errorf("openrouter anthropic: path=%s hdr=%v", last.path, last.h)
+	}
+	llm.Collect(orProv.Stream(context.Background(), llm.Request{
+		Model: "openai/gpt-6.1-sol", SessionID: "s-or2", Effort: "high", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if last.path != "/chat/completions" || last.h.Get("Authorization") != "Bearer k-openrouter" || last.h.Get("x-session-id") != "s-or2" {
+		t.Errorf("openrouter chat: path=%s hdr=%v", last.path, last.h)
+	}
+
+	// Fireworks: Anthropic model (NoToolCache) vs Chat Completions model.
+	fwProv, err := Open(store, "fireworks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(fwProv.Stream(context.Background(), llm.Request{
+		Model: "accounts/fireworks/models/deepseek-v4p1-flash",
+		Tools: []llm.Tool{{Name: "t", Description: "d"}},
+		Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if last.path != "/v1/messages" || last.h.Get("x-api-key") != "k-fireworks" {
+		t.Errorf("fireworks anthropic: path=%s hdr=%v", last.path, last.h)
+	}
+	if tools, _ := last.body["tools"].([]any); len(tools) != 1 || tools[0].(map[string]any)["cache_control"] != nil {
+		t.Errorf("fireworks should disable tool cache_control: %v", last.body["tools"])
+	}
+	llm.Collect(fwProv.Stream(context.Background(), llm.Request{
+		Model: "accounts/fireworks/models/glm-5p3", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if last.path != "/chat/completions" || last.h.Get("Authorization") != "Bearer k-fireworks" {
+		t.Errorf("fireworks chat: path=%s hdr=%v", last.path, last.h)
+	}
+
+	// OpenCode Zen: all 4 wire APIs + x-opencode-session.
+	ocProv, err := Open(store, "opencode")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		model, path, authHdr string
+	}{
+		{"claude-fable-5", "/v1/messages", "x-api-key"},
+		{"gemini-3-flash", "/v1beta/models/gemini-3-flash:streamGenerateContent", "x-goog-api-key"},
+		{"beam-free", "/chat/completions", "Authorization"},
+		{"gpt-5", "/responses", "Authorization"},
+	} {
+		llm.Collect(ocProv.Stream(context.Background(), llm.Request{
+			Model: tc.model, SessionID: "oc-sess", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+		}), nil)
+		if last.path != tc.path || last.h.Get(tc.authHdr) == "" || last.h.Get("x-opencode-session") != "oc-sess" {
+			t.Errorf("opencode %s: path=%s hdr=%v", tc.model, last.path, last.h)
+		}
+	}
+
+	// OpenCode Go: Anthropic + Gemini + Chat + x-opencode-session.
+	ocgProv, err := Open(store, "opencode-go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		model, path string
+	}{
+		{"claude-haiku-5-5", "/v1/messages"},
+		{"gemini-4-argon", "/v1beta/models/gemini-4-argon:streamGenerateContent"},
+		{"beam-free", "/chat/completions"},
+	} {
+		llm.Collect(ocgProv.Stream(context.Background(), llm.Request{
+			Model: tc.model, SessionID: "ocg-sess", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+		}), nil)
+		if last.path != tc.path || last.h.Get("x-opencode-session") != "ocg-sess" {
+			t.Errorf("opencode-go %s: path=%s hdr=%v", tc.model, last.path, last.h)
+		}
+	}
+}
+
+func TestProviderCompatAndHeaders(t *testing.T) {
+	var lastH http.Header
+	var lastBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		lastH = r.Header.Clone()
+		lastBody = nil
+		json.NewDecoder(r.Body).Decode(&lastBody)
+		w.WriteHeader(400)
+	}))
+	defer srv.Close()
+
+	store := &Memory{}
+	store.Set("nvidia", Credential{Kind: KindAPIKey, Key: "k", BaseURL: srv.URL})
+	nv, err := Open(store, "nvidia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(nv.Stream(context.Background(), llm.Request{
+		Model: "deepseek-ai/deepseek-v4.1-flash", Effort: "high", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if lastH.Get("NVCF-POLL-SECONDS") != "3600" {
+		t.Errorf("nvidia missing poll header: %v", lastH)
+	}
+
+	store.Set("zai", Credential{Kind: KindAPIKey, Key: "k", BaseURL: srv.URL})
+	zaiProv, err := Open(store, "zai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(zaiProv.Stream(context.Background(), llm.Request{
+		Model:    "glm-5.3",
+		Effort:   "high",
+		Tools:    []llm.Tool{{Name: "t", Description: "d"}},
+		Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if lastBody["tool_stream"] != true {
+		t.Errorf("zai missing tool_stream: %v", lastBody)
+	}
+	if th, _ := lastBody["thinking"].(map[string]any); th["type"] != "enabled" || th["clear_thinking"] != false {
+		t.Errorf("zai thinking: %v", lastBody["thinking"])
+	}
+
+	store.Set("baseten", Credential{Kind: KindAPIKey, Key: "k", BaseURL: srv.URL})
+	bt, err := Open(store, "baseten")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(bt.Stream(context.Background(), llm.Request{
+		Model: "zai-org/GLM-5.2", Effort: "high", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if cta, _ := lastBody["chat_template_args"].(map[string]any); cta["enable_thinking"] != true {
+		t.Errorf("baseten chat_template_args: %v", lastBody)
+	}
+
+	// Legacy "moonshot" alias resolves to moonshotai.
+	p, ok := Lookup("moonshot")
+	if !ok || p.ID != "moonshotai" {
+		t.Fatalf("Lookup(moonshot) = %+v, %v", p, ok)
+	}
+	store.Set("moonshot", Credential{Kind: KindAPIKey, Key: "k", BaseURL: srv.URL})
+	ms, err := Open(store, "moonshot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	llm.Collect(ms.Stream(context.Background(), llm.Request{
+		Model: "kimi-k3.1-pro", Effort: "high", Messages: []llm.Message{llm.Text(llm.User, "hi")},
+	}), nil)
+	if lastH.Get("Authorization") != "Bearer k" {
+		t.Errorf("moonshot alias auth header: %v", lastH)
+	}
+}

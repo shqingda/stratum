@@ -25,6 +25,8 @@ type mcpState struct {
 	skillSource      string
 	mcpLogsOpen      map[string]bool
 	hookFormOpen     bool
+	hookEditing      bool
+	hookEditIdx      int
 	hookProject      bool
 	hookEventIdx     int // 0: PreToolUse, 1: PostToolUse, 2: Stop
 	hookMatcher      string
@@ -395,7 +397,12 @@ func (a *App) hooksSection(c *ui.Context) {
 		ui.Text(c, locales.Hooks()).FontSize(13).FontWeight(600).TextColor(p.Fg).Shrink(0)
 		ui.Spacer(c)
 		if a.pushButton(c, "hook-add", locales.AddHook()).Clicked() {
-			st.hookFormOpen = !st.hookFormOpen
+			if st.hookFormOpen && !st.hookEditing {
+				st.hookFormOpen = false
+			} else {
+				st.hookFormOpen, st.hookEditing, st.hookEditIdx = true, false, -1
+				st.hookEventIdx, st.hookMatcher, st.hookCommand = 0, "", ""
+			}
 		}
 	})
 	if st.hookFormOpen {
@@ -453,30 +460,45 @@ func (a *App) hookAddForm(c *ui.Context) {
 					}
 					ui.Spacer(c)
 					if a.button(c, "hook-cancel", locales.Cancel(), "", false).Clicked() {
-						st.hookFormOpen = false
+						st.hookFormOpen, st.hookEditing, st.hookEditIdx = false, false, -1
 					}
 					canSave := strings.TrimSpace(st.hookCommand) != ""
 					if a.button(c, "hook-save", locales.Save(), "", true).Disabled(!canSave).Clicked() {
-						var next []proto.HookEntry
-						if a.C.Hooks != nil {
-							for _, existing := range a.C.Hooks.Hooks {
-								if existing.Editable && existing.Project == st.hookProject {
-									next = append(next, existing)
-								}
-							}
-						}
 						matcher := strings.TrimSpace(st.hookMatcher)
 						if st.hookEventIdx == 2 {
 							matcher = ""
 						}
-						next = append(next, proto.HookEntry{
+						entry := proto.HookEntry{
 							Event:   events[st.hookEventIdx],
 							Matcher: matcher,
 							Command: strings.TrimSpace(st.hookCommand),
 							Project: st.hookProject,
-						})
+						}
+						var next []proto.HookEntry
+						replaced := false
+						if a.C.Hooks != nil {
+							for i, existing := range a.C.Hooks.Hooks {
+								if !existing.Editable {
+									continue
+								}
+								if st.hookEditing && i == st.hookEditIdx {
+									if existing.Project == st.hookProject {
+										next = append(next, entry)
+										replaced = true
+									}
+									continue
+								}
+								if existing.Project == st.hookProject {
+									next = append(next, existing)
+								}
+							}
+						}
+						if !replaced {
+							next = append(next, entry)
+						}
 						a.do(a.C.SaveHooks(st.hookProject, next))
-						st.hookFormOpen, st.hookMatcher, st.hookCommand = false, "", ""
+						st.hookFormOpen, st.hookEditing, st.hookEditIdx = false, false, -1
+						st.hookMatcher, st.hookCommand = "", ""
 					}
 				})
 			})
@@ -499,6 +521,19 @@ func (a *App) hookRow(c *ui.Context, idx int, h proto.HookEntry) {
 			ui.Text(c, h.Command).Font("monospace").FontSize(12).TextColor(p.Fg2).SingleLine().Ellipsis("…")
 		})
 		if h.Editable {
+			if a.iconButton(c, fmt.Sprint("hook-edit:", idx), "pencil", locales.Edit()).Clicked() {
+				st := &a.mcpUI
+				st.hookFormOpen, st.hookEditing, st.hookEditIdx = true, true, idx
+				st.hookProject, st.hookMatcher, st.hookCommand = h.Project, h.Matcher, h.Command
+				switch h.Event {
+				case "PostToolUse":
+					st.hookEventIdx = 1
+				case "Stop":
+					st.hookEventIdx = 2
+				default:
+					st.hookEventIdx = 0
+				}
+			}
 			if a.iconButton(c, fmt.Sprint("hook-del:", idx), "trash", locales.Delete()).Clicked() && a.C.Hooks != nil {
 				var next []proto.HookEntry
 				for i, existing := range a.C.Hooks.Hooks {

@@ -77,11 +77,11 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 	as := fs.String("as", "", "store as provider/`label`, for a second account")
 	region := fs.String("region", "", "use the provider's regional endpoint, e.g. cn")
 	base := fs.String("base-url", "", "the endpoint address (required for custom)")
-	api := fs.String("api", "chat", "custom: the protocol, chat or anthropic")
+	api := fs.String("api", "chat", "custom: the protocol, chat, anthropic, responses, or gemini")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: talosd login <provider> [flags]\n\nproviders:")
 		for _, p := range auth.Providers {
-			fmt.Fprintf(os.Stderr, "  %-11s %s%s\n", p.ID, p.Name, loginsNote(p))
+			fmt.Fprintf(os.Stderr, "  %-30s %s%s\n", p.ID, p.Name, loginsNote(p))
 		}
 		fmt.Fprintln(os.Stderr, "\nflags:")
 		fs.PrintDefaults()

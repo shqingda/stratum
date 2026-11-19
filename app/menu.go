@@ -7,9 +7,9 @@ import (
 )
 
 // MenuBar is the app's own commands for the menu bar, each with the
-// shortcut the window already answers to: a Session menu, and Settings
-// and the sidebar for the app and View menus.
-func (a *App) MenuBar() (session []*mygo.MenuItem, settings, sidebar *mygo.MenuItem) {
+// shortcut the window already answers to: a Session menu, Settings,
+// and the sidebar / inspector toggles for the View menu.
+func (a *App) MenuBar() (session []*mygo.MenuItem, settings, sidebar, inspector *mygo.MenuItem) {
 	item := func(label, acc string, run func(c *ui.Context)) *mygo.MenuItem {
 		return &mygo.MenuItem{Label: label, Accelerator: acc, Click: func(*mygo.MenuItem, *mygo.Window) { a.fromMenu(run) }}
 	}
@@ -23,6 +23,14 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings, sidebar *mygo.MenuI
 			}
 		}),
 		item(locales.NextWaiting(), "CmdOrCtrl+J", func(*ui.Context) { a.nextWaiting() }),
+		item(locales.Archive(), "CmdOrCtrl+Shift+A", func(*ui.Context) {
+			if a.C.Current != nil && !a.settingsOpen && !a.automationsOpen {
+				s := *a.C.Current
+				a.archive(s, !s.Archived)
+			}
+		}),
+		mygo.Separator(),
+		item(locales.Close(), "CmdOrCtrl+W", func(*ui.Context) { a.closeOrDismiss() }),
 	}
 	settings = item(locales.Settings()+"…", "CmdOrCtrl+,", func(*ui.Context) {
 		if !a.settingsOpen {
@@ -30,6 +38,11 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings, sidebar *mygo.MenuI
 		}
 	})
 	sidebar = item(locales.ToggleSidebarMenu(), "CmdOrCtrl+\\", func(*ui.Context) { a.toggleSide() })
+	inspector = item(locales.ToggleInspector(), "CmdOrCtrl+Alt+I", func(*ui.Context) {
+		if !a.settingsOpen && !a.automationsOpen {
+			a.rv.open = !a.rv.open
+		}
+	})
 	return
 }
 

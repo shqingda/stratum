@@ -95,7 +95,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 			ui.Box(c).Height(topGap).Shrink(0).DragWindow()
 			ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
 				brandMark(c, 22, p.Fg)
-				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).TextColor(p.Fg)
+				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg)
 			})
 			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)
 			ui.Column(c).Grow(1).Padding(0, 12, 8, 12).Gap(2).Children(func() {
@@ -115,6 +115,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 					it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
 						Height(32).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
 					press(it)
+					focusRing(it, p)
 					switch {
 					case active:
 						it.Background(p.Sel)
@@ -169,6 +170,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 				done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Size(28, 28).Radius(8).Center().
 					Label(locales.CloseSettings()).Tooltip(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
 				press(done)
+				focusRing(done, p)
 				if done.Hovered() {
 					done.Background(p.Hover)
 				}
@@ -195,7 +197,7 @@ func section(c *ui.Context, p *Palette, label string, first bool) {
 	if first {
 		top = 2
 	}
-	ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(top, 0, 6, 0)
+	ui.Text(c, label).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(top, 0, 6, 0)
 }
 
 // note is the small text under a group.
@@ -336,7 +338,13 @@ func (a *App) appearancePage(c *ui.Context) {
 			[]string{locales.ThemeAuto(), locales.ThemeLight(), locales.ThemeDark()}, func(s *proto.Settings, v string) { s.Theme = v })
 		pick(r, "set-size", locales.TextSize(), []string{"small", "", "large"}, set.TextSize,
 			[]string{locales.TextSmall(), locales.TextDefault(), locales.TextLarge()}, func(s *proto.Settings, v string) { s.TextSize = v })
+		r.toggle("set-reduce-motion", locales.ReduceMotion(), set.ReduceMotion, false, func(on bool) {
+			s := set
+			s.ReduceMotion = on
+			a.do(a.C.SaveSettings(s))
+		})
 	})
+	note(c, p, locales.ReduceMotionNote())
 	section(c, p, locales.Conversation(), false)
 	group(c, p, func() {
 		pick(&rows{c: c, p: p}, "set-detail", locales.FinishedTurns(), []string{"", "thinking", "all"}, set.Detail,
@@ -710,7 +718,23 @@ func shortcuts(steers bool) []struct {
 		keys  []struct{ label, key string }
 	}{
 		{locales.Sessions(), []key{
-			{locales.NewSession(), "⌘N"}, {locales.FindInSession(), "⌘F"}, {locales.SessionsOneToNine(), "⌘1 – ⌘9"}, {locales.NextWaiting(), "⌘J"}, {locales.CommandPalette(), "⌘K"}, {locales.ToggleSidebar(), "⌘B / ⌘\\"}, {locales.Settings(), "⌘,"},
+			{locales.NewSession(), "⌘N"},
+			{locales.CommandPalette(), "⌘K / ⇧⌘P"},
+			{locales.FocusComposer(), "⌘L"},
+			{locales.SwitchModel(), "⌘/"},
+			{locales.SwitchPermissionMode(), "⇧Tab"},
+			{locales.FindInSession(), "⌘F"},
+			{locales.FindNext(), "⌘G / ⇧⌘G"},
+			{locales.CopyLastReply(), "⌥⌘C"},
+			{locales.Rewind(), "esc esc"},
+			{locales.SwitchSessionPrevNext(), "⌘[ / ⌘]"},
+			{locales.SessionsOneToNine(), "⌘1 – ⌘9"},
+			{locales.NextWaiting(), "⌘J"},
+			{locales.Archive() + " / " + locales.Unarchive(), "⇧⌘A"},
+			{locales.ToggleSidebar(), "⌘B / ⌘\\"},
+			{locales.ToggleInspector(), "⌘⌥I"},
+			{locales.Settings(), "⌘,"},
+			{locales.CloseSheetOrWindow(), "⌘W"},
 		}},
 		{locales.Approvals(), []key{
 			{locales.Allow(), "↩"}, {locales.AllowForSession(), "⌘↩"}, {locales.Deny(), "esc"},
@@ -790,10 +814,12 @@ func providerSymbol(provider string) string {
 		return "brand-openai"
 	case "xai":
 		return "brand-x"
-	case "openrouter":
+	case "openrouter", "fireworks", "vercel-ai-gateway", "opencode", "opencode-go":
 		return "route"
 	case "copilot":
 		return "brand-github"
+	case "kimi-coding", "kimi-coding-global":
+		return "sparkles"
 	}
 	return "key"
 }

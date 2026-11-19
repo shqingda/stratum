@@ -25,6 +25,7 @@ func replay(t *testing.T, status int, body string) (*httptest.Server, *map[strin
 		got["_goog"] = r.Header.Get("x-goog-api-key")
 		got["_query"] = r.URL.RawQuery
 		got["_version"] = r.Header.Get("anthropic-version")
+		got["_hdr"] = r.Header.Clone()
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(status)
 		io.WriteString(w, body)

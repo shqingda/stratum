@@ -6,6 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -25,6 +26,59 @@ func (a *App) keys(c *ui.Context) {
 			a.pal, a.query = false, ""
 		} else {
 			a.openPalette(c)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyP, func() {
+		if a.pal {
+			a.pal, a.query = false, ""
+		} else {
+			a.openPalette(c)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyW, func() {
+		if !c.ShortcutRepeated() {
+			a.closeOrDismiss()
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyA, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
+			s := *a.C.Current
+			a.archive(s, !s.Archived)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyL, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.composerInput.Focus(c)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeySlash, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil && a.C.CanAct() {
+			a.modelMenu = !a.modelMenu
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd|ui.Alt, ui.KeyC, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.copyLastReply(c)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketLeft, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.stepSession(-1)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketRight, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.stepSession(1)
+		}
+	})
+	c.OnWindowShortcut(ui.Alt, ui.KeyUp, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+			a.stepSession(-1)
+		}
+	})
+	c.OnWindowShortcut(ui.Alt, ui.KeyDown, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+			a.stepSession(1)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyF, func() {
@@ -48,8 +102,23 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyB, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen {
 			a.toggleSide()
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd|ui.Alt, ui.KeyI, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.rv.open = !a.rv.open
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyG, func() {
+		if a.find.on {
+			a.findStep(1)
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyG, func() {
+		if a.find.on {
+			a.findStep(-1)
 		}
 	})
 	c.OnWindowShortcut(ui.Shift, ui.KeyTab, func() {
@@ -91,6 +160,14 @@ func (a *App) keys(c *ui.Context) {
 func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	if a.modelMenu || a.effortMenu || a.modeMenu {
 		return false
+	}
+	if key == ui.KeyEscape && mods == 0 && a.automationsOpen {
+		if a.automationsUI.deletingID != "" {
+			a.automationsUI.deletingID, a.automationsUI.deletingName = "", ""
+		} else {
+			a.automationsOpen = false
+		}
+		return true
 	}
 	if key == ui.KeyEscape && mods == 0 && (a.renaming != "" || a.deleting != "") {
 		a.renaming, a.deleting = "", ""
@@ -296,4 +373,46 @@ func (a *App) lastSent() string {
 		}
 	}
 	return ""
+}
+
+// lastAssistantReply returns the latest non-empty assistant response in the session.
+func (a *App) lastAssistantReply() string {
+	for i := len(a.C.Entries) - 1; i >= 0; i-- {
+		if e := a.C.Entries[i]; e.Role == client.Assistant && strings.TrimSpace(e.Text) != "" {
+			return e.Text
+		}
+	}
+	return ""
+}
+
+func (a *App) copyLastReply(c *ui.Context) bool {
+	if reply := a.lastAssistantReply(); reply != "" {
+		c.WriteClipboard(reply)
+		a.flash("check", locales.CopyLastReply())
+		return true
+	}
+	return false
+}
+
+// stepSession switches to the previous (-1) or next (+1) visible session in the sidebar.
+func (a *App) stepSession(delta int) {
+	ids := a.visibleSessions
+	if len(ids) < 2 {
+		return
+	}
+	cur := ""
+	if a.C.Current != nil {
+		cur = a.C.Current.ID
+	}
+	idx := 0
+	for i, id := range ids {
+		if id == cur {
+			idx = i
+			break
+		}
+	}
+	next := ids[(idx+delta+len(ids))%len(ids)]
+	if next != cur {
+		a.do(a.C.Open(next))
+	}
 }

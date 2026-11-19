@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,18 +15,41 @@ import (
 	"time"
 )
 
+//go:embed models.json
+var modelsJSON []byte
+
+// ModelCompat holds per-model wire compatibility flags from the catalog.
+type ModelCompat struct {
+	MaxTokensField                              string         `json:"maxTokensField"`
+	ThinkingFormat                              string         `json:"thinkingFormat"`
+	SupportsReasoningEffort                     *bool          `json:"supportsReasoningEffort"`
+	RequiresReasoningContentOnAssistantMessages bool           `json:"requiresReasoningContentOnAssistantMessages"`
+	ZaiToolStream                               bool           `json:"zaiToolStream"`
+	ChatTemplateArgs                            map[string]any `json:"chatTemplateArgs"`
+	SupportsCacheControlOnTools                 *bool          `json:"supportsCacheControlOnTools"`
+	AllowEmptySignature                         bool           `json:"allowEmptySignature"`
+	ForceAdaptiveThinking                       *bool          `json:"forceAdaptiveThinking"`
+	SendSessionAffinityHeaders                  bool           `json:"sendSessionAffinityHeaders"`
+	SessionAffinityFormat                       string         `json:"sessionAffinityFormat"`
+}
+
 // Model describes a model in the catalog. Prices are US dollars per million
 // tokens.
 type Model struct {
-	ID        string
-	Provider  string // provider id: "openai", "anthropic", ...
-	Name      string
-	Context   int
-	MaxOutput int
-	Reasoning bool
-	Images    bool
-	Price     Price
-	Released  string // YYYY-MM-DD, where known
+	ID               string
+	Provider         string // provider id: "openai", "anthropic", ...
+	Name             string
+	API              string // wire protocol: "anthropic", "responses", "chat", "gemini"
+	BaseURL          string
+	Headers          map[string]string
+	Compat           *ModelCompat
+	ThinkingLevelMap map[string]*string
+	Context          int
+	MaxOutput        int
+	Reasoning        bool
+	Images           bool
+	Price            Price
+	Released         string // YYYY-MM-DD, where known
 }
 
 // Price is what a model costs per million tokens. A subscription pays by
@@ -41,51 +65,209 @@ func (m Model) Cost(u Usage) float64 {
 		float64(u.CacheRead)*m.Price.CacheRead + float64(u.CacheWrite)*m.Price.CacheWrite) / 1e6
 }
 
-// builtin is the catalog before models.dev answers, and the models it does
-// not list (the ChatGPT backend's). Taken from pi-ai's and models.dev's
-// catalogs of November 2026.
-var builtin = []Model{
-	{ID: "gpt-6.1-sol", Provider: "codex", Name: "GPT-6.1 Sol", Context: 500000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
-	{ID: "gpt-6-astra", Provider: "codex", Name: "GPT-6 Astra", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{10, 50, 1, 12.5}},
-	{ID: "gpt-6-sol", Provider: "codex", Name: "GPT-6 Sol", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.2, 2.5}},
-	{ID: "gpt-6-luna", Provider: "codex", Name: "GPT-6 Luna", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{0.1, 0.5, 0.01, 0.125}},
+var effortLevels = []string{"minimal", "low", "medium", "high", "xhigh", "max"}
 
-	{ID: "gpt-6.1-sol", Provider: "openai", Name: "GPT-6.1 Sol", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
-	{ID: "gpt-6-luna", Provider: "openai", Name: "GPT-6 Luna", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{0.1, 0.5, 0.01, 0.125}},
-	{ID: "claude-opus-5-5", Provider: "anthropic", Name: "Claude Opus 5.5", Context: 1000000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{4, 20, 0.2, 5}},
-	{ID: "claude-sonnet-5-5", Provider: "anthropic", Name: "Claude Sonnet 5.5", Context: 1000000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
-	{ID: "claude-haiku-5-5", Provider: "anthropic", Name: "Claude Haiku 5.5", Context: 1000000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{0.1, 0.5, 0.01, 0.125}},
-	{ID: "gemini-4-argon", Provider: "google", Name: "Gemini 4 Argon", Context: 1048576, MaxOutput: 32768, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 0}},
-	{ID: "gemini-3.8-flash", Provider: "google", Name: "Gemini 3.8 Flash", Context: 1048576, MaxOutput: 65536, Reasoning: true, Images: true, Price: Price{0.75, 3.75, 0.075, 0}},
-	{ID: "grok-4.7", Provider: "xai", Name: "Grok 4.7", Context: 500000, MaxOutput: 500000, Reasoning: true, Images: true, Price: Price{2, 6, 0.5, 0}},
-	{ID: "grok-4.3", Provider: "xai", Name: "Grok 4.3", Context: 1000000, MaxOutput: 30000, Reasoning: true, Images: true, Price: Price{1.25, 2.5, 0.2, 0}},
-	{ID: "deepseek-v4-pro", Provider: "deepseek", Name: "DeepSeek V4 Pro", Context: 1000000, MaxOutput: 384000, Reasoning: true, Price: Price{1.32, 3.96, 0.044, 0}},
-	{ID: "deepseek-flash", Provider: "deepseek", Name: "DeepSeek V4.1 Flash", Context: 1000000, MaxOutput: 384000, Reasoning: true, Images: true, Price: Price{0.3, 1.2, 0.006, 0}},
+// ResolveEffort clamps effort to the levels levelMap permits and returns the
+// wire value for it. An empty effort or map passes through unchanged.
+func ResolveEffort(effort string, levelMap map[string]*string) string {
+	if effort == "" || len(levelMap) == 0 {
+		return effort
+	}
+	supported := func(lv string) bool {
+		v, ok := levelMap[lv]
+		if ok && v == nil {
+			return false
+		}
+		if (lv == "xhigh" || lv == "max") && !ok {
+			return false
+		}
+		return true
+	}
+	chosen := ""
+	if supported(effort) {
+		chosen = effort
+	} else if idx := slices.Index(effortLevels, effort); idx >= 0 {
+		for i := idx + 1; i < len(effortLevels); i++ {
+			if supported(effortLevels[i]) {
+				chosen = effortLevels[i]
+				break
+			}
+		}
+		if chosen == "" {
+			for i := idx - 1; i >= 0; i-- {
+				if supported(effortLevels[i]) {
+					chosen = effortLevels[i]
+					break
+				}
+			}
+		}
+	} else {
+		for _, lv := range effortLevels {
+			if supported(lv) {
+				chosen = lv
+				break
+			}
+		}
+	}
+	if chosen == "" {
+		return ""
+	}
+	if v, ok := levelMap[chosen]; ok && v != nil {
+		return *v
+	}
+	return chosen
 }
+
+func canonicalProvider(provider string) string {
+	if provider == "moonshot" {
+		return "moonshotai"
+	}
+	return provider
+}
+
+func mapCatalogAPI(api string) string {
+	switch api {
+	case "anthropic-messages":
+		return "anthropic"
+	case "google-generative-ai":
+		return "gemini"
+	case "openai-completions":
+		return "chat"
+	case "openai-responses":
+		return "responses"
+	default:
+		return api
+	}
+}
+
+// builtin is the embedded catalog before models.dev answers, plus providers
+// models.dev does not list (such as the ChatGPT backend's).
+var builtin []Model
 
 // defaults are the models a provider's sessions start with.
 var defaults = map[string]string{
-	"codex":     "gpt-6.1-sol",
-	"openai":    "gpt-6.1-sol",
-	"anthropic": "claude-sonnet-5-5",
-	"google":    "gemini-4-argon",
-	"xai":       "grok-4.7",
-	"deepseek":  "deepseek-v4-pro",
+	"codex":                         "gpt-6.1-sol",
+	"copilot":                       "gpt-6.1-sol",
+	"openai":                        "gpt-6.1-sol",
+	"anthropic":                     "claude-sonnet-5-5",
+	"google":                        "gemini-4-argon",
+	"xai":                           "grok-4.7",
+	"openrouter":                    "anthropic/claude-sonnet-5.5",
+	"opencode":                      "claude-sonnet-5-5",
+	"opencode-go":                   "deepseek-v4-pro",
+	"vercel-ai-gateway":             "anthropic/claude-sonnet-5.5",
+	"fireworks":                     "accounts/fireworks/models/deepseek-v4p1-flash",
+	"groq":                          "openai/gpt-oss-120b",
+	"cerebras":                      "qwen-3.8-27b",
+	"together":                      "deepseek-ai/DeepSeek-V4-Pro-0813",
+	"baseten":                       "deepseek-ai/DeepSeek-V4-Pro-0813",
+	"huggingface":                   "deepseek-ai/DeepSeek-V4-Pro",
+	"nvidia":                        "deepseek-ai/deepseek-v4.1-flash",
+	"deepseek":                      "deepseek-v4-pro",
+	"kimi-coding":                   "kimi-for-coding",
+	"kimi-coding-global":            "kimi-for-coding",
+	"moonshotai":                    "kimi-k3.1-pro",
+	"moonshotai-cn":                 "kimi-k3.1-pro",
+	"zai":                           "glm-5.3",
+	"zai-api":                       "glm-5.3",
+	"zai-coding-cn":                 "glm-5.3",
+	"zhipuai":                       "glm-5.3",
+	"qwen":                          "qwen3.8-max",
+	"qwen-token-plan":               "qwen3.8-max",
+	"qwen-token-plan-cn":            "qwen3.8-max",
+	"qwen-token-plan-individual":    "qwen3.8-max",
+	"qwen-token-plan-individual-cn": "qwen3.8-max",
+	"minimax":                       "MiniMax-M3",
+	"minimax-cn":                    "MiniMax-M3",
+	"xiaomi":                        "mimo-v2.6-pro",
+	"xiaomi-token-plan-cn":          "mimo-v2.6-pro",
+	"xiaomi-token-plan-sgp":         "mimo-v2.6-pro",
+	"xiaomi-token-plan-ams":         "mimo-v2.6-pro",
+	"ant-ling":                      "Ring-2.6-1T",
 }
 
 var (
 	catalogMu sync.RWMutex
-	catalog   = builtin
+	catalog   []Model
 )
+
+func init() {
+	base := []Model{
+		{ID: "gpt-6.1-sol", Provider: "codex", Name: "GPT-6.1 Sol", API: "responses", Context: 500000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
+		{ID: "gpt-6-astra", Provider: "codex", Name: "GPT-6 Astra", API: "responses", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{10, 50, 1, 12.5}},
+		{ID: "gpt-6-sol", Provider: "codex", Name: "GPT-6 Sol", API: "responses", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.2, 2.5}},
+		{ID: "gpt-6-luna", Provider: "codex", Name: "GPT-6 Luna", API: "responses", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{0.1, 0.5, 0.01, 0.125}},
+
+		{ID: "gpt-6.1-sol", Provider: "copilot", Name: "GPT-6.1 Sol", API: "chat", Context: 272000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
+		{ID: "claude-sonnet-5-5", Provider: "copilot", Name: "Claude Sonnet 5.5", API: "chat", Context: 1000000, MaxOutput: 128000, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 2.5}},
+		{ID: "gemini-4-argon", Provider: "copilot", Name: "Gemini 4 Argon", API: "chat", Context: 1048576, MaxOutput: 32768, Reasoning: true, Images: true, Price: Price{2, 10, 0.1, 0}},
+
+		{ID: "qwen3.8-max", Provider: "qwen", Name: "Qwen3.8 Max", API: "chat", Context: 1000000, MaxOutput: 65536, Reasoning: true, Images: true, Price: Price{1.2, 6, 0, 0}},
+		{ID: "qwen3.8-flash", Provider: "qwen", Name: "Qwen3.8 Flash", API: "chat", Context: 1000000, MaxOutput: 65536, Reasoning: true, Images: true, Price: Price{0.15, 1.5, 0, 0}},
+		{ID: "qwen3.7-plus", Provider: "qwen", Name: "Qwen3.7 Plus", API: "chat", Context: 1000000, MaxOutput: 65536, Reasoning: true, Images: true, Price: Price{0.4, 1.2, 0, 0}},
+	}
+
+	var raw []struct {
+		ID        string   `json:"id"`
+		Name      string   `json:"name"`
+		API       string   `json:"api"`
+		BaseURL   string   `json:"baseUrl"`
+		Provider  string   `json:"provider"`
+		Reasoning bool     `json:"reasoning"`
+		Input     []string `json:"input"`
+		Cost      struct {
+			Input      float64 `json:"input"`
+			Output     float64 `json:"output"`
+			CacheRead  float64 `json:"cacheRead"`
+			CacheWrite float64 `json:"cacheWrite"`
+		} `json:"cost"`
+		ContextWindow    int                `json:"contextWindow"`
+		MaxTokens        int                `json:"maxTokens"`
+		Headers          map[string]string  `json:"headers"`
+		Compat           *ModelCompat       `json:"compat"`
+		ThinkingLevelMap map[string]*string `json:"thinkingLevelMap"`
+	}
+	if err := json.Unmarshal(modelsJSON, &raw); err != nil {
+		panic(fmt.Sprintf("llm: embedded models.json: %v", err))
+	}
+	for _, r := range raw {
+		base = append(base, Model{
+			ID:               r.ID,
+			Provider:         r.Provider,
+			Name:             r.Name,
+			API:              mapCatalogAPI(r.API),
+			BaseURL:          r.BaseURL,
+			Headers:          r.Headers,
+			Compat:           r.Compat,
+			ThinkingLevelMap: r.ThinkingLevelMap,
+			Context:          r.ContextWindow,
+			MaxOutput:        r.MaxTokens,
+			Reasoning:        r.Reasoning,
+			Images:           slices.Contains(r.Input, "image"),
+			Price:            Price{r.Cost.Input, r.Cost.Output, r.Cost.CacheRead, r.Cost.CacheWrite},
+		})
+	}
+	builtin = base
+	catalog = builtin
+}
 
 // Models lists the catalog's models of a provider, or all of them for "".
 func Models(provider string) []Model {
 	catalogMu.RLock()
 	defer catalogMu.RUnlock()
-	var out []Model
-	for _, m := range catalog {
-		if provider == "" || m.Provider == provider {
-			out = append(out, m)
+	filter := func(p string) []Model {
+		var out []Model
+		for _, m := range catalog {
+			if p == "" || m.Provider == p {
+				out = append(out, m)
+			}
+		}
+		return out
+	}
+	out := filter(provider)
+	if len(out) == 0 && provider != "" {
+		if canon := canonicalProvider(provider); canon != provider {
+			out = filter(canon)
 		}
 	}
 	return out
@@ -104,7 +286,7 @@ func FindModel(provider, id string) (Model, bool) {
 // DefaultModel is the model a provider's sessions start with; "" when there
 // is none to suggest and the user picks.
 func DefaultModel(provider string) string {
-	if id := defaults[provider]; id != "" {
+	if id := defaults[canonicalProvider(provider)]; id != "" {
 		return id
 	}
 	return ""
@@ -135,7 +317,20 @@ func LoadCatalog(ctx context.Context, path string, maxAge time.Duration, names m
 	if err != nil {
 		return err
 	}
-	// The ChatGPT backend's models are not on models.dev.
+	builtinByKey := make(map[[2]string]Model, len(builtin))
+	for _, m := range builtin {
+		builtinByKey[[2]string{m.Provider, m.ID}] = m
+	}
+	for i := range models {
+		if bm, ok := builtinByKey[[2]string{models[i].Provider, models[i].ID}]; ok {
+			models[i].API = bm.API
+			models[i].BaseURL = bm.BaseURL
+			models[i].Headers = bm.Headers
+			models[i].Compat = bm.Compat
+			models[i].ThinkingLevelMap = bm.ThinkingLevelMap
+		}
+	}
+	// Providers not listed on models.dev keep their built-in entries.
 	listed := map[string]bool{}
 	for _, m := range models {
 		listed[m.Provider] = true

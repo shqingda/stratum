@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 	"github.com/shqingda/talos/client"
@@ -105,7 +106,13 @@ func (a *App) bar(c *ui.Context) {
 			a.renameInput(c, *cur).FontSize(14.5).FontWeight(600).MaxWidth(360)
 		} else {
 			// Clicked, the title can be changed where it is.
-			t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Label(locales.Rename()).Tooltip(locales.Rename())
+			t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Padding(3, 7).Margin(0, 0, 0, -7).Radius(6).
+				Label(locales.Rename()).Tooltip(locales.Rename())
+			press(t)
+			focusRing(t, p)
+			if t.Hovered() {
+				t.Background(p.Hover)
+			}
 			if t.Clicked() {
 				a.rename(*cur, "bar")
 			}
@@ -191,6 +198,39 @@ func (a *App) transcript(c *ui.Context) {
 			{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h},
 			{Color: black, At: max(28, foot-56) / h}, {Color: ui.Transparent, At: foot / h}}})
 	}
+	if len(items) > 0 && !a.list.AtEnd() {
+		a.scrollBottomPill(c)
+	}
+}
+
+// scrollBottomPill floats a Liquid Glass pill above the composer when the
+// user scrolls up through a long conversation.
+func (a *App) scrollBottomPill(c *ui.Context) {
+	p := a.p
+	ui.Row(c).Absolute().Left(0).Right(0).Bottom(a.dockH+16).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
+		b := ui.ButtonBase(c.Key("scroll-bottom")).Row().Height(32).Padding(0, 12).Gap(6).Radius(16).
+			AlignItems(ui.Center).Material(glassButton(p)).Border(.5, p.Edge2).
+			Label(locales.ScrollToBottom()).Tooltip(locales.ScrollToBottom()).
+			Transition(ui.ElementTransition{
+				Enter:    &ui.Motion{Y: 10, Scale: .92, Opacity: 0},
+				Exit:     &ui.Motion{Y: 8, Scale: .94, Opacity: 0},
+				Duration: 180 * time.Millisecond,
+			})
+		press(b)
+		focusRing(b, p)
+		rim(b, p)
+		lift(b, p)
+		b.Children(func() {
+			if a.C.Busy {
+				ui.Box(c).Size(6, 6).Radius(3).Background(p.Live)
+			}
+			ui.Text(c, locales.ScrollToBottom()).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine()
+			sym(c, "chevron-down", 13, p.Fg2)
+		})
+		if b.Clicked() {
+			a.list.ScrollToEnd()
+		}
+	})
 }
 
 // item is a row of the transcript: an entry, a fold of steps that only
@@ -349,8 +389,14 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		for _, e := range steps {
 			names = append(names, e.Detail)
 		}
-		row := ui.ButtonBase(c.Key(key)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(locales.Browse() + " " + strings.Join(names, " ")).Expanded(open)
+		row := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(locales.Browse() + " " + strings.Join(names, " ")).Expanded(open)
+		press(row)
+		focusRing(row, p)
+		if row.Hovered() {
+			row.Background(p.Hover)
+		}
 		if row.Clicked() {
+			a.list.HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
@@ -359,18 +405,24 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 			ui.Text(c, locales.Browse()).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
 			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
 			ui.Spacer(c)
-			if row.Hovered() {
-				sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+			if row.Hovered() || open {
+				disclosureChevron(c, key, open, 10, p.Mute)
 			}
 		})
 	} else {
-		row := ui.ButtonBase(c.Key(key)).Row().Height(26).Gap(7).AlignItems(ui.Center).Label(locales.ExpandSteps()).Expanded(open)
+		row := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(7).Radius(6).AlignItems(ui.Center).Label(locales.ExpandSteps()).Expanded(open)
+		press(row)
+		focusRing(row, p)
+		if row.Hovered() {
+			row.Background(p.Hover)
+		}
 		if row.Clicked() {
+			a.list.HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
 		row.Children(func() {
-			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+			disclosureChevron(c, key, open, 12, p.Mute)
 			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(13.5).TextColor(p.Mute).SingleLine()
 			ui.Spacer(c)
 		})
@@ -419,12 +471,16 @@ func (a *App) turn(c *ui.Context, live bool, content func()) {
 	ui.Row(c).AlignItems(ui.Stretch).Children(func() {
 		rail := ui.Box(c).Width(2).Shrink(0).Clip()
 		if live {
-			rail.Background(p.LiveBg)
-			pulse := rail.Loop("pulse", 2800*time.Millisecond, ui.EaseInOut)
-			rail.Children(func() {
-				ui.Box(c).Absolute().Left(0).TopPercent(pulse*140 - 40).Width(2).HeightPercent(40).
-					LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: p.Live.Alpha(0), At: 0}, {Color: p.Live, At: .5}, {Color: p.Live.Alpha(0), At: 1}}})
-			})
+			if a.reduceMotion() {
+				rail.Background(p.Live.Alpha(.45))
+			} else {
+				rail.Background(p.LiveBg)
+				pulse := rail.Loop("pulse", 2800*time.Millisecond, ui.EaseInOut)
+				rail.Children(func() {
+					ui.Box(c).Absolute().Left(0).TopPercent(pulse*140 - 40).Width(2).HeightPercent(40).
+						LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: p.Live.Alpha(0), At: 0}, {Color: p.Live, At: .5}, {Color: p.Live.Alpha(0), At: 1}}})
+				})
+			}
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Padding(0, 0, 0, 12).Children(content)
 	})
@@ -434,6 +490,11 @@ func (a *App) turn(c *ui.Context, live bool, content func()) {
 func (a *App) running(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Height(28).Gap(8).AlignItems(ui.Center).Children(func() {
+		if a.reduceMotion() {
+			ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
+			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
+			return
+		}
 		spinner(c, p, 12)
 		// A faint blue light passes over the words, left to right.
 		words := ui.Box(c)
@@ -509,28 +570,63 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	p := a.p
 	switch e.Role {
 	case client.User:
-		// Left-aligned blockquote style (matching design-1/design-2): a subtle
-		// vertical quote bar on the left, attachments below, and hover actions
-		// (rewind / copy) on the trailing edge.
-		msg := ui.Row(c).Margin(6, 0, 18, 0).Gap(10).AlignItems(ui.Stretch)
+		// Right-aligned user message column (Antigravity-style): attached
+		// images above the text bubble, and hover actions (copy / rewind)
+		// right-aligned directly below the bubble.
+		msg := ui.Column(c).Margin(4, 0, 12, 0).AlignItems(ui.End).Gap(4)
+		msg.ContextMenu(func(m *ui.Menu) {
+			if e.Text != "" {
+				if m.Item(locales.Copy()).Chosen() {
+					c.WriteClipboard(e.Text)
+					a.flash("check", locales.Copy())
+				}
+			}
+			if a.rewindable(e) {
+				if m.Item(locales.RewindTo()).Chosen() {
+					seq := a.C.Turns[e.Turn].Seq
+					text := e.Text
+					if text == "" {
+						text = locales.ImagesPlaceholder(len(e.Images))
+					}
+					a.openRewindAt(seq, text)
+				}
+			}
+			m.Separator()
+			m.EditItems()
+		})
 		msg.Children(func() {
-			ui.Box(c).Width(2.5).Shrink(0).Radius(1.5).Background(p.Edge2)
-			ui.Column(c).Grow(1).MinWidth(0).Gap(8).Children(func() {
-				if e.Text != "" {
-					ui.Text(c, e.Text).FontSize(15).TextColor(p.Fg).LineHeight(1.55).Selectable()
-				}
-				if len(e.Images) > 0 {
-					a.sentImages(c, e)
-				}
-			})
-			ui.Row(c).Gap(2).Shrink(0).AlignItems(ui.Start).Children(func() {
-				if a.rewindable(e) {
-					a.rewindButton(c, e, msg.Hovered())
-				}
-				if e.Text != "" {
-					a.copyButton(c, e.Text, msg.Hovered())
-				}
-			})
+			if len(e.Images) > 0 {
+				a.sentImages(c, e)
+			}
+			if e.Text != "" {
+				ui.Column(c).MaxWidthPercent(80).Padding(9, 15).Radius(18).Background(p.Bubble).Children(func() {
+					a.userMessageText(c, e.Text)
+				})
+			}
+			ts := ""
+			if e.Turn >= 0 && e.Turn < len(a.C.Turns) {
+				ts = a.msgTime(a.C.Turns[e.Turn].Start)
+			}
+			if ts != "" || e.Text != "" || a.rewindable(e) {
+				ui.Row(c).Gap(2).AlignItems(ui.Center).Children(func() {
+					if ts != "" {
+						tbox := ui.Box(c).Padding(0, 4).Children(func() {
+							ui.Text(c, ts).FontSize(12).TextColor(p.Mute).SingleLine()
+						})
+						target := float32(0)
+						if msg.Hovered() {
+							target = 1
+						}
+						tbox.Opacity(tbox.AnimateTo("ts-shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
+					}
+					if e.Text != "" {
+						a.copyButton(c, e.Text, msg.Hovered())
+					}
+					if a.rewindable(e) {
+						a.rewindButton(c, e, msg.Hovered())
+					}
+				})
+			}
 		})
 	default:
 		if e.Typed {
@@ -540,6 +636,35 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 		}
 		a.turn(c, live, func() { a.body(c, e) })
 	}
+}
+
+// userMessageText renders a user's prompt, highlighting /skill tokens in
+// Claude-style blue (muted slash + vibrant blue name).
+func (a *App) userMessageText(c *ui.Context, text string) {
+	p := a.p
+	matches := slashTokenRe.FindAllStringSubmatchIndex(text, -1)
+	if len(matches) == 0 {
+		ui.Text(c, text).FontSize(15).TextColor(p.Fg).LineHeight(1.55).Selectable()
+		return
+	}
+	blue := skillAccent(p)
+	var spans []ui.Span
+	pos := 0
+	for _, m := range matches {
+		start, end := m[2], m[3]
+		if start > pos {
+			spans = append(spans, ui.Span{Text: text[pos:start], Size: 15, Color: p.Fg})
+		}
+		spans = append(spans,
+			ui.Span{Text: "/", Size: 15, Color: blue.Alpha(.55)},
+			ui.Span{Text: text[start+1 : end], Size: 15, Color: blue, Weight: 500},
+		)
+		pos = end
+	}
+	if pos < len(text) {
+		spans = append(spans, ui.Span{Text: text[pos:], Size: 15, Color: p.Fg})
+	}
+	ui.RichText(c, spans...).LineHeight(1.55).Selectable()
 }
 
 // body is what the agent did or said, without the rail of its turn.
@@ -559,8 +684,19 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 					m.Separator()
 					m.EditItems()
 				})
-				// The icon lines up with the text above it.
-				ui.Row(c).Margin(0, 0, 0, -6).Children(func() { a.copyButton(c, e.Text, msg.Hovered()) })
+				// Action bar below finished assistant reply: copy, retry, and timestamp.
+				p := a.p
+				ts := a.msgTime(a.turnTimestamp(e.Turn))
+				canRetry := a.canRetryTurn(e.Turn)
+				ui.Row(c).Margin(2, 0, 0, -6).Gap(2).AlignItems(ui.Center).Children(func() {
+					a.copyButton(c, e.Text, true)
+					if canRetry {
+						a.retryButton(c, e.Turn)
+					}
+					if ts != "" {
+						ui.Text(c, ts).FontSize(12).TextColor(p.Mute).Padding(0, 6).SingleLine()
+					}
+				})
 			} else {
 				markdown.Stream(c, e.Text, &a.md)
 			}
@@ -594,15 +730,23 @@ func (a *App) note(c *ui.Context, e *client.Entry) {
 	key := "note:" + strconv.Itoa(e.Key)
 	open := a.opened[key]
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(2, 0, 6, 0).Children(func() {
-		row := ui.ButtonBase(c.Key(key)).Row().MinHeight(25).Gap(8).AlignItems(ui.Center).MinWidth(0).Label(e.Text).Disabled(e.Output == "")
+		row := ui.ButtonBase(c.Key(key)).Row().MinHeight(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).MinWidth(0).Label(e.Text).Disabled(e.Output == "")
+		if e.Output != "" {
+			press(row)
+			focusRing(row, p)
+			if row.Hovered() {
+				row.Background(p.Hover)
+			}
+		}
 		if row.Clicked() {
+			a.list.HoldPlace()
 			a.opened[key] = !open
 		}
 		row.Children(func() {
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, icon, 14, col) })
 			ui.Text(c, e.Text).FontSize(13.5).TextColor(p.Mute).MinWidth(0)
 			if e.Output != "" {
-				sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+				disclosureChevron(c, key, open, 10, p.Mute)
 			}
 		})
 		if e.Note == "limit" && a.last(e) && !a.C.Busy && a.textButton(c, "go-on", locales.ContinueTurn()).Clicked() {
@@ -632,8 +776,17 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		}
 	}
 	open := a.opened[e.CallID]
-	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
-	if row.Clicked() && e.Output != "" && !e.Skipped {
+	canOpen := e.Output != "" && !e.Skipped
+	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
+	if canOpen {
+		press(row)
+		focusRing(row, p)
+		if row.Hovered() {
+			row.Background(p.Hover)
+		}
+	}
+	if row.Clicked() && canOpen {
+		a.list.HoldPlace()
 		a.opened[e.CallID] = !open
 	}
 	row.Children(func() {
@@ -653,8 +806,8 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 			ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
 		case e.Failed:
 			ui.Box(c).Size(7, 2).Background(p.Minus)
-		case e.Output != "" && row.Hovered():
-			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+		case e.Output != "" && (row.Hovered() || open):
+			disclosureChevron(c, "step:"+e.CallID, open, 10, p.Mute)
 		}
 	})
 	if !e.Done && len(e.Steps) > 0 {
@@ -1086,6 +1239,8 @@ func (a *App) copyButton(c *ui.Context, text string, shown bool) {
 	key := h.Sum64()
 	done := c.Now().Sub(copied[key]) < 2*time.Second
 	b := ui.ButtonBase(c.Key(key)).Size(26, 26).Radius(7).Center().Label(locales.Copy()).Tooltip(locales.Copy())
+	press(b)
+	focusRing(b, p)
 	target := float32(0)
 	if shown || done || b.Focused() {
 		target = 1
@@ -1095,16 +1250,108 @@ func (a *App) copyButton(c *ui.Context, text string, shown bool) {
 		b.Background(p.Hover)
 	}
 	b.Children(func() {
-		if done {
-			sym(c, "check", 14, p.Fg2)
-		} else {
-			sym(c, "copy", 14, p.Mute)
-		}
+		ui.Box(c).Absolute().Fill().Center().
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .6, Opacity: 0}, Exit: &ui.Motion{Scale: .6, Opacity: 0}}).
+			Key(done).Children(func() {
+			if done {
+				sym(c, "check", 14, p.Plus)
+			} else {
+				sym(c, "copy", 14, p.Mute)
+			}
+		})
 	})
 	if b.Clicked() {
 		c.WriteClipboard(text)
 		copied[key] = c.Now()
 		c.After(2 * time.Second)
+	}
+}
+
+func (a *App) turnTimestamp(turn int) time.Time {
+	if turn < 0 || turn >= len(a.C.Turns) {
+		return time.Time{}
+	}
+	tu := a.C.Turns[turn]
+	if !tu.End.IsZero() {
+		return tu.End
+	}
+	return tu.Start
+}
+
+// msgTime formats a message timestamp: relative time within 24 hours
+// ("just now", "12m ago", "3h ago") and a short date beyond 1 day
+// ("Nov 10" / "11月10日").
+func (a *App) msgTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	now := time.Now()
+	if a.now != nil {
+		now = a.now()
+	}
+	d := now.Sub(t)
+	if d < 0 {
+		d = 0
+	}
+	switch {
+	case d < time.Minute:
+		return locales.JustNow()
+	case d < time.Hour:
+		return locales.MsgAgoMinutes(int(d.Minutes()))
+	case d < 24*time.Hour:
+		return locales.MsgAgoHours(int(d.Hours()))
+	case now.Year() == t.Year():
+		if strings.HasPrefix(i18n.Locale(), "zh") {
+			return fmt.Sprintf("%d月%d日", t.Month(), t.Day())
+		}
+		return i18n.Months("en", i18n.Abbreviated, true)[t.Month()-1] + " " + strconv.Itoa(t.Day())
+	default:
+		if strings.HasPrefix(i18n.Locale(), "zh") {
+			return t.Format("2006年1月2日")
+		}
+		return i18n.Months("en", i18n.Abbreviated, true)[t.Month()-1] + fmt.Sprintf(" %d, %d", t.Day(), t.Year())
+	}
+}
+
+func (a *App) canRetryTurn(turn int) bool {
+	if turn < 0 || turn >= len(a.C.Turns) || !a.C.Turns[turn].Done || a.C.Turns[turn].Seq <= 0 {
+		return false
+	}
+	for _, e := range a.C.Entries {
+		if e.Turn == turn && e.Role == client.User && !e.Typed && strings.TrimSpace(e.Text) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *App) retryTurn(turn int) {
+	if a.C.Busy || !a.canRetryTurn(turn) {
+		return
+	}
+	seq := a.C.Turns[turn].Seq
+	action := "conversation"
+	for _, t := range a.C.Changes.Turns {
+		if t.TurnSeq >= seq && len(t.Files) > 0 && !a.C.Changes.Reverted[t.TurnSeq] {
+			action = "both"
+			break
+		}
+	}
+	a.do(a.C.Retry(seq, action))
+}
+
+func (a *App) retryButton(c *ui.Context, turn int) {
+	p := a.p
+	b := ui.ButtonBase(c.Key(fmt.Sprintf("retry:%d", turn))).Size(26, 26).Radius(7).Center().
+		Label(locales.Retry()).Tooltip(locales.Retry()).Disabled(a.C.Busy)
+	press(b)
+	focusRing(b, p)
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() { sym(c, "refresh", 14, p.Mute) })
+	if b.Clicked() {
+		a.retryTurn(turn)
 	}
 }
 

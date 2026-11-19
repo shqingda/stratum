@@ -114,6 +114,16 @@ func (msgs Messages) CopyCode() string {
 	return Catalog.Format(msgs.locale, "copyCode", nil)
 }
 
+// Retry says "重试"
+// in the language the app shows.
+func Retry() string { return In(i18n.Locale()).Retry() }
+
+// Retry says "重试"
+// in the language of msgs.
+func (msgs Messages) Retry() string {
+	return Catalog.Format(msgs.locale, "retry", nil)
+}
+
 // Search says "搜索"
 // in the language the app shows.
 func Search() string { return In(i18n.Locale()).Search() }
@@ -954,11 +964,11 @@ func (msgs Messages) EffortXhigh() string {
 	return Catalog.Format(msgs.locale, "effortXhigh", nil)
 }
 
-// ComposerPlaceholder says "描述任务，用 @ 引用文件"
+// ComposerPlaceholder says "描述任务，用 @ 引用文件，/ 调用操作"
 // in the language the app shows.
 func ComposerPlaceholder() string { return In(i18n.Locale()).ComposerPlaceholder() }
 
-// ComposerPlaceholder says "描述任务，用 @ 引用文件"
+// ComposerPlaceholder says "描述任务，用 @ 引用文件，/ 调用操作"
 // in the language of msgs.
 func (msgs Messages) ComposerPlaceholder() string {
 	return Catalog.Format(msgs.locale, "composerPlaceholder", nil)
@@ -1132,16 +1142,6 @@ func NoModels() string { return In(i18n.Locale()).NoModels() }
 // in the language of msgs.
 func (msgs Messages) NoModels() string {
 	return Catalog.Format(msgs.locale, "noModels", nil)
-}
-
-// DefaultModelMark says "✓ 默认模型"
-// in the language the app shows.
-func DefaultModelMark() string { return In(i18n.Locale()).DefaultModelMark() }
-
-// DefaultModelMark says "✓ 默认模型"
-// in the language of msgs.
-func (msgs Messages) DefaultModelMark() string {
-	return Catalog.Format(msgs.locale, "defaultModelMark", nil)
 }
 
 // PhaseStarting says "正在启动"
@@ -1494,6 +1494,16 @@ func (msgs Messages) SignInCopilotSub() string {
 	return Catalog.Format(msgs.locale, "signInCopilotSub", nil)
 }
 
+// SignInKimiSub says "Kimi Code 订阅"
+// in the language the app shows.
+func SignInKimiSub() string { return In(i18n.Locale()).SignInKimiSub() }
+
+// SignInKimiSub says "Kimi Code 订阅"
+// in the language of msgs.
+func (msgs Messages) SignInKimiSub() string {
+	return Catalog.Format(msgs.locale, "signInKimiSub", nil)
+}
+
 // SignInOpenRouterSub says "浏览器授权，换一把 key"
 // in the language the app shows.
 func SignInOpenRouterSub() string { return In(i18n.Locale()).SignInOpenRouterSub() }
@@ -1504,11 +1514,11 @@ func (msgs Messages) SignInOpenRouterSub() string {
 	return Catalog.Format(msgs.locale, "signInOpenRouterSub", nil)
 }
 
-// ApiKeySub says "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax 等"
+// ApiKeySub says "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax、Fireworks 等"
 // in the language the app shows.
 func ApiKeySub() string { return In(i18n.Locale()).ApiKeySub() }
 
-// ApiKeySub says "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax 等"
+// ApiKeySub says "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax、Fireworks 等"
 // in the language of msgs.
 func (msgs Messages) ApiKeySub() string {
 	return Catalog.Format(msgs.locale, "apiKeySub", nil)
@@ -4250,6 +4260,26 @@ func (msgs Messages) AgoHours(n int) string {
 	return Catalog.Format(msgs.locale, "agoHours", map[string]any{"n": n})
 }
 
+// MsgAgoMinutes says "{n} 分钟前"
+// in the language the app shows.
+func MsgAgoMinutes(n int) string { return In(i18n.Locale()).MsgAgoMinutes(n) }
+
+// MsgAgoMinutes says "{n} 分钟前"
+// in the language of msgs.
+func (msgs Messages) MsgAgoMinutes(n int) string {
+	return Catalog.Format(msgs.locale, "msgAgoMinutes", map[string]any{"n": n})
+}
+
+// MsgAgoHours says "{n} 小时前"
+// in the language the app shows.
+func MsgAgoHours(n int) string { return In(i18n.Locale()).MsgAgoHours(n) }
+
+// MsgAgoHours says "{n} 小时前"
+// in the language of msgs.
+func (msgs Messages) MsgAgoHours(n int) string {
+	return Catalog.Format(msgs.locale, "msgAgoHours", map[string]any{"n": n})
+}
+
 // Yesterday says "昨天"
 // in the language the app shows.
 func Yesterday() string { return In(i18n.Locale()).Yesterday() }
@@ -5024,4 +5054,134 @@ func AutomationFailed(error string) string { return In(i18n.Locale()).Automation
 // in the language of msgs.
 func (msgs Messages) AutomationFailed(error string) string {
 	return Catalog.Format(msgs.locale, "automationFailed", map[string]any{"error": error})
+}
+
+// ReduceMotion says "减弱动态效果"
+// in the language the app shows.
+func ReduceMotion() string { return In(i18n.Locale()).ReduceMotion() }
+
+// ReduceMotion says "减弱动态效果"
+// in the language of msgs.
+func (msgs Messages) ReduceMotion() string {
+	return Catalog.Format(msgs.locale, "reduceMotion", nil)
+}
+
+// ReduceMotionNote says "关闭弹簧、流光与脉冲动画，改用温和的淡入淡出。"
+// in the language the app shows.
+func ReduceMotionNote() string { return In(i18n.Locale()).ReduceMotionNote() }
+
+// ReduceMotionNote says "关闭弹簧、流光与脉冲动画，改用温和的淡入淡出。"
+// in the language of msgs.
+func (msgs Messages) ReduceMotionNote() string {
+	return Catalog.Format(msgs.locale, "reduceMotionNote", nil)
+}
+
+// ScrollToBottom says "回到底部"
+// in the language the app shows.
+func ScrollToBottom() string { return In(i18n.Locale()).ScrollToBottom() }
+
+// ScrollToBottom says "回到底部"
+// in the language of msgs.
+func (msgs Messages) ScrollToBottom() string {
+	return Catalog.Format(msgs.locale, "scrollToBottom", nil)
+}
+
+// DropToAttach says "松开以添加附件"
+// in the language the app shows.
+func DropToAttach() string { return In(i18n.Locale()).DropToAttach() }
+
+// DropToAttach says "松开以添加附件"
+// in the language of msgs.
+func (msgs Messages) DropToAttach() string {
+	return Catalog.Format(msgs.locale, "dropToAttach", nil)
+}
+
+// CopyPath says "复制相对路径"
+// in the language the app shows.
+func CopyPath() string { return In(i18n.Locale()).CopyPath() }
+
+// CopyPath says "复制相对路径"
+// in the language of msgs.
+func (msgs Messages) CopyPath() string {
+	return Catalog.Format(msgs.locale, "copyPath", nil)
+}
+
+// ToggleInspector says "切换审阅面板"
+// in the language the app shows.
+func ToggleInspector() string { return In(i18n.Locale()).ToggleInspector() }
+
+// ToggleInspector says "切换审阅面板"
+// in the language of msgs.
+func (msgs Messages) ToggleInspector() string {
+	return Catalog.Format(msgs.locale, "toggleInspector", nil)
+}
+
+// AutomationsLede says "按 cron 或固定周期在后台自动执行任务，完成后发出通知。"
+// in the language the app shows.
+func AutomationsLede() string { return In(i18n.Locale()).AutomationsLede() }
+
+// AutomationsLede says "按 cron 或固定周期在后台自动执行任务，完成后发出通知。"
+// in the language of msgs.
+func (msgs Messages) AutomationsLede() string {
+	return Catalog.Format(msgs.locale, "automationsLede", nil)
+}
+
+// DeleteAutomationTitle says "删除定时任务「{name}」？"
+// in the language the app shows.
+func DeleteAutomationTitle(name string) string { return In(i18n.Locale()).DeleteAutomationTitle(name) }
+
+// DeleteAutomationTitle says "删除定时任务「{name}」？"
+// in the language of msgs.
+func (msgs Messages) DeleteAutomationTitle(name string) string {
+	return Catalog.Format(msgs.locale, "deleteAutomationTitle", map[string]any{"name": name})
+}
+
+// DeleteAutomationBody says "删除后将停止该定时调度，此操作不可撤销。"
+// in the language the app shows.
+func DeleteAutomationBody() string { return In(i18n.Locale()).DeleteAutomationBody() }
+
+// DeleteAutomationBody says "删除后将停止该定时调度，此操作不可撤销。"
+// in the language of msgs.
+func (msgs Messages) DeleteAutomationBody() string {
+	return Catalog.Format(msgs.locale, "deleteAutomationBody", nil)
+}
+
+// FocusComposer says "聚焦输入框"
+// in the language the app shows.
+func FocusComposer() string { return In(i18n.Locale()).FocusComposer() }
+
+// FocusComposer says "聚焦输入框"
+// in the language of msgs.
+func (msgs Messages) FocusComposer() string {
+	return Catalog.Format(msgs.locale, "focusComposer", nil)
+}
+
+// CopyLastReply says "复制最新回复"
+// in the language the app shows.
+func CopyLastReply() string { return In(i18n.Locale()).CopyLastReply() }
+
+// CopyLastReply says "复制最新回复"
+// in the language of msgs.
+func (msgs Messages) CopyLastReply() string {
+	return Catalog.Format(msgs.locale, "copyLastReply", nil)
+}
+
+// SwitchSessionPrevNext says "切换上/下一个会话"
+// in the language the app shows.
+func SwitchSessionPrevNext() string { return In(i18n.Locale()).SwitchSessionPrevNext() }
+
+// SwitchSessionPrevNext says "切换上/下一个会话"
+// in the language of msgs.
+func (msgs Messages) SwitchSessionPrevNext() string {
+	return Catalog.Format(msgs.locale, "switchSessionPrevNext", nil)
+}
+
+// CloseSheetOrWindow says "关闭浮层或窗口"
+// in the language the app shows.
+func CloseSheetOrWindow() string { return In(i18n.Locale()).CloseSheetOrWindow() }
+
+// CloseSheetOrWindow says "关闭浮层或窗口"
+// in the language of msgs.
+func (msgs Messages) CloseSheetOrWindow() string {
+	return Catalog.Format(msgs.locale, "closeSheetOrWindow", nil)
 }

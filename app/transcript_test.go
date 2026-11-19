@@ -3,8 +3,11 @@ package app
 import (
 	"encoding/json"
 	"math"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/llm"
@@ -181,11 +184,76 @@ func TestTurnCost(t *testing.T) {
 	a.C.Current.Account = "anthropic"
 	a.C.Current.Model = "claude-sonnet-5-5"
 	a.C.Models = []proto.Model{m}
-	a.C.Turns[0].Usage = u
-	a.C.Usage = u
-	a.C.LastInput = 10000
+	if gotCost := a.turnCost(u); gotCost != "$0.03" {
+		t.Fatalf("turnCost = %q, want $0.03", gotCost)
+	}
+}
+
+func TestAllIconsParse(t *testing.T) {
+	entries, err := iconFiles.ReadDir("icons")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("no embedded icons")
+	}
+	for _, e := range entries {
+		name := strings.TrimSuffix(e.Name(), ".svg")
+		if icon(name) == nil {
+			t.Errorf("icon(%q) returned nil", name)
+		}
+	}
+}
+
+func TestMsgTime(t *testing.T) {
+	a := task8App()
+	base := time.Date(2026, 11, 19, 23, 0, 0, 0, testZone)
+	a.now = func() time.Time { return base }
+
+	t.Cleanup(func() { i18n.SetLocaleFunc(chinese) })
+	i18n.SetLocaleFunc(chinese)
+	if got := a.msgTime(base.Add(-30 * time.Second)); got != "刚刚" {
+		t.Errorf("zh <1m: %q", got)
+	}
+	if got := a.msgTime(base.Add(-12 * time.Minute)); got != "12 分钟前" {
+		t.Errorf("zh 12m: %q", got)
+	}
+	if got := a.msgTime(base.Add(-3 * time.Hour)); got != "3 小时前" {
+		t.Errorf("zh 3h: %q", got)
+	}
+	if got := a.msgTime(time.Date(2026, 11, 10, 12, 0, 0, 0, testZone)); got != "11月10日" {
+		t.Errorf("zh >1d: %q", got)
+	}
+	if got := a.msgTime(time.Date(2025, 11, 10, 12, 0, 0, 0, testZone)); got != "2025年11月10日" {
+		t.Errorf("zh prev year: %q", got)
+	}
+
+	i18n.SetLocaleFunc(func() string { return "en" })
+	if got := a.msgTime(base.Add(-12 * time.Minute)); got != "12m ago" {
+		t.Errorf("en 12m: %q", got)
+	}
+	if got := a.msgTime(base.Add(-3 * time.Hour)); got != "3h ago" {
+		t.Errorf("en 3h: %q", got)
+	}
+	if got := a.msgTime(time.Date(2026, 11, 10, 12, 0, 0, 0, testZone)); got != "Nov 10" {
+		t.Errorf("en >1d: %q", got)
+	}
+}
+
+func TestRetryTurn(t *testing.T) {
+	a := finishedApp()
+	a.C.Turns[0].End = a.now().Add(-12 * time.Minute)
 	tt := task8Tester(a, false)
-	if !tt.HasText("$0.03") {
-		t.Fatalf("missing turn cost in %q", tt.Texts())
+	drain(a)
+	if !tt.HasText("12 分钟前") {
+		t.Fatalf("missing timestamp in %q", tt.Texts())
+	}
+	if err := tt.Click("重试"); err != nil {
+		t.Fatal(err)
+	}
+	var rw proto.Rewind
+	task8Command(t, a, proto.MethodRewind, &rw)
+	if rw.TurnSeq != 1 || rw.Action != "conversation" {
+		t.Fatalf("unexpected rewind: %+v", rw)
 	}
 }

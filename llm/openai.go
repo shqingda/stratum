@@ -18,7 +18,10 @@ type OpenAI struct {
 	// Codex sends requests to the ChatGPT backend that a ChatGPT sign-in
 	// pays for (BaseURL https://chatgpt.com/backend-api when empty). Auth
 	// must set the bearer token and chatgpt-account-id.
-	Codex bool
+	Codex         bool
+	Provider      string            // catalog provider id for per-model metadata
+	Headers       map[string]string // extra static headers
+	SessionHeader string            // e.g. "x-opencode-session"
 }
 
 const openaiName = "openai"
@@ -33,6 +36,29 @@ func (p *OpenAI) Stream(ctx context.Context, req Request) iter.Seq2[Event, error
 			yield(Event{}, err)
 			return
 		}
+		if header == nil {
+			header = http.Header{}
+		} else {
+			header = header.Clone()
+		}
+		for k, v := range p.Headers {
+			header.Set(k, v)
+		}
+		if p.Provider != "" {
+			if m, ok := FindModel(p.Provider, req.Model); ok {
+				for k, v := range m.Headers {
+					header.Set(k, v)
+				}
+				if !m.Reasoning {
+					req.Effort = ""
+				} else if req.Effort != "" && len(m.ThinkingLevelMap) > 0 {
+					req.Effort = ResolveEffort(req.Effort, m.ThinkingLevelMap)
+				}
+			}
+		}
+		if p.SessionHeader != "" && req.SessionID != "" {
+			header.Set(p.SessionHeader, req.SessionID)
+		}
 		base, path, body := p.BaseURL, "/responses", responsesBody(req)
 		if p.Codex {
 			if base == "" {
@@ -40,7 +66,6 @@ func (p *OpenAI) Stream(ctx context.Context, req Request) iter.Seq2[Event, error
 			}
 			path = "/codex/responses"
 			codexBody(body, req)
-			header = header.Clone()
 			header.Set("OpenAI-Beta", "responses=experimental")
 			header.Set("originator", Originator)
 			if req.SessionID != "" {
@@ -294,10 +319,13 @@ func (s *responsesStream) event(ev sseEvent) (bool, error) {
 // Chat speaks the Chat Completions API that most other providers and local
 // servers offer: OpenRouter, DeepSeek, Groq, Ollama, LM Studio…
 type Chat struct {
-	BaseURL string // the URL before /chat/completions, e.g. https://openrouter.ai/api/v1
-	Auth    Auth
-	HTTP    *http.Client
-	Compat  ChatCompat
+	BaseURL       string // the URL before /chat/completions, e.g. https://openrouter.ai/api/v1
+	Auth          Auth
+	HTTP          *http.Client
+	Compat        ChatCompat
+	Provider      string
+	Headers       map[string]string
+	SessionHeader string
 }
 
 // ChatCompat covers how servers that speak Chat Completions differ.
@@ -309,13 +337,22 @@ type ChatCompat struct {
 	//   ""           reasoning_effort, as OpenAI does
 	//   "none"       not at all
 	//   "deepseek"   thinking {type: enabled} and reasoning_effort
-	//   "zai"        thinking {type: enabled}
-	//   "qwen"       enable_thinking
+	//   "zai"        thinking {type: enabled, clear_thinking: false} and reasoning_effort
+	//   "qwen"       enable_thinking and reasoning_effort
 	//   "openrouter" reasoning {effort}
+	//   "together"   reasoning {enabled: true} and reasoning_effort
+	//   "ant-ling"   reasoning {effort}
+	//   "baseten"    chat_template_args and reasoning_effort
 	Thinking string
 	// ReplayReasoning sends an assistant message's reasoning back as
 	// reasoning_content (DeepSeek requires it after tool calls).
-	ReplayReasoning bool
+	ReplayReasoning            bool
+	NoReasoningEffort          bool
+	ZaiToolStream              bool
+	ChatTemplateArgs           map[string]any
+	ThinkingLevelMap           map[string]*string
+	SendSessionAffinityHeaders bool
+	SessionAffinityFormat      string
 }
 
 func (p *Chat) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
@@ -327,9 +364,68 @@ func (p *Chat) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] 
 				yield(Event{}, err)
 				return
 			}
-			header = h
+			if h != nil {
+				header = h.Clone()
+			}
 		}
-		resp, err := client{p.HTTP}.post(ctx, strings.TrimSuffix(p.BaseURL, "/")+"/chat/completions", header, chatBody(req, p.Compat))
+		for k, v := range p.Headers {
+			header.Set(k, v)
+		}
+		compat := p.Compat
+		if p.Provider != "" {
+			if m, ok := FindModel(p.Provider, req.Model); ok {
+				for k, v := range m.Headers {
+					header.Set(k, v)
+				}
+				if !m.Reasoning {
+					req.Effort = ""
+				}
+				if len(m.ThinkingLevelMap) > 0 {
+					compat.ThinkingLevelMap = m.ThinkingLevelMap
+				}
+				if mc := m.Compat; mc != nil {
+					if mc.MaxTokensField != "" {
+						compat.MaxTokensField = mc.MaxTokensField
+					}
+					if mc.ThinkingFormat != "" {
+						compat.Thinking = mc.ThinkingFormat
+					}
+					if mc.RequiresReasoningContentOnAssistantMessages {
+						compat.ReplayReasoning = true
+					}
+					if mc.SupportsReasoningEffort != nil {
+						compat.NoReasoningEffort = !*mc.SupportsReasoningEffort
+					}
+					if mc.ZaiToolStream {
+						compat.ZaiToolStream = true
+					}
+					if len(mc.ChatTemplateArgs) > 0 {
+						compat.ChatTemplateArgs = mc.ChatTemplateArgs
+					}
+					if mc.SendSessionAffinityHeaders {
+						compat.SendSessionAffinityHeaders = true
+					}
+					if mc.SessionAffinityFormat != "" {
+						compat.SessionAffinityFormat = mc.SessionAffinityFormat
+					}
+				}
+			}
+		}
+		if p.SessionHeader != "" && req.SessionID != "" {
+			header.Set(p.SessionHeader, req.SessionID)
+		}
+		if compat.SendSessionAffinityHeaders && req.SessionID != "" {
+			if compat.SessionAffinityFormat == "openrouter" {
+				header.Set("x-session-id", req.SessionID)
+			} else {
+				header.Set("x-client-request-id", req.SessionID)
+				header.Set("x-session-affinity", req.SessionID)
+				if compat.SessionAffinityFormat != "openai-nosession" {
+					header.Set("session_id", req.SessionID)
+				}
+			}
+		}
+		resp, err := client{p.HTTP}.post(ctx, strings.TrimSuffix(p.BaseURL, "/")+"/chat/completions", header, chatBody(req, compat))
 		if err != nil {
 			yield(Event{}, err)
 			return
@@ -406,36 +502,76 @@ func chatBody(req Request, compat ChatCompat) map[string]any {
 	if req.MaxTokens > 0 {
 		body[cmp.Or(compat.MaxTokensField, "max_tokens")] = req.MaxTokens
 	}
-	chatThinking(body, req.Effort, compat.Thinking)
+	chatThinking(body, req.Effort, compat)
 	if len(req.Tools) > 0 {
 		tools := make([]any, len(req.Tools))
 		for i, t := range req.Tools {
 			tools[i] = map[string]any{"type": "function", "function": map[string]any{"name": t.Name, "description": t.Description, "parameters": toolSchema(t)}}
 		}
 		body["tools"] = tools
+		if compat.ZaiToolStream {
+			body["tool_stream"] = true
+		}
 	}
 	return body
 }
 
 // chatThinking asks for reasoning the way the server understands. An empty
 // effort leaves the server's default.
-func chatThinking(body map[string]any, effort, format string) {
+func chatThinking(body map[string]any, effort string, compat ChatCompat) {
 	if effort == "" {
 		return
 	}
-	switch format {
+	mapped := ResolveEffort(effort, compat.ThinkingLevelMap)
+	switch compat.Thinking {
 	case "none":
 	case "deepseek":
 		body["thinking"] = map[string]any{"type": "enabled"}
-		body["reasoning_effort"] = effort
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
 	case "zai":
-		body["thinking"] = map[string]any{"type": "enabled"}
+		body["thinking"] = map[string]any{"type": "enabled", "clear_thinking": false}
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
 	case "qwen":
 		body["enable_thinking"] = true
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
 	case "openrouter":
-		body["reasoning"] = map[string]any{"effort": effort}
+		if mapped != "" {
+			body["reasoning"] = map[string]any{"effort": mapped}
+		}
+	case "together":
+		body["reasoning"] = map[string]any{"enabled": true}
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
+	case "ant-ling":
+		if mapped != "" {
+			body["reasoning"] = map[string]any{"effort": mapped}
+		}
+	case "baseten":
+		if len(compat.ChatTemplateArgs) > 0 {
+			args := make(map[string]any, len(compat.ChatTemplateArgs))
+			for k, v := range compat.ChatTemplateArgs {
+				if obj, ok := v.(map[string]any); ok && obj["$var"] == "thinking.enabled" {
+					args[k] = true
+				} else {
+					args[k] = v
+				}
+			}
+			body["chat_template_args"] = args
+		}
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
 	default:
-		body["reasoning_effort"] = effort
+		if !compat.NoReasoningEffort && mapped != "" {
+			body["reasoning_effort"] = mapped
+		}
 	}
 }
 

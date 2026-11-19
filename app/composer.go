@@ -111,7 +111,8 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(7, 10, 7, 10)
+	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(7, 10, 7, 10).
+		Transition(ui.ElementTransition{Colors: true, Shadows: true, Duration: 160 * time.Millisecond})
 	if !a.helloShown() {
 		raise(box, p)
 	}
@@ -119,11 +120,21 @@ func (a *App) box(c *ui.Context) {
 	if files := box.DroppedFiles(); len(files) > 0 {
 		a.attachPaths(files)
 	}
-	if box.FileDragOver() {
-		box.Border(1.5, p.Live)
+	dragOver := box.FileDragOver()
+	switch {
+	case dragOver:
+		box.Border(1.5, p.Live).Background(p.Card.Mix(p.Live, .05))
+	case box.FocusWithin():
+		box.Border(.75, p.Live.Alpha(.38))
 	}
 	svc := c.Services()
 	box.Children(func() {
+		if dragOver {
+			ui.Row(c).Gap(6).Padding(2, 4, 6, 4).AlignItems(ui.Center).Children(func() {
+				sym(c, "plus", 14, p.Live)
+				ui.Text(c, locales.DropToAttach()).FontSize(12.5).FontWeight(500).TextColor(p.Live)
+			})
+		}
 		a.attachments(c)
 		a.mentionChips(c)
 		if a.recall != "" {
@@ -133,7 +144,7 @@ func (a *App) box(c *ui.Context) {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
-			area := ui.TextAreaBase(c, &a.draft)
+			area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
 			if a.toEnd {
 				// A draft put in whole is written on from its end.
 				n := len([]rune(a.draft))
@@ -244,6 +255,7 @@ func (a *App) putBack(text string) {
 func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(14).Center().Label(tip).Tooltip(tip)
 	press(b)
+	focusRing(b, a.p)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
@@ -255,6 +267,7 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 	p := a.p
 	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 9).Gap(5).Radius(14).AlignItems(ui.Center).Label(label)
 	press(b)
+	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}
@@ -276,6 +289,7 @@ func (a *App) goButton(c *ui.Context) {
 	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4).
 		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond})
 	press(b)
+	focusRing(b, p)
 	// The arrow and the stop square cross-fade where they are, so the
 	// button turns into the other rather than being swapped.
 	glyph := func(stop bool, fg ui.Color) {
@@ -361,6 +375,7 @@ func (a *App) textButton(c *ui.Context, key, label string) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key(key)).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Label(label).Shrink(0)
 	press(b)
+	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}

@@ -108,10 +108,13 @@ func TestTask8Menus(t *testing.T) {
 				{ID: "gpt-6-sol", Name: "GPT 6 Sol", Context: 1_000_000, Reasoning: true, Default: true},
 			})
 			tt.Frame()
-			for _, want := range []string{"GPT 6 Luna", "GPT 6 Sol", "200K", "1M", "✓ 默认模型"} {
+			for _, want := range []string{"GPT 6 Luna", "GPT 6 Sol", "200K", "1M"} {
 				if !tt.HasText(want) {
 					t.Errorf("missing %q in %q", want, tt.Texts())
 				}
+			}
+			if tt.HasText("✓ 默认模型") {
+				t.Errorf("unexpected default model subtitle in %q", tt.Texts())
 			}
 			if selected, ok := tt.AccessByRole(ui.RoleMenuItemCheckBox, "GPT 6 Luna"); !ok || !selected.Checked {
 				t.Errorf("current model is not checked: %+v", selected)

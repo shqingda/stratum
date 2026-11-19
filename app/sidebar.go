@@ -23,6 +23,7 @@ const (
 func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
 	press(b)
+	focusRing(b, a.p)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
@@ -32,7 +33,7 @@ func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 
 func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	p := a.p
-	side := ui.Column(c).Width(sidebarWidth).Shrink(0)
+	side := ui.Column(c).Width(a.sideWidth()).Shrink(0)
 	topGap := float32(barHeight)
 	if vibrant {
 		// Window VibrancyGlass provides the single native glass layer; add a
@@ -49,7 +50,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		ui.Box(c).Height(topGap).Shrink(0).DragWindow()
 		ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
 			brandMark(c, 22, p.Fg)
-			ui.Text(c, "Talos").FontSize(16).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, "Talos").FontSize(16).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg)
 		})
 		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
 			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
@@ -85,7 +86,7 @@ func (a *App) sideToggle(c *ui.Context) {
 	}
 	const pillW, pillH = float32(74), float32(32)
 	leftClosed := toggleLeft(c)
-	leftOpen := float32(sidebarWidth) - 14 - pillW
+	leftOpen := a.sideWidth() - 14 - pillW
 	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
 	bg := ui.RGBA(255, 255, 255, .94)
 	shadow := ui.RGBA(0, 0, 0, .08)
@@ -100,6 +101,7 @@ func (a *App) sideToggle(c *ui.Context) {
 		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(30, 26).Radius(13).Center().
 			Label(locales.NewSession()).Tooltip(locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN)
 		press(newBtn)
+		focusRing(newBtn, p)
 		newCol := p.Fg
 		if newBtn.Hovered() {
 			newBtn.Background(p.Hover)
@@ -112,6 +114,7 @@ func (a *App) sideToggle(c *ui.Context) {
 		togBtn := ui.ButtonBase(c.Key("side")).Size(30, 26).Radius(13).Center().
 			Label(tip).Tooltip(tip)
 		press(togBtn)
+		focusRing(togBtn, p)
 		togCol := p.Fg
 		if togBtn.Hovered() {
 			togBtn.Background(p.Hover)
@@ -130,6 +133,7 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 	p := a.p
 	it := ui.ButtonBase(c.Key(key)).Row().Height(36).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
 	press(it)
+	focusRing(it, p)
 	if it.Hovered() {
 		it.Background(p.Hover)
 	}
@@ -149,12 +153,7 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 func (a *App) sessions(c *ui.Context) {
 	a.visibleSessions = a.visibleSessions[:0]
 	if len(a.C.Sessions) == 0 {
-		p := a.p
-		ui.Column(c).Padding(24, 16).Gap(6).Center().Children(func() {
-			sym(c, "message-plus", 22, p.Mute)
-			ui.Text(c, locales.EmptySessionsTitle()).FontSize(13).FontWeight(500).TextColor(p.Fg2)
-			ui.Text(c, locales.EmptySessionsHint()).FontSize(12).TextColor(p.Mute)
-		})
+		emptyState(c, a.p, "message-plus", locales.EmptySessionsTitle(), locales.EmptySessionsHint(), nil)
 		return
 	}
 	var waiting, pinned, archived []proto.Session
@@ -198,16 +197,20 @@ func (a *App) sessions(c *ui.Context) {
 	}
 	if len(archived) > 0 {
 		p := a.p
-		b := ui.ButtonBase(c.Key("archived")).Row().Height(24).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).
+		b := ui.ButtonBase(c.Key("archived")).Row().Height(26).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).Radius(6).AlignItems(ui.Center).
 			Label(locales.Archived()).Expanded(a.showArchived)
 		press(b)
+		focusRing(b, p)
+		if b.Hovered() {
+			b.Background(p.Hover)
+		}
 		if b.Clicked() {
 			a.showArchived = !a.showArchived
 		}
 		b.Children(func() {
 			sym(c, "archive", 13, p.Mute)
-			ui.Text(c, locales.Archived()).FontSize(12.5).FontWeight(600).TextColor(p.Mute).SingleLine()
-			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[a.showArchived], 11, p.Mute)
+			ui.Text(c, locales.Archived()).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).SingleLine()
+			disclosureChevron(c, "archived", a.showArchived, 11, p.Mute)
 			ui.Spacer(c)
 			ui.Text(c, fmt.Sprint(len(archived))).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
 		})
@@ -225,7 +228,7 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 		if symbol != "" {
 			sym(c, symbol, 13, p.Mute)
 		}
-		ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(p.Mute).SingleLine()
+		ui.Text(c, label).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).SingleLine()
 		if n > 0 {
 			ui.Spacer(c)
 			ui.Text(c, fmt.Sprint(n)).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
@@ -256,8 +259,9 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)
 	n := len(a.visibleSessions) // its ⌘ number
-	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(30).Padding(0, 10).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
+	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(32).Padding(0, 10).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
 	row.Transition(ui.ElementTransition{Position: true, Colors: true, Shadows: true, Duration: 180 * time.Millisecond})
+	focusRing(row, p)
 	switch {
 	case on && p == dark:
 		row.Background(p.Sel)
@@ -350,6 +354,7 @@ func (a *App) footer(c *ui.Context) {
 		profile := ui.ButtonBase(c.Key("profile-card")).Row().Grow(1).MinWidth(0).Height(38).Padding(0, 6).Gap(9).Radius(9).
 			AlignItems(ui.Center).Justify(ui.Start).Label(name)
 		press(profile)
+		focusRing(profile, p)
 		if profile.Hovered() {
 			profile.Background(p.Hover)
 		}

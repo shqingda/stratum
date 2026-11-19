@@ -8,6 +8,7 @@
   "select": "选择",
   "copy": "复制",
   "copyCode": "复制代码",
+  "retry": "重试",
   "search": "搜索",
   "findInSession": "在会话中查找",
   "findPrevious": "上一个",
@@ -92,7 +93,7 @@
   "effortMedium": "中",
   "effortHigh": "高",
   "effortXhigh": "极高",
-  "composerPlaceholder": "描述任务，用 @ 引用文件",
+  "composerPlaceholder": "描述任务，用 @ 引用文件，/ 调用操作",
   "composerQueuePlaceholder": "运行中：⏎ 排队，⌘⏎ 插话",
   "composerAnswerPlaceholder": "回答上面的问题，回车发送",
   "noImageSupport": "当前模型看不了图片，换一个再发",
@@ -110,7 +111,6 @@
   "noEffortSupport": "这个模型不支持思考强度",
   "modelsLoadFailed": "加载失败，请重新打开菜单",
   "noModels": "这个账号没有可用模型",
-  "defaultModelMark": "✓ 默认模型",
   "phaseStarting": "正在启动",
   "phaseConnecting": "正在连接",
   "phaseSyncing": "正在同步",
@@ -188,8 +188,9 @@
   "signInChatGPTSub": "Plus、Pro、Business 订阅",
   "signInXTitle": "X 订阅",
   "signInCopilotSub": "Pro、Pro+、Business 订阅",
+  "signInKimiSub": "Kimi Code 订阅",
   "signInOpenRouterSub": "浏览器授权，换一把 key",
-  "apiKeySub": "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax 等",
+  "apiKeySub": "Anthropic、Gemini、DeepSeek、Kimi、智谱、通义、MiniMax、Fireworks 等",
   "onboardingTitle": "连接一个模型",
   "onboardingLead": "用你已有的订阅登录最省事。之后随时可以在设置里加别的。",
   "onboardingKeychain": "凭据只存在本机钥匙串，Talos 没有服务器。",
@@ -612,6 +613,22 @@
       }
     }
   },
+  "msgAgoMinutes": "{n} 分钟前",
+  "@msgAgoMinutes": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "msgAgoHours": "{n} 小时前",
+  "@msgAgoHours": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "yesterday": "昨天",
   "yearOnly": "{y, number, ::group-off} 年",
   "@yearOnly": {
@@ -754,5 +771,18 @@
   },
   "quotaResetsIn": "{time}后重置",
   "automationDone": "定时任务已完成",
-  "automationFailed": "定时任务失败：{error}"
+  "automationFailed": "定时任务失败：{error}",
+  "reduceMotion": "减弱动态效果",
+  "reduceMotionNote": "关闭弹簧、流光与脉冲动画，改用温和的淡入淡出。",
+  "scrollToBottom": "回到底部",
+  "dropToAttach": "松开以添加附件",
+  "copyPath": "复制相对路径",
+  "toggleInspector": "切换审阅面板",
+  "automationsLede": "按 cron 或固定周期在后台自动执行任务，完成后发出通知。",
+  "deleteAutomationTitle": "删除定时任务「{name}」？",
+  "deleteAutomationBody": "删除后将停止该定时调度，此操作不可撤销。",
+  "focusComposer": "聚焦输入框",
+  "copyLastReply": "复制最新回复",
+  "switchSessionPrevNext": "切换上/下一个会话",
+  "closeSheetOrWindow": "关闭浮层或窗口"
 }

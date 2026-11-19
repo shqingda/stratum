@@ -68,6 +68,7 @@ func main() {
 			Vibrancy:       mygo.VibrancyGlass,
 			Content:        ui.View(a.View),
 		})
+		a.SetCloseWindow(win.Close)
 		a.Serve(ctx, k.Server, win.Update)
 		a.UseDesktop()
 	})
@@ -79,7 +80,7 @@ func main() {
 // menu is the default menu bar with "Check for Updates…" after About and
 // the app's own commands: Settings, a Session menu and the sidebar in View.
 func menu(a *app.App) *mygo.Menu {
-	session, settings, sidebar := a.MenuBar()
+	session, settings, sidebar, inspector := a.MenuBar()
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Talos", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleAbout},
@@ -97,7 +98,7 @@ func menu(a *app.App) *mygo.Menu {
 		}},
 		{Label: locales.MenuSession(), Submenu: session},
 		{Role: mygo.RoleEditMenu},
-		{Label: "View", Submenu: []*mygo.MenuItem{sidebar, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}},
+		{Label: "View", Submenu: []*mygo.MenuItem{sidebar, inspector, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}},
 		{Role: mygo.RoleWindowMenu},
 	})
 }

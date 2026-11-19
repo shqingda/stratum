@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/locales"
@@ -81,7 +82,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 			}})
 		}
 	}
-	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], run: func() { a.rv.open = !a.rv.open }})
+	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], kbd: "⌘⌥I", run: func() { a.rv.open = !a.rv.open }})
 	if cur != nil {
 		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: func() { a.rv.open, a.rv.tab = true, "term" }})
 		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
@@ -120,7 +121,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 			a.do(a.C.Flag(proto.SessionFlag{SessionID: s.ID, Pinned: &on}))
 		}})
 		add(opt{icon: "eye", label: locales.MarkUnread(), sub: title(s), run: func() { a.markUnread(s.ID) }})
-		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), run: func() { a.archive(s, !s.Archived) }})
+		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), kbd: "⇧⌘A", run: func() { a.archive(s, !s.Archived) }})
 		add(opt{icon: "trash", label: locales.DeleteSession(), sub: title(s), run: func() { a.deleting = s.ID }})
 	}
 	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: a.toggleSide})
@@ -223,7 +224,8 @@ func (a *App) palette(c *ui.Context) {
 			scrim = ui.RGBA(6, 7, 10, .45)
 		}
 		backdrop.Background(scrim).Justify(ui.Start).Padding(84, 16, 16, 16)
-		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label(locales.CommandPalette())
+		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label(locales.CommandPalette()).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -8, Scale: .98, Opacity: 0}, Duration: 170 * time.Millisecond})
 		if p == dark {
 			panel.Shadow(0, 0, 0, .5, ui.RGBA(0, 0, 0, .8)).Shadow(0, 18, 48, -8, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .08))
 		} else {
@@ -237,13 +239,21 @@ func (a *App) palette(c *ui.Context) {
 					a.query = k.Text()
 					switch {
 					case k.Key == ui.KeyDown && k.Mods == 0:
-						a.palSel = min(a.palSel+1, len(all)-1)
+						if len(all) > 0 {
+							a.palSel = (a.palSel + 1) % len(all)
+							a.palScroll = true
+						}
 					case k.Key == ui.KeyUp && k.Mods == 0:
-						a.palSel = max(a.palSel-1, 0)
+						if len(all) > 0 {
+							a.palSel = (a.palSel + len(all) - 1) % len(all)
+							a.palScroll = true
+						}
 					case k.Key == ui.KeyEnter && (k.Mods == 0 || k.Mods == ui.Cmd):
 						if len(all) > 0 {
 							choose(a.palSel)
 						}
+					case k.Key == ui.KeyW && k.Mods == ui.Cmd:
+						a.pal, a.query = false, ""
 					default:
 						if k.Key != ui.KeyEnter {
 							a.palSel = 0
@@ -260,7 +270,7 @@ func (a *App) palette(c *ui.Context) {
 						return
 					}
 					ui.Column(c).Padding(6, 6, 2, 6).Children(func() {
-						ui.Text(c, name).FontSize(12.5).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 4, 10)
+						ui.Text(c, name).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 4, 10)
 						for _, o := range opts {
 							a.palRow(c, o, i, choose)
 							i++
@@ -295,9 +305,15 @@ func (a *App) palette(c *ui.Context) {
 func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 	p := a.p
 	b := ui.ButtonBase(c.Key(fmt.Sprintf("pal:%d", i))).Row().Height(34).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(o.label)
+	press(b)
+	focusRing(b, p)
 	switch {
 	case i == a.palSel:
 		b.Background(p.Sel)
+		if a.palScroll {
+			b.ScrollIntoView()
+			a.palScroll = false
+		}
 	case b.Hovered():
 		b.Background(p.Hover)
 	}

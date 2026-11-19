@@ -7,8 +7,8 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// The icons are Tabler's outline set (MIT), as the mockups draw them:
-// strokes of 2 on a 24 grid, in the color of the text.
+// The icons are Lucide's outline set (ISC): strokes of 1.75 on a 24 grid,
+// in the color of the text (with brand/app marks kept separate).
 //
 //go:embed icons/*.svg
 var iconFiles embed.FS

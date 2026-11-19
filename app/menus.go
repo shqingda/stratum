@@ -132,9 +132,6 @@ func (a *App) modelItems(m *ui.Menu, account, current string, choose func(id str
 			}
 			selected := model.ID == current || current == "" && model.Default
 			item := m.Item(name).ID(model.ID).Checked(selected).Trailing(contextSize(model.Context))
-			if model.Default {
-				item.Subtitle(locales.DefaultModelMark())
-			}
 			if item.Chosen() {
 				choose(model.ID)
 			}

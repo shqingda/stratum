@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/client"
@@ -105,12 +106,14 @@ func (a *App) findBar(c *ui.Context) {
 		return
 	}
 	p := a.p
-	bar := ui.Row(c).Absolute().Top(sheetBar+4).Right(20).Width(300).Height(38).Padding(0, 4, 0, 12).Gap(6).Radius(10).Background(p.Card).AlignItems(ui.Center)
+	bar := ui.Row(c.Key("find-bar")).Absolute().Top(sheetBar+4).Right(20).Width(312).Height(38).Padding(0, 4, 0, 12).Gap(6).Radius(10).Background(p.Card).AlignItems(ui.Center).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .98, Opacity: 0}, Duration: 160 * time.Millisecond})
+	rim(bar, p)
 	lift(bar, p)
 	bar.Children(func() {
 		sym(c, "search", 14, p.Mute)
 		ui.TextInputBase(c, &f.query).Bind(&f.input).Label(locales.FindInSession()).Placeholder(locales.FindInSession()).PlaceholderColor(p.Mute).
-			FontSize(13.5).TextColor(p.Fg).Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
+			FontSize(13.5).TextColor(p.Fg).Grow(1).MinWidth(0).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
 			f.query = k.Text()
 			switch {
 			case k.Key == ui.KeyEnter && k.Mods == 0, k.Key == ui.KeyDown && k.Mods == 0:
@@ -124,7 +127,11 @@ func (a *App) findBar(c *ui.Context) {
 		})
 		if strings.TrimSpace(f.query) != "" {
 			n := fmt.Sprintf("%d/%d", min(f.at+1, len(f.hits)), len(f.hits))
-			ui.Text(c, n).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
+			col := p.Mute
+			if len(f.hits) == 0 {
+				col = p.Minus
+			}
+			ui.Text(c, n).FontSize(12.5).TextColor(col).SingleLine().Shrink(0)
 		}
 		if a.iconPill(c, "find-up", "chevron-up", locales.FindPrevious()).Disabled(len(f.hits) == 0).Clicked() {
 			a.findStep(-1)

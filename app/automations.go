@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
 type automationsState struct {
-	formOpen bool
-	editID   string
-	name     string
-	schedule string
-	prompt   string
-	cwd      string
+	formOpen     bool
+	editID       string
+	name         string
+	schedule     string
+	prompt       string
+	cwd          string
+	deletingID   string
+	deletingName string
 }
 
 func (a *App) openAutomations() {
@@ -52,7 +55,7 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 			ui.Box(c).Height(barHeight).Shrink(0).DragWindow()
 			ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
 				sym(c, "clock-play", 20, p.Fg)
-				ui.Text(c, locales.Automations()).FontSize(16).FontWeight(600).TextColor(p.Fg)
+				ui.Text(c, locales.Automations()).FontSize(16).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg)
 			})
 			ui.Column(c).Padding(0, 12, 12, 12).Gap(8).Children(func() {
 				if a.button(c, "auto-new-side", locales.NewAutomation(), "plus", true).Clicked() {
@@ -64,27 +67,17 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 			})
 			ui.Spacer(c)
 			ui.Column(c).Padding(8, 12, 14, 12).Children(func() {
-				if a.navItem(c, "auto-back", "arrow-back-up", locales.Close(), "").Clicked() {
+				if a.navItem(c, "auto-back", "arrow-back-up", locales.Close(), "esc").Clicked() {
 					a.automationsOpen = false
 				}
 			})
 		})
 
-		ui.Column(c).Grow(1).Background(p.Sheet).Children(func() {
-			ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
-				ui.Text(c, locales.Automations()).FontSize(15).FontWeight(600).TextColor(p.Fg)
-				ui.Spacer(c)
-				if a.button(c, "auto-new-top", locales.NewAutomation(), "plus", true).Clicked() {
-					st.formOpen = !st.formOpen
-					st.editID = ""
-				}
-				if a.iconButton(c, "auto-close", "x", locales.Close()).Margin(0, 0, 0, 8).Clicked() {
-					a.automationsOpen = false
-				}
-			})
-
-			ui.Scroll(c).Grow(1).Padding(8, 28, 28, 28).Children(func() {
-				ui.Column(c).MaxWidth(680).Gap(14).Children(func() {
+		stageBg := p.Sheet
+		ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(stageBg).Clip().Children(func() {
+			ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
+				ui.Column(c).Width(640).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(barHeight+12, 28, 52, 28).Gap(14).Children(func() {
+					ui.Text(c, locales.AutomationsLede()).FontSize(13.5).LineHeight(1.5).TextColor(p.Mute).Margin(0, 0, 4, 0)
 					if st.formOpen {
 						a.automationForm(c)
 					}
@@ -94,9 +87,7 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 						ui.Text(c, locales.Reading()).FontSize(13).TextColor(p.Mute)
 					case len(list.Items) == 0:
 						group(c, p, func() {
-							ui.Column(c).Padding(20).Gap(10).Center().Children(func() {
-								sym(c, "clock-play", 26, p.Mute)
-								ui.Text(c, locales.AutomationsEmpty()).FontSize(13).TextColor(p.Fg2)
+							emptyState(c, p, "clock-play", locales.Automations(), locales.AutomationsEmpty(), func() {
 								if a.button(c, "auto-empty-add", locales.NewAutomation(), "plus", true).Clicked() {
 									st.formOpen = true
 									st.editID = ""
@@ -115,8 +106,30 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 					}
 				})
 			})
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight+8).PassThrough().
+				Material(glass.ScrollEdge{Background: stageBg})
+			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
+				ui.Text(c, locales.Automations()).FontSize(17).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg).SingleLine()
+				ui.Spacer(c)
+				if a.button(c, "auto-new-top", locales.NewAutomation(), "plus", true).Clicked() {
+					st.formOpen = !st.formOpen
+					st.editID = ""
+				}
+				done := ui.ButtonBase(c.Key("auto-close")).Row().Shrink(0).Size(28, 28).Margin(0, 0, 0, 8).Radius(8).Center().
+					Label(locales.Close()).Tooltip(locales.Close()).KeyShortcuts(0, ui.KeyEscape)
+				press(done)
+				focusRing(done, p)
+				if done.Hovered() {
+					done.Background(p.Hover)
+				}
+				done.Children(func() { sym(c, "x", 15, p.Fg2) })
+				if done.Clicked() {
+					a.automationsOpen = false
+				}
+			})
 		})
 	})
+	a.automationDeleteDialog(c)
 }
 
 func (a *App) automationForm(c *ui.Context) {
@@ -203,7 +216,41 @@ func (a *App) automationRow(c *ui.Context, it proto.Automation) {
 			a.do(a.C.UpsertAutomation(it))
 		}
 		if a.iconButton(c, "auto-del:"+it.ID, "trash", locales.Delete()).Clicked() {
-			a.do(a.C.DeleteAutomation(it.ID))
+			a.automationsUI.deletingID = it.ID
+			a.automationsUI.deletingName = it.Name
 		}
 	})
+}
+
+func (a *App) automationDeleteDialog(c *ui.Context) {
+	st := &a.automationsUI
+	open := st.deletingID != ""
+	if !open {
+		return
+	}
+	p := a.p
+	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
+		scrim := ui.RGBA(12, 12, 14, .18)
+		if p == dark {
+			scrim = ui.RGBA(0, 0, 0, .42)
+		}
+		backdrop.Background(scrim)
+		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.DeleteAutomationTitle(st.deletingName))
+		lift(panel, p).Children(func() {
+			ui.Text(c, locales.DeleteAutomationTitle(st.deletingName)).FontSize(15).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, locales.DeleteAutomationBody()).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
+			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
+				if a.button(c, "auto-del-cancel", locales.Cancel(), "esc", false).Clicked() {
+					st.deletingID, st.deletingName = "", ""
+				}
+				if a.button(c, "auto-del-ok", locales.Delete(), "", true).Background(p.Minus).Clicked() {
+					a.do(a.C.DeleteAutomation(st.deletingID))
+					st.deletingID, st.deletingName = "", ""
+				}
+			})
+		})
+	})
+	if !open {
+		st.deletingID, st.deletingName = "", ""
+	}
 }

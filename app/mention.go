@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
@@ -21,8 +22,9 @@ type mention struct {
 	query string // what follows the @ up to the caret
 	sel   int
 	shut  int  // the @ Escape put away, +1
-	open  bool // the list shows
-	place int  // where the caret goes next frame, +1
+	open      bool // the list shows
+	place     int  // where the caret goes next frame, +1
+	scrollSel bool // scroll selected row into view once after ↑/↓
 }
 
 // mentionItem is one row. text is what replaces the @ word, without the @.
@@ -85,18 +87,29 @@ func (a *App) mentionMenu(c *ui.Context) {
 	m.sel = min(m.sel, len(flat)-1)
 	m.open = true
 	p := a.p
-	list := ui.Column(c).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card)
+	list := ui.Column(c.Key("mention-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
+	rim(list, p)
 	lift(list, p)
 	list.Children(func() {
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			n := 0
 			for _, g := range groups {
-				ui.Text(c, g.label).FontSize(12).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 2, 10)
+				ui.Text(c, g.label).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 2, 10)
 				for _, it := range g.items {
 					i, item := n, it
 					n++
-					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(30).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name)
-					if i == m.sel || row.Hovered() {
+					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name)
+					press(row)
+					focusRing(row, p)
+					switch {
+					case i == m.sel:
+						row.Background(p.Sel)
+						if m.scrollSel {
+							row.ScrollIntoView()
+							m.scrollSel = false
+						}
+					case row.Hovered():
 						row.Background(p.Hover)
 					}
 					row.Children(func() {
@@ -283,8 +296,10 @@ func (a *App) mentionKey(k ui.TextKey) bool {
 	switch k.Key {
 	case ui.KeyUp:
 		m.sel = (m.sel + n - 1) % n
+		m.scrollSel = true
 	case ui.KeyDown:
 		m.sel = (m.sel + 1) % n
+		m.scrollSel = true
 	case ui.KeyEnter, ui.KeyTab:
 		a.complete(items[min(m.sel, n-1)].text)
 		k.SetText(a.draft)
@@ -324,28 +339,72 @@ func (a *App) mentionList() []string {
 	return list
 }
 
-var mentionTokenRe = regexp.MustCompile(`(?:^|\s)(@[^\s@]+)`)
+var (
+	mentionTokenRe = regexp.MustCompile(`(?:^|\s)(@[^\s@]+)`)
+	slashTokenRe   = regexp.MustCompile(`(?:^|\s)(/[A-Za-z0-9][A-Za-z0-9._:-]*)`)
+)
+
+// skillAccent returns the Claude-style crisp blue highlight for /skill tokens.
+func skillAccent(p *Palette) ui.Color {
+	if p == dark {
+		return ui.Hex("#6BAEFF")
+	}
+	return ui.Hex("#1D5BB8")
+}
+
+func (a *App) knownSlashToken(name string) bool {
+	if l := a.C.MCP; l != nil {
+		for _, sk := range l.Skills {
+			if !sk.Disabled && sk.Name == name {
+				return true
+			}
+		}
+		for _, cmd := range l.Commands {
+			if cmd.Name == name {
+				return true
+			}
+		}
+		for _, pr := range l.Prompts {
+			if pr.Server+":"+pr.Name == name {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 type mentionChip struct {
 	raw   string
 	icon  string
 	label string
+	slash bool
 }
 
 func (a *App) extractMentionChips() []mentionChip {
+	seen := map[string]bool{}
+	var out []mentionChip
+	if strings.Contains(a.draft, "/") && !a.slash.open {
+		for _, m := range slashTokenRe.FindAllStringSubmatchIndex(a.draft, -1) {
+			tok := a.draft[m[2]:m[3]]
+			name := strings.TrimPrefix(tok, "/")
+			if len(name) == 0 || seen[tok] || !a.knownSlashToken(name) {
+				continue
+			}
+			seen[tok] = true
+			out = append(out, mentionChip{raw: tok, label: name, slash: true})
+		}
+	}
 	if !strings.Contains(a.draft, "@") {
-		return nil
+		return out
 	}
 	matches := mentionTokenRe.FindAllStringSubmatchIndex(a.draft, -1)
 	if len(matches) == 0 {
-		return nil
+		return out
 	}
 	activeAt := -1
 	if a.mention.open && a.mention.at >= 0 {
 		activeAt = len(string([]rune(a.draft)[:a.mention.at]))
 	}
-	seen := map[string]bool{}
-	var out []mentionChip
 	for _, m := range matches {
 		start, end := m[2], m[3]
 		if start == activeAt {
@@ -384,26 +443,43 @@ func (a *App) extractMentionChips() []mentionChip {
 	return out
 }
 
-// mentionChips renders @mentions in the draft as removable Apple-style pills.
+// mentionChips renders /skills (Claude-style blue highlight) and @mentions in
+// the draft as removable Apple-style pills.
 func (a *App) mentionChips(c *ui.Context) {
 	chips := a.extractMentionChips()
 	if len(chips) == 0 {
 		return
 	}
 	p := a.p
+	blue := skillAccent(p)
 	ui.Row(c).Wrap().Gap(6).Margin(0, 0, 8, 0).Children(func() {
 		for _, ch := range chips {
-			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 6, 0, 8).Gap(5).Radius(7).
-				Background(p.Chip).Border(.5, p.Edge).AlignItems(ui.Center)
+			bg, border := p.Chip, p.Edge
+			if ch.slash {
+				bg, border = blue.Alpha(.10), blue.Alpha(.24)
+			}
+			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 6, 0, 8).Gap(4).Radius(7).
+				Background(bg).Border(.5, border).AlignItems(ui.Center)
 			pill.Children(func() {
-				sym(c, ch.icon, 12, p.Mute)
-				ui.Text(c, ch.label).FontSize(12).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				if ch.slash {
+					ui.Row(c).AlignItems(ui.Center).Children(func() {
+						ui.Text(c, "/").FontSize(12.5).FontWeight(500).TextColor(blue.Alpha(.55)).SingleLine()
+						ui.Text(c, ch.label).FontSize(12.5).FontWeight(500).TextColor(blue).SingleLine()
+					})
+				} else {
+					sym(c, ch.icon, 12, p.Mute)
+					ui.Text(c, ch.label).FontSize(12).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				}
 				rm := ui.ButtonBase(c.Key("mchip-rm:"+ch.raw)).Size(16, 16).Radius(8).Center().Label(locales.Remove())
 				press(rm)
 				if rm.Hovered() {
 					rm.Background(p.Hover)
 				}
-				rm.Children(func() { sym(c, "x", 10, p.Mute) })
+				rmCol := p.Mute
+				if ch.slash {
+					rmCol = blue.Alpha(.7)
+				}
+				rm.Children(func() { sym(c, "x", 10, rmCol) })
 				if rm.Clicked() {
 					next := strings.Replace(a.draft, ch.raw+" ", "", 1)
 					if next == a.draft {

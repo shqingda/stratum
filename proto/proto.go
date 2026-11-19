@@ -650,6 +650,8 @@ type Settings struct {
 	NotifyWhen string `json:"notifyWhen,omitempty"`
 	// TextSize zooms the window: "" for its size, "small" or "large".
 	TextSize string `json:"textSize,omitempty"`
+	// ReduceMotion turns off spring and ambient animations for accessibility.
+	ReduceMotion bool `json:"reduceMotion,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }
