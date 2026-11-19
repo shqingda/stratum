@@ -40,6 +40,8 @@
   "archived": "Archived",
   "archivedSession": "Archived “{title}”",
   "deleteSession": "Delete…",
+  "removeProject": "Remove Project",
+  "revealInFinder": "Reveal in Finder",
   "delete": "Delete",
   "deleteTitle": "Delete “{title}”?",
   "deleteBody": "Its messages and the history of its changes go with it, for good. To put it away instead, archive it.",

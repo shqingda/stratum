@@ -40,6 +40,8 @@
   "archived": "已归档",
   "archivedSession": "已归档「{title}」",
   "deleteSession": "删除…",
+  "removeProject": "从边栏移除项目",
+  "revealInFinder": "在访达中显示",
   "delete": "删除",
   "deleteTitle": "删除「{title}」？",
   "deleteBody": "这个会话的记录和改动历史会一起删掉，不能撤销。只想收起来的话，用归档。",

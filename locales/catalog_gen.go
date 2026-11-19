@@ -434,6 +434,26 @@ func (msgs Messages) DeleteSession() string {
 	return Catalog.Format(msgs.locale, "deleteSession", nil)
 }
 
+// RemoveProject says "从边栏移除项目"
+// in the language the app shows.
+func RemoveProject() string { return In(i18n.Locale()).RemoveProject() }
+
+// RemoveProject says "从边栏移除项目"
+// in the language of msgs.
+func (msgs Messages) RemoveProject() string {
+	return Catalog.Format(msgs.locale, "removeProject", nil)
+}
+
+// RevealInFinder says "在访达中显示"
+// in the language the app shows.
+func RevealInFinder() string { return In(i18n.Locale()).RevealInFinder() }
+
+// RevealInFinder says "在访达中显示"
+// in the language of msgs.
+func (msgs Messages) RevealInFinder() string {
+	return Catalog.Format(msgs.locale, "revealInFinder", nil)
+}
+
 // Delete says "删除"
 // in the language the app shows.
 func Delete() string { return In(i18n.Locale()).Delete() }

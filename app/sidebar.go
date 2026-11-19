@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -159,6 +160,7 @@ func (a *App) sessions(c *ui.Context) {
 	var waiting, pinned, archived []proto.Session
 	var folders []string
 	byFolder := map[string][]proto.Session{}
+	cwdByFolder := map[string]string{}
 	for _, s := range a.C.Sessions {
 		switch {
 		case a.state(s) == "wait":
@@ -174,6 +176,7 @@ func (a *App) sessions(c *ui.Context) {
 		f := filepath.Base(s.Cwd)
 		if _, ok := byFolder[f]; !ok {
 			folders = append(folders, f)
+			cwdByFolder[f] = s.Cwd
 		}
 		byFolder[f] = append(byFolder[f], s)
 	}
@@ -190,7 +193,7 @@ func (a *App) sessions(c *ui.Context) {
 		}
 	}
 	for _, f := range folders {
-		a.group(c, "folder", f, 0)
+		a.projectGroup(c, f, cwdByFolder[f], byFolder[f])
 		for _, s := range byFolder[f] {
 			a.sessionRow(c, s)
 		}
@@ -232,6 +235,48 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 		if n > 0 {
 			ui.Spacer(c)
 			ui.Text(c, fmt.Sprint(n)).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
+		}
+	})
+}
+
+func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Session) {
+	p := a.p
+	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(14, 0, 4, 0).Padding(0, 6, 0, 10).Gap(8).Radius(7).AlignItems(ui.Center)
+	if row.Hovered() {
+		row.Background(p.Hover)
+	}
+	row.Children(func() {
+		sym(c, "folder", 16, p.Fg2)
+		ui.Text(c, label).FontSize(13.5).FontWeight(600).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		if row.Hovered() {
+			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(22, 22).Radius(6).Center().Label(label)
+			if more.Hovered() {
+				more.Background(p.Sel)
+			}
+			more.Children(func() { sym(c, "dots", 14, p.Fg2) })
+			more.PopoverMenuButton(func(m *ui.Menu) {
+				if m.Item(locales.NewSession()).Chosen() {
+					a.do(a.C.NewSessionIn(cwd))
+				}
+				if cwd != "" && m.Item(locales.RevealInFinder()).Chosen() {
+					_ = exec.Command("open", "-R", cwd).Start()
+				}
+				m.Separator()
+				if m.Item(locales.RemoveProject()).Danger().Chosen() {
+					for _, s := range sessions {
+						a.do(a.C.Delete(s.ID))
+					}
+				}
+			}, a.menuOptions(nil))
+
+			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(22, 22).Radius(6).Center().Label(locales.NewSession()).Tooltip(locales.NewSession())
+			if add.Hovered() {
+				add.Background(p.Sel)
+			}
+			add.Children(func() { sym(c, "plus", 14, p.Fg2) })
+			if add.Clicked() {
+				a.do(a.C.NewSessionIn(cwd))
+			}
 		}
 	})
 }

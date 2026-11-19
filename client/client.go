@@ -319,7 +319,7 @@ func (c *Client) ready(f proto.Frame) []proto.Command {
 	}
 	c.Phase, c.Err, c.Instance = Handshaking, "", f.Instance
 	return []proto.Command{c.read(proto.MethodInitialize, nil, func(json.RawMessage) []proto.Command {
-		cmds := []proto.Command{c.listAccounts(), c.read(proto.MethodSettings, nil, c.keepSettings), c.listSessions(true)}
+		cmds := []proto.Command{c.listAccounts(), c.read(proto.MethodSettings, nil, c.keepSettings), c.listSessions(true, true)}
 		return append(cmds, c.checkUnknown()...)
 	})}
 }
@@ -387,7 +387,7 @@ func (c *Client) listAccounts() proto.Command {
 // listSessions reads the session list. With bind it then shows a session:
 // the one shown before a reconnect, else the workspace's newest, else a new
 // one.
-func (c *Client) listSessions(bind bool) proto.Command {
+func (c *Client) listSessions(bind, autoCreate bool) proto.Command {
 	return c.read(proto.MethodSessionList, nil, func(r json.RawMessage) []proto.Command {
 		var list []proto.Session
 		if err := json.Unmarshal(r, &list); err == nil {
@@ -413,7 +413,14 @@ func (c *Client) listSessions(bind bool) proto.Command {
 				return []proto.Command{c.bind(s.ID)}
 			}
 		}
-		return []proto.Command{c.create()}
+		if autoCreate {
+			return []proto.Command{c.create()}
+		}
+		if len(c.Sessions) > 0 {
+			return []proto.Command{c.bind(c.Sessions[0].ID)}
+		}
+		c.Phase = Ready
+		return nil
 	})
 }
 
@@ -474,7 +481,7 @@ func (c *Client) bind(id string) proto.Command {
 		// Deleted meanwhile: show another rather than nothing.
 		c.want = ""
 		c.Sessions = slices.DeleteFunc(c.Sessions, func(s proto.Session) bool { return s.ID == id })
-		return []proto.Command{c.listSessions(true)}
+		return []proto.Command{c.listSessions(true, false)}
 	}
 	return c.send(proto.MethodSessionGet, proto.SessionRef{SessionID: id}, p)
 }
@@ -1268,7 +1275,7 @@ func (c *Client) Delete(id string) ([]proto.Command, error) {
 			c.want = ""
 			c.Phase = Syncing
 			c.resetTranscript()
-			return []proto.Command{c.listSessions(true)}
+			return []proto.Command{c.listSessions(true, false)}
 		}
 		return nil
 	})

@@ -350,7 +350,10 @@ func TestDeletedSessionShowsAnother(t *testing.T) {
 	}
 	// Gone before it could be read: the list is read again.
 	list = one(t, c.Receive(errResp(get.ID, "not_found", "no session s0")), proto.MethodSessionList)
-	one(t, c.Receive(resp(list.ID, []proto.Session{})), proto.MethodSessionCreate)
+	cmds = c.Receive(resp(list.ID, []proto.Session{}))
+	if len(cmds) != 0 || c.Phase != Ready || c.Current != nil {
+		t.Fatalf("empty list after delete should stay at Ready/nil, got cmds=%v phase=%v cur=%v", cmds, c.Phase, c.Current)
+	}
 }
 
 func TestSessionUpdates(t *testing.T) {
