@@ -82,6 +82,7 @@ func TestReviewAgainstKernel(t *testing.T) {
 	if err := tt.Click("显示变更"); err != nil {
 		t.Fatal(err)
 	}
+	tt.Advance(time.Second) // let the inspector drawer spring open
 	until("the diffs", func() bool { return tt.HasText("@@ -1,7 +1,7 @@") && len(a.C.Changes.Diffs) == 2 })
 	if !tt.HasText("A") {
 		t.Error("the new file is not marked A")
