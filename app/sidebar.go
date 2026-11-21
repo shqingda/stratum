@@ -152,19 +152,16 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 
 // sessionGroups are the sessions as the sidebar groups them.
 type sessionGroups struct {
-	waiting, pinned, archived []proto.Session
-	folders                   []string
-	byFolder                  map[string][]proto.Session
-	cwdByFolder               map[string]string
+	pinned, archived []proto.Session
+	folders          []string
+	byFolder         map[string][]proto.Session
+	cwdByFolder      map[string]string
 }
 
 func (a *App) groupSessions() sessionGroups {
 	g := sessionGroups{byFolder: map[string][]proto.Session{}, cwdByFolder: map[string]string{}}
 	for _, s := range a.C.Sessions {
 		switch {
-		case a.state(s) == "wait":
-			g.waiting = append(g.waiting, s)
-			continue
 		case s.Archived:
 			g.archived = append(g.archived, s)
 			continue
@@ -212,7 +209,6 @@ func (a *App) sessionOrder() []string {
 			ids = append(ids, s.ID)
 		}
 	}
-	add(g.waiting)
 	add(g.pinned)
 	for _, f := range g.folders {
 		if !a.projectCollapsed(g.cwdByFolder[f]) {
@@ -234,13 +230,7 @@ func (a *App) sessions(c *ui.Context) {
 		return
 	}
 	g := a.groupSessions()
-	waiting, pinned, archived, folders, byFolder, cwdByFolder := g.waiting, g.pinned, g.archived, g.folders, g.byFolder, g.cwdByFolder
-	if len(waiting) > 0 {
-		a.group(c, "", locales.NeedsYou(), len(waiting))
-		for _, s := range waiting {
-			a.sessionRow(c, s)
-		}
-	}
+	pinned, archived, folders, byFolder, cwdByFolder := g.pinned, g.archived, g.folders, g.byFolder, g.cwdByFolder
 	if len(pinned) > 0 {
 		a.group(c, "pin", locales.Pinned(), 0)
 		for _, s := range pinned {
@@ -454,7 +444,7 @@ func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
 
 func (a *App) footer(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10, 0, 10).Gap(6).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
+	ui.Row(c).Height(54).Shrink(0).Padding(6, 10, 10, 10).Gap(6).AlignItems(ui.Center).Children(func() {
 		name, sub := locales.NotSignedIn(), locales.AddAccountInSettings()
 		curAcc := a.account()
 		if curAcc != nil {
@@ -469,7 +459,7 @@ func (a *App) footer(c *ui.Context) {
 				sub = locales.Subscription()
 			}
 		}
-		profile := ui.ButtonBase(c.Key("profile-card")).Row().Grow(1).MinWidth(0).Height(38).Padding(0, 6).Gap(9).Radius(9).
+		profile := ui.ButtonBase(c.Key("profile-card")).Row().Grow(1).MinWidth(0).Height(38).Padding(0, 8, 0, 6).Gap(9).Radius(10).
 			AlignItems(ui.Center).Justify(ui.Start).Label(name)
 		press(profile)
 		focusRing(profile, p)
@@ -477,13 +467,13 @@ func (a *App) footer(c *ui.Context) {
 			profile.Background(p.Hover)
 		}
 		profile.Children(func() {
-			ui.Box(c).Size(24, 24).Shrink(0).Radius(6).Background(p.Acc).Center().Children(func() {
-				ui.Text(c, initials(name)).TextColor(p.OnAcc).FontSize(12).FontWeight(600).SingleLine()
+			ui.Box(c).Size(26, 26).Shrink(0).Radius(13).Background(p.Chip).Border(.5, p.Edge).Center().Children(func() {
+				ui.Text(c, initials(name)).TextColor(p.Fg).FontSize(11.5).FontWeight(600).SingleLine()
 			})
 			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-				ui.Text(c, name).FontSize(13.5).TextColor(p.Fg).SingleLine().Ellipsis("…")
+				ui.Text(c, name).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
 				if sub != "" {
-					ui.Text(c, sub).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+					ui.Text(c, sub).FontSize(11).LetterSpacing(.1).TextColor(p.Mute).FontFeatures("tnum").SingleLine().Ellipsis("…")
 				}
 			})
 		}).PopoverMenuButton(func(m *ui.Menu) {
@@ -513,7 +503,7 @@ func (a *App) footer(c *ui.Context) {
 				a.openSettings()
 			}
 		}, a.menuOptions(nil))
-		if a.iconButton(c, "settings", "settings", locales.Settings()).Clicked() {
+		if a.iconButton(c, "settings", "settings", locales.Settings()).Radius(14).Clicked() {
 			a.openSettings()
 		}
 	})

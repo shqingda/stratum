@@ -64,11 +64,25 @@ func TestAdd(t *testing.T) {
 	}
 }
 EOF
+	mkdir -p docs internal/ops
+	cat >docs/notes.md <<'EOF'
+# Calc Notes
+
+Sample nested documentation for demo directory tree.
+EOF
+	cat >internal/ops/sub.go <<'EOF'
+package ops
+
+// Sub returns a - b.
+func Sub(a, b int) int {
+	return a - b
+}
+EOF
 	git add -A && git -c user.name=demo -c user.email=demo@example.test commit -qm "calc"
 fi
 for name in site notes; do
 	if repo $name; then
-		cp "$root/calc/go.mod" "$root/calc/add.go" "$root/calc/add_test.go" .
+		cp -R "$root/calc/go.mod" "$root/calc/add.go" "$root/calc/add_test.go" "$root/calc/docs" "$root/calc/internal" .
 		git add -A && git -c user.name=demo -c user.email=demo@example.test commit -qm "$name"
 	fi
 done

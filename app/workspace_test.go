@@ -13,6 +13,7 @@ func TestOpenAndCommit(t *testing.T) {
 	a := working()
 	a.C.Busy, a.C.Approvals = false, nil
 	a.C.Workspace.Branch = "main"
+	a.hasApp = func(name string) bool { return name == "Visual Studio Code" || name == "Terminal" }
 	var opened []string
 	a.openIn = func(app, dir string) error {
 		opened = append(opened, app, dir)
@@ -55,6 +56,40 @@ func TestOpenAndCommit(t *testing.T) {
 	tt.Frame()
 	if !a.C.Workspace.Committing || a.commitMsg != "" {
 		t.Fatalf("%+v %q", a.C.Workspace, a.commitMsg)
+	}
+}
+
+func TestWorkspaceCapsuleInstalledOpenersAndNoDetail(t *testing.T) {
+	a := working()
+	a.C.Busy, a.C.Approvals = false, nil
+	a.C.Workspace.Branch = "main"
+	a.C.Workspace.Branches = []string{"main", "feat"}
+	// Only Terminal and Cursor are installed; VS Code is NOT installed.
+	a.hasApp = func(name string) bool { return name == "Terminal" || name == "Cursor" }
+	tt := ui.NewTester(a.View, 1200, 800)
+	tt.Frame()
+	if err := tt.Click("calc · main"); err != nil {
+		t.Fatal(err)
+	}
+	menu := tt.Menu()
+	has := func(sub string) bool {
+		for _, m := range menu {
+			if m == sub {
+				return true
+			}
+		}
+		return false
+	}
+	if !has("用 Cursor 打开") || !has("用 终端 打开") || !has("用 访达 打开") {
+		t.Fatalf("expected Cursor, Terminal, Finder in menu, got %v", menu)
+	}
+	if has("用 VS Code 打开") {
+		t.Fatalf("uninstalled VS Code should not be in menu: %v", menu)
+	}
+	for _, m := range menu {
+		if m == "详情：纯文本" || m == "详情：含思考" || m == "详情：全部" {
+			t.Fatalf("Detail item should not be in workspace capsule menu: %v", menu)
+		}
 	}
 }
 

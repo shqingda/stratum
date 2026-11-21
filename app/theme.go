@@ -190,6 +190,16 @@ func glassButton(p *Palette) glass.Glass {
 	return glass.Glass{Tint: tint, Interactive: true}
 }
 
+// composerGlass returns a thick frosted Liquid Glass material for the floating
+// composer card so scrolling transcript softly blooms behind it while text stays crisp.
+func composerGlass(p *Palette) glass.Glass {
+	tint := ui.RGBA(255, 255, 255, .74)
+	if p == dark {
+		tint = ui.RGBA(28, 28, 31, .76)
+	}
+	return glass.Glass{Tint: tint}
+}
+
 func specular(p *Palette) ui.Color {
 	if p == dark {
 		return ui.RGBA(255, 255, 255, .13)

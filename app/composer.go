@@ -1,7 +1,6 @@
 package app
 
 import (
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -56,7 +55,7 @@ func (a *App) dock(c *ui.Context) {
 			Transition(ui.ElementTransition{Size: true, Duration: 180 * time.Millisecond}).Children(func() { a.queue(c) })
 	}
 	a.box(c)
-	a.metaBar(c)
+	a.liveStatus(c)
 	if a.err != "" {
 		// An action's error stays until dismissed or the next action, with
 		// its mark, as an inline error in a Mac form does.
@@ -119,10 +118,13 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	box := ui.Column(c).Radius(14).Background(p.Card).Border(.5, p.Edge2).Padding(7, 10, 7, 10).
+	box := ui.Column(c).Radius(20).Border(.5, p.Edge2).Padding(12, 12, 6, 12).
 		Transition(ui.ElementTransition{Colors: true, Shadows: true, Duration: 160 * time.Millisecond})
-	if !a.helloShown() {
+	a.glass(box, composerGlass(p))
+	if a.helloShown() {
 		raise(box, p)
+	} else {
+		lift(box, p)
 	}
 	rim(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {
@@ -131,9 +133,9 @@ func (a *App) box(c *ui.Context) {
 	dragOver := box.FileDragOver()
 	switch {
 	case dragOver:
-		box.Border(1.5, p.Live).Background(p.Card.Mix(p.Live, .05))
+		box.Border(1.5, p.Live).Background(p.Card.Mix(p.Live, .06))
 	case box.FocusWithin():
-		box.Border(.75, p.Live.Alpha(.38))
+		box.Border(.5, p.Live.Alpha(.45)).Shadow(0, 0, 0, 2.5, p.Live.Alpha(.14))
 	}
 	svc := c.Services()
 	box.Children(func() {
@@ -148,40 +150,49 @@ func (a *App) box(c *ui.Context) {
 		if a.recall != "" {
 			a.draft, a.recall, a.toEnd = a.recall, "", true
 		}
-		ui.Row(c).Gap(8).AlignItems(ui.End).Children(func() {
+		area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
+		if a.toEnd {
+			// A draft put in whole is written on from its end.
+			n := len([]rune(a.draft))
+			area.SetTextSelection(n, n)
+			a.toEnd = false
+		}
+		if pl := a.mention.place; pl > 0 {
+			area.SetTextSelection(pl-1, pl-1)
+			a.mention.place = 0
+		}
+		if _, caret := area.TextSelection(); caret != a.mention.caret {
+			// The @ word is found before the composer is built.
+			a.mention.caret = caret
+			c.Invalidate()
+		}
+		area.Lines(1, 10).Grow(1).MinWidth(0).Padding(2, 2, 8, 2).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
+			FontSize(14).LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
+		if _, ok := a.command(); ok {
+			// A draft that starts with ! runs in the terminal.
+			ui.Row(c).Height(26).Gap(5).AlignItems(ui.Center).Padding(0, 2).Shrink(0).Children(func() {
+				sym(c, "terminal-2", 14, p.Live)
+				ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
+			})
+		}
+		if a.noImages() {
+			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(0, 0, 4, 2)
+		}
+		cur := a.C.Current
+		ui.Row(c).Height(28).Gap(4).Padding(2, 0, 0, 0).AlignItems(ui.Center).Children(func() {
 			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
 				a.choose()
 			}
-			area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
-			if a.toEnd {
-				// A draft put in whole is written on from its end.
-				n := len([]rune(a.draft))
-				area.SetTextSelection(n, n)
-				a.toEnd = false
+			if cur != nil {
+				a.modelPill(c, cur.Model)
 			}
-			if pl := a.mention.place; pl > 0 {
-				area.SetTextSelection(pl-1, pl-1)
-				a.mention.place = 0
-			}
-			if _, caret := area.TextSelection(); caret != a.mention.caret {
-				// The @ word is found before the composer is built.
-				a.mention.caret = caret
-				c.Invalidate()
-			}
-			area.Lines(1, 10).Grow(1).MinWidth(0).Padding(5, 0, 5, 0).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
-				LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
-			if _, ok := a.command(); ok {
-				// A draft that starts with ! runs in the terminal.
-				ui.Row(c).Height(30).Gap(5).AlignItems(ui.Center).Margin(0, 4, 0, 0).Shrink(0).Children(func() {
-					sym(c, "terminal-2", 14, p.Live)
-					ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
-				})
+			ui.Spacer(c)
+			if cur != nil {
+				a.modePill(c, modeName(cur.Mode))
+				a.contextRing(c)
 			}
 			a.goButton(c)
 		})
-		if a.noImages() {
-			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(6, 0, 0, 6)
-		}
 	})
 }
 
@@ -198,9 +209,9 @@ func (a *App) composerPlaceholder() string {
 	}
 }
 
-// ready is a draft or attachments to send.
+// ready is a draft, attachments, or session mentions to send.
 func (a *App) ready() bool {
-	return strings.TrimSpace(a.draft) != "" || len(a.attached) > 0
+	return strings.TrimSpace(a.draft) != "" || len(a.attached) > 0 || len(a.mentionSessions) > 0
 }
 
 func (a *App) submit() {
@@ -235,7 +246,7 @@ func (a *App) send1(send func(string, ...llm.Image) ([]proto.Command, error)) {
 	cmds, err := send(text, images...)
 	a.do(cmds, err)
 	if err == nil {
-		a.draft, a.attached = "", nil
+		a.draft, a.attached, a.mentionSessions = "", nil, nil
 	}
 }
 
@@ -294,7 +305,7 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 // goButton sends, or stops the running turn.
 func (a *App) goButton(c *ui.Context) {
 	p := a.p
-	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4).
+	b := ui.ButtonBase(c.Key("go")).Size(28, 28).Radius(14).Center().Margin(0, 0, 0, 2).
 		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond}).KeepFocus()
 	press(b)
 	focusRing(b, p)
@@ -333,50 +344,20 @@ func (a *App) goButton(c *ui.Context) {
 	}
 }
 
-// metaBar sits directly under the composer pill: folder/status on the left,
-// unified model+effort, permission mode, and context ring on the right.
-func (a *App) metaBar(c *ui.Context) {
-	cur := a.C.Current
-	ui.Row(c).Margin(7, 6, 0, 6).Gap(4).AlignItems(ui.Center).Children(func() {
-		if cur != nil && a.helloShown() {
-			a.folderPill(c, cur)
-		} else {
-			a.status(c)
-		}
-		ui.Spacer(c)
-		if cur != nil {
-			a.modelPill(c, cur.Model)
-			a.modePill(c, modeName(cur.Mode))
-			a.contextRing(c)
-		}
-	})
-}
-
-func (a *App) status(c *ui.Context) {
+// liveStatus sits under the composer card only when connecting or a turn is running.
+func (a *App) liveStatus(c *ui.Context) {
+	showPhase := a.C.Phase != client.Ready
+	showRun := a.C.Busy && len(a.C.Approvals) == 0 && len(a.C.Turns) > 0 && !a.C.Turns[len(a.C.Turns)-1].Done && !a.C.Turns[len(a.C.Turns)-1].Start.IsZero()
+	if !showPhase && !showRun {
+		return
+	}
 	p := a.p
-	ui.Row(c).Height(28).Gap(10).Padding(0, 6).AlignItems(ui.Center).Children(func() {
-		item := func(symbol, label string) {
+	ui.Row(c).Margin(6, 8, 0, 8).Height(20).Gap(8).AlignItems(ui.Center).Children(func() {
+		if showPhase {
 			ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-				sym(c, symbol, 14, p.Fg2)
-				ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
+				sym(c, "refresh", 13, p.Fg2)
+				ui.Text(c, phaseText(a.C.Phase)).FontSize(12.5).TextColor(p.Fg2).SingleLine()
 			})
-		}
-		if cur := a.C.Current; cur != nil {
-			dir := cur.Cwd
-			if cur.Repo != "" {
-				dir = cur.Repo
-			}
-			name := filepath.Base(dir)
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				folderDot(c, p, name)
-				ui.Text(c, name).FontSize(13).TextColor(p.Fg2).SingleLine()
-			})
-			if cur.Worktree {
-				item("git-branch", locales.Worktree())
-			}
-		}
-		if a.C.Phase != client.Ready {
-			item("refresh", phaseText(a.C.Phase))
 		}
 		a.runningFor(c)
 	})

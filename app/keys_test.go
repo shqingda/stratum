@@ -40,9 +40,9 @@ func TestTask8NewAndSearchShortcuts(t *testing.T) {
 
 func TestTask8SessionShortcuts(t *testing.T) {
 	keys := []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9}
-	// The waiting current session comes first, then folders in first-seen
-	// order; the source list deliberately interleaves those folders.
-	want := []string{"6", "1", "3", "5", "7", "9", "2", "4", "8"}
+	// Folders appear in first-seen order ("a" then "b"); waiting sessions stay
+	// in their project group without a separate "Needs you" section.
+	want := []string{"1", "3", "5", "7", "9", "2", "4", "6", "8"}
 	for i, key := range keys {
 		t.Run(fmt.Sprint(i+1), func(t *testing.T) {
 			a := task8App()
@@ -51,11 +51,11 @@ func TestTask8SessionShortcuts(t *testing.T) {
 				folder := []string{"a", "b"}[j%2]
 				a.C.Sessions = append(a.C.Sessions, proto.Session{ID: fmt.Sprint(j + 1), Title: "会话" + fmt.Sprint(j+1), Cwd: "/work/" + folder})
 			}
-			a.C.Current = &a.C.Sessions[5]
+			a.C.Current = &a.C.Sessions[5] // ID "6", at index 7 in sidebar order
 			a.C.Approvals = []proto.Approval{{ID: "oldest", Tool: "shell"}}
 			tt := task8Tester(a, false)
 			tt.Key(ui.Cmd, key)
-			if i == 0 {
+			if i == 7 {
 				task8NoCommand(t, a)
 				return
 			}
@@ -150,13 +150,13 @@ func TestTask8SearchAndMenuKeepTheirKeys(t *testing.T) {
 	tt.Key(ui.Cmd, ui.KeyEnter)
 	tt.Key(0, ui.KeyEscape) // closes the palette, not the running turn
 	task8NoCommand(t, a)
-	task8Click(t, tt, "询问")
+	task8Click(t, tt, "手动")
 	tt.Key(0, ui.KeyEscape)
 	if len(tt.Menu()) != 0 {
 		t.Fatal("Escape did not close the mode menu")
 	}
 	task8NoCommand(t, a)
-	task8Click(t, tt, "询问")
+	task8Click(t, tt, "手动")
 	tt.Key(0, ui.KeyDown)
 	tt.Key(0, ui.KeyEnter)
 	task8Command(t, a, proto.MethodSessionUpdate, nil)
@@ -186,7 +186,7 @@ func TestTask8ApprovalHints(t *testing.T) {
 		tt := task8Tester(a, dark)
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
 		texts := strings.Join(tt.Texts(), "|")
-		if strings.Count(texts, "|⌘⏎|") != 1 || strings.Count(texts, "|⌥⌘⏎|") != 1 || strings.Count(texts, "esc") != 1 {
+		if strings.Count(texts, "|⌘⏎|") != 1 || strings.Count(texts, "esc") != 1 {
 			t.Fatalf("only oldest should show shortcut hints: %q", texts)
 		}
 		snapshot(t, tt, "t8-approval-keys-"+appearance)
@@ -471,6 +471,7 @@ func TestPaletteActions(t *testing.T) {
 		t.Fatalf("flag %+v", f)
 	}
 	tt.Key(ui.Cmd, ui.KeyK)
+	a.hasApp = func(name string) bool { return name == "Visual Studio Code" }
 	tt.Frame()
 	for _, want := range []string{"切换模型…", "打开终端面板", "用 VS Code 打开", "改名", "归档", "外观：深色"} {
 		if !tt.HasText(want) {
@@ -558,8 +559,14 @@ func TestMentionSession(t *testing.T) {
 	tt.Key(0, ui.KeyEnter)
 	task8NoCommand(t, a)
 	tt.Frame()
-	if a.draft != "@session:2 " {
-		t.Fatalf("draft %q", a.draft)
+	if a.draft != "" {
+		t.Fatalf("draft %q, want empty when session chip is stored", a.draft)
+	}
+	if len(a.mentionSessions) != 1 || a.mentionSessions[0] != "2" {
+		t.Fatalf("mentionSessions = %v, want [2]", a.mentionSessions)
+	}
+	if got, _ := a.prompt(); got != "@session:2" {
+		t.Fatalf("prompt = %q, want @session:2", got)
 	}
 }
 

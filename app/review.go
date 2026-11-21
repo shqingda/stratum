@@ -55,6 +55,21 @@ type review struct {
 	writing     string
 	remarkDraft string
 	remarkInput ui.Handle
+
+	// tree & in-pane file preview (Files tab)
+	maximized      bool
+	treeHidden     bool
+	treeCwd        string
+	treeOpen       map[string]bool
+	treeCache      map[string][]dirItem
+	treeList       ui.ListState
+	previewPath    string
+	previewRaw     bool
+	previewLines   []string
+	previewTok     [][]editor.Token
+	previewErr     string
+	previewLoading bool
+	previewList    ui.ListState
 }
 
 // fileDiff is a file's change cut into hunks, computed once.
@@ -286,7 +301,15 @@ func (a *App) reviewToggle(c *ui.Context) {
 func (a *App) reviewPanel(c *ui.Context) {
 	p := a.p
 	turns := a.shownTurns()
-	panel := ui.Column(c).Width(a.reviewWidth()).Shrink(0).Background(p.Sheet).Clip().BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+	panel := ui.Column(c).Background(p.Sheet).Clip()
+	if a.rv.maximized {
+		panel.Grow(1).MinWidth(0)
+		if a.sideOpen > 0.001 && !c.Vibrancy() {
+			panel.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+		}
+	} else {
+		panel.Width(a.reviewWidth()).Shrink(0).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+	}
 	panel.Children(func() {
 		a.reviewTabs(c, fileCount(turns))
 		switch a.rv.tab {
@@ -684,8 +707,12 @@ func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
 			}
 		})
 		if name.Clicked() {
-			if err := a.openIn("Visual Studio Code", f.Path); err != nil {
-				a.err = locales.CouldntOpen("VS Code", err.Error())
+			edLabel, edApp := a.preferredEditor()
+			if err := a.openIn(edApp, f.Path); err != nil {
+				if edLabel == "" {
+					edLabel = filepath.Base(f.Path)
+				}
+				a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
 			}
 		}
 		ui.Spacer(c)
@@ -703,8 +730,12 @@ func (a *App) fileContextMenu(c *ui.Context, m *ui.Menu, path string, gone bool)
 		openItem.Disabled(true)
 	}
 	if openItem.Chosen() && !gone {
-		if err := a.openIn("Visual Studio Code", path); err != nil {
-			a.err = locales.CouldntOpen("VS Code", err.Error())
+		edLabel, edApp := a.preferredEditor()
+		if err := a.openIn(edApp, path); err != nil {
+			if edLabel == "" {
+				edLabel = filepath.Base(path)
+			}
+			a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
 		}
 	}
 	if m.Item(locales.RevealInFinder()).Chosen() {
@@ -866,7 +897,7 @@ func (a *App) codeSpans(c *ui.Context, text string, toks []editor.Token) []ui.Sp
 	if len(toks) == 0 {
 		return []ui.Span{span(text, editor.TokenStyle{})}
 	}
-	styles := mdTheme(p, c.Theme()).CodeColors.Tokens
+	styles := editor.DefaultTheme(c.Theme()).Tokens
 	var out []ui.Span
 	at := 0
 	for _, t := range toks {

@@ -115,9 +115,9 @@
   "worktree": "Worktree",
   "worktreeSub": "在独立分支和目录中运行，互不干扰",
   "sandboxOn": "沙箱开启",
-  "modeAsk": "询问",
+  "modeAsk": "手动",
   "modeAuto": "自动",
-  "modeFull": "完全",
+  "modeFull": "完全访问",
   "modeAskShort": "写文件和运行命令前问你",
   "modeAutoShort": "沙箱内自动允许",
   "modeFullShort": "不再询问，慎用",
@@ -228,7 +228,7 @@
   "settingsGeneralWords": "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台",
   "settingsAccountsWords": "登录 退出 订阅 密钥",
   "settingsModelsWords": "默认模型 推理强度 后台任务 子任务 标题 摘要 额度 切换账号",
-  "settingsPermissionsWords": "询问 自动 完全访问 沙盒",
+  "settingsPermissionsWords": "手动 自动 完全访问 沙盒",
   "settingsShortcutsWords": "按键 键盘 快捷键",
   "settingsMcpWords": "服务器 mcp.json 技能",
   "closeSettings": "关闭设置",
@@ -807,5 +807,11 @@
   "closeSheetOrWindow": "关闭浮层或窗口",
   "copyCommand": "复制命令",
   "copyOutput": "复制输出",
-  "reconnect": "重新连接"
+  "reconnect": "重新连接",
+  "maximizePane": "最大化面板",
+  "restorePane": "还原面板",
+  "toggleWorkspaceTree": "显示/隐藏目录树",
+  "selectFileToPreview": "选择文件以预览代码",
+  "branch": "分支",
+  "raw": "源码"
 }

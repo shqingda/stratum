@@ -132,7 +132,7 @@ func TestApprovalRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	task8Command(t, a, proto.MethodApprovalRespond, &ans)
-	if !ans.Allow || !ans.Forever {
+	if !ans.Allow || !ans.Always {
 		t.Fatalf("answer %+v", ans)
 	}
 

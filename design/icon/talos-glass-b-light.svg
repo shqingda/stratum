@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="bgGrad" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+    <stop offset="0" stop-color="#EEF1F6"/>
+    <stop offset="1" stop-color="#D4DBE6"/>
+  </linearGradient>
+  <radialGradient id="bgGlow" cx="0.62" cy="0.46" r="0.58">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.26"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="bronzeGrad" x1="0.2" y1="0.1" x2="0.85" y2="0.95">
+    <stop offset="0" stop-color="#E8BD8A"/>
+    <stop offset="0.52" stop-color="#B57846"/>
+    <stop offset="1" stop-color="#6B4124"/>
+  </linearGradient>
+  <linearGradient id="crestGrad" x1="0" y1="0" x2="0.8" y2="1">
+    <stop offset="0" stop-color="#5B93E8"/>
+    <stop offset="1" stop-color="#3568C4"/>
+  </linearGradient>
+  <linearGradient id="ichorGrad" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#E8F3FF"/>
+    <stop offset="0.5" stop-color="#4E8DF0"/>
+    <stop offset="1" stop-color="#24549E"/>
+  </linearGradient>
+  <linearGradient id="glassSheen" x1="0.1" y1="0" x2="0.65" y2="0.85">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.50"/>
+    <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.05"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="rimStroke" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+    <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.10"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.28"/>
+  </linearGradient>
+  <filter id="softShadow" x="-15%" y="-15%" width="130%" height="130%">
+    <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#060912" flood-opacity="0.34"/>
+  </filter>
+  <clipPath id="squircle">
+    <rect x="88" y="88" width="848" height="848" rx="196"/>
+  </clipPath>
+</defs>
+
+<!-- Layer 1: Background Glass Tile -->
+<rect x="88" y="88" width="848" height="848" rx="196" fill="url(#bgGrad)"/>
+<g clip-path="url(#squircle)">
+  <rect x="88" y="88" width="848" height="848" fill="url(#bgGlow)"/>
+
+  <!-- Layer 2: Sculpted Talos Subject (no cartoon outlines) -->
+  <g filter="url(#softShadow)">
+    <!-- Swept-back crest blades -->
+    <path d="M672.8 353.0 L652.8 331.1 L621.2 220.9 L643.7 230.9 Z" fill="url(#crestGrad)" opacity="0.96"/>
+  <path d="M644.5 323.7 L620.3 306.5 L568.8 186.2 L594.7 191.6 Z" fill="url(#crestGrad)" opacity="0.84"/>
+  <path d="M610.5 301.1 L583.2 289.6 L505.6 159.1 L534.3 158.7 Z" fill="url(#crestGrad)" opacity="0.96"/>
+  <path d="M572.6 286.4 L543.4 281.0 L432.8 146.7 L462.9 139.7 Z" fill="url(#crestGrad)" opacity="0.84"/>
+  <path d="M532.3 280.2 L502.6 281.2 L355.3 154.8 L385.1 140.5 Z" fill="url(#crestGrad)" opacity="0.96"/>
+  <path d="M491.6 282.8 L462.9 290.2 L281.0 185.9 L308.1 164.6 Z" fill="url(#crestGrad)" opacity="0.84"/>
+  <path d="M452.5 294.1 L426.0 307.6 L218.2 239.1 L240.7 211.8 Z" fill="url(#crestGrad)" opacity="0.96"/>
+  <path d="M416.7 313.6 L393.7 332.4 L178.9 311.7 L194.9 280.4 Z" fill="url(#crestGrad)" opacity="0.84"/>
+  <path d="M385.9 340.4 L367.6 363.7 L170.2 393.3 L178.6 360.9 Z" fill="url(#crestGrad)" opacity="0.96"/>
+    <!-- Torso -->
+    <path d="M144 924 C166 826 244 766 354 748 C426 738 598 738 664 748 C774 768 852 832 880 924 Z" fill="url(#bronzeGrad)"/>
+    <!-- Neck -->
+    <path d="M422 688 C422 728 452 752 518 752 C584 752 618 728 618 688 L606 632 C576 644 468 644 434 632 Z" fill="url(#bronzeGrad)"/>
+    <!-- Glowing blue ichor glass vein -->
+    <path d="M492 648 C482 684 480 718 486 752 L506 752 C500 718 502 684 512 648 Z" fill="url(#ichorGrad)"/>
+    <!-- Helmet main sculpted form -->
+    <path d="M524 286 C628 282 700 344 708 430 L714 594 L708 704 C686 708 656 700 634 686 C604 666 584 644 568 642 C542 642 520 666 468 694 C436 710 396 716 362 708 C346 642 336 560 340 478 C346 366 418 290 524 286 Z" fill="url(#bronzeGrad)"/>
+    <!-- Subtle volumetric shadow on rear cheek -->
+    <path d="M524 286 C418 290 346 366 340 478 C336 560 346 642 362 708 C396 716 426 708 456 694 C416 620 404 520 412 430 C420 356 462 308 524 286 Z" fill="#4E2E18" opacity="0.28"/>
+    <!-- Visor & eye slit -->
+    <path d="M592 454 C610 442 666 440 722 448 L722 504 L702 506 L702 652 C695 662 675 662 668 652 L666 506 C640 508 606 506 594 496 C582 488 582 464 592 454 Z" fill="#141926" opacity="0.90"/>
+    <ellipse cx="644" cy="482" rx="16" ry="11" fill="url(#ichorGrad)"/>
+  </g>
+
+  <!-- Layer 3: Liquid Glass Specular Highlights -->
+  <path d="M120 280 C240 130 540 100 840 150 L840 96 C540 84 220 96 100 220 Z" fill="url(#glassSheen)"/>
+  <ellipse cx="420" cy="230" rx="280" ry="120" fill="url(#glassSheen)" transform="rotate(-14 420 230)"/>
+  <path d="M510 302 C595 300 658 345 674 415" fill="none" stroke="#FFFFFF" stroke-opacity="0.38" stroke-width="10" stroke-linecap="round"/>
+</g>
+<rect x="89.5" y="89.5" width="845" height="845" rx="194.5" fill="none" stroke="url(#rimStroke)" stroke-width="3"/>
+</svg>

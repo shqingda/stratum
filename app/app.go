@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
@@ -95,6 +96,7 @@ type App struct {
 	seen                map[string]time.Time // when approvals first showed
 	openIn              func(app, dir string) error
 	openURL             func(url string) error
+	hasApp              func(appName string) bool
 	// version is the app's, as packaged; checkUpdates asks the updater,
 	// nil where there is none.
 	version      string
@@ -131,7 +133,8 @@ type App struct {
 	locale                                    Locale
 	theme                                     string // the appearance last applied
 
-	attached []attachment
+	attached        []attachment
+	mentionSessions []string
 	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
 	pick     func() []string           // the open panel
 	pickDir  func() string             // the open panel, for a folder
@@ -165,6 +168,20 @@ func (a *App) restoreFocus(c *ui.Context) {
 // openInBackground opens dir in app off the UI thread, as LaunchServices
 // can take a while to answer: a click never holds the window up. A failure
 // shows as the action's error once it comes.
+func shortOpenErr(err error) string {
+	s := strings.TrimSpace(err.Error())
+	if i := strings.Index(s, " (Error Domain="); i > 0 {
+		s = s[:i]
+	}
+	if i := strings.IndexByte(s, '\n'); i > 0 {
+		s = s[:i]
+	}
+	if len(s) > 80 {
+		s = s[:80] + "…"
+	}
+	return s
+}
+
 func (a *App) openInBackground(app, dir string) error {
 	go func() {
 		err := openIn(app, dir)
@@ -175,7 +192,7 @@ func (a *App) openInBackground(app, dir string) error {
 		if name == "" {
 			name = filepath.Base(dir)
 		}
-		a.update(func() { a.err = locales.CouldntOpen(name, err.Error()) })
+		a.update(func() { a.flash("alert-circle", locales.CouldntOpen(name, shortOpenErr(err))) })
 	}()
 	return nil
 }
@@ -407,6 +424,12 @@ func (a *App) helloShown() bool {
 // parts it from the sidebar, and another from the review panel beside it.
 func (a *App) main(c *ui.Context) {
 	p := a.p
+	if a.rv.open && a.rv.maximized {
+		ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Stretch).Clip().Children(func() {
+			a.reviewPanel(c)
+		})
+		return
+	}
 	sheet := ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
 	if a.sideOpen > 0.001 && !c.Vibrancy() {
 		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)

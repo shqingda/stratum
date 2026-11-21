@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -29,8 +30,18 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			break
 		}
 	}
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
-		track := ui.Row(c.Key("rv-tabs")).Grow(1).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center)
+	leftPad := float32(12)
+	if a.rv.maximized {
+		shut := toggleLeft(c) + 74 + 12
+		leftPad = 12*a.sideOpen + shut*(1-a.sideOpen)
+	}
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12, 0, leftPad).Gap(6).AlignItems(ui.Center).DragWindow().Children(func() {
+		track := ui.Row(c.Key("rv-tabs")).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center)
+		if a.rv.maximized {
+			track.Width(400).Shrink(1)
+		} else {
+			track.Grow(1).MinWidth(0)
+		}
 		trackW := track.Bounds().W
 		pos := track.Spring("tab-pos", float32(activeIdx), springDefault) // critically damped: a tap carries no momentum
 		track.Children(func() {
@@ -79,6 +90,16 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 				}
 			}
 		})
+		if a.rv.maximized {
+			ui.Spacer(c)
+		}
+		tip := locales.MaximizePane()
+		if a.rv.maximized {
+			tip = locales.RestorePane()
+		}
+		if a.iconButton(c, "rv-maximize", "arrows-exchange", tip).Clicked() {
+			a.rv.maximized = !a.rv.maximized
+		}
 	})
 }
 
@@ -196,7 +217,9 @@ func (a *App) planPane(c *ui.Context) {
 	})
 }
 
-// filesPane lists matching workspace files and opens one in the default editor.
+// filesPane shows a collapsible workspace directory tree with in-pane file preview,
+// and falls back to fuzzy search when a query is entered. When wide or maximized,
+// it shows the code preview and workspace tree side-by-side.
 func (a *App) filesPane(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
@@ -204,56 +227,111 @@ func (a *App) filesPane(c *ui.Context) {
 		a.reviewNote(c, locales.NoOpenSession())
 		return
 	}
-	q := strings.TrimSpace(a.rv.fileQuery)
-	if key := cur.Cwd + "\x00" + q; a.filesKey != key && a.C.Phase == client.Ready {
-		if cmds := a.C.FindFiles(q); cmds != nil {
-			a.filesKey = key
-			a.quiet(cmds, nil)
-		}
-	}
-	ui.Column(c).Padding(10, 12, 6, 12).Children(func() {
-		ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
-	})
-	if len(a.C.Files) == 0 {
-		a.reviewNote(c, locales.NoFilesFound())
+	w, _ := c.Size()
+	split := (a.rv.maximized || a.reviewWidth() >= 560) && w >= 640
+	if !split && a.rv.previewPath != "" {
+		a.filePreviewView(c, cur.Cwd, false)
 		return
 	}
-	ui.Scroll(c).Grow(1).Padding(4, 8, 12, 8).Children(func() {
-		for _, f := range a.C.Files {
-			isDir := strings.HasSuffix(f, "/")
-			icon := "file-text"
-			if isDir {
-				icon = "folder"
+	renderTree := func() {
+		q := strings.TrimSpace(a.rv.fileQuery)
+		ui.Column(c).Padding(10, 12, 6, 12).Children(func() {
+			ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
+		})
+		if q == "" {
+			if nodes := a.buildTreeNodes(cur.Cwd); len(nodes) > 0 {
+				a.fileTreeListNodes(c, cur.Cwd, nodes)
+				return
 			}
-			row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
-			press(row)
-			focusRing(row, p)
-			if row.Hovered() {
-				row.Background(p.Hover)
+		}
+		if key := cur.Cwd + "\x00" + q; a.filesKey != key && a.C.Phase == client.Ready {
+			if cmds := a.C.FindFiles(q); cmds != nil {
+				a.filesKey = key
+				a.quiet(cmds, nil)
 			}
-			file := f
-			row.ContextMenu(func(m *ui.Menu) {
-				if !isDir && a.openIn != nil {
-					if m.Item(locales.Open()).Chosen() {
-						if err := a.openIn("", filepath.Join(cur.Cwd, file)); err != nil {
-							a.err = locales.CouldntOpen(file, err.Error())
+		}
+		if len(a.C.Files) == 0 {
+			a.reviewNote(c, locales.NoFilesFound())
+			return
+		}
+		ui.Scroll(c).Grow(1).Padding(4, 8, 12, 8).Children(func() {
+			for _, f := range a.C.Files {
+				isDir := strings.HasSuffix(f, "/")
+				icon := "file-text"
+				if isDir {
+					icon = "folder"
+				}
+				row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
+				press(row)
+				focusRing(row, p)
+				if row.Hovered() {
+					row.Background(p.Hover)
+				}
+				file := f
+				row.ContextMenu(func(m *ui.Menu) {
+					if !isDir && m.Item(locales.Preview()).Chosen() {
+						a.openFilePreview(cur.Cwd, file)
+					}
+					if !isDir && a.openIn != nil {
+						if m.Item(locales.OpenInEditor()).Chosen() {
+							edLabel, edApp := a.preferredEditor()
+							if err := a.openIn(edApp, filepath.Join(cur.Cwd, file)); err != nil {
+								if edLabel == "" {
+									edLabel = file
+								}
+								a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+							}
+						}
+					}
+					if m.Item(locales.CopyPath()).Chosen() {
+						c.WriteClipboard(file)
+						a.flash("check", locales.CopyPath())
+					}
+				})
+				row.Children(func() {
+					sym(c, icon, 14, p.Mute)
+					ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
+				})
+				if row.Clicked() && !isDir {
+					abs := filepath.Join(cur.Cwd, f)
+					if _, err := os.Stat(abs); err == nil {
+						a.openFilePreview(cur.Cwd, f)
+					} else if a.openIn != nil {
+						edLabel, edApp := a.preferredEditor()
+						if err := a.openIn(edApp, abs); err != nil {
+							if edLabel == "" {
+								edLabel = f
+							}
+							a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
 						}
 					}
 				}
-				if m.Item(locales.CopyPath()).Chosen() {
-					c.WriteClipboard(file)
-					a.flash("check", locales.CopyPath())
-				}
-			})
-			row.Children(func() {
-				sym(c, icon, 14, p.Mute)
-				ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
-			})
-			if row.Clicked() && !isDir && a.openIn != nil {
-				if err := a.openIn("", filepath.Join(cur.Cwd, f)); err != nil {
-					a.err = locales.CouldntOpen(f, err.Error())
-				}
 			}
+		})
+	}
+	if !split {
+		renderTree()
+		return
+	}
+	ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+			if a.rv.previewPath != "" {
+				a.filePreviewView(c, cur.Cwd, true)
+			} else {
+				ui.Row(c).Height(34).Shrink(0).Padding(0, 8).AlignItems(ui.Center).
+					BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+					ui.Spacer(c)
+					if a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(24, 24).Clicked() {
+						a.rv.treeHidden = !a.rv.treeHidden
+					}
+				})
+				emptyState(c, p, "file-text", locales.SelectFileToPreview(), "", nil)
+			}
+		})
+		if !a.rv.treeHidden {
+			ui.Column(c).Width(240).Shrink(0).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge).Children(func() {
+				renderTree()
+			})
 		}
 	})
 }

@@ -139,7 +139,7 @@ func TestTask8Menus(t *testing.T) {
 			if update.Effort == nil || *update.Effort != "xhigh" {
 				t.Fatalf("effort update = %+v", update)
 			}
-			task8Click(t, tt, "询问")
+			task8Click(t, tt, "手动")
 			for _, text := range []string{"写文件和运行命令前问你", "沙箱内自动允许", "不再询问，慎用"} {
 				if !tt.HasText(text) {
 					t.Errorf("missing mode explanation %q", text)
@@ -179,9 +179,9 @@ func TestTask8AllMenuValues(t *testing.T) {
 		{"gpt-6-luna", []string{"推理强度", "中"}, "effort", "medium"},
 		{"gpt-6-luna", []string{"推理强度", "高"}, "effort", "high"},
 		{"gpt-6-luna", []string{"推理强度", "极高"}, "effort", "xhigh"},
-		{"询问", []string{"询问"}, "mode", "ask"},
-		{"询问", []string{"自动"}, "mode", "auto"},
-		{"询问", []string{"完全"}, "mode", "full"},
+		{"手动", []string{"手动"}, "mode", "ask"},
+		{"手动", []string{"自动"}, "mode", "auto"},
+		{"手动", []string{"完全访问"}, "mode", "full"},
 	} {
 		t.Run(tc.field+"/"+tc.path[len(tc.path)-1], func(t *testing.T) {
 			a := task8App()

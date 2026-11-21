@@ -48,7 +48,7 @@ func (a *App) receive(f proto.Frame) {
 
 func (a *App) menuOptions(open *bool) ui.PopoverMenuButtonOptions {
 	return ui.PopoverMenuButtonOptions{Open: open, Panel: func(panel ui.Element) {
-		panel.Background(a.p.Card).Border(.5, a.p.Edge2).Radius(12).NoShadow()
+		panel.Background(a.p.Card).Border(.5, a.p.Edge2).Radius(12).FontSize(13).NoShadow()
 		lift(panel, a.p)
 		rim(panel, a.p)
 	}}
@@ -70,14 +70,15 @@ func (a *App) modelPill(c *ui.Context, label string) {
 	}
 	p := a.p
 	effort := effortLabel(a.C.Current.Effort)
-	b := ui.ButtonBase(c.Key("pill:model")).Row().Height(28).Padding(0, 9).Gap(6).Radius(14).AlignItems(ui.Center).
+	b := ui.ButtonBase(c.Key("pill:model")).Row().Height(28).Padding(0, 9).Gap(5).Radius(14).AlignItems(ui.Center).
 		Label(label).Disabled(!a.C.CanAct())
 	press(b)
+	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}
 	b.Children(func() {
-		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
+		ui.Text(c, label).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine()
 		ui.Text(c, effort).FontSize(13).TextColor(p.Mute).SingleLine()
 	})
 	b.PopoverMenuButton(func(m *ui.Menu) {
@@ -187,7 +188,22 @@ func (a *App) effortPill(c *ui.Context, label string) {
 }
 
 func (a *App) modePill(c *ui.Context, label string) {
-	a.pill(c, "mode", "", label, false).Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
+	p := a.p
+	var b ui.Element
+	if a.C.Current != nil && a.C.Current.Mode == "full" {
+		b = ui.ButtonBase(c.Key("pill:mode")).Row().Height(28).Padding(0, 9).Gap(5).Radius(14).AlignItems(ui.Center).Label(label)
+		press(b)
+		focusRing(b, p)
+		if b.Hovered() {
+			b.Background(p.Minus.Alpha(.08))
+		}
+		b.Children(func() {
+			ui.Text(c, label).FontSize(13).FontWeight(500).TextColor(p.Minus).SingleLine()
+		})
+	} else {
+		b = a.pill(c, "mode", "", label, false)
+	}
+	b.Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		for _, mode := range []struct{ id, description string }{
 			{"ask", locales.ModeAskShort()},
 			{"auto", locales.ModeAutoShort()},

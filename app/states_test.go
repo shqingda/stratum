@@ -86,7 +86,7 @@ func TestStateMatrix(t *testing.T) {
 		{name: "sidebar-long-title", setup: func(a *App) { a.C.Sessions[0].Title = string([]rune(strings.Repeat("修复 Talos 边界 ", 8))[:80]) }, want: []string{"修复 Talos 边界"}},
 		{name: "palette-hit", setup: func(a *App) { a.pal, a.query = true, "CLIENT" }, want: []string{"按日志重建", "talos · 3 时"}},
 		{name: "palette-miss", setup: func(a *App) { a.pal, a.query = true, "完全不存在的会话" }, want: []string{"没有匹配的会话、操作或消息"}},
-		{name: "sidebar-waiting", setup: func(a *App) { a.C.Approvals = []proto.Approval{stateApproval("waiting")} }, want: []string{"需要你", "审批"}},
+		{name: "sidebar-waiting", setup: func(a *App) { a.C.Approvals = []proto.Approval{stateApproval("waiting")} }, want: []string{"审批"}},
 		{name: "sidebar-relative-times", setup: func(a *App) {
 			a.C.Sessions = nil
 			for i, d := range []time.Duration{0, 2 * time.Minute, 3 * time.Hour, 26 * time.Hour, 80 * time.Hour, 40 * 24 * time.Hour, 400 * 24 * time.Hour} {
@@ -357,7 +357,7 @@ func TestStateInteractions(t *testing.T) {
 	for _, tc := range []struct {
 		label         string
 		allow, always bool
-	}{{"拒绝", false, false}, {"本会话都允许", true, true}, {"允许", true, false}} {
+	}{{"拒绝", false, false}, {"总是允许", true, true}, {"允许", true, false}} {
 		t.Run("approval-"+tc.label, func(t *testing.T) {
 			a := stateApp()
 			a.C.Approvals = []proto.Approval{stateApproval("approval")}

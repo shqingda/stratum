@@ -4,6 +4,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -275,6 +276,15 @@ func (a *App) complete(text string) {
 	for end < len(r) && !unicode.IsSpace(r[end]) {
 		end++
 	}
+	if id, ok := strings.CutPrefix(text, "session:"); ok {
+		a.draft = string(r[:m.at]) + strings.TrimLeft(string(r[end:]), " ")
+		m.place = m.at + 1
+		m.open = false
+		if !slices.Contains(a.mentionSessions, id) {
+			a.mentionSessions = append(a.mentionSessions, id)
+		}
+		return
+	}
 	word := "@" + text
 	rest := string(r[end:])
 	if rest == "" {
@@ -374,15 +384,31 @@ func (a *App) knownSlashToken(name string) bool {
 }
 
 type mentionChip struct {
-	raw   string
-	icon  string
-	label string
-	slash bool
+	raw       string
+	icon      string
+	label     string
+	slash     bool
+	sessionID string
 }
 
 func (a *App) extractMentionChips() []mentionChip {
 	seen := map[string]bool{}
 	var out []mentionChip
+	for _, id := range a.mentionSessions {
+		tok := "@session:" + id
+		if seen[tok] {
+			continue
+		}
+		seen[tok] = true
+		label := id
+		for _, s := range a.C.Sessions {
+			if s.ID == id && title(s) != "" {
+				label = title(s)
+				break
+			}
+		}
+		out = append(out, mentionChip{raw: tok, icon: "message", label: label, sessionID: id})
+	}
 	if strings.Contains(a.draft, "/") && !a.slash.open {
 		for _, m := range slashTokenRe.FindAllStringSubmatchIndex(a.draft, -1) {
 			tok := a.draft[m[2]:m[3]]
@@ -481,12 +507,16 @@ func (a *App) mentionChips(c *ui.Context) {
 				}
 				rm.Children(func() { sym(c, "x", 10, rmCol) })
 				if rm.Clicked() {
-					next := strings.Replace(a.draft, ch.raw+" ", "", 1)
-					if next == a.draft {
-						next = strings.Replace(a.draft, ch.raw, "", 1)
+					if ch.sessionID != "" {
+						a.mentionSessions = slices.DeleteFunc(a.mentionSessions, func(id string) bool { return id == ch.sessionID })
+					} else {
+						next := strings.Replace(a.draft, ch.raw+" ", "", 1)
+						if next == a.draft {
+							next = strings.Replace(a.draft, ch.raw, "", 1)
+						}
+						a.draft = strings.TrimLeft(next, " ")
+						a.toEnd = true
 					}
-					a.draft = strings.TrimLeft(next, " ")
-					a.toEnd = true
 				}
 			})
 		}

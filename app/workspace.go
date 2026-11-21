@@ -2,24 +2,105 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
+	"sync"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
-// openers are the apps the top bar opens a session's folder in.
-func openers() []struct{ label, icon, app string } {
-	return []struct{ label, icon, app string }{
+type opener struct {
+	label, icon, app string
+}
+
+var (
+	candidateEditors = []opener{
+		{"Cursor", "file-code", "Cursor"},
 		{"VS Code", "brand-vscode", "Visual Studio Code"},
-		{locales.Finder(), "folder", ""},
-		{locales.Terminal(), "terminal-2", "Terminal"},
+		{"VS Code Insiders", "brand-vscode", "Visual Studio Code - Insiders"},
+		{"Zed", "file-code", "Zed"},
+		{"Xcode", "file-code", "Xcode"},
+		{"Sublime Text", "file-code", "Sublime Text"},
 	}
+	candidateTerminals = []opener{
+		{"Terminal", "terminal-2", "Terminal"},
+		{"Ghostty", "terminal-2", "Ghostty"},
+		{"Warp", "terminal-2", "Warp"},
+		{"iTerm2", "terminal-2", "iTerm"},
+	}
+	installedOnce sync.Once
+	installedMap  map[string]bool
+)
+
+func detectInstalledApps() map[string]bool {
+	installedOnce.Do(func() {
+		installedMap = map[string]bool{}
+		home, _ := os.UserHomeDir()
+		roots := []string{"/Applications", "/System/Applications", "/System/Applications/Utilities"}
+		if home != "" {
+			roots = append(roots, filepath.Join(home, "Applications"))
+		}
+		check := func(appName string) bool {
+			for _, r := range roots {
+				if _, err := os.Stat(filepath.Join(r, appName+".app")); err == nil {
+					return true
+				}
+			}
+			return false
+		}
+		for _, o := range candidateEditors {
+			installedMap[o.app] = check(o.app)
+		}
+		for _, o := range candidateTerminals {
+			installedMap[o.app] = check(o.app)
+		}
+	})
+	return installedMap
+}
+
+func (a *App) appInstalled(appName string) bool {
+	if appName == "" {
+		return true
+	}
+	if a.hasApp != nil {
+		return a.hasApp(appName)
+	}
+	return detectInstalledApps()[appName]
+}
+
+// installedOpeners returns only the apps actually installed on this Mac,
+// in order: editors, Finder, terminals.
+func (a *App) installedOpeners() []opener {
+	var out []opener
+	for _, o := range candidateEditors {
+		if a.appInstalled(o.app) {
+			out = append(out, o)
+		}
+	}
+	out = append(out, opener{locales.Finder(), "folder", ""})
+	for _, o := range candidateTerminals {
+		if a.appInstalled(o.app) {
+			lbl := o.label
+			if o.app == "Terminal" {
+				lbl = locales.Terminal()
+			}
+			out = append(out, opener{lbl, o.icon, o.app})
+		}
+	}
+	return out
+}
+
+func (a *App) preferredEditor() (label, appName string) {
+	for _, o := range candidateEditors {
+		if a.appInstalled(o.app) {
+			return o.label, o.app
+		}
+	}
+	return "", ""
 }
 
 func openIn(app, dir string) error {
@@ -27,10 +108,21 @@ func openIn(app, dir string) error {
 	if app != "" {
 		args = []string{"-a", app, dir}
 	}
-	if out, err := exec.Command("open", args...).CombinedOutput(); err != nil {
-		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	out, err := exec.Command("open", args...).CombinedOutput()
+	if err == nil {
+		return nil
 	}
-	return nil
+	if app == "" {
+		// No default app claims this file type (e.g. .go without an editor):
+		// fall back to default text editor (-t), then Reveal in Finder (-R).
+		if exec.Command("open", "-t", dir).Run() == nil {
+			return nil
+		}
+		if exec.Command("open", "-R", dir).Run() == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 }
 
 func openBrowser(u string) error {
@@ -58,11 +150,14 @@ func (a *App) barButton(c *ui.Context, key, symbol, label string, children func(
 	return b
 }
 
-// workspaceCapsule groups the folder, active branch, external openers,
-// and transcript detail preference into one compact top-bar capsule.
+// workspaceCapsule groups the project switcher, branch switcher, and installed
+// external openers into one compact top-bar capsule.
 func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	p := a.p
 	dir := cur.Cwd
+	if cur.Repo != "" {
+		dir = cur.Repo
+	}
 	label := filepath.Base(dir)
 	if br := a.C.Workspace.Branch; br != "" {
 		label += " · " + br
@@ -79,39 +174,70 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
 		sym(c, "chevron-down", 11, p.Mute)
 	})
-	thought := slices.ContainsFunc(a.C.Entries, func(e *client.Entry) bool { return e.Role == client.Thinking })
-	set := a.settings()
 	b.PopoverMenuButton(func(m *ui.Menu) {
-		if len(a.C.Workspace.Branches) > 0 && !cur.Worktree && a.C.CanAct() {
-			for _, br := range a.C.Workspace.Branches {
-				branch := br
-				if m.Item(branch).ID("branch:" + branch).Checked(branch == a.C.Workspace.Branch).Chosen() {
-					if branch != a.C.Workspace.Branch {
-						a.do(a.C.Checkout(branch))
+		menuText := func(it *ui.MenuItem, text string) *ui.MenuItem {
+			return it.Content(func(mc ui.MenuItemContent) {
+				ui.Text(mc.Context, text).FontSize(13).TextColor(mc.Text).SingleLine()
+			})
+		}
+		menuText(m.Submenu(locales.Project(), func(sm *ui.Menu) {
+			seen := map[string]bool{}
+			for _, s := range a.C.Sessions {
+				dirPath := s.Cwd
+				if s.Repo != "" {
+					dirPath = s.Repo
+				}
+				if seen[dirPath] {
+					continue
+				}
+				seen[dirPath] = true
+				name := filepath.Base(dirPath)
+				if menuText(sm.Item(name).ID("proj:"+dirPath).Checked(dirPath == dir), name).Chosen() {
+					if dirPath != dir {
+						if a.helloShown() {
+							a.moveTo(dirPath)
+						} else {
+							a.do(a.C.NewSessionIn(dirPath))
+						}
 					}
 				}
 			}
-			m.Separator()
-		}
-		for _, o := range openers() {
-			if m.Item(locales.OpenWith(o.label)).ID("open:" + o.label).Chosen() {
-				if err := a.openIn(o.app, dir); err != nil {
-					a.err = locales.CouldntOpen(o.label, err.Error())
+			if a.pickDir != nil && a.update != nil {
+				sm.Separator()
+				if menuText(sm.Item(locales.ChooseFolder()).ID("proj:choose"), locales.ChooseFolder()).Chosen() {
+					go func() {
+						if chosen := a.pickDir(); chosen != "" {
+							a.update(func() {
+								if a.helloShown() {
+									a.moveTo(chosen)
+								} else {
+									a.do(a.C.NewSessionIn(chosen))
+								}
+							})
+						}
+					}()
 				}
 			}
+		}), locales.Project())
+		if len(a.C.Workspace.Branches) > 0 && !cur.Worktree && a.C.CanAct() {
+			menuText(m.Submenu(locales.Branch(), func(sm *ui.Menu) {
+				for _, br := range a.C.Workspace.Branches {
+					branch := br
+					if menuText(sm.Item(branch).ID("branch:"+branch).Checked(branch == a.C.Workspace.Branch), branch).Chosen() {
+						if branch != a.C.Workspace.Branch {
+							a.do(a.C.Checkout(branch))
+						}
+					}
+				}
+			}), locales.Branch())
 		}
 		m.Separator()
-		for _, d := range []struct {
-			id   string
-			name func() string
-		}{{"", locales.DetailPlain}, {"thinking", locales.DetailThinking}, {"all", locales.DetailAll}} {
-			if d.id == "thinking" && !thought && set.Detail != "thinking" {
-				continue
-			}
-			if m.Item(locales.DetailTo(d.name())).ID("detail:" + d.id).Checked(set.Detail == d.id).Chosen() {
-				s := a.settings()
-				s.Detail = d.id
-				a.do(a.C.SaveSettings(s))
+		for _, o := range a.installedOpeners() {
+			lbl := locales.OpenWith(o.label)
+			if menuText(m.Item(lbl).ID("open:"+o.label), lbl).Chosen() {
+				if err := a.openIn(o.app, cur.Cwd); err != nil {
+					a.flash("alert-circle", locales.CouldntOpen(o.label, shortOpenErr(err)))
+				}
 			}
 		}
 	}, a.menuOptions(&a.openMenu))

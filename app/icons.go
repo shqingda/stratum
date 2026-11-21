@@ -77,6 +77,7 @@ var sfNames = map[string]string{
 	"device-laptop":                "laptopcomputer",
 	"dots":                         "ellipsis",
 	"edit":                         "square.and.pencil",
+	"external-link":                "arrow.up.forward.app",
 	"eye":                          "eye",
 	"file-code":                    "chevron.left.forwardslash.chevron.right",
 	"file-pencil":                  "pencil.line",

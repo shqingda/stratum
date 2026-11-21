@@ -109,6 +109,18 @@ func (a *App) choose() {
 // prompt is the draft with the files it names, and the pictures it sends.
 func (a *App) prompt() (string, []llm.Image) {
 	text := a.expandCommand(strings.TrimSpace(a.draft))
+	if len(a.mentionSessions) > 0 {
+		refs := make([]string, len(a.mentionSessions))
+		for i, id := range a.mentionSessions {
+			refs[i] = "@session:" + id
+		}
+		prefix := strings.Join(refs, " ")
+		if text != "" {
+			text = prefix + " " + text
+		} else {
+			text = prefix
+		}
+	}
 	var files []string
 	var images []llm.Image
 	for _, at := range a.attached {

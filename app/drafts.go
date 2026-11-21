@@ -16,9 +16,10 @@ type drafts struct {
 	kept  string    // the draft as the kernel has it
 	last  string    // the draft as the last frame saw it
 	since time.Time // when it last changed
-	// files are the attachments left in each session's composer: they
-	// stay with their session, as a Mail draft keeps its attachments.
-	files map[string][]attachment
+	// files and sessions are the attachments and @session refs left in each
+	// session's composer: they stay with their session.
+	files    map[string][]attachment
+	sessions map[string][]string
 }
 
 const draftPause = time.Second
@@ -37,6 +38,9 @@ func (a *App) syncDraft(c *ui.Context) {
 		if d.files == nil {
 			d.files = map[string][]attachment{}
 		}
+		if d.sessions == nil {
+			d.sessions = map[string][]string{}
+		}
 		if d.of != "" || d.began {
 			if len(a.attached) > 0 {
 				d.files[d.of] = a.attached
@@ -45,6 +49,13 @@ func (a *App) syncDraft(c *ui.Context) {
 			}
 			a.attached = d.files[id]
 			delete(d.files, id)
+			if len(a.mentionSessions) > 0 {
+				d.sessions[d.of] = a.mentionSessions
+			} else {
+				delete(d.sessions, d.of)
+			}
+			a.mentionSessions = d.sessions[id]
+			delete(d.sessions, id)
 		}
 		// The first session shown keeps what the composer holds unless
 		// the kernel kept something for it; any other gets its own.

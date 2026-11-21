@@ -103,10 +103,10 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 				a.commitInput.Focus(c)
 			}})
 		}
-		for _, o := range openers() {
+		for _, o := range a.installedOpeners() {
 			add(opt{icon: o.icon, label: locales.OpenWith(o.label), run: func() {
 				if err := a.openIn(o.app, cur.Cwd); err != nil {
-					a.err = locales.CouldntOpen(o.label, err.Error())
+					a.flash("alert-circle", locales.CouldntOpen(o.label, shortOpenErr(err)))
 				}
 			}})
 		}
@@ -161,8 +161,12 @@ func (a *App) palFiles() []opt {
 	for _, f := range a.C.Files[:min(5, len(a.C.Files))] {
 		path := filepath.Join(cur.Cwd, f)
 		out = append(out, opt{icon: "file-code", label: f, sub: filepath.Base(cur.Cwd), mono: true, run: func() {
-			if err := a.openIn("Visual Studio Code", path); err != nil {
-				a.err = locales.CouldntOpen("VS Code", err.Error())
+			edLabel, edApp := a.preferredEditor()
+			if err := a.openIn(edApp, path); err != nil {
+				if edLabel == "" {
+					edLabel = filepath.Base(path)
+				}
+				a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
 			}
 		}})
 	}

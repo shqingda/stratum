@@ -108,9 +108,9 @@
   "worktree": "Worktree",
   "worktreeSub": "Run in an isolated branch and directory",
   "sandboxOn": "Sandbox on",
-  "modeAsk": "Ask",
+  "modeAsk": "Manual",
   "modeAuto": "Auto",
-  "modeFull": "Full",
+  "modeFull": "Full access",
   "modeAskShort": "Asks before writing files or running commands",
   "modeAutoShort": "Allows anything inside the sandbox",
   "modeFullShort": "Never asks. Use with care",
@@ -179,7 +179,7 @@
   "settingsGeneralWords": "language return enter queue send notifications approval finished failed dock badge background",
   "settingsAccountsWords": "sign in sign out subscription key",
   "settingsModelsWords": "default model reasoning effort background subtasks titles summaries quota switch account",
-  "settingsPermissionsWords": "ask auto full access sandbox",
+  "settingsPermissionsWords": "manual auto full access sandbox",
   "settingsShortcutsWords": "keys keyboard shortcuts",
   "settingsMcpWords": "servers mcp.json skills",
   "closeSettings": "Close Settings",
@@ -529,5 +529,11 @@
   "closeSheetOrWindow": "Close Panel or Window",
   "copyCommand": "Copy Command",
   "copyOutput": "Copy Output",
-  "reconnect": "Reconnect"
+  "reconnect": "Reconnect",
+  "maximizePane": "Maximize Pane",
+  "restorePane": "Restore Pane",
+  "toggleWorkspaceTree": "Toggle Workspace Tree",
+  "selectFileToPreview": "Select a file to preview",
+  "branch": "Branch",
+  "raw": "Raw"
 }

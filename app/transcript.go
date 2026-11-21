@@ -99,26 +99,25 @@ func (a *App) bar(c *ui.Context) {
 			ui.Text(c, phaseText(a.C.Phase)).FontSize(14.5).FontWeight(600).TextColor(p.Mute)
 			return
 		}
-		if a.helloShown() {
-			return // the middle of the window says what the session is
-		}
-		if a.renaming == cur.ID && a.renameIn == "bar" {
-			a.renameInput(c, *cur).FontSize(14.5).FontWeight(600).MaxWidth(360)
-		} else {
-			// Clicked, the title can be changed where it is.
-			t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Padding(3, 7).Margin(0, 0, 0, -7).Radius(6).
-				Label(locales.Rename()).Tooltip(locales.Rename())
-			press(t)
-			focusRing(t, p)
-			if t.Hovered() {
-				t.Background(p.Hover)
+		if !a.helloShown() {
+			if a.renaming == cur.ID && a.renameIn == "bar" {
+				a.renameInput(c, *cur).FontSize(14.5).FontWeight(600).MaxWidth(360)
+			} else {
+				// Clicked, the title can be changed where it is.
+				t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Padding(3, 7).Margin(0, 0, 0, -7).Radius(6).
+					Label(locales.Rename()).Tooltip(locales.Rename())
+				press(t)
+				focusRing(t, p)
+				if t.Hovered() {
+					t.Background(p.Hover)
+				}
+				if t.Clicked() {
+					a.rename(*cur, "bar")
+				}
+				t.Children(func() {
+					ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+				})
 			}
-			if t.Clicked() {
-				a.rename(*cur, "bar")
-			}
-			t.Children(func() {
-				ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
-			})
 		}
 		a.workspaceCapsule(c, cur)
 		ui.Spacer(c)
@@ -879,12 +878,12 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			if kind == "" {
 				kind = ap.Tool
 			}
-			ui.Text(c, kind).FontSize(13.5).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.NeedsApproval()).FontSize(13.5).TextColor(p.Fg2)
+			ui.Text(c, kind).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Shrink(0)
+			ui.Text(c, locales.NeedsApproval()).FontSize(13.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
 			ui.Spacer(c)
 			if w := a.waited(c, ap.ID); w != "" {
 				sym(c, "clock", 12, p.Mute)
-				ui.Text(c, w).FontSize(12.5).TextColor(p.Mute)
+				ui.Text(c, w).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
 			}
 		})
 		what := ap.Command
@@ -903,38 +902,41 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			what = compact(ap.Args)
 		}
 		editing := a.editing == ap.ID
-		chip := ui.Row(c).Padding(9, 12).Radius(9).Background(p.Chip).Margin(11, 0, 9, 0).AlignItems(ui.Center)
+		chip := ui.Column(c).Padding(9, 12).Gap(4).Radius(9).Background(p.Chip).Margin(10, 0, 8, 0)
 		if editing {
 			chip.InsetShadow(0, 0, 0, 1, p.Live)
 		}
 		chip.Children(func() {
 			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
-				// A long folder gives way to the command, cut short in
-				// the middle so both ends still say where it is.
 				cwd := home(a.C.Current.Cwd)
-				ui.Text(c, cwd).Font("monospace").FontSize(13.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MaxWidth(160).Shrink(0).Unselectable().Tooltip(cwd)
-				ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Margin(0, 8, 0, 6).Unselectable()
+				ui.Text(c, filepath.Base(a.C.Current.Cwd)).Font("monospace").FontSize(11.5).TextColor(p.Mute).
+					SingleLine().TruncateMiddle().Unselectable().Tooltip(cwd)
 			}
-			if editing {
-				ui.TextInputBase(c, &a.cmdDraft).Bind(&a.cmdInput).Label(locales.EditCommand()).Font("monospace").FontSize(13.5).TextColor(p.Fg).
-					Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
-					a.cmdDraft = k.Text()
-					if k.Key == ui.KeyEnter && k.Mods == 0 {
-						a.runEdited(ap)
-						return true
-					}
-					return false
-				})
-				return
-			}
-			ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+				if ap.Command != "" && ap.Kind != "mcp" {
+					ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Unselectable()
+				}
+				if editing {
+					ui.TextInputBase(c, &a.cmdDraft).Bind(&a.cmdInput).Label(locales.EditCommand()).Font("monospace").FontSize(13.5).TextColor(p.Fg).
+						Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
+						a.cmdDraft = k.Text()
+						if k.Key == ui.KeyEnter && k.Mods == 0 {
+							a.runEdited(ap)
+							return true
+						}
+						return false
+					})
+					return
+				}
+				ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
+			})
 		})
 		a.approvalDiff(c, ap)
-		ui.Row(c).Gap(14).Children(func() {
+		ui.Column(c).Gap(4).Children(func() {
 			why := func(symbol, s string) {
-				ui.Row(c).Gap(4).AlignItems(ui.Center).MinWidth(0).Children(func() {
+				ui.Row(c).Gap(6).AlignItems(ui.Center).MinWidth(0).Children(func() {
 					sym(c, symbol, 12, p.Mute)
-					ui.Text(c, s).FontSize(13).TextColor(p.Mute)
+					ui.Text(c, s).FontSize(12.5).TextColor(p.Mute).MinWidth(0)
 				})
 			}
 			if ap.Reason != "" {
@@ -952,8 +954,8 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				why("route", locales.RuleScope(ruleText(*ap.Rule)))
 			}
 		})
-		ui.Row(c).Gap(8).Wrap().Justify(ui.End).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
-			if editing {
+		if editing {
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
 				ui.Text(c, locales.EditCommandHint()).FontSize(13).TextColor(p.Mute).Grow(1).MinWidth(0)
 				if a.button(c, "edit-cancel:"+ap.ID, locales.Cancel(), "esc", false).Disabled(busy).Clicked() {
 					a.editing = ""
@@ -961,8 +963,10 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				if a.button(c, "edit-run:"+ap.ID, locales.RunIt(), "⏎", true).Disabled(busy || strings.TrimSpace(a.cmdDraft) == "").Clicked() {
 					a.runEdited(ap)
 				}
-				return
-			}
+			})
+			return
+		}
+		ui.Row(c).Gap(6).Wrap().AlignItems(ui.Center).Margin(10, 0, 0, 0).Children(func() {
 			if ap.Kind == "exec" && ap.Command != "" && a.textButton(c, "edit:"+ap.ID, locales.EditCommand()).Disabled(busy).Clicked() {
 				a.editing, a.cmdDraft = ap.ID, ap.Command
 				a.cmdInput.Focus(c)
@@ -976,10 +980,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				a.deny(ap.ID)
 			}
 			if ap.Rule != nil {
-				if a.button(c, "forever:"+ap.ID, locales.AllowAlways(), a.approvalHint(c, ap.ID, "⌥⌘⏎"), false).Disabled(busy).Clicked() {
-					a.do(a.C.Respond(proto.ApprovalAnswer{ApprovalID: ap.ID, Allow: true, Forever: true}))
-				}
-				if a.button(c, "always:"+ap.ID, locales.AllowForSession(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
+				if a.button(c, "always:"+ap.ID, locales.AllowAlways(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
 					a.do(a.C.Answer(ap.ID, true, true))
 				}
 			}
@@ -1091,7 +1092,7 @@ func (a *App) button(c *ui.Context, key, label, kbd string, primary bool) ui.Ele
 	p := a.p
 	// Answering keeps the keyboard where it was, in the composer for the
 	// next message, as the buttons of Mail's and Notes' bars do.
-	b := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 12).Gap(8).Radius(8).AlignItems(ui.Center).Label(label).KeepFocus()
+	b := ui.ButtonBase(c.Key(key)).Row().Height(26).Padding(0, 10).Gap(5).Radius(7).AlignItems(ui.Center).Label(label).KeepFocus()
 	press(b)
 	focusRing(b, p)
 	fg, hint := p.Fg, p.Mute
@@ -1105,9 +1106,9 @@ func (a *App) button(c *ui.Context, key, label, kbd string, primary bool) ui.Ele
 		}
 	}
 	b.Children(func() {
-		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(fg).SingleLine()
+		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(fg).SingleLine()
 		if kbd != "" {
-			ui.Text(c, kbd).FontSize(12).TextColor(hint).SingleLine()
+			ui.Text(c, kbd).FontSize(11).TextColor(hint).SingleLine()
 		}
 	})
 	return b

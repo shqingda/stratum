@@ -1114,11 +1114,11 @@ func (msgs Messages) SandboxOn() string {
 	return Catalog.Format(msgs.locale, "sandboxOn", nil)
 }
 
-// ModeAsk says "询问"
+// ModeAsk says "手动"
 // in the language the app shows.
 func ModeAsk() string { return In(i18n.Locale()).ModeAsk() }
 
-// ModeAsk says "询问"
+// ModeAsk says "手动"
 // in the language of msgs.
 func (msgs Messages) ModeAsk() string {
 	return Catalog.Format(msgs.locale, "modeAsk", nil)
@@ -1134,11 +1134,11 @@ func (msgs Messages) ModeAuto() string {
 	return Catalog.Format(msgs.locale, "modeAuto", nil)
 }
 
-// ModeFull says "完全"
+// ModeFull says "完全访问"
 // in the language the app shows.
 func ModeFull() string { return In(i18n.Locale()).ModeFull() }
 
-// ModeFull says "完全"
+// ModeFull says "完全访问"
 // in the language of msgs.
 func (msgs Messages) ModeFull() string {
 	return Catalog.Format(msgs.locale, "modeFull", nil)
@@ -1826,11 +1826,11 @@ func (msgs Messages) SettingsModelsWords() string {
 	return Catalog.Format(msgs.locale, "settingsModelsWords", nil)
 }
 
-// SettingsPermissionsWords says "询问 自动 完全访问 沙盒"
+// SettingsPermissionsWords says "手动 自动 完全访问 沙盒"
 // in the language the app shows.
 func SettingsPermissionsWords() string { return In(i18n.Locale()).SettingsPermissionsWords() }
 
-// SettingsPermissionsWords says "询问 自动 完全访问 沙盒"
+// SettingsPermissionsWords says "手动 自动 完全访问 沙盒"
 // in the language of msgs.
 func (msgs Messages) SettingsPermissionsWords() string {
 	return Catalog.Format(msgs.locale, "settingsPermissionsWords", nil)
@@ -5344,4 +5344,64 @@ func Reconnect() string { return In(i18n.Locale()).Reconnect() }
 // in the language of msgs.
 func (msgs Messages) Reconnect() string {
 	return Catalog.Format(msgs.locale, "reconnect", nil)
+}
+
+// MaximizePane says "最大化面板"
+// in the language the app shows.
+func MaximizePane() string { return In(i18n.Locale()).MaximizePane() }
+
+// MaximizePane says "最大化面板"
+// in the language of msgs.
+func (msgs Messages) MaximizePane() string {
+	return Catalog.Format(msgs.locale, "maximizePane", nil)
+}
+
+// RestorePane says "还原面板"
+// in the language the app shows.
+func RestorePane() string { return In(i18n.Locale()).RestorePane() }
+
+// RestorePane says "还原面板"
+// in the language of msgs.
+func (msgs Messages) RestorePane() string {
+	return Catalog.Format(msgs.locale, "restorePane", nil)
+}
+
+// ToggleWorkspaceTree says "显示/隐藏目录树"
+// in the language the app shows.
+func ToggleWorkspaceTree() string { return In(i18n.Locale()).ToggleWorkspaceTree() }
+
+// ToggleWorkspaceTree says "显示/隐藏目录树"
+// in the language of msgs.
+func (msgs Messages) ToggleWorkspaceTree() string {
+	return Catalog.Format(msgs.locale, "toggleWorkspaceTree", nil)
+}
+
+// SelectFileToPreview says "选择文件以预览代码"
+// in the language the app shows.
+func SelectFileToPreview() string { return In(i18n.Locale()).SelectFileToPreview() }
+
+// SelectFileToPreview says "选择文件以预览代码"
+// in the language of msgs.
+func (msgs Messages) SelectFileToPreview() string {
+	return Catalog.Format(msgs.locale, "selectFileToPreview", nil)
+}
+
+// Branch says "分支"
+// in the language the app shows.
+func Branch() string { return In(i18n.Locale()).Branch() }
+
+// Branch says "分支"
+// in the language of msgs.
+func (msgs Messages) Branch() string {
+	return Catalog.Format(msgs.locale, "branch", nil)
+}
+
+// Raw says "源码"
+// in the language the app shows.
+func Raw() string { return In(i18n.Locale()).Raw() }
+
+// Raw says "源码"
+// in the language of msgs.
+func (msgs Messages) Raw() string {
+	return Catalog.Format(msgs.locale, "raw", nil)
 }
