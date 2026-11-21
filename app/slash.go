@@ -190,7 +190,7 @@ func (a *App) slashMenu(c *ui.Context) {
 	list.Children(func() {
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			for i, it := range items {
-				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name)
+				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name).KeepFocus()
 				press(row)
 				focusRing(row, p)
 				switch {

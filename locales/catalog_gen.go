@@ -204,6 +204,26 @@ func (msgs Messages) Stop() string {
 	return Catalog.Format(msgs.locale, "stop", nil)
 }
 
+// EscToInterrupt says "esc 中断"
+// in the language the app shows.
+func EscToInterrupt() string { return In(i18n.Locale()).EscToInterrupt() }
+
+// EscToInterrupt says "esc 中断"
+// in the language of msgs.
+func (msgs Messages) EscToInterrupt() string {
+	return Catalog.Format(msgs.locale, "escToInterrupt", nil)
+}
+
+// StopEsc says "停止（esc）"
+// in the language the app shows.
+func StopEsc() string { return In(i18n.Locale()).StopEsc() }
+
+// StopEsc says "停止（esc）"
+// in the language of msgs.
+func (msgs Messages) StopEsc() string {
+	return Catalog.Format(msgs.locale, "stopEsc", nil)
+}
+
 // Send says "发送"
 // in the language the app shows.
 func Send() string { return In(i18n.Locale()).Send() }
@@ -472,6 +492,26 @@ func DeleteTitle(title string) string { return In(i18n.Locale()).DeleteTitle(tit
 // in the language of msgs.
 func (msgs Messages) DeleteTitle(title string) string {
 	return Catalog.Format(msgs.locale, "deleteTitle", map[string]any{"title": title})
+}
+
+// RemoveProjectTitle says "移除「{name}」？"
+// in the language the app shows.
+func RemoveProjectTitle(name string) string { return In(i18n.Locale()).RemoveProjectTitle(name) }
+
+// RemoveProjectTitle says "移除「{name}」？"
+// in the language of msgs.
+func (msgs Messages) RemoveProjectTitle(name string) string {
+	return Catalog.Format(msgs.locale, "removeProjectTitle", map[string]any{"name": name})
+}
+
+// RemoveProjectBody says "它的 {count} …"
+// in the language the app shows.
+func RemoveProjectBody(count int) string { return In(i18n.Locale()).RemoveProjectBody(count) }
+
+// RemoveProjectBody says "它的 {count} …"
+// in the language of msgs.
+func (msgs Messages) RemoveProjectBody(count int) string {
+	return Catalog.Format(msgs.locale, "removeProjectBody", map[string]any{"count": count})
 }
 
 // DeleteBody says "这个会话的记录和改动历史会一起删掉，不能撤销。只想收起来的话，用归档。"
@@ -2668,6 +2708,76 @@ func MenuSession() string { return In(i18n.Locale()).MenuSession() }
 // in the language of msgs.
 func (msgs Messages) MenuSession() string {
 	return Catalog.Format(msgs.locale, "menuSession", nil)
+}
+
+// MenuView says "显示"
+// in the language the app shows.
+func MenuView() string { return In(i18n.Locale()).MenuView() }
+
+// MenuView says "显示"
+// in the language of msgs.
+func (msgs Messages) MenuView() string {
+	return Catalog.Format(msgs.locale, "menuView", nil)
+}
+
+// ZoomIn says "放大"
+// in the language the app shows.
+func ZoomIn() string { return In(i18n.Locale()).ZoomIn() }
+
+// ZoomIn says "放大"
+// in the language of msgs.
+func (msgs Messages) ZoomIn() string {
+	return Catalog.Format(msgs.locale, "zoomIn", nil)
+}
+
+// ZoomOut says "缩小"
+// in the language the app shows.
+func ZoomOut() string { return In(i18n.Locale()).ZoomOut() }
+
+// ZoomOut says "缩小"
+// in the language of msgs.
+func (msgs Messages) ZoomOut() string {
+	return Catalog.Format(msgs.locale, "zoomOut", nil)
+}
+
+// ActualSize says "实际大小"
+// in the language the app shows.
+func ActualSize() string { return In(i18n.Locale()).ActualSize() }
+
+// ActualSize says "实际大小"
+// in the language of msgs.
+func (msgs Messages) ActualSize() string {
+	return Catalog.Format(msgs.locale, "actualSize", nil)
+}
+
+// PreviousSession says "上一个会话"
+// in the language the app shows.
+func PreviousSession() string { return In(i18n.Locale()).PreviousSession() }
+
+// PreviousSession says "上一个会话"
+// in the language of msgs.
+func (msgs Messages) PreviousSession() string {
+	return Catalog.Format(msgs.locale, "previousSession", nil)
+}
+
+// NextSession says "下一个会话"
+// in the language the app shows.
+func NextSession() string { return In(i18n.Locale()).NextSession() }
+
+// NextSession says "下一个会话"
+// in the language of msgs.
+func (msgs Messages) NextSession() string {
+	return Catalog.Format(msgs.locale, "nextSession", nil)
+}
+
+// RecallLastPrompt says "调回上一条消息（输入框为空时）"
+// in the language the app shows.
+func RecallLastPrompt() string { return In(i18n.Locale()).RecallLastPrompt() }
+
+// RecallLastPrompt says "调回上一条消息（输入框为空时）"
+// in the language of msgs.
+func (msgs Messages) RecallLastPrompt() string {
+	return Catalog.Format(msgs.locale, "recallLastPrompt", nil)
 }
 
 // ToolWebFetch says "读取网页"

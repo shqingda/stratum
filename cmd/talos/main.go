@@ -80,7 +80,7 @@ func main() {
 // menu is the default menu bar with "Check for Updates…" after About and
 // the app's own commands: Settings, a Session menu and the sidebar in View.
 func menu(a *app.App) *mygo.Menu {
-	session, settings, sidebar, inspector := a.MenuBar()
+	session, settings, view := a.MenuBar()
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Talos", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleAbout},
@@ -98,7 +98,7 @@ func menu(a *app.App) *mygo.Menu {
 		}},
 		{Label: locales.MenuSession(), Submenu: session},
 		{Role: mygo.RoleEditMenu},
-		{Label: "View", Submenu: []*mygo.MenuItem{sidebar, inspector, mygo.Separator(), {Role: mygo.RoleToggleFullScreen}}},
+		{Label: locales.MenuView(), Submenu: view},
 		{Role: mygo.RoleWindowMenu},
 	})
 }

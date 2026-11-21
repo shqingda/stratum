@@ -99,7 +99,7 @@ func (a *App) mentionMenu(c *ui.Context) {
 				for _, it := range g.items {
 					i, item := n, it
 					n++
-					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name)
+					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name).KeepFocus()
 					press(row)
 					focusRing(row, p)
 					switch {

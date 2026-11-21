@@ -61,6 +61,29 @@ func (a *App) keys(c *ui.Context) {
 			a.copyLastReply(c)
 		}
 	})
+	for _, z := range []struct {
+		mods ui.Modifiers
+		key  ui.Key
+		step int
+	}{{ui.Cmd, ui.KeyEqual, 1}, {ui.Cmd | ui.Shift, ui.KeyEqual, 1}, {ui.Cmd, ui.KeyMinus, -1}, {ui.Cmd, ui.Key0, 0}} {
+		c.OnWindowShortcut(z.mods, z.key, func() {
+			if !c.ShortcutRepeated() {
+				a.zoomText(z.step)
+			}
+		})
+	}
+	// ⌘Z takes back an archiving while the focus is not in text, which
+	// keeps ⌘Z for its own typing.
+	c.OnWindowShortcut(ui.Cmd, ui.KeyZ, func() {
+		if !c.ShortcutRepeated() && !c.FocusTakesText() {
+			a.undoArchive()
+		}
+	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeyPeriod, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.stopTurn()
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketLeft, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
 			a.stepSession(-1)
@@ -145,9 +168,9 @@ func (a *App) keys(c *ui.Context) {
 	for _, key := range []struct {
 		mods ui.Modifiers
 		key  ui.Key
-	}{{0, ui.KeyEnter}, {ui.Cmd, ui.KeyEnter}, {0, ui.KeyEscape}} {
+	}{{0, ui.KeyEnter}, {ui.Cmd, ui.KeyEnter}, {ui.Cmd | ui.Alt, ui.KeyEnter}, {0, ui.KeyEscape}} {
 		c.OnWindowShortcut(key.mods, key.key, func() {
-			if !a.pal && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods == ui.Cmd && !a.searchInput.Focused(c)) {
+			if !a.pal && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods&ui.Cmd != 0 && !a.searchInput.Focused(c)) {
 				a.keyRepeat = false
 				a.actionKey(key.mods, key.key)
 			}
@@ -169,8 +192,8 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		}
 		return true
 	}
-	if key == ui.KeyEscape && mods == 0 && (a.renaming != "" || a.deleting != "") {
-		a.renaming, a.deleting = "", ""
+	if key == ui.KeyEscape && mods == 0 && (a.renaming != "" || a.deleting != "" || len(a.removing) > 0) {
+		a.renaming, a.deleting, a.removing = "", "", nil
 		return true
 	}
 	if a.editing != "" {
@@ -254,21 +277,29 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	}
 	if len(a.C.Approvals) > 0 {
 		ap := a.C.Approvals[0]
-		allow, always := false, false
+		allow, always, forever := false, false, false
 		switch {
 		case key == ui.KeyEnter && mods == 0:
 			allow = true
 		case key == ui.KeyEnter && mods == ui.Cmd:
 			allow, always = true, true
+		case key == ui.KeyEnter && mods == ui.Cmd|ui.Alt:
+			// Option adds the stronger choice, as Option does to a Mac's
+			// menu items: allowed from now on, in every session.
+			allow, forever = true, true
 		case key == ui.KeyEscape && mods == 0:
 		default:
 			return false
 		}
 		if ap.Rule == nil {
-			always = false // nothing to keep: it is allowed once
+			always, forever = false, false // nothing to keep: it is allowed once
 		}
 		if !a.C.Answering[ap.ID] && !a.keyRepeat {
-			a.do(a.C.Answer(ap.ID, allow, always))
+			if forever {
+				a.do(a.C.Respond(proto.ApprovalAnswer{ApprovalID: ap.ID, Allow: true, Forever: true}))
+			} else {
+				a.do(a.C.Answer(ap.ID, allow, always))
+			}
 		}
 		return true
 	}
@@ -296,6 +327,15 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 }
 
 func (a *App) composerKey(k ui.TextKey) bool {
+	// The editor takes Shift+Cmd+A as Cmd+A, select all; in the composer
+	// it archives the session, as it does wherever else the focus is.
+	if k.Key == ui.KeyA && k.Mods == ui.Cmd|ui.Shift {
+		if a.C.Current != nil && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			s := *a.C.Current
+			a.archive(s, !s.Archived)
+		}
+		return true
+	}
 	text := k.Text()
 	prev := a.draft
 	a.draft = text

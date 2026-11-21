@@ -17,6 +17,8 @@
   "copyReply": "复制",
   "copyMarkdown": "复制为 Markdown",
   "stop": "停止",
+  "escToInterrupt": "esc 中断",
+  "stopEsc": "停止（esc）",
   "send": "发送",
   "undo": "撤销",
   "rewind": "回退",
@@ -44,6 +46,15 @@
   "revealInFinder": "在访达中显示",
   "delete": "删除",
   "deleteTitle": "删除「{title}」？",
+  "removeProjectTitle": "移除「{name}」？",
+  "removeProjectBody": "它的 {count} 个会话会连同记录和改动历史一起删掉，不能撤销。只想收起来的话，逐个归档。",
+  "@removeProjectBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "deleteBody": "这个会话的记录和改动历史会一起删掉，不能撤销。只想收起来的话，用归档。",
   "nextWaiting": "下一个等你的会话",
   "redo": "重做",
@@ -360,6 +371,13 @@
   "showChanges": "显示变更",
   "showSidebar": "显示边栏",
   "menuSession": "会话",
+  "menuView": "显示",
+  "zoomIn": "放大",
+  "zoomOut": "缩小",
+  "actualSize": "实际大小",
+  "previousSession": "上一个会话",
+  "nextSession": "下一个会话",
+  "recallLastPrompt": "调回上一条消息（输入框为空时）",
   "toolWebFetch": "读取网页",
   "toolWebSearch": "搜索网页",
   "toolMemory": "记忆",

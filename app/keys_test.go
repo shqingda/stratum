@@ -186,7 +186,7 @@ func TestTask8ApprovalHints(t *testing.T) {
 		tt := task8Tester(a, dark)
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
 		texts := strings.Join(tt.Texts(), "|")
-		if strings.Count(texts, "⌘⏎") != 1 || strings.Count(texts, "esc") != 1 {
+		if strings.Count(texts, "|⌘⏎|") != 1 || strings.Count(texts, "|⌥⌘⏎|") != 1 || strings.Count(texts, "esc") != 1 {
 			t.Fatalf("only oldest should show shortcut hints: %q", texts)
 		}
 		snapshot(t, tt, "t8-approval-keys-"+appearance)

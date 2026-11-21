@@ -32,7 +32,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).AlignItems(ui.Center).DragWindow().Children(func() {
 		track := ui.Row(c.Key("rv-tabs")).Grow(1).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center)
 		trackW := track.Bounds().W
-		pos := track.Spring("tab-pos", float32(activeIdx), ui.SpringOptions{Stiffness: 420, Damping: 36})
+		pos := track.Spring("tab-pos", float32(activeIdx), ui.SpringOptions{Stiffness: 420, Damping: 41}) // critically damped: a tap carries no momentum
 		track.Children(func() {
 			thumbBg := p.Card
 			if p == dark {

@@ -176,7 +176,7 @@ func (a *App) transcript(c *ui.Context) {
 				case it.older:
 					a.olderRow(c)
 				case it.ap != nil:
-					a.turn(c, true, func() { a.ask(c, *it.ap) })
+					a.waitTurn(c, func() { a.ask(c, *it.ap) })
 				case it.fold != nil:
 					a.turn(c, it.live, func() { a.fold(c, it.fold) })
 				case it.work != nil:
@@ -209,13 +209,14 @@ func (a *App) scrollBottomPill(c *ui.Context) {
 	p := a.p
 	ui.Row(c).Absolute().Left(0).Right(0).Bottom(a.dockH+16).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
 		b := ui.ButtonBase(c.Key("scroll-bottom")).Row().Height(32).Padding(0, 12).Gap(6).Radius(16).
-			AlignItems(ui.Center).Material(glassButton(p)).Border(.5, p.Edge2).
+			AlignItems(ui.Center).Border(.5, p.Edge2).
 			Label(locales.ScrollToBottom()).Tooltip(locales.ScrollToBottom()).
 			Transition(ui.ElementTransition{
 				Enter:    &ui.Motion{Y: 10, Scale: .92, Opacity: 0},
 				Exit:     &ui.Motion{Y: 8, Scale: .94, Opacity: 0},
 				Duration: 180 * time.Millisecond,
 			})
+		a.glass(b, glassButton(p))
 		press(b)
 		focusRing(b, p)
 		rim(b, p)
@@ -467,11 +468,23 @@ func (a *App) liveFrom() int {
 // turn indents what the agent did 14 points, behind a 2-point rail that
 // the running turn lights, with a pulse running down it.
 func (a *App) turn(c *ui.Context, live bool, content func()) {
+	a.turnRail(c, live, false, content)
+}
+
+// waitTurn is a turn waiting on the user: its rail is lit and still, as
+// what waits does not move while nothing happens, and the window is not
+// redrawn for as long as the question stands.
+func (a *App) waitTurn(c *ui.Context, content func()) {
+	a.turnRail(c, true, true, content)
+}
+
+func (a *App) turnRail(c *ui.Context, live, still bool, content func()) {
 	p := a.p
 	ui.Row(c).AlignItems(ui.Stretch).Children(func() {
 		rail := ui.Box(c).Width(2).Shrink(0).Clip()
 		if live {
-			if a.reduceMotion() {
+			// While the turn waits on the user nothing of it moves.
+			if still || len(a.C.Approvals) > 0 || a.reduceMotion() {
 				rail.Background(p.Live.Alpha(.45))
 			} else {
 				rail.Background(p.LiveBg)
@@ -549,7 +562,7 @@ func (a *App) heroEmblem(c *ui.Context, size float32) {
 		if emblem.Hovered() {
 			target = -2.5
 		}
-		lift := emblem.Spring("hero-lift", target, ui.SpringOptions{Stiffness: 340, Damping: 26})
+		lift := emblem.Spring("hero-lift", target, ui.SpringOptions{Stiffness: 340, Damping: 37}) // critically damped, as a hover carries no momentum
 		scale := 1 - lift*.016
 		emblem.Translate(0, lift).Scale(scale, scale)
 		ui.Box(c).Width(size * .54).Height(4).Radius(2).Margin(5, 0, 0, 0).
@@ -752,6 +765,11 @@ func (a *App) note(c *ui.Context, e *client.Entry) {
 		if e.Note == "limit" && a.last(e) && !a.C.Busy && a.textButton(c, "go-on", locales.ContinueTurn()).Clicked() {
 			a.do(a.C.Prompt(locales.ContinueTurn()))
 		}
+		// A turn that failed can be run again from where it stands, as
+		// Safari offers to reload a page that did not load.
+		if e.Note == "fail" && a.last(e) && !a.C.Busy && a.canRetryTurn(e.Turn) && a.textButton(c, "retry-failed", locales.Retry()).Clicked() {
+			a.retryTurn(e.Turn)
+		}
 	})
 	if open {
 		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
@@ -945,7 +963,7 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				a.deny(ap.ID)
 			}
 			if ap.Rule != nil {
-				if a.button(c, "forever:"+ap.ID, locales.AllowAlways(), "", false).Disabled(busy).Clicked() {
+				if a.button(c, "forever:"+ap.ID, locales.AllowAlways(), a.approvalHint(c, ap.ID, "⌥⌘⏎"), false).Disabled(busy).Clicked() {
 					a.do(a.C.Respond(proto.ApprovalAnswer{ApprovalID: ap.ID, Allow: true, Forever: true}))
 				}
 				if a.button(c, "always:"+ap.ID, locales.AllowForSession(), a.approvalHint(c, ap.ID, "⌘⏎"), false).Disabled(busy).Clicked() {
@@ -1058,8 +1076,11 @@ func (a *App) question(c *ui.Context, ap proto.Approval) {
 // ink on paper turned over.
 func (a *App) button(c *ui.Context, key, label, kbd string, primary bool) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 12).Gap(8).Radius(8).AlignItems(ui.Center).Label(label)
+	// Answering keeps the keyboard where it was, in the composer for the
+	// next message, as the buttons of Mail's and Notes' bars do.
+	b := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 12).Gap(8).Radius(8).AlignItems(ui.Center).Label(label).KeepFocus()
 	press(b)
+	focusRing(b, p)
 	fg, hint := p.Fg, p.Mute
 	if primary {
 		b.Background(p.Acc)
@@ -1355,28 +1376,42 @@ func (a *App) retryButton(c *ui.Context, turn int) {
 	}
 }
 
-// approvalDiff shows what a file change asked about would change, before
-// it runs: the first lines of the edit, or of the new file.
-func (a *App) approvalDiff(c *ui.Context, ap proto.Approval) {
-	if ap.Tool != "edit_file" && ap.Tool != "write_file" {
-		return
-	}
+// approvalLines is the diff a file change asked about would make, worked
+// out once for each approval.
+func approvalLines(ap proto.Approval) []diffLine {
 	var args struct {
 		OldText string `json:"old_text"`
 		NewText string `json:"new_text"`
 		Content *string
 	}
 	if json.Unmarshal(ap.Args, &args) != nil {
-		return
+		return nil
 	}
 	oldText, newText := args.OldText, args.NewText
 	if ap.Tool == "write_file" {
 		if args.Content == nil {
-			return
+			return nil
 		}
 		oldText, newText = "", *args.Content
 	}
 	lines, _ := lineDiff(oldText, newText)
+	return lines
+}
+
+// approvalDiff shows what a file change asked about would change, before
+// it runs: the first lines of the edit, or of the new file.
+func (a *App) approvalDiff(c *ui.Context, ap proto.Approval) {
+	if ap.Tool != "edit_file" && ap.Tool != "write_file" {
+		return
+	}
+	lines, ok := a.apDiffs[ap.ID]
+	if !ok {
+		lines = approvalLines(ap)
+		if a.apDiffs == nil || len(a.apDiffs) > 16 {
+			a.apDiffs = map[string][]diffLine{}
+		}
+		a.apDiffs[ap.ID] = lines
+	}
 	if len(lines) == 0 {
 		return
 	}

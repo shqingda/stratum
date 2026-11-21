@@ -8,12 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/kernel/rpc"
+	"github.com/shqingda/talos/locales"
 	"github.com/shqingda/talos/proto"
 )
 
@@ -54,6 +56,7 @@ type App struct {
 	toast              struct {
 		icon, text string
 		at         time.Time
+		said       bool // VoiceOver has been told
 	}
 	cardCache          map[string]parsedCard
 	keptUnread         string // marked unread while shown
@@ -74,6 +77,12 @@ type App struct {
 	sideW               float32 // user-adjusted sidebar width, 0 means default
 	rvW                 float32 // user-adjusted review width, 0 means default
 	dockH               float32 // how tall the composer floating on the transcript was
+	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
+	sys                 ui.Preferences        // the desktop's accessibility preferences, read each frame
+	focusSession        string                // the session the composer last took the focus for
+	overWas             bool                  // the palette, settings or automations showed last frame
+	removing            []string              // the sessions of the project the user asked to remove, waiting on Remove
+	removingName        string
 	pal                 bool    // the ⌘K palette shows
 	jump                int64   // a message to scroll to, from a search
 	jumpIn              string  // the session it is in
@@ -129,8 +138,43 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	return &App{C: c, now: time.Now, openIn: openIn, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
+	a := &App{C: c, now: time.Now, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
+	a.openIn = a.openInBackground
+	return a
+}
+
+// restoreFocus puts the keyboard back in the composer when the session
+// changes, and when the palette, settings or automations close: what
+// comes next is typing, as in Claude's and Codex's apps.
+func (a *App) restoreFocus(c *ui.Context) {
+	id := ""
+	if a.C.Current != nil {
+		id = a.C.Current.ID
+	}
+	over := a.pal || a.settingsOpen || a.automationsOpen
+	if !over && (id != a.focusSession || a.overWas) && id != "" {
+		a.composerInput.Focus(c)
+	}
+	a.focusSession, a.overWas = id, over
+}
+
+// openInBackground opens dir in app off the UI thread, as LaunchServices
+// can take a while to answer: a click never holds the window up. A failure
+// shows as the action's error once it comes.
+func (a *App) openInBackground(app, dir string) error {
+	go func() {
+		err := openIn(app, dir)
+		if err == nil || a.update == nil {
+			return
+		}
+		name := app
+		if name == "" {
+			name = filepath.Base(dir)
+		}
+		a.update(func() { a.err = locales.CouldntOpen(name, err.Error()) })
+	}()
+	return nil
 }
 
 // Serve connects the app to a kernel on in-process pipes until ctx ends.
@@ -213,6 +257,7 @@ func (a *App) View(c *ui.Context) {
 	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
 		c.SetZoom(z)
 	}
+	a.sys = c.Preferences()
 	if a.reduceMotion() {
 		c.DisableAnimations()
 	}
@@ -267,6 +312,8 @@ func (a *App) View(c *ui.Context) {
 				sideWrap.Translate(-(1-a.sideOpen)*10, 0).Opacity(min(1, a.sideOpen*1.35))
 			}
 			sideWrap.Children(func() { a.sidebar(c, vibrant) })
+		} else {
+			a.visibleSessions = a.sessionOrder()
 		}
 		a.main(c)
 		if a.sideOpen > 0.99 {
@@ -277,10 +324,13 @@ func (a *App) View(c *ui.Context) {
 	a.palette(c)
 	a.toastHUD(c)
 	a.keys(c)
+	a.restoreFocus(c)
 }
 
+// reduceMotion is whether to keep still what would move: as the user set
+// in Talos, or in macOS (Accessibility › Display › Reduce motion).
 func (a *App) reduceMotion() bool {
-	return a.settings().ReduceMotion
+	return a.settings().ReduceMotion || a.sys.ReduceMotion
 }
 
 const (

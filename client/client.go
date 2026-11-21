@@ -191,6 +191,10 @@ type Client struct {
 	overflow  bool
 	streaming *Entry
 	thinking  *Entry // the thinking entry streaming in
+	// streamBuf and thinkBuf gather the deltas of streaming and thinking,
+	// whose Text they hand out, so that a long reply is not copied whole
+	// for each delta.
+	streamBuf, thinkBuf strings.Builder
 	thought   *Entry // the streamed thinking entry its message has not yet sent whole
 	want      string // session to show on (re)connect
 	modelsReq string
@@ -683,8 +687,10 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.endStream()
 			c.thinking = c.add(&Entry{Role: Thinking, at: e.At})
 			c.thought = c.thinking
+			c.thinkBuf.Reset()
 		}
-		c.thinking.Text += d.Text
+		c.thinkBuf.WriteString(d.Text)
+		c.thinking.Text = c.thinkBuf.String()
 		c.thinking.Took = e.At.Sub(c.thinking.at)
 	case proto.EventUsage:
 		var u llm.Usage
@@ -697,8 +703,10 @@ func (c *Client) event(e proto.Event) []proto.Command {
 		c.endThinking()
 		if c.streaming == nil {
 			c.streaming = c.add(&Entry{Role: Assistant})
+			c.streamBuf.Reset()
 		}
-		c.streaming.Text += d.Text
+		c.streamBuf.WriteString(d.Text)
+		c.streaming.Text = c.streamBuf.String()
 	case proto.EventMessage:
 		var m llm.Message
 		if json.Unmarshal(e.Data, &m) == nil {

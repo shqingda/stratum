@@ -149,6 +149,60 @@ func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element 
 	return it
 }
 
+// sessionGroups are the sessions as the sidebar groups them.
+type sessionGroups struct {
+	waiting, pinned, archived []proto.Session
+	folders                   []string
+	byFolder                  map[string][]proto.Session
+	cwdByFolder               map[string]string
+}
+
+func (a *App) groupSessions() sessionGroups {
+	g := sessionGroups{byFolder: map[string][]proto.Session{}, cwdByFolder: map[string]string{}}
+	for _, s := range a.C.Sessions {
+		switch {
+		case a.state(s) == "wait":
+			g.waiting = append(g.waiting, s)
+			continue
+		case s.Archived:
+			g.archived = append(g.archived, s)
+			continue
+		case s.Pinned:
+			g.pinned = append(g.pinned, s)
+			continue
+		}
+		f := filepath.Base(s.Cwd)
+		if _, ok := g.byFolder[f]; !ok {
+			g.folders = append(g.folders, f)
+			g.cwdByFolder[f] = s.Cwd
+		}
+		g.byFolder[f] = append(g.byFolder[f], s)
+	}
+	return g
+}
+
+// sessionOrder is the sessions in the order the sidebar shows them, for
+// ⌘1–⌘9 and ⌘[ ⌘] to count by while the sidebar is hidden: the numbers
+// stay those the sidebar would show, as Safari's tabs keep theirs.
+func (a *App) sessionOrder() []string {
+	g := a.groupSessions()
+	ids := a.visibleSessions[:0]
+	add := func(ss []proto.Session) {
+		for _, s := range ss {
+			ids = append(ids, s.ID)
+		}
+	}
+	add(g.waiting)
+	add(g.pinned)
+	for _, f := range g.folders {
+		add(g.byFolder[f])
+	}
+	if a.showArchived {
+		add(g.archived)
+	}
+	return ids
+}
+
 // sessions lists the sessions: the ones waiting on the user first, then
 // the rest by workspace, each newest first.
 func (a *App) sessions(c *ui.Context) {
@@ -157,29 +211,8 @@ func (a *App) sessions(c *ui.Context) {
 		emptyState(c, a.p, "message-plus", locales.EmptySessionsTitle(), locales.EmptySessionsHint(), nil)
 		return
 	}
-	var waiting, pinned, archived []proto.Session
-	var folders []string
-	byFolder := map[string][]proto.Session{}
-	cwdByFolder := map[string]string{}
-	for _, s := range a.C.Sessions {
-		switch {
-		case a.state(s) == "wait":
-			waiting = append(waiting, s)
-			continue
-		case s.Archived:
-			archived = append(archived, s)
-			continue
-		case s.Pinned:
-			pinned = append(pinned, s)
-			continue
-		}
-		f := filepath.Base(s.Cwd)
-		if _, ok := byFolder[f]; !ok {
-			folders = append(folders, f)
-			cwdByFolder[f] = s.Cwd
-		}
-		byFolder[f] = append(byFolder[f], s)
-	}
+	g := a.groupSessions()
+	waiting, pinned, archived, folders, byFolder, cwdByFolder := g.waiting, g.pinned, g.archived, g.folders, g.byFolder, g.cwdByFolder
 	if len(waiting) > 0 {
 		a.group(c, "", locales.NeedsYou(), len(waiting))
 		for _, s := range waiting {
@@ -262,9 +295,12 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 					_ = exec.Command("open", "-R", cwd).Start()
 				}
 				m.Separator()
-				if m.Item(locales.RemoveProject()).Danger().Chosen() {
+				if m.Item(locales.RemoveProject()+"…").Danger().Chosen() {
+					// It deletes every session in it, for good: ask first, as
+					// Finder does before emptying the Trash.
+					a.removing, a.removingName = a.removing[:0], label
 					for _, s := range sessions {
-						a.do(a.C.Delete(s.ID))
+						a.removing = append(a.removing, s.ID)
 					}
 				}
 			}, a.menuOptions(nil))

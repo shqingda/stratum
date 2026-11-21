@@ -150,6 +150,22 @@ func emptyState(c *ui.Context, p *Palette, icon, title, subtitle string, action 
 
 // tintedGlass returns macOS Tinted Liquid Glass: balanced frosted tint and
 // contrast over Clear so sidebar text stays sharp while preserving glass depth.
+// glass puts g on e, or the solid card where macOS asks for less
+// transparency (Accessibility › Display › Reduce transparency), as its own
+// bars turn solid; with more contrast, its edge is darker too.
+func (a *App) glass(e ui.Element, g glass.Glass) ui.Element {
+	switch {
+	case a.sys.ReduceTransparency || a.sys.HighContrast:
+		e.Background(a.p.Card)
+		if a.sys.HighContrast {
+			e.Border(1, a.p.Fg2)
+		}
+	default:
+		e.Material(g)
+	}
+	return e
+}
+
 func tintedGlass(p *Palette) glass.Glass {
 	tint := ui.RGBA(244, 245, 248, .28)
 	if p == dark {

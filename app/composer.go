@@ -58,7 +58,15 @@ func (a *App) dock(c *ui.Context) {
 	a.box(c)
 	a.metaBar(c)
 	if a.err != "" {
-		ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).Margin(6, 0, 0, 0).Center()
+		// An action's error stays until dismissed or the next action, with
+		// its mark, as an inline error in a Mac form does.
+		ui.Row(c).Gap(6).Margin(6, 0, 0, 0).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+			sym(c, "alert-circle", 13, p.Minus)
+			ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).MinWidth(0).Selectable()
+			if a.iconPill(c, "dismiss-error", "x", locales.Close()).Size(24, 24).Clicked() {
+				a.err = ""
+			}
+		})
 	}
 }
 
@@ -253,7 +261,7 @@ func (a *App) putBack(text string) {
 
 // iconPill is a composer control that is only a symbol.
 func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
-	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(14).Center().Label(tip).Tooltip(tip)
+	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(14).Center().Label(tip).Tooltip(tip).KeepFocus()
 	press(b)
 	focusRing(b, a.p)
 	if b.Hovered() {
@@ -287,7 +295,7 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 func (a *App) goButton(c *ui.Context) {
 	p := a.p
 	b := ui.ButtonBase(c.Key("go")).Size(30, 30).Radius(15).Center().Margin(0, 0, 0, 4).
-		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond})
+		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond}).KeepFocus()
 	press(b)
 	focusRing(b, p)
 	// The arrow and the stop square cross-fade where they are, so the
@@ -304,10 +312,13 @@ func (a *App) goButton(c *ui.Context) {
 	}
 	switch {
 	case a.C.Busy && !a.ready():
-		b.Label(locales.Stop()).Background(p.Acc).Children(func() {
+		b.Label(locales.Stop()).Tooltip(locales.StopEsc()).Background(p.Acc).Children(func() {
 			glyph(true, p.OnAcc)
-			// A ring round it goes while the turn runs.
-			ui.Box(c).Absolute().Left(-3).Top(-3).Size(36, 36).Children(func() { spinner(c, p, 36) })
+			// A ring round it goes while the turn runs, and stops while
+			// the turn waits on the user.
+			if len(a.C.Approvals) == 0 {
+				ui.Box(c).Absolute().Left(-3).Top(-3).Size(36, 36).Children(func() { spinner(c, p, 36) })
+			}
 		})
 		if b.Clicked() {
 			a.do(a.C.Cancel())
@@ -367,7 +378,24 @@ func (a *App) status(c *ui.Context) {
 		if a.C.Phase != client.Ready {
 			item("refresh", phaseText(a.C.Phase))
 		}
+		a.runningFor(c)
 	})
+}
+
+// runningFor says how long the turn has run and that Esc stops it, as
+// Xcode's toolbar tells a build's progress: the time ticks each second.
+func (a *App) runningFor(c *ui.Context) {
+	if !a.C.Busy || len(a.C.Approvals) > 0 || len(a.C.Turns) == 0 {
+		return
+	}
+	t := a.C.Turns[len(a.C.Turns)-1]
+	if t.Done || t.Start.IsZero() {
+		return
+	}
+	p := a.p
+	ui.Spacer(c)
+	ui.Text(c, span(a.now().Sub(t.Start))+" · "+locales.EscToInterrupt()).FontSize(12.5).TextColor(p.Mute).SingleLine().FontFeatures("tnum")
+	c.After(time.Second)
 }
 
 // textButton is a small button that is only words.

@@ -98,12 +98,23 @@ func (a *App) archivedToast(c *ui.Context) {
 		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Exit: &ui.Motion{Y: 8, Opacity: 0}}).Children(func() {
 		sym(c, "archive", 14, p.Mute)
 		ui.Text(c, locales.ArchivedSession(u.title)).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		if a.textButton(c, "undo-archive", locales.Undo()).Clicked() {
-			off := false
-			a.do(a.C.Flag(proto.SessionFlag{SessionID: u.id, Archived: &off}))
-			a.undone = undo{}
+		if a.textButton(c, "undo-archive", locales.Undo()).Tooltip(locales.Undo()+"  ⌘Z").Clicked() {
+			a.undoArchive()
 		}
 	})
+}
+
+// undoArchive takes back the archiving just done, from the toast's button
+// or ⌘Z, as Mail takes back a message moved away.
+func (a *App) undoArchive() bool {
+	u := a.undone
+	if u.id == "" || a.now().Sub(u.at) >= archivedFor {
+		return false
+	}
+	off := false
+	a.do(a.C.Flag(proto.SessionFlag{SessionID: u.id, Archived: &off}))
+	a.undone = undo{}
+	return true
 }
 
 // flash shows a brief Apple-style HUD pill at the top center for keyboard or
@@ -112,6 +123,7 @@ func (a *App) flash(icon, text string) {
 	a.toast.icon = icon
 	a.toast.text = text
 	a.toast.at = a.now()
+	a.toast.said = false
 }
 
 const toastFor = 1800 * time.Millisecond
@@ -124,11 +136,17 @@ func (a *App) toastHUD(c *ui.Context) {
 		return
 	}
 	c.After(left)
+	if !a.toast.said {
+		// What the pill shows, VoiceOver says, as macOS's HUDs do.
+		c.Announce(t.text)
+		a.toast.said = true
+	}
 	p := a.p
 	ui.Row(c).Absolute().Top(barHeight+8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
 		pill := ui.Row(c.Key("toast-hud")).Height(32).Padding(0, 12).Gap(7).Radius(16).
-			Material(tintedGlass(p)).Border(.5, p.Edge2).AlignItems(ui.Center).
+			Border(.5, p.Edge2).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Opacity: 0}, Exit: &ui.Motion{Y: -4, Opacity: 0}})
+		a.glass(pill, tintedGlass(p))
 		lift(pill, p).Children(func() {
 			if t.icon != "" {
 				sym(c, t.icon, 13, p.Fg2)
@@ -140,6 +158,10 @@ func (a *App) toastHUD(c *ui.Context) {
 
 // deleteDialog asks before a session is deleted, which cannot be undone.
 func (a *App) deleteDialog(c *ui.Context) {
+	if len(a.removing) > 0 {
+		a.removeProjectDialog(c)
+		return
+	}
 	open := a.deleting != ""
 	if !open {
 		return
@@ -174,6 +196,40 @@ func (a *App) deleteDialog(c *ui.Context) {
 	})
 	if !open {
 		a.deleting = ""
+	}
+}
+
+// removeProjectDialog asks before a project's sessions are all deleted.
+func (a *App) removeProjectDialog(c *ui.Context) {
+	open := true
+	p := a.p
+	n := len(a.removing)
+	head := locales.RemoveProjectTitle(a.removingName)
+	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
+		scrim := ui.RGBA(12, 12, 14, .18)
+		if p == dark {
+			scrim = ui.RGBA(0, 0, 0, .42)
+		}
+		backdrop.Background(scrim)
+		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(head)
+		lift(panel, p).Children(func() {
+			ui.Text(c, head).FontSize(15).FontWeight(600).TextColor(p.Fg)
+			ui.Text(c, locales.RemoveProjectBody(n)).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
+			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
+				if a.button(c, "remove-cancel", locales.Cancel(), "esc", false).Clicked() {
+					open = false
+				}
+				if a.button(c, "remove-ok", locales.RemoveProject(), "", true).Background(p.Minus).Clicked() {
+					for _, id := range a.removing {
+						a.do(a.C.Delete(id))
+					}
+					open = false
+				}
+			})
+		})
+	})
+	if !open {
+		a.removing, a.removingName = nil, ""
 	}
 }
 

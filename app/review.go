@@ -37,13 +37,17 @@ type review struct {
 	sel    string // client.DiffKey of the file shown
 	asked  map[string]bool
 	diffs  map[string]*fileDiff
-	// The diffs show one under another: jump is the file to scroll to,
-	// tops where each file's diff starts.
-	scroll ui.ScrollState
-	jump   string
-	tops   map[string]float32
-	lastY  float32 // where the diffs were scrolled to last frame
-	folded map[string]bool
+	// computing are the large diffs being worked out off the UI thread.
+	computing map[string]bool
+	// The diffs show one under another, as a List of items: jump is the
+	// file to scroll to, settle the frames its landing takes, lastFirst
+	// the row at the top last frame.
+	list      ui.ListState
+	items     []diffItem
+	jump      string
+	settle    int
+	lastFirst int
+	folded    map[string]bool
 	// remarks are the comments on lines waiting to go to the agent
 	// together; writing is the line one is being written at.
 	remarks     []remark
@@ -181,23 +185,63 @@ func (a *App) shownTurns() []proto.ChangeTurn {
 	return turns[len(turns)-1:]
 }
 
+// syncDiffBytes is how large a file's two sides can be, together, for
+// its diff to be worked out on the UI thread: a small one shows in the
+// frame that asks for it, and a large one comes a moment later rather
+// than hold the window up.
+const syncDiffBytes = 64 << 10
+
 func (a *App) fileDiff(key string) *fileDiff {
 	if f, ok := a.rv.diffs[key]; ok {
 		return f
 	}
-	d, ok := a.C.Changes.Diffs[key]
-	if path, uncommitted := strings.CutPrefix(key, client.DiffKey(0, "")); uncommitted {
-		d, ok = a.C.Workspace.Diffs[path]
-	}
-	if path, branch := strings.CutPrefix(key, client.DiffKey(-1, "")); branch {
-		d, ok = a.C.Workspace.BaseDiffs[path]
-	}
+	d, ok := a.diffSource(key)
 	if !ok {
 		return nil
 	}
-	f := newFileDiff(d)
-	a.rv.diffs[key] = f
-	return f
+	size := 0
+	if d.Before != nil {
+		size += len(*d.Before)
+	}
+	if d.After != nil {
+		size += len(*d.After)
+	}
+	if size <= syncDiffBytes || a.update == nil {
+		f := newFileDiff(d)
+		a.rv.diffs[key] = f
+		return f
+	}
+	if a.rv.computing == nil {
+		a.rv.computing = map[string]bool{}
+	}
+	if !a.rv.computing[key] {
+		a.rv.computing[key] = true
+		go func() {
+			f := newFileDiff(d)
+			a.update(func() {
+				delete(a.rv.computing, key)
+				// The file may have changed again meanwhile.
+				if cur, ok := a.diffSource(key); ok && cur.Before == d.Before && cur.After == d.After {
+					a.rv.diffs[key] = f
+				}
+			})
+		}()
+	}
+	return nil
+}
+
+// diffSource is the two sides of the file a diff key names.
+func (a *App) diffSource(key string) (proto.ChangeDiff, bool) {
+	if path, uncommitted := strings.CutPrefix(key, client.DiffKey(0, "")); uncommitted {
+		d, ok := a.C.Workspace.Diffs[path]
+		return d, ok
+	}
+	if path, branch := strings.CutPrefix(key, client.DiffKey(-1, "")); branch {
+		d, ok := a.C.Workspace.BaseDiffs[path]
+		return d, ok
+	}
+	d, ok := a.C.Changes.Diffs[key]
+	return d, ok
 }
 
 // reviewToggle is the button in the bar that shows and hides the inspector.
@@ -445,48 +489,139 @@ func (a *App) splitPath(path string) (dir, base string) {
 	return dir, base
 }
 
+// diffItem is one row of the diffs pane: a file's head, a note, a hunk's
+// head or a line. The pane is a List of them, so that only the rows in
+// view are built, however long the diffs.
+type diffItem struct {
+	kind byte // 'f' file head, 'n' note, 'h' hunk head, 'l' line
+	key  string
+	turn int64
+	file proto.ChangeFile
+	d    *fileDiff
+	hunk int
+	e    edit
+	note string
+}
+
+// diffItemID is a row's identity, for the List to keep its place by.
+type diffItemID struct {
+	key  string
+	kind byte
+	hunk int
+	a, b int
+}
+
+func (it *diffItem) id() diffItemID {
+	return diffItemID{it.key, it.kind, it.hunk, it.e.a, it.e.b}
+}
+
+// diffItems lays the files' diffs out as rows, at most maxDiffLines
+// lines in all.
+func (a *App) diffItems(turns []proto.ChangeTurn) []diffItem {
+	items := a.rv.items[:0]
+	shown := 0
+	for _, t := range turns {
+		for _, f := range t.Files {
+			key := client.DiffKey(t.TurnSeq, f.Path)
+			items = append(items, diffItem{kind: 'f', key: key, turn: t.TurnSeq, file: f})
+			if a.rv.folded[key] {
+				continue
+			}
+			note := func(s string, n int) {
+				items = append(items, diffItem{kind: 'n', key: key, note: s, hunk: n})
+			}
+			d := a.fileDiff(key)
+			switch {
+			case d == nil:
+				note(locales.Reading(), -1)
+				continue
+			case len(d.hunks) == 0:
+				note(locales.NoContentChange(), -1)
+				continue
+			case shown >= maxDiffLines:
+				note(locales.TooManyChanges(), -1)
+				continue
+			}
+			if d.gaveUp {
+				note(locales.TooManyChangesWhole(), -2)
+			}
+			for i, h := range d.hunks {
+				if shown >= maxDiffLines {
+					note(locales.MoreHunks(len(d.hunks)-i), i)
+					break
+				}
+				items = append(items, diffItem{kind: 'h', key: key, turn: t.TurnSeq, file: f, d: d, hunk: i})
+				for _, e := range h.edits {
+					if shown >= maxDiffLines {
+						break
+					}
+					items = append(items, diffItem{kind: 'l', key: key, turn: t.TurnSeq, file: f, d: d, hunk: i, e: e})
+					shown++
+				}
+			}
+		}
+	}
+	a.rv.items = items
+	return items
+}
+
 // reviewDiff shows the files' diffs one under another; picking a file
 // scrolls to it, and scrolling picks the file at the top.
 func (a *App) reviewDiff(c *ui.Context, turns []proto.ChangeTurn) {
-	if a.rv.tops == nil {
-		a.rv.tops, a.rv.folded = map[string]float32{}, map[string]bool{}
+	if a.rv.folded == nil {
+		a.rv.folded = map[string]bool{}
 	}
-	ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&a.rv.scroll).Children(func() {
-		var secs []ui.Element
-		var keys []string
-		inner := ui.Column(c).Padding(6, 0, 10, 0).Children(func() {
-			shown := 0
-			for _, t := range turns {
-				for _, f := range t.Files {
-					key := client.DiffKey(t.TurnSeq, f.Path)
-					sec := ui.Column(c.Key("diff:" + key)).Children(func() {
-						a.fileHead(c, key, f)
-						if !a.rv.folded[key] {
-							shown = a.fileDiffView(c, t.TurnSeq, f.Path, shown)
-						}
-					})
-					secs, keys = append(secs, sec), append(keys, key)
+	items := a.diffItems(turns)
+	st := &a.rv.list
+	st.Key = func(i int) any { return a.rv.items[i].id() }
+	first, _ := st.Visible()
+	switch {
+	case a.rv.jump != "":
+		for i := range items {
+			if items[i].kind == 'f' && items[i].key == a.rv.jump {
+				st.ScrollTo(i, ui.Start)
+				break
+			}
+		}
+		a.rv.jump, a.rv.settle = "", 2
+	case a.rv.settle > 0:
+		// The jump lands as the next frames are laid out.
+		a.rv.settle--
+		a.rv.lastFirst = first
+	case first != a.rv.lastFirst && first >= 0 && first < len(items):
+		a.rv.lastFirst = first
+		a.rv.sel = items[first].key
+	}
+	ui.List(c, st, len(items), func(i int) { a.diffItemView(c, &a.rv.items[i]) }).Grow(1).MinHeight(0)
+}
+
+// diffItemView shows one row of the diffs pane.
+func (a *App) diffItemView(c *ui.Context, it *diffItem) {
+	p := a.p
+	switch it.kind {
+	case 'f':
+		a.fileHead(c, it.key, it.file)
+	case 'n':
+		pad := float32(6)
+		if it.hunk >= 0 {
+			pad = 8
+		}
+		ui.Text(c, it.note).FontSize(13).TextColor(p.Mute).Padding(pad, 14)
+	case 'h':
+		h := it.d.hunks[it.hunk]
+		ui.Row(c).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Children(func() {
+			ui.Text(c, h.head()).Font("monospace").FontSize(12.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
+			if it.turn > 0 && !a.C.Changes.FileReverted(it.turn, it.file.Path) {
+				b := a.barButton(c, "hunk", "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
+				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
+				if b.Clicked() {
+					a.do(a.C.RevertHunk(it.turn, it.file.Path, h.oldStart, h.oldLen, h.newStart, h.newLen))
 				}
 			}
 		})
-		if top := inner.Bounds().Y; inner.Bounds().H > 0 {
-			for i, sec := range secs {
-				a.rv.tops[keys[i]] = sec.Bounds().Y - top
-			}
-			y := a.rv.scroll.Y
-			if to, ok := a.rv.tops[a.rv.jump]; ok {
-				a.rv.scroll.ScrollTo(0, to, ui.Smooth)
-				a.rv.jump = ""
-			} else if y != a.rv.lastY && !a.rv.scroll.Scrolling() {
-				for _, k := range keys {
-					if a.rv.tops[k] <= y+8 {
-						a.rv.sel = k
-					}
-				}
-			}
-			a.rv.lastY = y
-		}
-	})
+	case 'l':
+		a.diffRow(c, it.file.Path, it.d, it.e)
+	}
 }
 
 // foldAll folds every file's diff, or opens them all when all are.
@@ -553,56 +688,6 @@ func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
 	if head.Clicked() {
 		a.rv.folded[key] = !folded
 	}
-}
-
-// fileDiffView is one file's hunks, and returns how many lines show so
-// far.
-func (a *App) fileDiffView(c *ui.Context, turn int64, path string, shown int) int {
-	p := a.p
-	key := client.DiffKey(turn, path)
-	note := func(s string) {
-		ui.Text(c, s).FontSize(13).TextColor(p.Mute).Padding(6, 14)
-	}
-	d := a.fileDiff(key)
-	switch {
-	case d == nil:
-		note(locales.Reading())
-		return shown
-	case len(d.hunks) == 0:
-		note(locales.NoContentChange())
-		return shown
-	case shown >= maxDiffLines:
-		note(locales.TooManyChanges())
-		return shown
-	}
-	if d.gaveUp {
-		note(locales.TooManyChangesWhole())
-	}
-	for i, h := range d.hunks {
-		if shown >= maxDiffLines {
-			ui.Text(c, locales.MoreHunks(len(d.hunks)-i)).FontSize(13).TextColor(p.Mute).Padding(8, 14)
-			break
-		}
-		ui.Row(c.Key(i)).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Children(func() {
-			head := fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.oldStart, h.oldLen, h.newStart, h.newLen)
-			ui.Text(c, head).Font("monospace").FontSize(12.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
-			if turn > 0 && !a.C.Changes.FileReverted(turn, path) {
-				b := a.barButton(c, fmt.Sprintf("hunk:%s:%d", key, i), "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
-				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
-				if b.Clicked() {
-					a.do(a.C.RevertHunk(turn, path, h.oldStart, h.oldLen, h.newStart, h.newLen))
-				}
-			}
-		})
-		for _, e := range h.edits {
-			if shown >= maxDiffLines {
-				break
-			}
-			a.diffRow(c, path, d, e)
-			shown++
-		}
-	}
-	return shown
 }
 
 // diffRow is one line: old and new line numbers, the sign and the text.

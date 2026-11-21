@@ -727,6 +727,7 @@ func shortcuts(steers bool) []struct {
 			{locales.FindNext(), "⌘G / ⇧⌘G"},
 			{locales.CopyLastReply(), "⌥⌘C"},
 			{locales.Rewind(), "esc esc"},
+			{locales.RecallLastPrompt(), "↑"},
 			{locales.SwitchSessionPrevNext(), "⌘[ / ⌘]"},
 			{locales.SessionsOneToNine(), "⌘1 – ⌘9"},
 			{locales.NextWaiting(), "⌘J"},
@@ -735,12 +736,14 @@ func shortcuts(steers bool) []struct {
 			{locales.ToggleInspector(), "⌘⌥I"},
 			{locales.Settings(), "⌘,"},
 			{locales.CloseSheetOrWindow(), "⌘W"},
+			{locales.ZoomIn() + " / " + locales.ZoomOut(), "⌘+ / ⌘−"},
+			{locales.ActualSize(), "⌘0"},
 		}},
 		{locales.Approvals(), []key{
-			{locales.Allow(), "↩"}, {locales.AllowForSession(), "⌘↩"}, {locales.Deny(), "esc"},
+			{locales.Allow(), "↩"}, {locales.AllowForSession(), "⌘↩"}, {locales.AllowAlways(), "⌥⌘↩"}, {locales.Deny(), "esc"},
 		}},
 		{locales.WhileWorking(), []key{
-			{locales.Stop(), "esc"}, {locales.SendRightAway(), now}, {locales.QueueIt(), queue},
+			{locales.Stop(), "esc / ⌘."}, {locales.SendRightAway(), now}, {locales.QueueIt(), queue},
 		}},
 	}
 }

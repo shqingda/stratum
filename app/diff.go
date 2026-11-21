@@ -1,5 +1,7 @@
 package app
 
+import "fmt"
+
 // A line diff for whole files, as the review panel shows them: Myers'
 // O(ND) algorithm, fast on long files with small edits, cut into hunks
 // with context around them.
@@ -127,6 +129,11 @@ type hunk struct {
 	oldStart, oldLen int // 1-based, as in "@@ -l,s +l,s @@"
 	newStart, newLen int
 	edits            []edit
+}
+
+// head is the hunk's "@@ -l,s +l,s @@" line.
+func (h hunk) head() string {
+	return fmt.Sprintf("@@ -%d,%d +%d,%d @@", h.oldStart, h.oldLen, h.newStart, h.newLen)
 }
 
 // hunks cuts edits into hunks with ctx kept lines on each side, joining
