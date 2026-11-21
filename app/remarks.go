@@ -39,7 +39,7 @@ func (a *App) remarksAt(c *ui.Context, at remark) {
 			Background(p.Card).Border(.5, p.Edge2).AlignItems(ui.Start).Children(func() {
 			sym(c, "message", 14, p.Mute)
 			ui.Text(c, r.text).FontSize(13).TextColor(p.Fg).Grow(1).MinWidth(0).Selectable()
-			if a.iconPill(c, fmt.Sprintf("unremark:%d", i), "x", locales.RemoveRemark()).Size(20, 20).Clicked() {
+			if a.iconPill(c, fmt.Sprintf("unremark:%d", i), "x", locales.RemoveRemark()).Size(24, 24).Clicked() {
 				a.rv.remarks = append(a.rv.remarks[:i:i], a.rv.remarks[i+1:]...)
 			}
 		})

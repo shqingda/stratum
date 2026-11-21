@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -181,6 +182,25 @@ func (a *App) groupSessions() sessionGroups {
 	return g
 }
 
+func (a *App) projectCollapsed(cwd string) bool {
+	return cwd != "" && slices.Contains(a.settings().CollapsedProjects, cwd)
+}
+
+func (a *App) toggleProjectCollapsed(cwd string) {
+	if cwd == "" {
+		return
+	}
+	s := a.settings()
+	list := slices.Clone(s.CollapsedProjects)
+	if idx := slices.Index(list, cwd); idx >= 0 {
+		list = append(list[:idx], list[idx+1:]...)
+	} else {
+		list = append(list, cwd)
+	}
+	s.CollapsedProjects = list
+	a.do(a.C.SaveSettings(s))
+}
+
 // sessionOrder is the sessions in the order the sidebar shows them, for
 // ⌘1–⌘9 and ⌘[ ⌘] to count by while the sidebar is hidden: the numbers
 // stay those the sidebar would show, as Safari's tabs keep theirs.
@@ -195,7 +215,9 @@ func (a *App) sessionOrder() []string {
 	add(g.waiting)
 	add(g.pinned)
 	for _, f := range g.folders {
-		add(g.byFolder[f])
+		if !a.projectCollapsed(g.cwdByFolder[f]) {
+			add(g.byFolder[f])
+		}
 	}
 	if a.showArchived {
 		add(g.archived)
@@ -226,9 +248,12 @@ func (a *App) sessions(c *ui.Context) {
 		}
 	}
 	for _, f := range folders {
-		a.projectGroup(c, f, cwdByFolder[f], byFolder[f])
-		for _, s := range byFolder[f] {
-			a.sessionRow(c, s)
+		cwd := cwdByFolder[f]
+		a.projectGroup(c, f, cwd, byFolder[f])
+		if !a.projectCollapsed(cwd) {
+			for _, s := range byFolder[f] {
+				a.sessionRow(c, s)
+			}
 		}
 	}
 	if len(archived) > 0 {
@@ -274,38 +299,50 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 
 func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Session) {
 	p := a.p
-	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(14, 0, 4, 0).Padding(0, 6, 0, 10).Gap(8).Radius(7).AlignItems(ui.Center)
+	collapsed := a.projectCollapsed(cwd)
+	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(14, 0, 4, 0).Padding(0, 4, 0, 8).Gap(4).Radius(7).AlignItems(ui.Center)
 	if row.Hovered() {
 		row.Background(p.Hover)
 	}
+	fillMenu := func(m *ui.Menu) {
+		if m.Item(locales.NewSession()).Chosen() {
+			a.do(a.C.NewSessionIn(cwd))
+		}
+		if cwd != "" && m.Item(locales.RevealInFinder()).Chosen() {
+			_ = exec.Command("open", "-R", cwd).Start()
+		}
+		m.Separator()
+		if m.Item(locales.RemoveProject()+"…").Danger().Chosen() {
+			// It deletes every session in it, for good: ask first, as
+			// Finder does before emptying the Trash.
+			a.removing, a.removingName = a.removing[:0], label
+			for _, s := range sessions {
+				a.removing = append(a.removing, s.ID)
+			}
+		}
+	}
+	row.ContextMenu(fillMenu)
 	row.Children(func() {
-		sym(c, "folder", 16, p.Fg2)
-		ui.Text(c, label).FontSize(13.5).FontWeight(600).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		toggle := ui.ButtonBase(c.Key("proj-toggle:"+cwd)).Row().Grow(1).MinWidth(0).Height(28).Gap(6).AlignItems(ui.Center).
+			KeepFocus().Label(label).Expanded(!collapsed)
+		focusRing(toggle, p)
+		toggle.Children(func() {
+			disclosureChevron(c, "proj:"+cwd, !collapsed, 11, p.Mute)
+			sym(c, "folder", 15, p.Fg2)
+			ui.Text(c, label).FontSize(13.5).FontWeight(600).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		})
+		if toggle.Clicked() {
+			a.toggleProjectCollapsed(cwd)
+		}
 		if row.Hovered() {
-			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(22, 22).Radius(6).Center().Label(label)
+			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(label)
 			if more.Hovered() {
 				more.Background(p.Sel)
 			}
 			more.Children(func() { sym(c, "dots", 14, p.Fg2) })
-			more.PopoverMenuButton(func(m *ui.Menu) {
-				if m.Item(locales.NewSession()).Chosen() {
-					a.do(a.C.NewSessionIn(cwd))
-				}
-				if cwd != "" && m.Item(locales.RevealInFinder()).Chosen() {
-					_ = exec.Command("open", "-R", cwd).Start()
-				}
-				m.Separator()
-				if m.Item(locales.RemoveProject()+"…").Danger().Chosen() {
-					// It deletes every session in it, for good: ask first, as
-					// Finder does before emptying the Trash.
-					a.removing, a.removingName = a.removing[:0], label
-					for _, s := range sessions {
-						a.removing = append(a.removing, s.ID)
-					}
-				}
-			}, a.menuOptions(nil))
+			more.PopoverMenuButton(fillMenu, a.menuOptions(nil))
 
-			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(22, 22).Radius(6).Center().Label(locales.NewSession()).Tooltip(locales.NewSession())
+			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(locales.NewSession()).Tooltip(locales.NewSession())
 			if add.Hovered() {
 				add.Background(p.Sel)
 			}

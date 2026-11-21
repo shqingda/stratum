@@ -139,21 +139,22 @@ func (a *App) transcript(c *ui.Context) {
 	a.seek(items)
 	a.findIn(items)
 	hit := a.hit()
-	a.list.Key = func(i int) any {
+	st := a.transcriptList()
+	st.Key = func(i int) any {
 		if i < len(items) {
 			return items[i].key()
 		}
 		return "running"
 	}
-	a.list.FollowEnd = true
-	a.list.FollowAnimation = &ui.Smooth
+	st.FollowEnd = true
+	st.FollowAnimation = &ui.Smooth
 	a.md.Theme = mdTheme(p, c.Theme())
 	a.md.CodeBlock = a.codeBlock
 	n := len(items)
 	if a.thinking() {
 		n++
 	}
-	list := ui.List(c, &a.list, n, func(i int) {
+	list := ui.List(c, st, n, func(i int) {
 		row := ui.Row(c).Justify(ui.Center).Padding(0, 28)
 		// What the running turn adds rises into place; rows already there
 		// when a session opens just show.
@@ -198,7 +199,7 @@ func (a *App) transcript(c *ui.Context) {
 			{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h},
 			{Color: black, At: max(28, foot-56) / h}, {Color: ui.Transparent, At: foot / h}}})
 	}
-	if len(items) > 0 && !a.list.AtEnd() {
+	if len(items) > 0 && !a.transcriptList().AtEnd() {
 		a.scrollBottomPill(c)
 	}
 }
@@ -229,7 +230,7 @@ func (a *App) scrollBottomPill(c *ui.Context) {
 			sym(c, "chevron-down", 13, p.Fg2)
 		})
 		if b.Clicked() {
-			a.list.ScrollToEnd()
+			a.transcriptList().ScrollToEnd()
 		}
 	})
 }
@@ -397,7 +398,7 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 			row.Background(p.Hover)
 		}
 		if row.Clicked() {
-			a.list.HoldPlace()
+			a.transcriptList().HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
@@ -418,7 +419,7 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 			row.Background(p.Hover)
 		}
 		if row.Clicked() {
-			a.list.HoldPlace()
+			a.transcriptList().HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
@@ -527,18 +528,30 @@ func (a *App) empty(c *ui.Context) {
 	ui.Column(c).Grow(1).Center().Gap(10).Padding(0, 28, 60, 28).Children(func() {
 		switch {
 		case a.C.Phase == client.Disconnected:
-			sym(c, "plug-connected-x", 28, p.Minus)
-			ui.Text(c, locales.KernelDisconnected()).FontSize(16).FontWeight(600).TextColor(p.Fg).Margin(8, 0, 0, 0)
+			subtitle := locales.KernelDisconnectedHint()
 			if a.C.Err != "" {
-				ui.Text(c, a.C.Err).FontSize(13.5).TextColor(p.Fg2).MaxWidth(480).TextAlign(ui.Center).Selectable()
+				subtitle = a.C.Err + "\n" + subtitle
 			}
-			ui.Text(c, locales.KernelDisconnectedHint()).FontSize(13).TextColor(p.Mute)
+			var action func()
+			if a.reconnect != nil {
+				action = func() {
+					if a.pushButton(c, "reconnect-kernel", locales.Reconnect()).Clicked() {
+						a.reconnect()
+					}
+				}
+			}
+			emptyState(c, p, "plug-connected-x", locales.KernelDisconnected(), subtitle, action)
 		case a.C.Phase != client.Ready:
 			heroMark(c, 52, p == dark).Opacity(.5)
 			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(14, 0, 0, 0)
 		case a.C.Current == nil:
 			heroMark(c, 52, p == dark)
 			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(14, 0, 0, 0)
+			ui.Box(c).Margin(6, 0, 0, 0).Children(func() {
+				if a.pushButton(c, "empty-new-session", locales.NewSession()).Clicked() {
+					a.do(a.C.NewSession())
+				}
+			})
 		default:
 			a.hello(c)
 		}
@@ -562,7 +575,7 @@ func (a *App) heroEmblem(c *ui.Context, size float32) {
 		if emblem.Hovered() {
 			target = -2.5
 		}
-		lift := emblem.Spring("hero-lift", target, ui.SpringOptions{Stiffness: 340, Damping: 37}) // critically damped, as a hover carries no momentum
+		lift := emblem.Spring("hero-lift", target, springDefault) // critically damped, as a hover carries no momentum
 		scale := 1 - lift*.016
 		emblem.Translate(0, lift).Scale(scale, scale)
 		ui.Box(c).Width(size * .54).Height(4).Radius(2).Margin(5, 0, 0, 0).
@@ -752,7 +765,7 @@ func (a *App) note(c *ui.Context, e *client.Entry) {
 			}
 		}
 		if row.Clicked() {
-			a.list.HoldPlace()
+			a.transcriptList().HoldPlace()
 			a.opened[key] = !open
 		}
 		row.Children(func() {
@@ -804,7 +817,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		}
 	}
 	if row.Clicked() && canOpen {
-		a.list.HoldPlace()
+		a.transcriptList().HoldPlace()
 		a.opened[e.CallID] = !open
 	}
 	row.Children(func() {
@@ -1159,7 +1172,7 @@ func (a *App) seek(items []item) {
 	}
 	for i, it := range items {
 		if it.e != nil && it.e.Seq == a.jump || has(it.work) || has(it.fold) {
-			a.list.ScrollTo(i, ui.Center)
+			a.transcriptList().ScrollTo(i, ui.Center)
 			a.jump = 0
 			return
 		}

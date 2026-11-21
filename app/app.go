@@ -62,8 +62,8 @@ type App struct {
 	keptUnread         string // marked unread while shown
 	showArchived       bool
 	drafts             drafts       // keeps each session's draft in the kernel
-	query              string       // the sidebar's search
-	list               ui.ListState // the transcript
+	query              string                   // the sidebar's search
+	lists              map[string]*ui.ListState // per-session transcript scroll state
 	md                 markdown.Options
 	opened             map[string]bool // tool calls whose output shows
 	inWork             bool            // building a finished turn's folded work
@@ -72,6 +72,8 @@ type App struct {
 	// that opening it in a narrow window put the sidebar away, so that
 	// closing it brings the sidebar back.
 	panelWas, sideMoved bool
+	rvOverlay           bool    // review panel floats over main when window is very narrow
+	lastW               float32 // last window width seen by fitPanel
 	sideOpen            float32 // how far the sidebar is out, 0 to 1, on its way
 	rvOpen              float32 // how far the review inspector is out, 0 to 1
 	sideW               float32 // user-adjusted sidebar width, 0 means default
@@ -105,6 +107,7 @@ type App struct {
 	searchInput                                             ui.Handle
 	composerInput                                           ui.Handle
 	closeWindow                                             func()
+	reconnect                                               func()
 	keyRepeat                                               bool
 	visibleSessions                                         []string
 	menuSession                                             string
@@ -294,7 +297,7 @@ func (a *App) View(c *ui.Context) {
 	}
 	// Keep the review drawer spring on the root so collapsing the sidebar
 	// never shifts child indices and replays the opening animation.
-	a.rvOpen = c.Root().Spring("review", rvTarget, ui.SpringOptions{Stiffness: 300, Damping: 34.6})
+	a.rvOpen = c.Root().Spring("review", rvTarget, springDefault)
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -303,7 +306,7 @@ func (a *App) View(c *ui.Context) {
 	if a.noSide {
 		target = 0
 	}
-	a.sideOpen = shell.Spring("side", target, ui.SpringOptions{Stiffness: 300, Damping: 34.6})
+	a.sideOpen = shell.Spring("side", target, springDefault)
 	sw := a.sideWidth()
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
@@ -418,16 +421,31 @@ func (a *App) main(c *ui.Context) {
 	})
 	if a.rvOpen > 0.001 {
 		rw := a.reviewWidth()
-		rvWrap := ui.Row(c).Width(a.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
-		if a.rvOpen < 0.999 {
-			rvWrap.Translate((1-a.rvOpen)*10, 0).Opacity(min(1, a.rvOpen*1.35))
-		}
-		rvWrap.Children(func() {
-			a.reviewPanel(c)
-			if a.rvOpen > 0.99 {
-				a.splitHandle(c, "split-review", 0, func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
+		if a.rvOverlay {
+			w, _ := c.Size()
+			if w > 0 {
+				rw = min(rw, w*0.85)
 			}
-		})
+			rvWrap := ui.Row(c).Absolute().Top(0).Bottom(0).Right(0).Width(rw).ZIndex(20).AlignItems(ui.Stretch).Clip()
+			lift(rvWrap, p)
+			if a.rvOpen < 0.999 {
+				rvWrap.Translate((1-a.rvOpen)*20, 0).Opacity(min(1, a.rvOpen*1.35))
+			}
+			rvWrap.Children(func() {
+				a.reviewPanel(c)
+			})
+		} else {
+			rvWrap := ui.Row(c).Width(a.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
+			if a.rvOpen < 0.999 {
+				rvWrap.Translate((1-a.rvOpen)*10, 0).Opacity(min(1, a.rvOpen*1.35))
+			}
+			rvWrap.Children(func() {
+				a.reviewPanel(c)
+				if a.rvOpen > 0.99 {
+					a.splitHandle(c, "split-review", 0, func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
+				}
+			})
+		}
 	}
 }
 
@@ -447,19 +465,52 @@ func textZoom(size string) float32 {
 const minMain = 600
 
 // fitPanel puts the sidebar away when the review panel opens in a window
-// too narrow for all three, and brings it back when the panel closes.
+// too narrow for all three, overlays the panel when even without the sidebar
+// the main sheet would be narrower than minMain, and restores the sidebar when
+// the window widens or the panel closes.
 func (a *App) fitPanel(c *ui.Context) {
-	if a.rv.open == a.panelWas {
+	w, _ := c.Size()
+	if a.rv.open == a.panelWas && w == a.lastW {
 		return
 	}
 	a.panelWas = a.rv.open
-	w, _ := c.Size()
-	switch {
-	case a.rv.open && !a.noSide && w < a.sideWidth()+a.reviewWidth()+minMain:
+	a.lastW = w
+	if !a.rv.open {
+		a.rvOverlay = false
+		if a.sideMoved {
+			a.noSide, a.sideMoved = false, false
+		}
+		return
+	}
+	needAll := a.sideWidth() + a.reviewWidth() + minMain
+	if !a.noSide && w < needAll {
 		a.noSide, a.sideMoved = true, true
-	case !a.rv.open && a.sideMoved:
+	} else if a.sideMoved && w >= needAll {
 		a.noSide, a.sideMoved = false, false
 	}
+	a.rvOverlay = w < a.reviewWidth()+minMain
+}
+
+// transcriptList returns the scroll state for the active session.
+func (a *App) transcriptList() *ui.ListState {
+	id := ""
+	if a.C.Current != nil {
+		id = a.C.Current.ID
+	}
+	if a.lists == nil {
+		a.lists = map[string]*ui.ListState{}
+	}
+	st := a.lists[id]
+	if st == nil {
+		st = &ui.ListState{}
+		a.lists[id] = st
+	}
+	return st
+}
+
+// SetReconnect registers a callback to reconnect when the kernel disconnects.
+func (a *App) SetReconnect(fn func()) {
+	a.reconnect = fn
 }
 
 // SetCloseWindow registers the host window close callback used by ⌘W

@@ -458,7 +458,7 @@ func (a *App) mentionChips(c *ui.Context) {
 			if ch.slash {
 				bg, border = blue.Alpha(.10), blue.Alpha(.24)
 			}
-			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 6, 0, 8).Gap(4).Radius(7).
+			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 2, 0, 8).Gap(4).Radius(7).
 				Background(bg).Border(.5, border).AlignItems(ui.Center)
 			pill.Children(func() {
 				if ch.slash {
@@ -470,7 +470,7 @@ func (a *App) mentionChips(c *ui.Context) {
 					sym(c, ch.icon, 12, p.Mute)
 					ui.Text(c, ch.label).FontSize(12).FontWeight(500).TextColor(p.Fg2).SingleLine()
 				}
-				rm := ui.ButtonBase(c.Key("mchip-rm:"+ch.raw)).Size(16, 16).Radius(8).Center().Label(locales.Remove())
+				rm := ui.ButtonBase(c.Key("mchip-rm:"+ch.raw)).Size(24, 24).Radius(8).Center().KeepFocus().Label(locales.Remove())
 				press(rm)
 				if rm.Hovered() {
 					rm.Background(p.Hover)

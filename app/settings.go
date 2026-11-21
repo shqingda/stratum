@@ -385,7 +385,7 @@ func (a *App) settingsBuildFoot(c *ui.Context) {
 		}
 		ui.Spacer(c)
 		if a.checkUpdates != nil {
-			b := ui.ButtonBase(c.Key("check-updates")).Padding(2, 6).Radius(5).Center().Label(locales.CheckForUpdates())
+			b := ui.ButtonBase(c.Key("check-updates")).MinHeight(24).Padding(4, 8).Radius(5).Center().Label(locales.CheckForUpdates())
 			if b.Hovered() {
 				b.Background(p.Hover)
 			}

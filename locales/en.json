@@ -526,5 +526,8 @@
   "focusComposer": "Focus Composer",
   "copyLastReply": "Copy Last Reply",
   "switchSessionPrevNext": "Previous / Next Session",
-  "closeSheetOrWindow": "Close Panel or Window"
+  "closeSheetOrWindow": "Close Panel or Window",
+  "copyCommand": "Copy Command",
+  "copyOutput": "Copy Output",
+  "reconnect": "Reconnect"
 }

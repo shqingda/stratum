@@ -212,6 +212,11 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 		return
 	}
 	box := ui.Column(c.Key("card:"+e.CallID)).Margin(8, 0, 14, 0).Radius(12).Background(p.Card).Clip()
+	box.ContextMenu(func(m *ui.Menu) {
+		if path != "" && m.Item(locales.CopyPath()).Chosen() {
+			c.WriteClipboard(path)
+		}
+	})
 	raise(box, p)
 	diff := ui.Local(box, "diff", func() cardDiff { return cardDiff{} })
 	if diff.lines == nil || diff.oldText != oldText || diff.newText != newText {
@@ -294,6 +299,16 @@ func (a *App) cardStep(c *ui.Context, e *client.Entry, summary string, failed bo
 	tool, _ := toolFor(e.Text)
 	open := a.opened[e.CallID]
 	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(25).Gap(8).AlignItems(ui.Center).Label(tool.verb + " " + e.Detail).Expanded(open)
+	if e.Detail != "" || e.Output != "" {
+		row.ContextMenu(func(m *ui.Menu) {
+			if e.Detail != "" && m.Item(locales.CopyCommand()).Chosen() {
+				c.WriteClipboard(e.Detail)
+			}
+			if e.Output != "" && m.Item(locales.CopyOutput()).Chosen() {
+				c.WriteClipboard(e.Output)
+			}
+		})
+	}
 	if row.Clicked() {
 		open = !open
 		a.opened[e.CallID] = open

@@ -282,7 +282,7 @@ func (a *App) palette(c *ui.Context) {
 				section(locales.Files(), files)
 				section(locales.PaletteMessages(), hits)
 				if len(all) == 0 {
-					ui.Text(c, locales.PaletteNoMatches()).FontSize(13.5).TextColor(p.Mute).Padding(18, 16)
+					emptyState(c, p, "search", locales.PaletteNoMatches(), "", nil)
 				}
 				ui.Box(c).Height(6)
 			})

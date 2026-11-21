@@ -99,6 +99,12 @@ func lift(e ui.Element, p *Palette) ui.Element {
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.12)).Shadow(0, 2, 6, 0, ink.Alpha(.06)).Shadow(0, 18, 40, -16, ink.Alpha(.22))
 }
 
+var (
+	springDefault  = ui.SpringOptions{Stiffness: 300, Damping: 34.6} // critically damped (ζ ≈ 1.0)
+	springSnappy   = ui.SpringOptions{Stiffness: 650, Damping: 51}   // critically damped (ζ ≈ 1.0)
+	springMomentum = ui.SpringOptions{Stiffness: 480, Damping: 36}   // ζ ≈ 0.82, for rotation / momentum
+)
+
 // press shrinks a control a little while it is held, using a critically
 // damped spring so the feedback is interruptible on rapid taps.
 func press(e ui.Element) ui.Element {
@@ -106,7 +112,7 @@ func press(e ui.Element) ui.Element {
 	if e.Pressed() {
 		target = .965
 	}
-	s := e.Spring("press", target, ui.SpringOptions{Stiffness: 650, Damping: 51})
+	s := e.Spring("press", target, springSnappy)
 	return e.Scale(s, s)
 }
 
@@ -124,7 +130,7 @@ func disclosureChevron(c *ui.Context, key string, open bool, size float32, col u
 		target = 90
 	}
 	wrap := ui.Box(c.Key("chev:"+key)).Size(size+2, size+2).Center().Shrink(0)
-	deg := wrap.Spring("deg", target, ui.SpringOptions{Stiffness: 480, Damping: 36})
+	deg := wrap.Spring("deg", target, springMomentum)
 	wrap.Rotate(deg).Children(func() {
 		sym(c, "chevron-right", size, col)
 	})

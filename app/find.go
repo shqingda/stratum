@@ -80,7 +80,7 @@ func (a *App) findIn(items []item) {
 		case it.fold != nil:
 			a.opened["fold:"+it.fold[0].CallID] = true
 		}
-		a.list.ScrollTo(i, ui.Center)
+		a.transcriptList().ScrollTo(i, ui.Center)
 	}
 }
 

@@ -652,6 +652,8 @@ type Settings struct {
 	TextSize string `json:"textSize,omitempty"`
 	// ReduceMotion turns off spring and ambient animations for accessibility.
 	ReduceMotion bool `json:"reduceMotion,omitempty"`
+	// CollapsedProjects lists workspace cwds collapsed in the sidebar.
+	CollapsedProjects []string `json:"collapsedProjects,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"maps"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -432,6 +433,7 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 	key := client.DiffKey(turn, f.Path)
 	on := a.rv.sel == key
 	row := ui.ButtonBase(c.Key("file:"+key)).Row().Height(28).Padding(0, 8).Gap(8).Radius(6).AlignItems(ui.Center).Label(f.Path)
+	focusRing(row, p)
 	switch {
 	case on:
 		row.Background(p.Sel)
@@ -441,6 +443,7 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 	if row.Clicked() {
 		a.rv.sel, a.rv.jump = key, key
 	}
+	gone := false
 	status, col := "M", p.Mute
 	if d := a.fileDiff(key); d != nil {
 		switch d.status {
@@ -448,8 +451,10 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 			status, col = "A", p.Plus
 		case 'D':
 			status, col = "D", p.Minus
+			gone = true
 		}
 	}
+	row.ContextMenu(func(m *ui.Menu) { a.fileContextMenu(c, m, f.Path, gone) })
 	reverted := a.C.Changes.FileReverted(turn, f.Path)
 	row.Children(func() {
 		ui.Text(c, status).FontSize(11.5).FontWeight(600).TextColor(col).Width(12).TextAlign(ui.Center).Shrink(0)
@@ -656,15 +661,17 @@ func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
 	dir, base := a.splitPath(f.Path)
 	head := ui.ButtonBase(c.Key("head:"+key)).Row().Height(32).Padding(0, 12, 0, 8).Gap(6).AlignItems(ui.Center).
 		Label(dir+base).Expanded(!folded).Background(p.Sheet).BorderWidth(.5, 0).BorderColor(p.Edge)
+	focusRing(head, p)
 	if head.Hovered() {
 		head.Background(p.Hover)
 	}
+	gone := false
+	if d := a.fileDiff(key); d != nil && d.status == 'D' {
+		gone = true
+	}
+	head.ContextMenu(func(m *ui.Menu) { a.fileContextMenu(c, m, f.Path, gone) })
 	head.Children(func() {
 		sym(c, map[bool]string{true: "chevron-right", false: "chevron-down"}[folded], 14, p.Mute)
-		gone := false
-		if d := a.fileDiff(key); d != nil && d.status == 'D' {
-			gone = true
-		}
 		name := ui.ButtonBase(c.Key("name:" + key)).Row().MinWidth(0).Shrink(1).Label(locales.OpenInEditor()).Tooltip(locales.OpenInEditor()).Disabled(gone)
 		hover := name.Hovered() && !gone
 		name.Children(func() {
@@ -687,6 +694,25 @@ func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
 	})
 	if head.Clicked() {
 		a.rv.folded[key] = !folded
+	}
+}
+
+func (a *App) fileContextMenu(c *ui.Context, m *ui.Menu, path string, gone bool) {
+	openItem := m.Item(locales.OpenInEditor())
+	if gone {
+		openItem.Disabled(true)
+	}
+	if openItem.Chosen() && !gone {
+		if err := a.openIn("Visual Studio Code", path); err != nil {
+			a.err = locales.CouldntOpen("VS Code", err.Error())
+		}
+	}
+	if m.Item(locales.RevealInFinder()).Chosen() {
+		_ = exec.Command("open", "-R", path).Start()
+	}
+	if m.Item(locales.CopyPath()).Chosen() {
+		dir, base := a.splitPath(path)
+		c.WriteClipboard(dir + base)
 	}
 }
 

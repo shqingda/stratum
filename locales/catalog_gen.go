@@ -5315,3 +5315,33 @@ func CloseSheetOrWindow() string { return In(i18n.Locale()).CloseSheetOrWindow()
 func (msgs Messages) CloseSheetOrWindow() string {
 	return Catalog.Format(msgs.locale, "closeSheetOrWindow", nil)
 }
+
+// CopyCommand says "复制命令"
+// in the language the app shows.
+func CopyCommand() string { return In(i18n.Locale()).CopyCommand() }
+
+// CopyCommand says "复制命令"
+// in the language of msgs.
+func (msgs Messages) CopyCommand() string {
+	return Catalog.Format(msgs.locale, "copyCommand", nil)
+}
+
+// CopyOutput says "复制输出"
+// in the language the app shows.
+func CopyOutput() string { return In(i18n.Locale()).CopyOutput() }
+
+// CopyOutput says "复制输出"
+// in the language of msgs.
+func (msgs Messages) CopyOutput() string {
+	return Catalog.Format(msgs.locale, "copyOutput", nil)
+}
+
+// Reconnect says "重新连接"
+// in the language the app shows.
+func Reconnect() string { return In(i18n.Locale()).Reconnect() }
+
+// Reconnect says "重新连接"
+// in the language of msgs.
+func (msgs Messages) Reconnect() string {
+	return Catalog.Format(msgs.locale, "reconnect", nil)
+}
