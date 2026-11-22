@@ -139,29 +139,15 @@ func (a *App) prompt() (string, []llm.Image) {
 	return text, images
 }
 
-// attachments are the composer's chips, one for each attachment.
-func (a *App) attachments(c *ui.Context) {
-	p := a.p
-	if len(a.attached) == 0 {
-		return
-	}
-	ui.Row(c).Wrap().Gap(6).Margin(0, 0, 8, -4).Children(func() {
-		for i, at := range a.attached {
-			ui.Row(c.Key(i)).Height(36).Padding(3, 4, 3, 3).Gap(7).Radius(8).AlignItems(ui.Center).Background(p.Chip).MaxWidth(220).Children(func() {
-				ui.Box(c).Size(30, 30).Radius(6).Clip().Background(p.Card).Center().Shrink(0).Children(func() {
-					if at.thumb != nil {
-						ui.Image(c, at.thumb).Size(30, 30).Fit(ui.Cover)
-					} else {
-						sym(c, "file", 15, p.Fg2)
-					}
-				})
-				ui.Text(c, at.name).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
-				if a.iconButton(c, fmt.Sprint("unattach:", i), "x", locales.AttachRemove(at.name)).Size(24, 24).Clicked() {
-					a.attached = append(a.attached[:i:i], a.attached[i+1:]...)
-				}
-			})
+// attachmentTokens are the files attached, as grey tokens of the attached
+// row, a picture's own small image in place of the symbol.
+func (a *App) attachmentTokens(c *ui.Context) {
+	for i, at := range a.attached {
+		if a.token(c, fmt.Sprint("unattach:", i), "file", at.thumb, at.name).Clicked() {
+			a.attached = append(a.attached[:i:i], a.attached[i+1:]...)
+			return
 		}
-	})
+	}
 }
 
 // noImages says the session's model may not see pictures it is sent.

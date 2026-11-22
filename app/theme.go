@@ -209,6 +209,17 @@ func (a *App) glass(e ui.Element, g glass.Glass) ui.Element {
 	return e
 }
 
+// sideTint is the frost the sidebars of the window, Settings and
+// Automations lay over the window's glass: thick enough that their text
+// reads over whatever is behind the window, as Finder's sidebar does,
+// while the glass still shows through.
+func sideTint(p *Palette) ui.Color {
+	if p.Dark {
+		return ui.RGBA(18, 18, 20, .58)
+	}
+	return ui.RGBA(244, 245, 248, .50)
+}
+
 func tintedGlass(p *Palette) glass.Glass {
 	tint := ui.RGBA(244, 245, 248, .28)
 	if p.Dark {

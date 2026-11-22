@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -150,5 +151,108 @@ func TestHelloRemembersFolder(t *testing.T) {
 	a.C.Current = &a.C.Sessions[4] // site, never read
 	if known, _ := a.overview(); known {
 		t.Error("a folder never read is known")
+	}
+}
+
+// TestComposerAttached: what goes with the words is a row of tokens at
+// the card's top, over a hairline, and the card is the words alone without
+// it; the words keep still as the row comes; the pop-up buttons say they
+// are, and the mode is its name alone.
+func TestComposerAttached(t *testing.T) {
+	a := emptySession(proto.Workspace{})
+	tt := helloTester(a)
+	snapshot(t, tt, "composer-idle")
+	wantTexts(t, tt, "chevron.up.chevron.down")
+	if tt.HasText("附带") || tt.HasText("eye") {
+		t.Errorf("an empty card shows the attached row or a mode symbol: %q", tt.Texts())
+	}
+	idle, _ := tt.Find("手动")
+	a.attached = []attachment{{name: "screenshot.png", path: "/tmp/screenshot.png"}}
+	a.mentionSessions = []string{"5"}
+	a.draft = "@add_test.go 把计算器的除零改成返回错误"
+	tt.Frame()
+	tt.Advance(time.Second)
+	tt.Frame()
+	snapshot(t, tt, "composer-attached")
+	wantTexts(t, tt, "附带", "首页文案改写", "screenshot.png")
+	if _, ok := tt.Find("add_test.go"); ok {
+		t.Error("a file the words name with @ is said again in the attached row")
+	}
+	row, _ := tt.Find("附带")
+	words, _ := tt.Find("手动")
+	if row.Y >= words.Y {
+		t.Errorf("the attached row at y %v is not over the controls at %v", row.Y, words.Y)
+	}
+	if words.Y < idle.Y-1 || words.Y > idle.Y+60 {
+		t.Errorf("the controls went from y %v to %v: the words did not keep still", idle.Y, words.Y)
+	}
+	if err := tt.Click("移除 screenshot.png"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if len(a.attached) != 0 {
+		t.Error("the x of a token does not take it out")
+	}
+	a.C.Current.Mode = "full"
+	tt.Frame()
+	if tt.HasText("shield.slash") {
+		t.Error("full access shows a symbol")
+	}
+	tt.SetDark(true)
+	tt.Frame()
+	tt.Advance(time.Second)
+	tt.Frame()
+	snapshot(t, tt, "composer-attached-dark")
+}
+
+// TestComposerMarksReferences: the skills and the files the draft names
+// show in the accent in the words, the / or @ faint; a / word that names
+// no skill, and the @ word still being written, show plain.
+func TestComposerMarksReferences(t *testing.T) {
+	a := emptySession(proto.Workspace{})
+	a.C.MCP = &proto.MCPList{Skills: []proto.SkillInfo{{Name: "review"}}}
+	a.draft = "看看 @add.go 和 @docs/ 用 /review 别管 /usr"
+	tt := helloTester(a)
+	snapshot(t, tt, "composer-marks")
+	type span struct{ start, end int }
+	var got []span
+	for _, r := range a.draftMarks() {
+		got = append(got, span{r.Start, r.End})
+	}
+	// 看看 is runes 0–1; @add.go 3–9, @docs/ 13–18, /review 22–28.
+	want := []span{{3, 4}, {4, 10}, {13, 14}, {14, 19}, {22, 23}, {23, 29}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("marks %v, want %v", got, want)
+	}
+	a.mention.open, a.mention.at = true, 13
+	if n := len(a.draftMarks()); n != 4 {
+		t.Errorf("the @ word being written is marked: %d marks", n)
+	}
+}
+
+// TestComposerKeepsStillWhileRunning: sending a prompt and the turn running
+// leave the composer where it is; nothing comes under it to push it up.
+func TestComposerKeepsStillWhileRunning(t *testing.T) {
+	a := emptySession(proto.Workspace{Branch: "main", Commits: []proto.CommitSummary{{Hash: "a", Subject: "x", Time: now.Unix()}}})
+	tt := helloTester(a)
+	idle, _ := tt.Find("手动")
+	a.C.Entries = []*client.Entry{{Key: 1, Role: client.User, Text: "写一个计算器", Done: true}}
+	a.C.Busy = true
+	a.C.Turns = []client.Turn{{Seq: 1, Start: now.Add(-time.Second)}}
+	tt.Frame()
+	tt.Advance(time.Second)
+	tt.Frame()
+	if run, _ := tt.Find("手动"); run.Y != idle.Y {
+		t.Errorf("the composer went from y %v to %v as the turn ran", idle.Y, run.Y)
+	}
+	if tt.HasText("esc 中断") || tt.HasText("1 秒 · esc 中断") {
+		t.Errorf("a line under the composer tells the time: %q", tt.Texts())
+	}
+	a.C.Busy = false
+	a.C.Turns[0].Done = true
+	tt.Frame()
+	tt.Advance(time.Second)
+	if done, _ := tt.Find("手动"); done.Y != idle.Y {
+		t.Errorf("the composer went from y %v to %v as the turn ended", idle.Y, done.Y)
 	}
 }

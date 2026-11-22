@@ -33,7 +33,11 @@ func effortLabel(effort string) string {
 // a status line under it.
 // It floats over the foot of the transcript, which fades out above it.
 func (a *App) composer(c *ui.Context) {
-	dock := ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Justify(ui.Center).Padding(0, 28, 10, 28)
+	// Keyed: the pill that takes the transcript to its end comes and goes
+	// before it, and the dock, by its place, would take the pill's size,
+	// which the transcript's room for the dock follows, and the list's end
+	// with it, as a jolt at the end of the list.
+	dock := ui.Row(c.Key("dock")).Absolute().Left(0).Right(0).Bottom(0).Justify(ui.Center).Padding(0, 28, 10, 28)
 	a.placeHero(c, dock)
 	dock.Children(func() {
 		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() { a.dock(c) })
@@ -55,8 +59,10 @@ func (a *App) dock(c *ui.Context) {
 		ui.Column(c).Margin(0, 20, -1, 20).Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).Clip().
 			Transition(ui.ElementTransition{Size: true, Duration: 180 * time.Millisecond}).Children(func() { a.queue(c) })
 	}
+	// Nothing goes under the card while a turn runs: a line there would
+	// push the card up as the turn starts and drop it as it ends. The stop
+	// button says the turn runs, and its tooltip that Esc stops it.
 	a.box(c)
-	a.liveStatus(c)
 	if a.err != "" {
 		// An action's error stays until dismissed or the next action, with
 		// its mark, as an inline error in a Mac form does.
@@ -87,7 +93,7 @@ func (a *App) queue(c *ui.Context) {
 				sym(c, "corner-down-right", 14, p.Mute)
 			}
 			// Its words, clicked, come back to the composer to change.
-			words := ui.ButtonBase(c.Key("edit:" + q.ID)).Row().Grow(1).MinWidth(0).Height(26).AlignItems(ui.Center).
+			words := ui.ButtonBase(c.Key("edit:" + q.ID)).Row().Grow(1).MinWidth(0).Height(26).AlignItems(ui.Center).Justify(ui.Start).
 				Label(client.QueuedLabel(q)).Disabled(q.Images > 0)
 			if q.Images == 0 {
 				words.Tooltip(locales.EditQueued())
@@ -119,7 +125,7 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	box := ui.Column(c).Radius(20).Border(.5, p.Edge2).Padding(12, 12, 6, 12).
+	box := ui.Column(c).Radius(20).Border(.5, p.Edge2).
 		Transition(ui.ElementTransition{Colors: true, Shadows: true, Duration: 160 * time.Millisecond})
 	a.glass(box, composerGlass(p))
 	if a.helloShown() {
@@ -140,60 +146,116 @@ func (a *App) box(c *ui.Context) {
 	}
 	svc := c.Services()
 	box.Children(func() {
-		if dragOver {
-			ui.Row(c).Gap(6).Padding(2, 4, 6, 4).AlignItems(ui.Center).Children(func() {
-				sym(c, "plus", 14, p.Live)
-				ui.Text(c, locales.DropToAttach()).FontSize(12.5).FontWeight(500).TextColor(p.Live)
+		a.attachedRow(c)
+		ui.Column(c).Padding(12, 12, 6, 12).Children(func() { a.words(c, dragOver, svc) })
+	})
+}
+
+// attachedRow is what goes with the words, at the card's top over a
+// hairline, as the To field is over a message in Mail: the sessions and
+// files attached. A file or a skill the words name with @ or / is in the
+// words already and is not said again. With none, the row folds away
+// along a spring, and the card is the words alone.
+func (a *App) attachedRow(c *ui.Context) {
+	p := a.p
+	has := len(a.attached) > 0 || len(a.mentionSessions) > 0
+	ui.Column(c.Key("attached")).Clip().
+		Transition(ui.ElementTransition{Size: true, Animation: &ui.Animation{Spring: springDefault}}).
+		Children(func() {
+			if !has {
+				return
+			}
+			ui.Row(c).Wrap().Gap(6).Padding(9, 14, 9, 14).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+				ui.Text(c, locales.Attached()).FontSize(13).TextColor(p.Mute).SingleLine().Margin(0, 2, 0, 0)
+				a.sessionTokens(c)
+				a.attachmentTokens(c)
 			})
-		}
-		a.attachments(c)
-		a.mentionChips(c)
-		if a.recall != "" {
-			a.draft, a.recall, a.toEnd = a.recall, "", true
-		}
-		area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
-		if a.toEnd {
-			// A draft put in whole is written on from its end.
-			n := len([]rune(a.draft))
-			area.SetTextSelection(n, n)
-			a.toEnd = false
-		}
-		if pl := a.mention.place; pl > 0 {
-			area.SetTextSelection(pl-1, pl-1)
-			a.mention.place = 0
-		}
-		if _, caret := area.TextSelection(); caret != a.mention.caret {
-			// The @ word is found before the composer is built.
-			a.mention.caret = caret
-			c.Invalidate()
-		}
-		area.Lines(1, 10).Grow(1).MinWidth(0).Padding(2, 2, 8, 2).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
-			FontSize(14).LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) })
-		if _, ok := a.command(); ok {
-			// A draft that starts with ! runs in the terminal.
-			ui.Row(c).Height(26).Gap(5).AlignItems(ui.Center).Padding(0, 2).Shrink(0).Children(func() {
-				sym(c, "terminal-2", 14, p.Live)
-				ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
-			})
-		}
-		if a.noImages() {
-			ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(0, 0, 4, 2)
-		}
-		cur := a.C.Current
-		ui.Row(c).Height(28).Gap(4).Padding(2, 0, 0, 0).AlignItems(ui.Center).Children(func() {
-			if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
-				a.choose()
-			}
-			if cur != nil {
-				a.modelPill(c, cur.Model)
-			}
-			ui.Spacer(c)
-			if cur != nil {
-				a.modePill(c, modeName(cur.Mode))
-				a.contextRing(c)
-			}
-			a.goButton(c)
 		})
+}
+
+// token is one thing that goes with the words, as a token of a Mac token
+// field: a grey filled mark with rounded corners and no edge, which the x
+// at its end takes out. It returns that x.
+func (a *App) token(c *ui.Context, key, icon string, thumb ui.ImageSource, label string) ui.Element {
+	p := a.p
+	bg, fg, mark := p.Chip, p.Fg2, p.Mute
+	var rm ui.Element
+	ui.Row(c.Key(key)).Height(22).Padding(0, 1, 0, 7).Gap(4).Radius(6).Background(bg).AlignItems(ui.Center).MaxWidth(240).Children(func() {
+		switch {
+		case thumb != nil:
+			ui.Box(c).Size(16, 16).Radius(3).Clip().Shrink(0).Children(func() {
+				ui.Image(c, thumb).Size(16, 16).Fit(ui.Cover)
+			})
+		case icon != "":
+			sym(c, icon, 12, mark)
+		}
+		ui.Text(c, label).FontSize(12.5).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
+		rm = ui.ButtonBase(c.Key(key+":x")).Size(20, 20).Radius(5).Center().KeepFocus().Label(locales.AttachRemove(label))
+		press(rm)
+		if rm.Hovered() {
+			rm.Background(fg.Alpha(.10))
+		}
+		rm.Children(func() { sym(c, "x", 10, mark) })
+	})
+	return rm
+}
+
+// words is the card under its attached row: the draft and the controls.
+func (a *App) words(c *ui.Context, dragOver bool, svc ui.Services) {
+	p := a.p
+	if dragOver {
+		ui.Row(c).Gap(6).Padding(2, 4, 6, 4).AlignItems(ui.Center).Children(func() {
+			sym(c, "plus", 14, p.Live)
+			ui.Text(c, locales.DropToAttach()).FontSize(12.5).FontWeight(500).TextColor(p.Live)
+		})
+	}
+	if a.recall != "" {
+		a.draft, a.recall, a.toEnd = a.recall, "", true
+	}
+	area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
+	a.hero.words = area.LayoutBounds()
+	if a.toEnd {
+		// A draft put in whole is written on from its end.
+		n := len([]rune(a.draft))
+		area.SetTextSelection(n, n)
+		a.toEnd = false
+	}
+	if pl := a.mention.place; pl > 0 {
+		area.SetTextSelection(pl-1, pl-1)
+		a.mention.place = 0
+	}
+	if _, caret := area.TextSelection(); caret != a.mention.caret {
+		// The @ word is found before the composer is built.
+		a.mention.caret = caret
+		c.Invalidate()
+	}
+	area.Lines(1, 10).Grow(1).MinWidth(0).Padding(2, 2, 8, 2).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
+		FontSize(14).LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) }).
+		TextRanges(a.draftMarks()...)
+	if _, ok := a.command(); ok {
+		// A draft that starts with ! runs in the terminal.
+		ui.Row(c).Height(26).Gap(5).AlignItems(ui.Center).Padding(0, 2).Shrink(0).Children(func() {
+			sym(c, "terminal-2", 14, p.Live)
+			ui.Text(c, locales.RunsInTerminal()).FontSize(12.5).TextColor(p.Live).SingleLine()
+		})
+	}
+	if a.noImages() {
+		ui.Text(c, locales.NoImageSupport()).FontSize(12.5).TextColor(p.Mute).Margin(0, 0, 4, 2)
+	}
+	cur := a.C.Current
+	ui.Row(c).Height(28).Gap(4).Padding(2, 0, 0, 0).AlignItems(ui.Center).Children(func() {
+		if a.iconPill(c, "attach", "plus", locales.AttachAdd()).Clicked() {
+			a.choose()
+		}
+		if cur != nil {
+			a.modelPill(c, cur.Model)
+		}
+		ui.Spacer(c)
+		if cur != nil {
+			a.modePill(c, modeName(cur.Mode))
+			a.contextRing(c)
+		}
+		a.goButton(c)
 	})
 }
 
@@ -297,11 +359,16 @@ func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.El
 		}
 		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine()
 		if chevron {
-			sym(c, "chevron-down", 11, p.Mute)
+			// A pop-up button's mark, as macOS draws on one: it opens a
+			// menu of values to choose from.
+			sym(c, "selector", 11, p.Mute)
 		}
 	})
 	return b
 }
+
+// idleInk is how much ink the send button has with nothing to send.
+const idleInk = .38
 
 // goButton sends, or stops the running turn.
 func (a *App) goButton(c *ui.Context) {
@@ -336,48 +403,15 @@ func (a *App) goButton(c *ui.Context) {
 			a.do(a.C.Cancel())
 		}
 	case !a.ready() || !a.C.CanAct():
-		b.Label(locales.Send()).Background(p.Chip).Children(func() { glyph(false, p.Mute) })
+		// Ink, held back until there is something to send: the one mark
+		// of the composer the eye finds first, even before words.
+		b.Label(locales.Send()).Background(p.Acc.Alpha(idleInk)).Children(func() { glyph(false, p.OnAcc) })
 	default:
 		b.Label(locales.Send()).Background(p.Acc).Children(func() { glyph(false, p.OnAcc) })
 		if b.Clicked() {
 			a.submit()
 		}
 	}
-}
-
-// liveStatus sits under the composer card only when connecting or a turn is running.
-func (a *App) liveStatus(c *ui.Context) {
-	showPhase := a.C.Phase != client.Ready
-	showRun := a.C.Busy && len(a.C.Approvals) == 0 && len(a.C.Turns) > 0 && !a.C.Turns[len(a.C.Turns)-1].Done && !a.C.Turns[len(a.C.Turns)-1].Start.IsZero()
-	if !showPhase && !showRun {
-		return
-	}
-	p := a.p
-	ui.Row(c).Margin(6, 8, 0, 8).Height(20).Gap(8).AlignItems(ui.Center).Children(func() {
-		if showPhase {
-			ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-				sym(c, "refresh", 13, p.Fg2)
-				ui.Text(c, phaseText(a.C.Phase)).FontSize(12.5).TextColor(p.Fg2).SingleLine()
-			})
-		}
-		a.runningFor(c)
-	})
-}
-
-// runningFor says how long the turn has run and that Esc stops it, as
-// Xcode's toolbar tells a build's progress: the time ticks each second.
-func (a *App) runningFor(c *ui.Context) {
-	if !a.C.Busy || len(a.C.Approvals) > 0 || len(a.C.Turns) == 0 {
-		return
-	}
-	t := a.C.Turns[len(a.C.Turns)-1]
-	if t.Done || t.Start.IsZero() {
-		return
-	}
-	p := a.p
-	ui.Spacer(c)
-	ui.Text(c, span(a.now().Sub(t.Start))+" · "+locales.EscToInterrupt()).FontSize(12.5).TextColor(p.Mute).SingleLine().FontFeatures("tnum")
-	c.After(time.Second)
 }
 
 // textButton is a small button that is only words.

@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -255,5 +256,56 @@ func TestRetryTurn(t *testing.T) {
 	task8Command(t, a, proto.MethodRewind, &rw)
 	if rw.TurnSeq != 1 || rw.Action != "conversation" {
 		t.Fatalf("unexpected rewind: %+v", rw)
+	}
+}
+
+// TestTranscriptEndScrollsSmoothly: at the end of the transcript, a small
+// scroll up moves the rows by as much, and scrolling down into the end
+// never moves them back: the pill that takes the list to its end coming
+// and going must not change the room kept for the composer.
+func TestTranscriptEndScrollsSmoothly(t *testing.T) {
+	a := working()
+	a.C.Queued = nil
+	var es []*client.Entry
+	for i := range 6 {
+		es = append(es,
+			&client.Entry{Key: 100 + 2*i, Role: client.User, Text: fmt.Sprintf("问题 %d", i), Done: true},
+			&client.Entry{Key: 101 + 2*i, Role: client.Assistant, Text: strings.Repeat(fmt.Sprintf("第 %d 段回答，写长一些好让它换行。", i), 6), Done: true})
+	}
+	a.C.Entries = append(es, a.C.Entries...)
+	tt := task8Tester(a, false)
+	tt.Advance(time.Second)
+	tt.Scroll(800, 300, 0, -2000)
+	tt.Advance(time.Second)
+	at := func() float32 {
+		r, ok := tt.Find("运行命令")
+		if !ok {
+			return -1
+		}
+		return r.Y
+	}
+	last := float32(-1)
+	for range 120 {
+		tt.Scroll(800, 300, 0, 12)
+		tt.Advance(16 * time.Millisecond)
+		y := at()
+		if last >= 0 && y > last+.5 {
+			t.Fatalf("scrolling down, the rows went back down from y %v to %v", last, y)
+		}
+		if y >= 0 {
+			last = y
+		}
+	}
+	if !a.transcriptList().AtEnd() {
+		t.Fatal("the transcript is not at its end")
+	}
+	for i := range 10 {
+		tt.Scroll(800, 300, 0, -6)
+		tt.Advance(16 * time.Millisecond)
+		y := at()
+		if d := y - last; d < 5.5 || d > 6.5 {
+			t.Fatalf("scroll %d up by 6 moved the rows by %v", i, d)
+		}
+		last = y
 	}
 }

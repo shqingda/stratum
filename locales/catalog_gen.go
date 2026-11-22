@@ -204,16 +204,6 @@ func (msgs Messages) Stop() string {
 	return Catalog.Format(msgs.locale, "stop", nil)
 }
 
-// EscToInterrupt says "esc 中断"
-// in the language the app shows.
-func EscToInterrupt() string { return In(i18n.Locale()).EscToInterrupt() }
-
-// EscToInterrupt says "esc 中断"
-// in the language of msgs.
-func (msgs Messages) EscToInterrupt() string {
-	return Catalog.Format(msgs.locale, "escToInterrupt", nil)
-}
-
 // StopEsc says "停止（esc）"
 // in the language the app shows.
 func StopEsc() string { return In(i18n.Locale()).StopEsc() }
@@ -784,6 +774,28 @@ func (msgs Messages) Settings() string {
 	return Catalog.Format(msgs.locale, "settings", nil)
 }
 
+// SettingsMenu says "设置…"
+// in the language the app shows.
+func SettingsMenu() string { return In(i18n.Locale()).SettingsMenu() }
+
+// SettingsMenu says "设置…"
+// in the language of msgs.
+func (msgs Messages) SettingsMenu() string {
+	return Catalog.Format(msgs.locale, "settingsMenu", nil)
+}
+
+// AccountQuota says "{name}，{quota}"
+// in the language the app shows.
+func AccountQuota(name string, quota string) string {
+	return In(i18n.Locale()).AccountQuota(name, quota)
+}
+
+// AccountQuota says "{name}，{quota}"
+// in the language of msgs.
+func (msgs Messages) AccountQuota(name string, quota string) string {
+	return Catalog.Format(msgs.locale, "accountQuota", map[string]any{"name": name, "quota": quota})
+}
+
 // NewSession says "新会话"
 // in the language the app shows.
 func NewSession() string { return In(i18n.Locale()).NewSession() }
@@ -952,6 +964,16 @@ func AttachmentsHeader() string { return In(i18n.Locale()).AttachmentsHeader() }
 // in the language of msgs.
 func (msgs Messages) AttachmentsHeader() string {
 	return Catalog.Format(msgs.locale, "attachmentsHeader", nil)
+}
+
+// Attached says "附带"
+// in the language the app shows.
+func Attached() string { return In(i18n.Locale()).Attached() }
+
+// Attached says "附带"
+// in the language of msgs.
+func (msgs Messages) Attached() string {
+	return Catalog.Format(msgs.locale, "attached", nil)
 }
 
 // AttachRemove says "移除 {name}"
@@ -3288,6 +3310,48 @@ func ThemeTo(theme string) string { return In(i18n.Locale()).ThemeTo(theme) }
 // in the language of msgs.
 func (msgs Messages) ThemeTo(theme string) string {
 	return Catalog.Format(msgs.locale, "themeTo", map[string]any{"theme": theme})
+}
+
+// SettingTo says "{setting}：{value}"
+// in the language the app shows.
+func SettingTo(setting string, value string) string {
+	return In(i18n.Locale()).SettingTo(setting, value)
+}
+
+// SettingTo says "{setting}：{value}"
+// in the language of msgs.
+func (msgs Messages) SettingTo(setting string, value string) string {
+	return Catalog.Format(msgs.locale, "settingTo", map[string]any{"setting": setting, "value": value})
+}
+
+// SettingOn says "开"
+// in the language the app shows.
+func SettingOn() string { return In(i18n.Locale()).SettingOn() }
+
+// SettingOn says "开"
+// in the language of msgs.
+func (msgs Messages) SettingOn() string {
+	return Catalog.Format(msgs.locale, "settingOn", nil)
+}
+
+// SettingOff says "关"
+// in the language the app shows.
+func SettingOff() string { return In(i18n.Locale()).SettingOff() }
+
+// SettingOff says "关"
+// in the language of msgs.
+func (msgs Messages) SettingOff() string {
+	return Catalog.Format(msgs.locale, "settingOff", nil)
+}
+
+// NotifyKind says "{kind}通知"
+// in the language the app shows.
+func NotifyKind(kind string) string { return In(i18n.Locale()).NotifyKind(kind) }
+
+// NotifyKind says "{kind}通知"
+// in the language of msgs.
+func (msgs Messages) NotifyKind(kind string) string {
+	return Catalog.Format(msgs.locale, "notifyKind", map[string]any{"kind": kind})
 }
 
 // ShowTerminal says "打开终端面板"

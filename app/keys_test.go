@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -619,5 +620,54 @@ func TestMentionGroups(t *testing.T) {
 	got := a.mentionItems()
 	if len(got) != 1 || got[0].text != "session:2" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// The palette sets what Settings sets, a row for each value but the
+// current one.
+func TestPaletteSettings(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Frame()
+	for _, want := range []string{
+		"语言：简体中文", "语言：English", "文字大小：小", "文字大小：大", "减弱动态效果：开",
+		"按回车：立即发送", "需要确认通知：关", "在程序坞图标上显示数字：关", "什么时候通知：总是", "什么时候通知：从不",
+	} {
+		if !tt.HasText(want) {
+			t.Errorf("no %q in the palette", want)
+		}
+	}
+	if tt.HasText("文字大小：默认") || tt.HasText("语言：跟随系统") || tt.HasText("什么时候通知：后台时") {
+		t.Error("the palette offers a current value")
+	}
+	tt.Type("通知")
+	tt.Frame()
+	snapshot(t, tt, "palette-settings")
+	tt.Key(0, ui.KeyEscape)
+	tt.Key(ui.Cmd, ui.KeyK)
+
+	tt.Type("文字大小：大")
+	tt.Key(0, ui.KeyEnter)
+	var s proto.Settings
+	task8Command(t, a, proto.MethodSetSettings, &s)
+	if s.TextSize != "large" {
+		t.Fatalf("text size %q, want large", s.TextSize)
+	}
+
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Type("完成通知")
+	tt.Key(0, ui.KeyEnter)
+	s = proto.Settings{}
+	task8Command(t, a, proto.MethodSetSettings, &s)
+	if !slices.Contains(s.Quiet, "done") {
+		t.Fatalf("quiet %v, want done in it", s.Quiet)
+	}
+
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Type("English")
+	tt.Key(0, ui.KeyEnter)
+	if got := a.locale.Chosen(); got != "en" {
+		t.Fatalf("locale %q, want en", got)
 	}
 }

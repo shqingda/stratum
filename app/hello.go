@@ -31,6 +31,7 @@ type hero struct {
 	// new session in it starts in place.
 	empty map[string]bool
 	sheet ui.Rect // the sheet the composer floats on, the frame before
+	words ui.Rect // where the layout put the composer's words
 }
 
 const (
@@ -40,9 +41,11 @@ const (
 	// heroLine is the share of the sheet over the composer when it sits on
 	// the canvas, a little above the middle.
 	heroLine = .4
-	// heroRefH is how tall the composer is with a line in it: its top
-	// keeps still as more lines push it taller.
-	heroRefH = 104
+	// heroRefH is how tall the composer is with a line in it, and
+	// heroWordsAt how far its words are from its top: the words keep
+	// still as lines push the card down and the attached row up.
+	heroRefH    = 104
+	heroWordsAt = 14
 	// overviewMax is how many uncommitted files the overview lists.
 	overviewMax = 3
 )
@@ -114,11 +117,12 @@ func (a *App) placeHero(c *ui.Context, dock ui.Element) {
 	t := root.Spring("hero", target, springDefault)
 	if t > .001 {
 		// The dock keeps its place at the foot in the layout; it is drawn
-		// higher, so its top stays where it was as it grows.
-		lb, sheet := dock.LayoutBounds(), a.hero.sheet
-		if sheet.H > 0 && lb.H > 0 {
-			top := sheet.Y + (sheet.H-heroRefH)*heroLine
-			if dy := lb.Y - top; dy > 0 {
+		// higher, so that the words stay where they are as the card grows
+		// down with lines and up with what is attached.
+		words, sheet := a.hero.words, a.hero.sheet
+		if sheet.H > 0 && words.H > 0 {
+			top := sheet.Y + (sheet.H-heroRefH)*heroLine + heroWordsAt
+			if dy := words.Y - top; dy > 0 {
 				dock.Translate(0, -dy*t)
 			}
 		}

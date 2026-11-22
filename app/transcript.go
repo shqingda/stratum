@@ -629,28 +629,27 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	}
 }
 
-// userMessageText renders a user's prompt, highlighting /skill tokens in
-// Claude-style blue (muted slash + vibrant blue name).
+// userMessageText renders a user's prompt with its /skill and @file words
+// in the accent, the / or @ faint, as the composer showed them.
 func (a *App) userMessageText(c *ui.Context, text string) {
 	p := a.p
-	matches := slashTokenRe.FindAllStringSubmatchIndex(text, -1)
-	if len(matches) == 0 {
+	toks := refTokens(text, nil)
+	if len(toks) == 0 {
 		ui.Text(c, text).FontSize(15).TextColor(p.Fg).LineHeight(1.55).Selectable()
 		return
 	}
 	blue := skillAccent(p)
 	var spans []ui.Span
 	pos := 0
-	for _, m := range matches {
-		start, end := m[2], m[3]
-		if start > pos {
-			spans = append(spans, ui.Span{Text: text[pos:start], Size: 15, Color: p.Fg})
+	for _, t := range toks {
+		if t.start > pos {
+			spans = append(spans, ui.Span{Text: text[pos:t.start], Size: 15, Color: p.Fg})
 		}
 		spans = append(spans,
-			ui.Span{Text: "/", Size: 15, Color: blue.Alpha(.55)},
-			ui.Span{Text: text[start+1 : end], Size: 15, Color: blue, Weight: 500},
+			ui.Span{Text: text[t.start : t.start+1], Size: 15, Color: blue.Alpha(.55)},
+			ui.Span{Text: text[t.start+1 : t.end], Size: 15, Color: blue, Weight: 500},
 		)
-		pos = end
+		pos = t.end
 	}
 	if pos < len(text) {
 		spans = append(spans, ui.Span{Text: text[pos:], Size: 15, Color: p.Fg})

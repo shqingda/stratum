@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -135,6 +136,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 			}})
 		}
 	}
+	a.settingOpts(set, add)
 	add(opt{icon: "settings", label: locales.Settings(), kbd: "⌘,", run: a.openSettings})
 	add(opt{icon: "user-circle", label: locales.AddAccount(), run: func() {
 		a.openSettings()
@@ -143,6 +145,65 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	add(opt{icon: "puzzle", label: locales.SettingsMcp(), run: a.openMCP})
 	add(opt{icon: "clock-play", label: locales.Automations(), run: a.openAutomations})
 	return sessions, actions
+}
+
+// settingOpts are the settings the palette sets, a row for each value but
+// the current one, as with its appearance and detail rows, so that none
+// needs a trip to Settings.
+func (a *App) settingOpts(set proto.Settings, add func(opt)) {
+	save := func(edit func(*proto.Settings)) func() {
+		return func() {
+			s := set
+			edit(&s)
+			a.do(a.C.SaveSettings(s))
+		}
+	}
+	chosen := a.locale.Chosen()
+	for _, l := range languages() {
+		if l.tag != chosen {
+			add(opt{icon: "world", label: locales.SettingTo(locales.Language(), l.label), run: func() { a.locale.Set(l.tag) }})
+		}
+	}
+	for _, t := range []struct{ id, name string }{{"small", locales.TextSmall()}, {"", locales.TextDefault()}, {"large", locales.TextLarge()}} {
+		if t.id != set.TextSize {
+			add(opt{icon: "a-large-small", label: locales.SettingTo(locales.TextSize(), t.name), run: save(func(s *proto.Settings) { s.TextSize = t.id })})
+		}
+	}
+	add(opt{icon: "accessibility", label: locales.SettingTo(locales.ReduceMotion(), onOff(!set.ReduceMotion)), run: save(func(s *proto.Settings) {
+		s.ReduceMotion = !set.ReduceMotion
+	})})
+	enter := locales.SendRightAway()
+	if set.EnterSteers {
+		enter = locales.QueueIt()
+	}
+	add(opt{icon: "keyboard", label: locales.SettingTo(locales.ReturnKey(), enter), run: save(func(s *proto.Settings) {
+		s.EnterSteers = !set.EnterSteers
+	})})
+	for _, n := range []struct{ kind, label string }{
+		{"wait", locales.NotifyKind(locales.NotifyWaitSetting())}, {"done", locales.NotifyKind(locales.NotifyDoneSetting())},
+		{"fail", locales.NotifyKind(locales.NotifyFailSetting())}, {"badge", locales.DockBadge()},
+	} {
+		quiet := slices.Contains(set.Quiet, n.kind)
+		add(opt{icon: "bell", label: locales.SettingTo(n.label, onOff(quiet)), run: save(func(s *proto.Settings) {
+			s.Quiet = slices.DeleteFunc(slices.Clone(set.Quiet), func(k string) bool { return k == n.kind })
+			if !quiet {
+				s.Quiet = append(s.Quiet, n.kind)
+			}
+		})})
+	}
+	for _, w := range []struct{ id, name string }{{"", locales.NotifyInBackground()}, {"always", locales.NotifyAlways()}, {"never", locales.NotifyNever()}} {
+		if w.id != set.NotifyWhen {
+			add(opt{icon: "bell", label: locales.SettingTo(locales.NotifyWhen(), w.name), run: save(func(s *proto.Settings) { s.NotifyWhen = w.id })})
+		}
+	}
+}
+
+// onOff names a switch's state, as a row of Settings shows it.
+func onOff(on bool) string {
+	if on {
+		return locales.SettingOn()
+	}
+	return locales.SettingOff()
 }
 
 // palFiles are the workspace's files the query names; chosen, one opens

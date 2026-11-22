@@ -54,6 +54,8 @@ func sym(c *ui.Context, name string, size float32, col ui.Color) ui.Element {
 // sfNames are the SF Symbols that stand for the app's Lucide names. The
 // brand marks, Talos's own, and the spinner keep their drawings.
 var sfNames = map[string]string{
+	"a-large-small":                "textformat.size",
+	"accessibility":                "accessibility",
 	"adjustments-horizontal":       "slider.horizontal.3",
 	"adjustments":                  "slider.vertical.3",
 	"alert-circle":                 "exclamationmark.circle",
@@ -63,6 +65,7 @@ var sfNames = map[string]string{
 	"arrow-right":                  "arrow.right",
 	"arrow-up":                     "arrow.up",
 	"arrows-exchange":              "arrow.left.arrow.right",
+	"bell":                         "bell",
 	"brain":                        "brain",
 	"bulb":                         "lightbulb",
 	"check":                        "checkmark",

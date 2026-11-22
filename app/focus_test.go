@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -47,19 +46,6 @@ func TestOptionCmdEnterAllowsAlways(t *testing.T) {
 	task8Command(t, a, proto.MethodApprovalRespond, &ans)
 	if !ans.Allow || !ans.Forever || ans.ApprovalID != "x" {
 		t.Errorf("answer = %+v, want x allowed forever", ans)
-	}
-}
-
-// TestRunningShowsElapsed checks that a running turn says how long it has
-// run and that Esc stops it.
-func TestRunningShowsElapsed(t *testing.T) {
-	a := working()
-	a.C.Approvals, a.C.Queued = nil, nil
-	a.C.Turns = []client.Turn{{Seq: 1, Start: now.Add(-12 * time.Second)}}
-	tt := ui.NewTester(a.View, 1440, 880)
-	tt.Frame()
-	if want := "12 秒 · esc 中断"; !tt.HasText(want) {
-		t.Errorf("no %q in %q", want, tt.Texts())
 	}
 }
 

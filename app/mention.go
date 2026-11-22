@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
@@ -350,9 +351,64 @@ func (a *App) mentionList() []string {
 }
 
 var (
-	mentionTokenRe = regexp.MustCompile(`(?:^|\s)(@[^\s@]+)`)
 	slashTokenRe   = regexp.MustCompile(`(?:^|\s)(/[A-Za-z0-9][A-Za-z0-9._:-]*)`)
+	mentionTokenRe = regexp.MustCompile(`(?:^|\s)(@[^\s@]+)`)
 )
+
+// refToken is a / or @ word of a message, by its bytes, the / or @ first:
+// a skill, a command or a prompt it runs, or a file, a folder or a
+// resource it names.
+type refToken struct{ start, end int }
+
+// refTokens are the / and @ words of text, in order; slash, when set,
+// says which / words count.
+func refTokens(text string, slash func(name string) bool) []refToken {
+	var out []refToken
+	if strings.Contains(text, "/") {
+		for _, m := range slashTokenRe.FindAllStringSubmatchIndex(text, -1) {
+			if slash == nil || slash(text[m[2]+1:m[3]]) {
+				out = append(out, refToken{m[2], m[3]})
+			}
+		}
+	}
+	if strings.Contains(text, "@") {
+		for _, m := range mentionTokenRe.FindAllStringSubmatchIndex(text, -1) {
+			if m[3]-m[2] >= 2 {
+				out = append(out, refToken{m[2], m[3]})
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b refToken) int { return a.start - b.start })
+	return out
+}
+
+// draftMarks color the skills and the files the draft names in the words,
+// as Messages colors a mention: the / or @ faint, the name in the accent.
+// A / word counts when it names a skill, a command or a prompt; the @
+// word being written, its list open, shows plain until it is chosen.
+func (a *App) draftMarks() []ui.TextRange {
+	d := a.draft
+	toks := refTokens(d, a.knownSlashToken)
+	if len(toks) == 0 {
+		return nil
+	}
+	blue := skillAccent(a.p)
+	out := make([]ui.TextRange, 0, 2*len(toks))
+	at, runes := 0, 0 // a byte of d, and the runes before it
+	for _, t := range toks {
+		runes += utf8.RuneCountInString(d[at:t.start])
+		start := runes
+		runes += utf8.RuneCountInString(d[t.start:t.end])
+		at = t.end
+		if a.mention.open && d[t.start] == '@' && start == a.mention.at {
+			continue
+		}
+		out = append(out,
+			ui.TextRange{Start: start, End: start + 1, Color: blue.Alpha(.55)},
+			ui.TextRange{Start: start + 1, End: runes, Color: blue, Weight: 500})
+	}
+	return out
+}
 
 // skillAccent returns the Claude-style crisp blue highlight for /skill tokens.
 func skillAccent(p *Palette) ui.Color {
@@ -362,6 +418,8 @@ func skillAccent(p *Palette) ui.Color {
 	return ui.Hex("#1D5BB8")
 }
 
+// knownSlashToken says whether name is a skill, a command or a prompt the
+// session has.
 func (a *App) knownSlashToken(name string) bool {
 	if l := a.C.MCP; l != nil {
 		for _, sk := range l.Skills {
@@ -383,23 +441,11 @@ func (a *App) knownSlashToken(name string) bool {
 	return false
 }
 
-type mentionChip struct {
-	raw       string
-	icon      string
-	label     string
-	slash     bool
-	sessionID string
-}
-
-func (a *App) extractMentionChips() []mentionChip {
-	seen := map[string]bool{}
-	var out []mentionChip
+// sessionTokens are the sessions the draft takes in, as tokens of the
+// attached row: a session is not in the words, as a file or a skill the
+// words name is, but goes with them, as an attachment does.
+func (a *App) sessionTokens(c *ui.Context) {
 	for _, id := range a.mentionSessions {
-		tok := "@session:" + id
-		if seen[tok] {
-			continue
-		}
-		seen[tok] = true
 		label := id
 		for _, s := range a.C.Sessions {
 			if s.ID == id && title(s) != "" {
@@ -407,118 +453,8 @@ func (a *App) extractMentionChips() []mentionChip {
 				break
 			}
 		}
-		out = append(out, mentionChip{raw: tok, icon: "message", label: label, sessionID: id})
-	}
-	if strings.Contains(a.draft, "/") && !a.slash.open {
-		for _, m := range slashTokenRe.FindAllStringSubmatchIndex(a.draft, -1) {
-			tok := a.draft[m[2]:m[3]]
-			name := strings.TrimPrefix(tok, "/")
-			if len(name) == 0 || seen[tok] || !a.knownSlashToken(name) {
-				continue
-			}
-			seen[tok] = true
-			out = append(out, mentionChip{raw: tok, label: name, slash: true})
+		if a.token(c, "msession:"+id, "message", nil, label).Clicked() {
+			a.mentionSessions = slices.DeleteFunc(slices.Clone(a.mentionSessions), func(x string) bool { return x == id })
 		}
 	}
-	if !strings.Contains(a.draft, "@") {
-		return out
-	}
-	matches := mentionTokenRe.FindAllStringSubmatchIndex(a.draft, -1)
-	if len(matches) == 0 {
-		return out
-	}
-	activeAt := -1
-	if a.mention.open && a.mention.at >= 0 {
-		activeAt = len(string([]rune(a.draft)[:a.mention.at]))
-	}
-	for _, m := range matches {
-		start, end := m[2], m[3]
-		if start == activeAt {
-			continue
-		}
-		tok := a.draft[start:end]
-		if len(tok) < 2 || seen[tok] {
-			continue
-		}
-		seen[tok] = true
-		body := tok[1:]
-		icon, label := "file-text", path.Base(body)
-		switch {
-		case strings.HasPrefix(body, "session:"):
-			icon = "message"
-			id := strings.TrimPrefix(body, "session:")
-			label = id
-			for _, s := range a.C.Sessions {
-				if s.ID == id && title(s) != "" {
-					label = title(s)
-					break
-				}
-			}
-		case strings.Contains(body, "://") || strings.Contains(body, ":"):
-			icon = "plug"
-			label = body
-		case strings.HasSuffix(body, "/"):
-			icon = "folder"
-			label = strings.TrimSuffix(body, "/")
-			if base := path.Base(label); base != "" && base != "." {
-				label = base + "/"
-			}
-		}
-		out = append(out, mentionChip{raw: tok, icon: icon, label: label})
-	}
-	return out
-}
-
-// mentionChips renders /skills (Claude-style blue highlight) and @mentions in
-// the draft as removable Apple-style pills.
-func (a *App) mentionChips(c *ui.Context) {
-	chips := a.extractMentionChips()
-	if len(chips) == 0 {
-		return
-	}
-	p := a.p
-	blue := skillAccent(p)
-	ui.Row(c).Wrap().Gap(6).Margin(0, 0, 8, 0).Children(func() {
-		for _, ch := range chips {
-			bg, border := p.Chip, p.Edge
-			if ch.slash {
-				bg, border = blue.Alpha(.10), blue.Alpha(.24)
-			}
-			pill := ui.Row(c.Key("mchip:"+ch.raw)).Height(24).Padding(0, 2, 0, 8).Gap(4).Radius(7).
-				Background(bg).Border(.5, border).AlignItems(ui.Center)
-			pill.Children(func() {
-				if ch.slash {
-					ui.Row(c).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, "/").FontSize(12.5).FontWeight(500).TextColor(blue.Alpha(.55)).SingleLine()
-						ui.Text(c, ch.label).FontSize(12.5).FontWeight(500).TextColor(blue).SingleLine()
-					})
-				} else {
-					sym(c, ch.icon, 12, p.Mute)
-					ui.Text(c, ch.label).FontSize(12).FontWeight(500).TextColor(p.Fg2).SingleLine()
-				}
-				rm := ui.ButtonBase(c.Key("mchip-rm:"+ch.raw)).Size(24, 24).Radius(8).Center().KeepFocus().Label(locales.Remove())
-				press(rm)
-				if rm.Hovered() {
-					rm.Background(p.Hover)
-				}
-				rmCol := p.Mute
-				if ch.slash {
-					rmCol = blue.Alpha(.7)
-				}
-				rm.Children(func() { sym(c, "x", 10, rmCol) })
-				if rm.Clicked() {
-					if ch.sessionID != "" {
-						a.mentionSessions = slices.DeleteFunc(a.mentionSessions, func(id string) bool { return id == ch.sessionID })
-					} else {
-						next := strings.Replace(a.draft, ch.raw+" ", "", 1)
-						if next == a.draft {
-							next = strings.Replace(a.draft, ch.raw, "", 1)
-						}
-						a.draft = strings.TrimLeft(next, " ")
-						a.toEnd = true
-					}
-				}
-			})
-		}
-	})
 }

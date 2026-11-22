@@ -44,16 +44,12 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 	if vibrant {
 		// Window VibrancyGlass provides the single native glass layer; add a
 		// Tinted frost wash and one right hairline so there are no nested frames.
-		tint := ui.RGBA(244, 245, 248, .38)
-		if p.Dark {
-			tint = ui.RGBA(18, 18, 20, .48)
-		}
-		side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
+		side.Background(sideTint(p)).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 	} else {
 		side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 	}
 	side.Children(func() {
-		ui.Box(c).Height(topGap+6).Shrink(0).DragWindow()
+		ui.Box(c).Height(topGap + 6).Shrink(0).DragWindow()
 		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
 			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
 				a.openPalette(c)
@@ -302,7 +298,7 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 			_ = exec.Command("open", "-R", cwd).Start()
 		}
 		m.Separator()
-		if m.Item(locales.RemoveProject()+"…").Danger().Chosen() {
+		if m.Item(locales.RemoveProject() + "…").Danger().Chosen() {
 			// It deletes every session in it, for good: ask first, as
 			// Finder does before emptying the Trash.
 			a.removing, a.removingName = a.removing[:0], label
@@ -313,7 +309,7 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 	}
 	row.ContextMenu(fillMenu)
 	row.Children(func() {
-		toggle := ui.ButtonBase(c.Key("proj-toggle:"+cwd)).Row().Grow(1).MinWidth(0).Height(28).Gap(6).AlignItems(ui.Center).
+		toggle := ui.ButtonBase(c.Key("proj-toggle:" + cwd)).Row().Grow(1).MinWidth(0).Height(28).Gap(6).AlignItems(ui.Center).
 			KeepFocus().Label(label).Expanded(!collapsed)
 		focusRing(toggle, p)
 		toggle.Children(func() {
@@ -444,69 +440,80 @@ func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
 
 func (a *App) footer(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(54).Shrink(0).Padding(6, 10, 10, 10).Gap(6).AlignItems(ui.Center).Children(func() {
-		name, sub := locales.NotSignedIn(), locales.AddAccountInSettings()
-		curAcc := a.account()
-		if curAcc != nil {
-			name = curAcc.Name
-			if name == "" {
-				name = curAcc.ID
-			}
-			sub = curAcc.Email
-			if qText, _ := formatQuota(a.now(), p, curAcc.Quota); qText != "" {
-				sub = qText
-			} else if curAcc.Subscription && sub == "" {
-				sub = locales.Subscription()
-			}
+	cur := a.account()
+	name := locales.NotSignedIn()
+	var q *proto.AccountQuota
+	if cur != nil {
+		name, q = accountName(*cur), cur.Quota
+	}
+	left, _ := formatQuota(a.now(), p, q)
+	ui.Column(c).Shrink(0).Padding(6, 8, 10, 8).Children(func() {
+		label := name
+		if left != "" {
+			label = locales.AccountQuota(name, left)
 		}
-		profile := ui.ButtonBase(c.Key("profile-card")).Row().Grow(1).MinWidth(0).Height(38).Padding(0, 8, 0, 6).Gap(9).Radius(10).
-			AlignItems(ui.Center).Justify(ui.Start).Label(name)
-		press(profile)
-		focusRing(profile, p)
-		if profile.Hovered() {
-			profile.Background(p.Hover)
+		b := ui.ButtonBase(c.Key("profile-card")).Row().Height(32).Padding(0, 8, 0, 10).Gap(6).Radius(8).
+			AlignItems(ui.Center).Label(label)
+		if left != "" {
+			b.Tooltip(left)
 		}
-		profile.Children(func() {
-			ui.Box(c).Size(26, 26).Shrink(0).Radius(13).Background(p.Chip).Border(.5, p.Edge).Center().Children(func() {
-				ui.Text(c, initials(name)).TextColor(p.Fg).FontSize(11.5).FontWeight(600).SingleLine()
-			})
-			ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-				ui.Text(c, name).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
-				if sub != "" {
-					ui.Text(c, sub).FontSize(11).LetterSpacing(.1).TextColor(p.Mute).FontFeatures("tnum").SingleLine().Ellipsis("…")
+		press(b)
+		focusRing(b, p)
+		if b.Hovered() {
+			b.Background(p.Hover)
+		}
+		b.Children(func() {
+			ui.Text(c, name).FontSize(14).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			if q != nil && q.RemainingPct >= 0 {
+				low := q.RemainingPct < 15
+				ink := p.Mute
+				if low {
+					ink = p.Minus
 				}
-			})
-		}).PopoverMenuButton(func(m *ui.Menu) {
-			if len(a.C.Accounts) > 0 {
-				for _, acc := range a.C.Accounts {
-					accName := acc.Name
-					if accName == "" {
-						accName = acc.ID
-					}
-					id := acc.ID
-					checked := curAcc != nil && curAcc.ID == id
-					item := m.Item(accName).Checked(checked)
-					if a.C.Current != nil && item.Chosen() {
-						a.do(a.C.Update(proto.SessionUpdate{Account: &id}))
-						a.flash("sparkles", accName)
-					}
-				}
-				m.Separator()
+				ui.Image(c, ring(p, q.RemainingPct, low)).Size(14, 14).Shrink(0)
+				ui.Text(c, fmt.Sprintf("%d%%", q.RemainingPct)).FontSize(12.5).TextColor(ink).FontFeatures("tnum").SingleLine()
 			}
-			if m.Item(locales.SettingsAccounts()).Chosen() {
-				a.openSettingsPage("accounts")
-			}
-			if m.Item(locales.SettingsMcp()).Chosen() {
-				a.openMCP()
-			}
-			if m.Item(locales.Settings()).Chosen() {
-				a.openSettings()
-			}
-		}, a.menuOptions(nil))
-		if a.iconButton(c, "settings", "settings", locales.Settings()).Radius(14).Clicked() {
-			a.openSettings()
-		}
+			sym(c, "selector", 11, p.Mute)
+		}).PopoverMenuButton(func(m *ui.Menu) { a.accountMenu(m, cur) }, a.menuOptions(nil))
 	})
+}
+
+// accountMenu is what the footer opens: the accounts, the current one
+// checked, each with what is left of its quota, then adding one, then
+// Settings, as an account menu of macOS does.
+func (a *App) accountMenu(m *ui.Menu, cur *proto.Account) {
+	for _, acc := range a.C.Accounts {
+		id, name := acc.ID, accountName(acc)
+		item := m.Item(name).ID("account:" + id).Checked(cur != nil && cur.ID == id)
+		if sub, _ := formatQuota(a.now(), a.p, acc.Quota); sub != "" {
+			item.Subtitle(sub)
+		} else if acc.Email != "" {
+			item.Subtitle(acc.Email)
+		}
+		if a.C.Current != nil && item.Chosen() {
+			a.do(a.C.Update(proto.SessionUpdate{Account: &id}))
+			a.flash("sparkles", name)
+		}
+	}
+	if len(a.C.Accounts) > 0 {
+		m.Separator()
+	}
+	if m.Item(locales.AddAccount()).ID("account-add").Chosen() {
+		a.openSettings()
+		a.settingsPage, a.addingAccount = "accounts", true
+	}
+	m.Separator()
+	if m.Item(locales.SettingsMenu()).ID("account-settings").Shortcut(ui.Cmd, ui.KeyComma).Chosen() {
+		a.openSettings()
+	}
+}
+
+// accountName is what an account is called: its name, or its ID.
+func accountName(acc proto.Account) string {
+	if acc.Name != "" {
+		return acc.Name
+	}
+	return acc.ID
 }
 
 // account is the current session's account, or the first one.

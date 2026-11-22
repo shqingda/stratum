@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -111,5 +112,46 @@ func TestNextWaitingAndSeen(t *testing.T) {
 	task8Command(t, a, proto.MethodSessionGet, &ref)
 	if ref.SessionID != "3" {
 		t.Fatalf("⌘J opened %+v", ref)
+	}
+}
+
+// TestSidebarFooter: the footer is one row, the account and the ring of
+// its quota, with no gear; it opens the accounts, each with its quota, then
+// adding one and Settings.
+func TestSidebarFooter(t *testing.T) {
+	a := task8App()
+	a.C.Accounts = []proto.Account{
+		{ID: "chatgpt", Name: "ChatGPT Pro", Quota: &proto.AccountQuota{RemainingPct: 74}},
+		{ID: "work", Name: "Work", Quota: &proto.AccountQuota{RemainingPct: 9}},
+	}
+	tt := task8Tester(a, false)
+	snapshot(t, tt, "sidebar-footer")
+	if _, ok := tt.Find("74%"); !ok {
+		t.Errorf("the footer does not show the quota as a percent: %q", tt.Texts())
+	}
+	if _, ok := tt.Find("还剩 74%"); ok {
+		t.Error("the footer still says the quota on a line of its own")
+	}
+	if _, ok := tt.Find("设置"); ok {
+		t.Error("the footer still has a gear for Settings")
+	}
+	if err := tt.Click("ChatGPT Pro，还剩 74%"); err != nil {
+		t.Fatal(err)
+	}
+	menu := strings.Join(tt.Menu(), "|")
+	for _, want := range []string{"ChatGPT Pro", "Work", "添加账号…", "设置…"} {
+		if !strings.Contains(menu, want) {
+			t.Errorf("no %q in the menu %q", want, menu)
+		}
+	}
+	if strings.Contains(menu, "技能与 MCP") {
+		t.Errorf("the menu repeats the sidebar's own rows: %q", menu)
+	}
+	if err := tt.ChooseMenuItem("设置…"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.settingsOpen {
+		t.Error("设置… does not open Settings")
 	}
 }

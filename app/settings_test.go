@@ -34,9 +34,7 @@ func TestSettings(t *testing.T) {
 	}
 	tt := ui.NewTester(a.View, 1120, 800)
 	tt.Frame()
-	if err := tt.Click("设置"); err != nil {
-		t.Fatal(err)
-	}
+	tt.Key(ui.Cmd, ui.KeyComma)
 	tt.Frame()
 	sent(proto.MethodSettings)
 	a.C.Settings = &proto.Settings{Mode: "auto"}

@@ -62,20 +62,20 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 	ui.Column(c.Key("work-body:"+key)).Margin(2, 0, 8, 0).
 		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
 		Children(func() {
-		for i := 0; i < len(steps); {
-			var run []item
-			run, i = a.row(steps, i, -1, nil)
-			for _, it := range run {
-				ui.Column(c.Key(it.key())).Children(func() {
-					if it.fold != nil {
-						a.fold(c, it.fold)
-					} else {
-						a.body(c, it.e)
-					}
-				})
+			for i := 0; i < len(steps); {
+				var run []item
+				run, i = a.row(steps, i, -1, nil)
+				for _, it := range run {
+					ui.Column(c.Key(it.key())).Children(func() {
+						if it.fold != nil {
+							a.fold(c, it.fold)
+						} else {
+							a.body(c, it.e)
+						}
+					})
+				}
 			}
-		}
-	})
+		})
 }
 
 // span says how long something took: "38 秒", "2 分 5 秒".
@@ -284,7 +284,7 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 		ui.Spacer(c)
 	})
 	if open {
-		ui.Column(c.Key("thought-body:"+key)).
+		ui.Column(c.Key("thought-body:" + key)).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
 			Children(func() {
 				ui.Text(c, strings.TrimSpace(e.Text)).FontSize(13.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
@@ -293,7 +293,38 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 }
 
 // rings are the context rings drawn, by percent and appearance.
-var rings = map[[2]int]*ui.SVG{}
+var rings = map[ringKey]*ui.SVG{}
+
+type ringKey struct {
+	pct         int
+	dark, alert bool
+}
+
+// ring is a circle of radius 6 on a 16 grid in the edge color, pct of it
+// drawn over from the top, clockwise, as the battery and storage rings of
+// macOS are: in the secondary ink, or in red when alert.
+func ring(p *Palette, pct int, alert bool) *ui.SVG {
+	pct = max(0, min(100, pct))
+	key := ringKey{pct, p.Dark, alert}
+	if svg, ok := rings[key]; ok {
+		return svg
+	}
+	hex := func(col ui.Color) string {
+		return fmt.Sprintf("rgba(%d,%d,%d,%.3f)", col.R, col.G, col.B, float64(col.A)/255)
+	}
+	arc := p.Fg2
+	if alert {
+		arc = p.Minus
+	}
+	const circ = 2 * 3.14159265 * 6
+	doc := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">`+
+		`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6"/>`+
+		`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="%.2f %.2f" transform="rotate(-90 8 8)"/></svg>`,
+		hex(p.Edge2), hex(arc), circ*float64(pct)/100, circ)
+	svg := ui.MustParseSVG([]byte(doc))
+	rings[key] = svg
+	return svg
+}
 
 // contextRing says how much of the model's context the session fills,
 // as of the latest request this window saw.
@@ -308,29 +339,7 @@ func (a *App) contextRing(c *ui.Context) {
 	}
 	window := m.Context
 	pct := min(100, (a.C.LastInput*100+window/2)/window)
-	isDark := 0
-	if p.Dark {
-		isDark = 1
-	}
-	key := [2]int{pct, isDark}
-	svg, ok := rings[key]
-	if !ok {
-		hex := func(col ui.Color) string {
-			return fmt.Sprintf("rgba(%d,%d,%d,%.3f)", col.R, col.G, col.B, float64(col.A)/255)
-		}
-		arc := p.Fg2
-		if pct >= 85 {
-			arc = p.Minus
-		}
-		// A circle of radius 6 on a 16 grid, its arc from the top, clockwise.
-		const circ = 2 * 3.14159265 * 6
-		doc := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">`+
-			`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6"/>`+
-			`<circle cx="8" cy="8" r="6" stroke="%s" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="%.2f %.2f" transform="rotate(-90 8 8)"/></svg>`,
-			hex(p.Edge2), hex(arc), circ*float64(pct)/100, circ)
-		svg = ui.MustParseSVG([]byte(doc))
-		rings[key] = svg
-	}
+	svg := ring(p, pct, pct >= 85)
 	tip := fmt.Sprintf("%d%% · %s", pct, locales.ContextUsed(tokens(a.C.LastInput), tokens(window)))
 	if total := a.turnCost(a.C.Usage); total != "" {
 		tip += " · " + total

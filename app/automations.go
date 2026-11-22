@@ -43,11 +43,7 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 		if vibrant {
-			tint := ui.RGBA(244, 245, 248, .38)
-			if p.Dark {
-				tint = ui.RGBA(18, 18, 20, .48)
-			}
-			side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
+			side.Background(sideTint(p)).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 		} else {
 			side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 		}
