@@ -1,4 +1,4 @@
-# Talos 设计规范
+# Stratum 设计规范
 
 方向：**单色 Mono**（2026-11-12 选定）。与 ogma 同族：共用色板，各有标志。
 
@@ -11,27 +11,21 @@
 
 ## 图标
 
-应用图标是**机械塔罗斯**（2026-11-12 定）：希腊神话里看守克里特岛的青铜巨人，画成卡通描边 + 赛璐璐阴影的青铜自动机半身像，3/4 侧脸，不正对镜头。
+应用标识为**三条错开的圆角横条（地层 / Stratum）**：
 
-- 头盔：一排**向后扫**的蓝色金属盔缨片，铆在铜轨上；镜头眼、铰链螺栓、成排铆钉。
-- 颈侧一根发蓝光的玻璃管，是 Talos 唯一的血管；胸口舷窗里是齿轮。
-- 底：深海军蓝径向渐变 + 放射光芒；macOS 圆角方块（1024 画布，tile 824，圆角 186）。
-- 青铜只作为人物的材质；界面本身仍是单色，蓝色只给「活着的东西」。
-- 描边 `#22150e`，青铜 `#d58c4b` / 暗部 `#a45f2e` / 高光 `#f2bd80`，盔缨蓝 `#6a9ef0` / `#5389dc`。
+- 应用内单色符号：[app/icons/stratum.svg](file:///Users/shqingda/Projects/stratum/app/icons/stratum.svg)（`24×24` 网格，`currentColor`，随浅/深色文字自适应）。
+- macOS 应用图标：连续超椭圆（`1024×1024` 画布，`824×824` tile，圆角 `186`）。默认采用瓷白渐变底 + 黑曜石三横条（`Stratum.icns` 与 `resources/icon.png`），同时保留深黑曜石底款（`Stratum-dark.icns`）。
+- 16 / 32 px 小尺寸使用独立光学简化版，保持像素级清晰度。
 
 文件在 `icon/`：
 
 | 文件 | 说明 |
 |---|---|
-| `talos-mech.svg` | 主图标（后扫盔缨），由 `src/mech.py` 生成 |
-| `talos-mech-32.svg` | 小尺寸简化版，用于 32 px 与 16@2x，`python3 small.py 32` |
-| `talos-mech-16.svg` | 小尺寸简化版，用于 16 px，`python3 small.py 16` |
-| `talos-mech-upright.svg` | 存档：直立盔缨，`python3 mech.py upright` |
-| `talos-orbit.svg` | 备选：轨道式，`src/orbit.py` |
-| `talos-real.svg` | 备选：拟物青铜头盔，`src/real.py` |
-| `preview.html` / `compare.png` | 大图、文字组合、各尺寸、Dock 预览 |
-
-小尺寸版只保留能在像素里读出来的东西：裁到头部、去掉铆钉/接缝/舷窗/光芒，盔缨改成 4 片（16 px 为 3 片）近乎平行的后扫刃，刃间用底色描边隔开，眼睛加大加亮。64 px 及以上用主图标。
+| `src/stratum.py` | 生成浅/深色主图与 32 / 16 px 简化版 SVG |
+| `build.sh` | 渲染并打包 `Stratum.icns`、`Stratum-dark.icns` 与 `resources/icon.png` |
+| `stratum-icon-light{,-32,-16}.svg` | 瓷白底默认款 SVG（1024 / 32 / 16） |
+| `stratum-icon-dark{,-32,-16}.svg` | 深黑底保留款 SVG（1024 / 32 / 16） |
+| `Stratum.icns` / `Stratum-dark.icns` | macOS 应用图标包 |
 
 ## 颜色
 
