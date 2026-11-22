@@ -150,6 +150,7 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 	if global != "" {
 		memory(filepath.Join(global, "MEMORY.md"))
 	}
+	memory(filepath.Join(cwd, ".stratum", "MEMORY.md"))
 	memory(filepath.Join(cwd, ".talos", "MEMORY.md"))
 	if l.GlobalDir == "" {
 		if home, err := os.UserHomeDir(); err == nil {
@@ -162,6 +163,7 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 	}
 	files = append(files, skillFiles(true, cwd, ".agents", "skills")...)
 	files = append(files, skillFiles(true, cwd, ".claude", "skills")...)
+	files = append(files, skillFiles(true, cwd, ".stratum", "skills")...)
 	files = append(files, skillFiles(true, cwd, ".talos", "skills")...)
 	if l.ExtraSkillDirs != nil {
 		for _, sd := range l.ExtraSkillDirs(cwd) {
@@ -378,22 +380,58 @@ func parseSkill(data []byte) (Skill, error) {
 		if !ok {
 			return Skill{}, errors.New("missing closing front matter delimiter")
 		}
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		key, value, found := strings.Cut(line, ":")
+		// Skip indented nested YAML blocks for auxiliary keys.
+		if line[0] == ' ' || line[0] == '\t' {
+			continue
+		}
+		key, rawVal, found := strings.Cut(line, ":")
 		if !found || key == "" || strings.TrimSpace(key) != key || strings.ContainsAny(key, " \t[]{}") {
 			return Skill{}, errors.New("expected a flat key: value field")
 		}
 		if _, exists := fields[key]; exists {
 			return Skill{}, errors.New("duplicate front matter field")
 		}
-		value, err := scalar(strings.TrimSpace(value))
+		valTrimmed := strings.TrimSpace(rawVal)
+		if isBlockScalar(valTrimmed) {
+			var parts []string
+			for {
+				peek, nextRest, hasNext := strings.Cut(rest, "\n")
+				peekTrimmed := strings.TrimSuffix(peek, "\r")
+				if strings.TrimSpace(peekTrimmed) == "---" || (!hasNext && strings.TrimSpace(peekTrimmed) == "") {
+					break
+				}
+				if len(peekTrimmed) > 0 && peekTrimmed[0] != ' ' && peekTrimmed[0] != '\t' {
+					break
+				}
+				if t := strings.TrimSpace(peekTrimmed); t != "" {
+					parts = append(parts, t)
+				}
+				rest = nextRest
+				if !hasNext {
+					break
+				}
+			}
+			val := strings.Join(parts, " ")
+			if val == "" {
+				return Skill{}, errors.New("empty block scalar")
+			}
+			fields[key] = val
+			continue
+		}
+		value, err := scalar(valTrimmed)
 		if err != nil {
 			return Skill{}, err
 		}
 		fields[key] = strings.Join(strings.Fields(value), " ")
 	}
+}
+
+func isBlockScalar(v string) bool {
+	return v == "|" || v == "|-" || v == "|+" || v == ">" || v == ">-" || v == ">+"
 }
 
 func scalar(value string) (string, error) {
@@ -419,9 +457,6 @@ func scalar(value string) (string, error) {
 		}
 		return strings.ReplaceAll(inner, "''", "'"), nil
 	case '|', '>', '[', '{', '&', '*', '!', '#':
-		return "", bad
-	}
-	if strings.Contains(value, ": ") {
 		return "", bad
 	}
 	if at := strings.Index(value, " #"); at >= 0 {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/session"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/session"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestWorkspace(t *testing.T) {

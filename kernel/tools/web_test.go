@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 func TestWebFetch(t *testing.T) {

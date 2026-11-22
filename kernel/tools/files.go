@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 const maxRead = 256 << 10 // bytes read_file returns

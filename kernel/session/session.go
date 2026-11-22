@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/shqingda/talos/kernel/mcp"
+	"github.com/shqingda/stratum/kernel/mcp"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,17 +19,17 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/shqingda/talos/kernel/agent"
-	"github.com/shqingda/talos/kernel/agents"
-	"github.com/shqingda/talos/kernel/changes"
-	"github.com/shqingda/talos/kernel/lsp"
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/sandbox"
-	"github.com/shqingda/talos/kernel/skills"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/kernel/tools"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/agent"
+	"github.com/shqingda/stratum/kernel/agents"
+	"github.com/shqingda/stratum/kernel/changes"
+	"github.com/shqingda/stratum/kernel/lsp"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/sandbox"
+	"github.com/shqingda/stratum/kernel/skills"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/kernel/tools"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Manager runs the sessions of one kernel.
@@ -56,7 +56,7 @@ type Manager struct {
 	mu   sync.Mutex
 	runs map[string]*run
 	// allowed are the rules the user allowed for the rest of a session,
-	// by its ID, until Talos quits.
+	// by its ID, until Stratum quits.
 	allowed map[string][]proto.Rule
 	subs    map[int]func(proto.Event)
 	nextS   int
@@ -866,7 +866,7 @@ func (m *Manager) Recover(ctx context.Context) error {
 				m.record(ctx, id, proto.EventMessage, res)
 			}
 		}
-		m.record(ctx, id, proto.EventTurnEnd, proto.TurnEnd{Error: "Talos quit before the turn finished."})
+		m.record(ctx, id, proto.EventTurnEnd, proto.TurnEnd{Error: "Stratum quit before the turn finished."})
 	}
 	return nil
 }
@@ -901,7 +901,7 @@ func titleOf(text string) string {
 
 func systemPrompt(x store.Session, sandboxed bool) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "You are Talos, a coding agent working in %s on %s.\n", x.Cwd, time.Now().Format("2006-01-02"))
+	fmt.Fprintf(&b, "You are Stratum, a coding agent working in %s on %s.\n", x.Cwd, time.Now().Format("2006-01-02"))
 	b.WriteString("Use the tools to read, search and change files and to run commands; read a file before editing it. ")
 	b.WriteString("Keep changes focused, run the project's tests after changing code, and answer briefly.\n")
 	if sandboxed {

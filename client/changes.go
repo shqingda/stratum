@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Changes is what the turns of the current session changed in files, read

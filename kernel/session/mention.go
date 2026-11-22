@@ -6,9 +6,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/shqingda/talos/kernel/mcp"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/kernel/mcp"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
 )
 
 // mentionRunes is how much of a session or MCP resource is attached.

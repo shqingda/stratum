@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestLogin(t *testing.T) {

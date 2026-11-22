@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 const automationsKey = "automations:v1"

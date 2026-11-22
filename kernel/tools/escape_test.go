@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 func escapeDirs(t *testing.T) (Env, string) {

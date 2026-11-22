@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // opt is a row of the palette: a session to open or an action to take.

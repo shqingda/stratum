@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/preview"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/preview"
 )
 
 // Preview opens a localhost or web URL in the built-in browser preview,

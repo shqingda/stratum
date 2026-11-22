@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shqingda/talos/kernel/rpc"
-	"github.com/shqingda/talos/kernel/session"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/rpc"
+	"github.com/shqingda/stratum/kernel/session"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // conn drives a Client against a real kernel over pipes, as the app does

@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 	"modernc.org/sqlite"
 )
 

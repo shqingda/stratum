@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/lsp"
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/lsp"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 // LSP queries a persistent language server (gopls, typescript-language-server,

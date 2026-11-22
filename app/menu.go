@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/locales"
 )
 
 // MenuBar is the app's own commands for the menu bar, each with the

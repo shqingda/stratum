@@ -10,8 +10,8 @@ import (
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // settingsPages are the pages of the settings, in the order of the list,
@@ -93,8 +93,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		}
 		side.Children(func() {
 			ui.Box(c).Height(topGap).Shrink(0).DragWindow()
-			ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
-				brandMark(c, 22, p.Fg)
+			ui.Row(c).Padding(4, 20, 14, 20).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, locales.Settings()).FontSize(16).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg)
 			})
 			ui.SearchField(c, &a.settingsQuery).Label(locales.SearchSettings()).Placeholder(locales.Search()).Margin(0, 12, 12, 12)
@@ -379,7 +378,7 @@ func (a *App) settingsBuildFoot(c *ui.Context) {
 	}
 	tip := strings.TrimSpace(commit + " " + built)
 	ui.Row(c).Height(42).Shrink(0).Padding(0, 14).Gap(6).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-		v := ui.Text(c, "Talos "+version).FontSize(11.5).TextColor(p.Mute).SingleLine()
+		v := ui.Text(c, "Stratum "+version).FontSize(11.5).TextColor(p.Mute).SingleLine()
 		if tip != "" {
 			v.Tooltip(tip)
 		}

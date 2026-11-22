@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/skills"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/skills"
 )
 
 func TestMemoryToolAndLoader(t *testing.T) {

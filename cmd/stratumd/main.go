@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/shqingda/talos/llm/auth"
+	"github.com/shqingda/stratum/llm/auth"
 )
 
 const usage = `usage: talosd <command> [flags]

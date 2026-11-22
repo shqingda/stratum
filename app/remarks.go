@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/locales"
 )
 
 // remark is a comment on a line of the diff, kept until the batch goes

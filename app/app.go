@@ -8,16 +8,17 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/kernel/rpc"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/kernel/rpc"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // App is the state of the window. Everything in it is touched on the UI
@@ -342,9 +343,10 @@ func (a *App) View(c *ui.Context) {
 	sw := a.sideWidth()
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
-			sideWrap := ui.Row(c).Width(a.sideOpen * sw).Shrink(0).AlignItems(ui.Stretch).Clip()
+			sideW := float32(math.Round(float64(a.sideOpen * sw)))
+			sideWrap := ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip()
 			if a.sideOpen < 0.999 {
-				sideWrap.Translate(-(1-a.sideOpen)*10, 0).Opacity(min(1, a.sideOpen*1.35))
+				sideWrap.Opacity(min(1, a.sideOpen*1.25))
 			}
 			sideWrap.Children(func() { a.sidebar(c, vibrant) })
 		} else {

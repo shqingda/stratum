@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/sandbox"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/sandbox"
 )
 
 const (

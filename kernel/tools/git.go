@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 func git(ctx context.Context, env Env, args ...string) (string, error) {

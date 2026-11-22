@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/proto"
 )
 
 var testZone = time.FixedZone("test-UTC+8", 8*60*60)

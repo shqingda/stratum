@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/rpc"
-	"github.com/shqingda/talos/kernel/session"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/llm/auth"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/rpc"
+	"github.com/shqingda/stratum/kernel/session"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/llm/auth"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Options say what the kernel runs on.

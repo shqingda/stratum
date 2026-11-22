@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 // BenchmarkNewFileDiff is a whole-file diff of 20,000 lines, as opening a

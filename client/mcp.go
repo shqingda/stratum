@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/json"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 // ReadMCP reads how the MCP servers are for the current session's folder.

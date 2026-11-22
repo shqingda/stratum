@@ -12,24 +12,27 @@ import (
 	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/app"
-	"github.com/shqingda/talos/app/web"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/kernel/boot"
-	"github.com/shqingda/talos/llm/auth"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/app"
+	"github.com/shqingda/stratum/app/web"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/kernel/boot"
+	"github.com/shqingda/stratum/llm/auth"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	opts := boot.Options{Creds: &auth.Keychain{}}
-	demo := os.Getenv("TALOS_DEMO")
+	demo := os.Getenv("STRATUM_DEMO")
+	if demo == "" {
+		demo = os.Getenv("TALOS_DEMO")
+	}
 	if demo != "" {
-		// The demo keeps out of ~/.talos and the keychain: a fresh data
+		// The demo keeps out of ~/.stratum and the keychain: a fresh data
 		// directory and one scripted account.
-		dir, err := os.MkdirTemp("", "talos-demo-")
+		dir, err := os.MkdirTemp("", "stratum-demo-")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -39,7 +42,13 @@ func main() {
 	if err := os.MkdirAll(auth.Dir, 0o700); err != nil {
 		log.Fatal(err)
 	}
-	opts.DB = filepath.Join(auth.Dir, "talos.db")
+	opts.DB = filepath.Join(auth.Dir, "stratum.db")
+	if _, err := os.Stat(opts.DB); err != nil {
+		legacyDB := filepath.Join(auth.Dir, "talos.db")
+		if _, lerr := os.Stat(legacyDB); lerr == nil {
+			opts.DB = legacyDB
+		}
+	}
 	k, err := boot.Start(ctx, opts)
 	if err != nil {
 		log.Fatal(err)
@@ -60,7 +69,7 @@ func main() {
 	mygo.App.WhenReady(func() {
 		mygo.App.SetMenu(menu(a))
 		win := mygo.NewWindow(mygo.WindowOptions{
-			Title:          "Talos",
+			Title:          "Stratum",
 			Width:          1200,
 			Height:         780,
 			MinWidth:       760,
@@ -99,7 +108,7 @@ func main() {
 func menu(a *app.App) *mygo.Menu {
 	session, settings, view := a.MenuBar()
 	return mygo.NewMenu([]*mygo.MenuItem{
-		{Label: "Talos", Submenu: []*mygo.MenuItem{
+		{Label: "Stratum", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleAbout},
 			updater.MenuItem(),
 			mygo.Separator(),

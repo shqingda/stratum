@@ -7,10 +7,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 )
 
 type diffLine struct {
@@ -167,7 +168,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 		return
 	case "rows":
 		if a.cardStep(c, e, locales.Results(pc.count), false) {
-			a.cardOutput(c, func() {
+			a.cardOutput(c, "out:"+e.CallID, func() {
 				for _, row := range pc.rows {
 					ui.Text(c, row).Font("monospace").FontSize(13).TextColor(a.p.Fg2).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
 				}
@@ -321,15 +322,17 @@ func (a *App) cardStep(c *ui.Context, e *client.Entry, summary string, failed bo
 			color = p.Minus
 		}
 		ui.Text(c, summary).FontSize(12.5).TextColor(color).SingleLine().Shrink(0)
-		if row.Hovered() {
-			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 10, p.Mute)
+		if row.Hovered() || open {
+			disclosureChevron(c, "card:"+e.CallID, open, 10, p.Mute)
 		}
 	})
 	return open
 }
 
-func (a *App) cardOutput(c *ui.Context, content func()) {
-	ui.Column(c).Padding(9, 11).Radius(8).Background(a.p.Chip).Margin(2, 0, 8, 24).Children(content)
+func (a *App) cardOutput(c *ui.Context, key string, content func()) {
+	ui.Column(c.Key(key)).Padding(9, 11).Radius(8).Background(a.p.Chip).Margin(2, 0, 8, 24).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+		Children(content)
 }
 
 func shellTail(output string) (lines []string, omitted int, exit string) {
@@ -358,7 +361,7 @@ func (a *App) shellCard(c *ui.Context, e *client.Entry) {
 		summary = locales.Failed()
 	}
 	if a.cardStep(c, e, summary, exit != "" || e.Failed) {
-		a.cardOutput(c, func() {
+		a.cardOutput(c, "out:"+e.CallID, func() {
 			if omitted > 0 {
 				ui.Text(c, locales.OmittedLines(omitted)).FontSize(12.5).TextColor(a.p.Mute)
 			}

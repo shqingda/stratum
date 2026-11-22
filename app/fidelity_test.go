@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // The fixtures here hold the content of the screens in

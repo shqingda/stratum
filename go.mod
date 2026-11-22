@@ -1,4 +1,4 @@
-module github.com/shqingda/talos
+module github.com/shqingda/stratum
 
 go 1.27.4
 

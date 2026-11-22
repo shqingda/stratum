@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shqingda/talos/app/web"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/app/web"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestWebAssetsEmbedded(t *testing.T) {

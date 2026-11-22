@@ -3,8 +3,8 @@ package client
 import (
 	"encoding/json"
 
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Workspace is what the current session's folder is in git, read on

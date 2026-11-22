@@ -9,8 +9,8 @@ import (
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/tools"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/tools"
 )
 
 // TestMain is also the MCP server the tests start: the test binary run

@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/json"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 // OpenPreview navigates the built-in preview browser to url and refreshes Preview.

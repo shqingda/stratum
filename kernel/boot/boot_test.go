@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/shqingda/talos/llm/auth"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm/auth"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestLogin(t *testing.T) {

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // work is a finished turn's steps as one line, "工作了 38 秒", that
@@ -47,7 +47,7 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 		did = append(did, locales.RanCommands(runs))
 	}
 	row.Children(func() {
-		sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+		disclosureChevron(c, key, open, 12, p.Mute)
 		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).SingleLine().Shrink(0)
 		if len(did) > 0 {
 			ui.Text(c, "· "+strings.Join(did, locales.ClauseSeparator())).FontSize(13.5).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
@@ -59,7 +59,9 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 	}
 	a.inWork = true
 	defer func() { a.inWork = false }()
-	ui.Column(c).Margin(2, 0, 8, 0).Children(func() {
+	ui.Column(c.Key("work-body:"+key)).Margin(2, 0, 8, 0).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+		Children(func() {
 		for i := 0; i < len(steps); {
 			var run []item
 			run, i = a.row(steps, i, -1, nil)
@@ -276,13 +278,17 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, "bulb", 15, p.Mute) })
 			ui.Text(c, label).FontSize(13.5).TextColor(p.Fg2).SingleLine()
 		} else {
-			sym(c, map[bool]string{true: "chevron-down", false: "chevron-right"}[open], 13, p.Mute)
+			disclosureChevron(c, key, open, 12, p.Mute)
 			ui.Text(c, label).FontSize(13.5).TextColor(p.Mute).SingleLine()
 		}
 		ui.Spacer(c)
 	})
 	if open {
-		ui.Text(c, strings.TrimSpace(e.Text)).FontSize(13.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
+		ui.Column(c.Key("thought-body:"+key)).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+			Children(func() {
+				ui.Text(c, strings.TrimSpace(e.Text)).FontSize(13.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
+			})
 	}
 }
 

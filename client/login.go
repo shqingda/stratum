@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/json"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 // SignIn is a sign-in under way, and what the user has to do for it.

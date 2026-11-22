@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // effortLabel names a reasoning effort.

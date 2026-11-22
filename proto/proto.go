@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 )
 
 // Version is the protocol version; initialize reports it.

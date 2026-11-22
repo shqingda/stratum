@@ -1,7 +1,7 @@
 #!/bin/sh
-# Runs Talos in the demo environment: a development build with live reload,
+# Runs Stratum in the demo environment: a development build with live reload,
 # one scripted account (llm.Play) and a data directory of its own, so no
-# real account, ~/.talos or the keychain is touched.
+# real account, ~/.stratum or the keychain is touched.
 #
 #   scripts/demo.sh [folder]
 #
@@ -21,7 +21,7 @@
 #   出错 / error      fail mid-turn
 set -e
 project=$(cd "$(dirname "$0")/.." && pwd)
-root=${1:-$(mktemp -d -t talos-demo)}
+root=${1:-$(mktemp -d -t stratum-demo)}
 mkdir -p "$root"
 root=$(cd "$root" && pwd)
 

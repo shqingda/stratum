@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/kernel/boot"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/llm/auth"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/kernel/boot"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/llm/auth"
 )
 
 // TestAgainstKernel drives the window against a real kernel answering

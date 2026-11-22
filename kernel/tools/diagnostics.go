@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 const diagnosticsTimeout = 30 * time.Second

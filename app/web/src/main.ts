@@ -159,7 +159,7 @@ function applyMode(m: ModePayload) {
   currentDiffStyle = m.diffStyle === "split" ? "split" : "unified";
   diffsView.classList.toggle("hidden", currentMode !== "diffs");
   filesView.classList.toggle("hidden", currentMode !== "files");
-  treePane.classList.toggle("hidden", m.treeHidden);
+  treePane.classList.toggle("collapsed", m.treeHidden);
 }
 
 function renderDiffs(payload: DiffsPayload) {
@@ -258,7 +258,7 @@ function renderDiffs(payload: DiffsPayload) {
 }
 
 function renderTree(payload: TreePayload) {
-  treePane.classList.toggle("hidden", payload.hidden);
+  treePane.classList.toggle("collapsed", payload.hidden);
   const paths = payload.paths ?? [];
   const gitStatus = payload.gitStatus ?? [];
   try {

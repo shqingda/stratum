@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/tools"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/tools"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // runner runs a turn's tool calls: it decides permission, asks the user

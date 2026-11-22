@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/locales"
 )
 
 type previewState struct {

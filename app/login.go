@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/llm/auth"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm/auth"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // signIns are the browser sign-ins the list offers, subscriptions first.

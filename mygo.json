@@ -1,13 +1,13 @@
 {
-  "name": "Talos",
-  "slug": "talos",
-  "identifier": "com.shqingda.talos",
+  "name": "Stratum",
+  "slug": "stratum",
+  "identifier": "com.shqingda.stratum",
   "version": "0.1.0",
   "copyright": "© 2026 Qingda Shang",
-  "main": "./cmd/talos",
+  "main": "./cmd/stratum",
   "out": "build",
   "macos": {
-    "icon": "design/icon/Talos.icns",
+    "icon": "design/icon/Stratum.icns",
     "minimumSystemVersion": "13.0",
     "infoPlist": {
       "LSApplicationCategoryType": "public.app-category.developer-tools"
@@ -15,7 +15,7 @@
   },
   "updates": {
     "publicKey": "TRLJA+/611JIjHwoz9R0DWsIdhtWCqcbwCOG9ITf6Q0=",
-    "github": "shqingda/talos-releases",
+    "github": "shqingda/stratum-releases",
     "privateKey": "~/Library/Application Support/mygo/update-keys/mygo-update.key"
   },
   "i18n": {

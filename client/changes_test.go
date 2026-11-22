@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/session"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/session"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestChangesAgainstKernel(t *testing.T) {

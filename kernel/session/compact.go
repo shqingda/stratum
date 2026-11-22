@@ -6,9 +6,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 var errEmptySummary = errors.New("the summary came back empty")

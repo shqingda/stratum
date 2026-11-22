@@ -1274,11 +1274,11 @@ func (msgs Messages) KernelDisconnected() string {
 	return Catalog.Format(msgs.locale, "kernelDisconnected", nil)
 }
 
-// KernelDisconnectedHint says "重新打开 Talos 会重启内核，没写完的轮次会从日志里恢复。"
+// KernelDisconnectedHint says "重新打开 Stratum 会重启内核，没写完的轮次会从日志里恢复。"
 // in the language the app shows.
 func KernelDisconnectedHint() string { return In(i18n.Locale()).KernelDisconnectedHint() }
 
-// KernelDisconnectedHint says "重新打开 Talos 会重启内核，没写完的轮次会从日志里恢复。"
+// KernelDisconnectedHint says "重新打开 Stratum 会重启内核，没写完的轮次会从日志里恢复。"
 // in the language of msgs.
 func (msgs Messages) KernelDisconnectedHint() string {
 	return Catalog.Format(msgs.locale, "kernelDisconnectedHint", nil)
@@ -1604,11 +1604,11 @@ func (msgs Messages) OnboardingLead() string {
 	return Catalog.Format(msgs.locale, "onboardingLead", nil)
 }
 
-// OnboardingKeychain says "凭据只存在本机钥匙串，Talos 没有服务器。"
+// OnboardingKeychain says "凭据只存在本机钥匙串，Stratum 没有服务器。"
 // in the language the app shows.
 func OnboardingKeychain() string { return In(i18n.Locale()).OnboardingKeychain() }
 
-// OnboardingKeychain says "凭据只存在本机钥匙串，Talos 没有服务器。"
+// OnboardingKeychain says "凭据只存在本机钥匙串，Stratum 没有服务器。"
 // in the language of msgs.
 func (msgs Messages) OnboardingKeychain() string {
 	return Catalog.Format(msgs.locale, "onboardingKeychain", nil)
@@ -3060,11 +3060,11 @@ func (msgs Messages) SettingsShortcutsLede() string {
 	return Catalog.Format(msgs.locale, "settingsShortcutsLede", nil)
 }
 
-// SettingsMcpLede says "Talos 能用的技能和 MCP 服务器。"
+// SettingsMcpLede says "Stratum 能用的技能和 MCP 服务器。"
 // in the language the app shows.
 func SettingsMcpLede() string { return In(i18n.Locale()).SettingsMcpLede() }
 
-// SettingsMcpLede says "Talos 能用的技能和 MCP 服务器。"
+// SettingsMcpLede says "Stratum 能用的技能和 MCP 服务器。"
 // in the language of msgs.
 func (msgs Messages) SettingsMcpLede() string {
 	return Catalog.Format(msgs.locale, "settingsMcpLede", nil)
@@ -4180,11 +4180,11 @@ func (msgs Messages) HelloTitle(folder string) string {
 	return Catalog.Format(msgs.locale, "helloTitle", map[string]any{"folder": folder})
 }
 
-// HelloLead says "Talos 会先读代码，改动前按你的权限模式询问。"
+// HelloLead says "Stratum 会先读代码，改动前按你的权限模式询问。"
 // in the language the app shows.
 func HelloLead() string { return In(i18n.Locale()).HelloLead() }
 
-// HelloLead says "Talos 会先读代码，改动前按你的权限模式询问。"
+// HelloLead says "Stratum 会先读代码，改动前按你的权限模式询问。"
 // in the language of msgs.
 func (msgs Messages) HelloLead() string {
 	return Catalog.Format(msgs.locale, "helloLead", nil)
@@ -4906,11 +4906,11 @@ func (msgs Messages) PreviewUrlPlaceholder() string {
 	return Catalog.Format(msgs.locale, "previewUrlPlaceholder", nil)
 }
 
-// PreviewEmpty says "输入 localhost 地址，或让 Talos 打开本地应用预览。"
+// PreviewEmpty says "输入 localhost 地址，或让 Stratum 打开本地应用预览。"
 // in the language the app shows.
 func PreviewEmpty() string { return In(i18n.Locale()).PreviewEmpty() }
 
-// PreviewEmpty says "输入 localhost 地址，或让 Talos 打开本地应用预览。"
+// PreviewEmpty says "输入 localhost 地址，或让 Stratum 打开本地应用预览。"
 // in the language of msgs.
 func (msgs Messages) PreviewEmpty() string {
 	return Catalog.Format(msgs.locale, "previewEmpty", nil)

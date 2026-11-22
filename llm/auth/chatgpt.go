@@ -128,10 +128,18 @@ func chatgptCredential(t tokenResponse, client string) (Credential, error) {
 	}, nil
 }
 
-// Dir is Talos's data directory.
+// Dir is Stratum's data directory (~/.stratum, falling back to existing ~/.talos).
 var Dir = func() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".talos")
+	stratum := filepath.Join(home, ".stratum")
+	if _, err := os.Stat(stratum); err == nil {
+		return stratum
+	}
+	legacy := filepath.Join(home, ".talos")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return stratum
 }()
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)

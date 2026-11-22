@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 )
 
 // rewind is the /rewind menu: pick a prompt, then what to put back.

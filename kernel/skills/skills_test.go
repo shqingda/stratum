@@ -150,7 +150,6 @@ func TestSkillFrontMatter(t *testing.T) {
 		"missing-closing":     "---\nname: review\ndescription: desc\nbody",
 		"broken-field":        "---\nname review\ndescription: desc\n---\nbody",
 		"duplicate":           "---\nname: first\nname: second\ndescription: desc\n---\nbody",
-		"multiline":           "---\nname: review\ndescription: |\n  text\n---\nbody",
 		"collection":          "---\nname: review\ndescription: [one, two]\n---\nbody",
 		"bad-quote":           "---\nname: review\ndescription: 'not closed\n---\nbody",
 		"comment-only":        "---\nname: review\ndescription: # no value\n---\nbody",
@@ -162,6 +161,24 @@ func TestSkillFrontMatter(t *testing.T) {
 				t.Fatalf("accepted malformed skill: %+v", skill)
 			}
 		})
+	}
+}
+
+func TestParseSkillMultilineAndColon(t *testing.T) {
+	s1, err := parseSkill([]byte("---\nname: modern-web\ndescription: |\n  Search tool: modern web.\n  Trigger immediately.\n---\nbody"))
+	if err != nil {
+		t.Fatalf("multiline skill failed: %v", err)
+	}
+	if s1.Name != "modern-web" || s1.Description != "Search tool: modern web. Trigger immediately." {
+		t.Fatalf("unexpected multiline skill: %+v", s1)
+	}
+
+	s2, err := parseSkill([]byte("---\nname: ste\ndescription: Make report: ASD-STE100 style.\n---\nbody"))
+	if err != nil {
+		t.Fatalf("colon skill failed: %v", err)
+	}
+	if s2.Description != "Make report: ASD-STE100 style." {
+		t.Fatalf("unexpected colon skill: %+v", s2)
 	}
 }
 

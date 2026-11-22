@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 )
 
 // reviewTabs switches the review panel between the changes, the

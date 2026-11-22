@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 )
 
 func TestTurnRunsTools(t *testing.T) {

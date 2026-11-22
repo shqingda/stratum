@@ -10,8 +10,8 @@ import (
 
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 const (
@@ -53,11 +53,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
 	}
 	side.Children(func() {
-		ui.Box(c).Height(topGap).Shrink(0).DragWindow()
-		ui.Row(c).Padding(4, 20, 14, 20).Gap(10).AlignItems(ui.Center).Children(func() {
-			brandMark(c, 22, p.Fg)
-			ui.Text(c, "Talos").FontSize(16).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg)
-		})
+		ui.Box(c).Height(topGap+6).Shrink(0).DragWindow()
 		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
 			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
 				a.openPalette(c)
@@ -372,7 +368,7 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	st := a.state(s)
 	n := len(a.visibleSessions) // its ⌘ number
 	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(32).Padding(0, 10).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
-	row.Transition(ui.ElementTransition{Position: true, Colors: true, Shadows: true, Duration: 180 * time.Millisecond})
+	row.Transition(ui.ElementTransition{Position: true, Duration: 180 * time.Millisecond})
 	focusRing(row, p)
 	switch {
 	case on && p.Dark:

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // routed is a manager whose "script" account is main and whose "xai"

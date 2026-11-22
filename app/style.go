@@ -7,7 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/egoist/mygo/ui/markdown"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/locales"
 )
 
 // mdThemes are the Markdown looks of the two palettes, made once.

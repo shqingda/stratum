@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 )
 
 // Tools runs tool calls, deciding permission and asking the user as needed.

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/tools"
+	"github.com/shqingda/stratum/kernel/tools"
 )
 
 // Agent is a primary assistant or specialized subagent.
@@ -91,6 +91,7 @@ func Load(globalDir, cwd string) []Agent {
 				filepath.Join(home, ".config", "opencode", "agents"),
 				filepath.Join(home, ".agents", "agents"),
 				filepath.Join(home, ".claude", "agents"),
+				filepath.Join(home, ".stratum", "agents"),
 				filepath.Join(home, ".talos", "agents"),
 			)
 		}
@@ -102,6 +103,7 @@ func Load(globalDir, cwd string) []Agent {
 			filepath.Join(cwd, ".opencode", "agents"),
 			filepath.Join(cwd, ".agents", "agents"),
 			filepath.Join(cwd, ".claude", "agents"),
+			filepath.Join(cwd, ".stratum", "agents"),
 			filepath.Join(cwd, ".talos", "agents"),
 		)
 	}

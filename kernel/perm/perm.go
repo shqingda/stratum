@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/workspace"
+	"github.com/shqingda/stratum/kernel/workspace"
 )
 
 // Mode is how much a session may do unasked.

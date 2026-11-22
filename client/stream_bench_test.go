@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 // BenchmarkStreamDeltas is a reply streamed as 10,000 deltas, the cost

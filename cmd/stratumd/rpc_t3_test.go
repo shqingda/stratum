@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestRPCChangesRevertRedo(t *testing.T) {

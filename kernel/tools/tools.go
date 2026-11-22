@@ -11,9 +11,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/workspace"
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/workspace"
+	"github.com/shqingda/stratum/llm"
 )
 
 // Env is where calls run.

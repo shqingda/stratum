@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/shqingda/talos/kernel/changes"
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/changes"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/proto"
 )
 
 func (m *Manager) ChangesList(ctx context.Context, id string) ([]proto.ChangeTurn, error) {

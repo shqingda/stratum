@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
+	"github.com/shqingda/stratum/client"
 )
 
 func TestSidebarToggle(t *testing.T) {
@@ -39,7 +39,7 @@ func TestVibrantSidebarVisible(t *testing.T) {
 	tt := ui.NewTester(a.View, 1200, 800)
 	tt.SetVibrancy(true)
 	tt.Frame()
-	for _, s := range []string{"Talos", "新会话", "技能与 MCP"} {
+	for _, s := range []string{"搜索", "新会话", "技能与 MCP"} {
 		r, ok := tt.Find(s)
 		if !ok || r.W <= 0 || r.H <= 0 || r.X >= sidebarWidth {
 			t.Fatalf("vibrant sidebar item %q invalid rect: ok=%v rect=%+v", s, ok, r)

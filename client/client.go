@@ -31,9 +31,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Phase is where the connection stands.

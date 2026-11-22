@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/sandbox"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/sandbox"
 )
 
 func call(t *testing.T, env Env, tool *Tool, args any) (string, error) {

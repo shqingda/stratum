@@ -15,7 +15,7 @@ import (
 
 	"github.com/zalando/go-keyring"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 )
 
 // Kind is how a credential authenticates.

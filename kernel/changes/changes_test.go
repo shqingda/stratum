@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/store"
+	"github.com/shqingda/stratum/kernel/store"
 )
 
 func setup(t *testing.T) (*store.Store, *Log, string, string) {

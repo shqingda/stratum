@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/tools"
+	"github.com/shqingda/stratum/kernel/tools"
 )
 
 func TestLoadCustomMarkdownAndJSONAgents(t *testing.T) {

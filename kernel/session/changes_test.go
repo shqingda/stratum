@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 func changesManager(t *testing.T, script *llm.Script) (*Manager, proto.Session) {

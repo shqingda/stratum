@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo"
-	"github.com/shqingda/talos/locales"
+	"github.com/shqingda/stratum/locales"
 )
 
 // Desktop is what the app tells the system about its sessions: a Dock

@@ -19,7 +19,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/shqingda/talos/kernel/store"
+	"github.com/shqingda/stratum/kernel/store"
 )
 
 type Log struct {

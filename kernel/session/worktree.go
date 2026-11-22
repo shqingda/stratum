@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/store"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/store"
+	"github.com/shqingda/stratum/proto"
 )
 
 type worktreeMeta struct {

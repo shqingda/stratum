@@ -13,7 +13,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 // fileTool keeps the exported descriptor usable for specs and access inspection.

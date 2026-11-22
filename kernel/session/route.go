@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // target is a model of an account to send requests to.

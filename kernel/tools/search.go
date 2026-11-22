@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/workspace"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/workspace"
 )
 
 type searchArgs struct {

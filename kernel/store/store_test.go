@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/shqingda/talos/llm"
+	"github.com/shqingda/stratum/llm"
 )
 
 func TestStore(t *testing.T) {

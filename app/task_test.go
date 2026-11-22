@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/client"
+	"github.com/shqingda/stratum/client"
 )
 
 func TestTaskRow(t *testing.T) {

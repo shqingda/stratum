@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/mcp"
-	"github.com/shqingda/talos/kernel/skills"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/mcp"
+	"github.com/shqingda/stratum/kernel/skills"
+	"github.com/shqingda/stratum/proto"
 )
 
 const (
@@ -438,10 +438,10 @@ func copySkillDir(src, dst string) error {
 func commands(cwd string) []proto.CommandInfo {
 	var dirs []string
 	if cwd != "" {
-		dirs = append(dirs, filepath.Join(cwd, ".talos", "commands"), filepath.Join(cwd, ".claude", "commands"))
+		dirs = append(dirs, filepath.Join(cwd, ".stratum", "commands"), filepath.Join(cwd, ".talos", "commands"), filepath.Join(cwd, ".claude", "commands"))
 	}
 	if home, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs, filepath.Join(home, ".talos", "commands"))
+		dirs = append(dirs, filepath.Join(home, ".stratum", "commands"), filepath.Join(home, ".talos", "commands"))
 	}
 	var out []proto.CommandInfo
 	seen := map[string]bool{}

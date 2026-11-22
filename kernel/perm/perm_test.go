@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/shqingda/talos/kernel/workspace"
+	"github.com/shqingda/stratum/kernel/workspace"
 )
 
 func TestResolveAndDecide(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/skills"
-	"github.com/shqingda/talos/kernel/workspace"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/skills"
+	"github.com/shqingda/stratum/kernel/workspace"
 )
 
 // Skill reads only the installed skill snapshot supplied for this turn.

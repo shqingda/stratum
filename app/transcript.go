@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,9 +15,9 @@ import (
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
-	"github.com/shqingda/talos/client"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 const columnWidth = 660
@@ -92,7 +93,7 @@ func (a *App) bar(c *ui.Context) {
 	// Past the sidebar the title starts at 20; with the sidebar in, past
 	// its 74-point toggle pill; in between, as far as the sidebar is.
 	shut := toggleLeft(c) + 74 + 12
-	left := 22*a.sideOpen + shut*(1-a.sideOpen)
+	left := float32(math.Round(float64(22*a.sideOpen + shut*(1-a.sideOpen))))
 	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 10, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
 		cur := a.C.Current
 		if cur == nil {
@@ -429,11 +430,13 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		})
 	}
 	if open {
-		ui.Column(c).Margin(2, 0, 8, 0).Children(func() {
-			for _, e := range steps {
-				ui.Column(c.Key(e.Key)).Children(func() { a.card(c, e) })
-			}
-		})
+		ui.Column(c).Margin(2, 0, 8, 0).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -4, Opacity: 0}, Duration: 150 * time.Millisecond}).
+			Children(func() {
+				for _, e := range steps {
+					ui.Column(c.Key(e.Key)).Children(func() { a.card(c, e) })
+				}
+			})
 	}
 }
 
@@ -541,12 +544,9 @@ func (a *App) empty(c *ui.Context) {
 			}
 			emptyState(c, p, "plug-connected-x", locales.KernelDisconnected(), subtitle, action)
 		case a.C.Phase != client.Ready:
-			heroMark(c, 52, p.Dark).Opacity(.5)
-			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(14, 0, 0, 0)
+			emptyState(c, p, "clock", phaseText(a.C.Phase)+"…", "", nil)
 		case a.C.Current == nil:
-			heroMark(c, 52, p.Dark)
-			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(14, 0, 0, 0)
-			ui.Box(c).Margin(6, 0, 0, 0).Children(func() {
+			emptyState(c, p, "message-plus", locales.StartNewSession(), "", func() {
 				if a.pushButton(c, "empty-new-session", locales.NewSession()).Clicked() {
 					a.do(a.C.NewSession())
 				}
@@ -557,38 +557,12 @@ func (a *App) empty(c *ui.Context) {
 	})
 }
 
-// heroEmblem draws the Welcome Talos crest with a specular metallic finish,
-// subtle contact shadow, and spring hover lift.
-func (a *App) heroEmblem(c *ui.Context, size float32) {
-	p := a.p
-	isDark := p.Dark
-	shadow := ui.RGBA(12, 14, 22, .08)
-	if isDark {
-		shadow = ui.RGBA(0, 0, 0, .28)
-	}
-	ui.Column(c.Key("hero-emblem")).AlignItems(ui.Center).Justify(ui.Center).
-		Width(size + 24).Height(size + 18).Children(func() {
-		emblem := ui.Box(c.Key("hero-mark")).Size(size, size).AlignItems(ui.Center).Justify(ui.Center).
-			Children(func() { heroMark(c, size, isDark) })
-		target := float32(0)
-		if emblem.Hovered() {
-			target = -2.5
-		}
-		lift := emblem.Spring("hero-lift", target, springDefault) // critically damped, as a hover carries no momentum
-		scale := 1 - lift*.016
-		emblem.Translate(0, lift).Scale(scale, scale)
-		ui.Box(c).Width(size * .54).Height(4).Radius(2).Margin(5, 0, 0, 0).
-			Background(shadow).Blur(5)
-	})
-}
-
 // hello is a new session: what it works on in the center while the composer
 // stays anchored at the bottom.
 func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
-	a.heroEmblem(c, 52)
-	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(24).FontWeight(600).LetterSpacing(-.33).TextColor(p.Fg).Margin(8, 0, 64, 0)
+	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(26).FontWeight(600).LetterSpacing(-.42).TextColor(p.Fg).Margin(0, 0, 72, 0)
 }
 
 func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
@@ -785,7 +759,8 @@ func (a *App) note(c *ui.Context, e *client.Entry) {
 	})
 	if open {
 		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
-			Margin(0, 0, 8, 24).Selectable()
+			Margin(0, 0, 8, 24).Selectable().
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -4, Opacity: 0}, Duration: 150 * time.Millisecond})
 	}
 }
 

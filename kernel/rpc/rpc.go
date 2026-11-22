@@ -13,11 +13,11 @@ import (
 	"io"
 	"sync"
 
-	"github.com/shqingda/talos/kernel/preview"
-	"github.com/shqingda/talos/kernel/session"
-	"github.com/shqingda/talos/kernel/store"
-	ws "github.com/shqingda/talos/kernel/workspace"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/preview"
+	"github.com/shqingda/stratum/kernel/session"
+	"github.com/shqingda/stratum/kernel/store"
+	ws "github.com/shqingda/stratum/kernel/workspace"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Server answers commands for one kernel.

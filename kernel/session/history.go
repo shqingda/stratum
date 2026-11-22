@@ -3,7 +3,7 @@ package session
 import (
 	"context"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 func (m *Manager) EventsBefore(ctx context.Context, q proto.EventsQuery) (proto.EventPage, error) {

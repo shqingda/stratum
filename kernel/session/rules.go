@@ -4,8 +4,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/proto"
 )
 
 // ruleFor is the rule allowing a call like req: a command by its program

@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 func TestSettings(t *testing.T) {
@@ -41,7 +41,7 @@ func TestSettings(t *testing.T) {
 	sent(proto.MethodSettings)
 	a.C.Settings = &proto.Settings{Mode: "auto"}
 	tt.Frame()
-	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || !tt.HasText("Talos devel") {
+	if !tt.HasText("语言") || !tt.HasText("在程序坞图标上显示数字") || !tt.HasText("Stratum devel") {
 		t.Fatalf("not the general page: %q", tt.Texts())
 	}
 	snapshot(t, tt, "settings")
@@ -241,7 +241,7 @@ func TestAppearanceAndAbout(t *testing.T) {
 	if z := textZoom(a.C.Settings.TextSize); z != 1.15 {
 		t.Errorf("zoom %v for %q", z, a.C.Settings.TextSize)
 	}
-	if !tt.HasText("Talos devel") {
+	if !tt.HasText("Stratum devel") {
 		t.Fatalf("about footer: %q", tt.Texts())
 	}
 }

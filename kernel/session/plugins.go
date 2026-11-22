@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shqingda/talos/kernel/mcp"
-	"github.com/shqingda/talos/kernel/skills"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/mcp"
+	"github.com/shqingda/stratum/kernel/skills"
+	"github.com/shqingda/stratum/proto"
 )
 
 const disabledPluginsKey = "plugins:disabled"

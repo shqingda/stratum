@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shqingda/talos/kernel/perm"
+	"github.com/shqingda/stratum/kernel/perm"
 )
 
 const defaultSearchURL = "https://html.duckduckgo.com/html/"

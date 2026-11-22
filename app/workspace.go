@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/talos/locales"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/locales"
+	"github.com/shqingda/stratum/proto"
 )
 
 type opener struct {

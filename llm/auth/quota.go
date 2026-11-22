@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/proto"
 )
 
 const quotaTTL = 2 * time.Minute

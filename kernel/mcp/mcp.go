@@ -21,9 +21,9 @@ import (
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/shqingda/talos/kernel/perm"
-	"github.com/shqingda/talos/kernel/tools"
-	"github.com/shqingda/talos/proto"
+	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/tools"
+	"github.com/shqingda/stratum/proto"
 )
 
 // Server is a server's configuration, as .mcp.json files write it: a

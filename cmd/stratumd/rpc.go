@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/shqingda/talos/kernel/boot"
-	"github.com/shqingda/talos/llm"
-	"github.com/shqingda/talos/llm/auth"
+	"github.com/shqingda/stratum/kernel/boot"
+	"github.com/shqingda/stratum/llm"
+	"github.com/shqingda/stratum/llm/auth"
 )
 
 // serveRPC serves the kernel over stdio until stdin closes.

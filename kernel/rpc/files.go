@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	ws "github.com/shqingda/talos/kernel/workspace"
+	ws "github.com/shqingda/stratum/kernel/workspace"
 )
 
 // The composer's @ asks at each key; a workspace's files are listed once
