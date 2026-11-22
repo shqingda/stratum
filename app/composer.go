@@ -248,6 +248,7 @@ func (a *App) words(c *ui.Context, dragOver bool, svc ui.Services) {
 			a.choose()
 		}
 		if cur != nil {
+			a.agentPill(c)
 			a.modelPill(c, cur.Model)
 		}
 		ui.Spacer(c)

@@ -828,5 +828,21 @@
   "toggleWorkspaceTree": "显示/隐藏目录树",
   "selectFileToPreview": "选择文件以预览代码",
   "branch": "分支",
-  "raw": "源码"
+  "raw": "源码",
+  "agents": "代理",
+  "agentBuild": "构建",
+  "agentPlan": "规划",
+  "agentGeneral": "通用",
+  "agentExplore": "探索",
+  "agentBuildNote": "可以改文件、运行命令",
+  "agentPlanNote": "只读：看代码、出计划，不改文件",
+  "agentGeneralNote": "子代理：多步调研和独立的实现任务",
+  "agentExploreNote": "子代理：快速搜索和阅读代码，不改文件",
+  "nextAgent": "下一个代理",
+  "primaryAgents": "主代理",
+  "subagents": "子代理",
+  "builtIn": "内置",
+  "agentsNote": "主代理带领会话，在输入框按 Tab 切换；子代理接手任务，在消息里写 @名字 交给它。自己的代理写在 .stratum/agents/*.md、~/.stratum/agents/*.md 或 opencode.json。",
+  "formatters": "格式化",
+  "formattersNote": "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。"
 }

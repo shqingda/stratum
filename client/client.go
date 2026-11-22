@@ -151,13 +151,13 @@ type Client struct {
 	Older, LoadingOlder bool
 	// MCP is how the MCP servers are for the folder MCPFor, nil until
 	// read.
-	MCP         *proto.MCPList
-	MCPFor      string
-	Preview     *proto.PreviewSnapshot
+	MCP              *proto.MCPList
+	MCPFor           string
+	Preview          *proto.PreviewSnapshot
 	Automations      *proto.AutomationList
 	AutomationAlerts []proto.Automation
 	Hooks            *proto.HooksList
-	Plugins     *proto.PluginList
+	Plugins          *proto.PluginList
 	// Hits are the messages matching HitsFor, nil before an answer.
 	Hits      []proto.SearchHit
 	HitsFor   string
@@ -196,11 +196,11 @@ type Client struct {
 	// whose Text they hand out, so that a long reply is not copied whole
 	// for each delta.
 	streamBuf, thinkBuf strings.Builder
-	thought   *Entry // the streamed thinking entry its message has not yet sent whole
-	want      string // session to show on (re)connect
-	modelsReq string
-	afterSync func() []proto.Command
-	decoded   any
+	thought             *Entry // the streamed thinking entry its message has not yet sent whole
+	want                string // session to show on (re)connect
+	modelsReq           string
+	afterSync           func() []proto.Command
+	decoded             any
 }
 
 // New returns a client for the workspace at cwd that has not connected

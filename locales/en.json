@@ -543,5 +543,21 @@
   "toggleWorkspaceTree": "Toggle Workspace Tree",
   "selectFileToPreview": "Select a file to preview",
   "branch": "Branch",
-  "raw": "Raw"
+  "raw": "Raw",
+  "agents": "Agents",
+  "agentBuild": "Build",
+  "agentPlan": "Plan",
+  "agentGeneral": "General",
+  "agentExplore": "Explore",
+  "agentBuildNote": "Edits files and runs commands",
+  "agentPlanNote": "Read-only: studies the code and plans, changes nothing",
+  "agentGeneralNote": "Subagent for research and self-contained tasks",
+  "agentExploreNote": "Subagent that searches and reads code, changes nothing",
+  "nextAgent": "Next Agent",
+  "primaryAgents": "Primary Agents",
+  "subagents": "Subagents",
+  "builtIn": "Built-in",
+  "agentsNote": "A primary agent leads the session; press Tab in the composer to switch. A subagent takes tasks; write @name in a message to hand one over. Your own go in .stratum/agents/*.md, ~/.stratum/agents/*.md or opencode.json.",
+  "formatters": "Formatters",
+  "formattersNote": "After the agent writes a file, the formatter for its extension runs. Rules go in the project’s .stratum/formatters.json."
 }

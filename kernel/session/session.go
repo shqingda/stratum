@@ -44,7 +44,7 @@ type Manager struct {
 	// Defaults fills an account and model a new session leaves empty.
 	Defaults func() (account, model string)
 	// Accounts lists the signed-in accounts, for backups.
-	Accounts func() []string
+	Accounts    func() []string
 	Tools       tools.Set
 	Skills      skills.Loader
 	MCP         *mcp.Hub // nil without MCP
@@ -159,7 +159,7 @@ func toProto(e store.Event) proto.Event {
 
 func toSession(x store.Session) proto.Session {
 	return proto.Session{ID: x.ID, Title: x.Title, Cwd: x.Cwd, Account: x.Account, Model: x.Model,
-		Effort: x.Effort, Mode: x.Mode, ParentID: x.ParentID, Created: x.Created, Updated: x.Updated, Pinned: x.Pinned, Archived: x.Archived, Mark: x.Mark}
+		Effort: x.Effort, Mode: x.Mode, Agent: x.Agent, ParentID: x.ParentID, Created: x.Created, Updated: x.Updated, Pinned: x.Pinned, Archived: x.Archived, Mark: x.Mark}
 }
 
 // Create makes a session.
@@ -312,6 +312,16 @@ func (m *Manager) Update(ctx context.Context, u proto.SessionUpdate) (proto.Sess
 	set(&x.Mode, u.Mode)
 	if !perm.Mode(x.Mode).Valid() {
 		return proto.Session{}, proto.Errorf("bad_request", "unknown permission mode %q", x.Mode)
+	}
+	if u.Agent != nil {
+		name := strings.TrimSpace(*u.Agent)
+		if name == "build" {
+			name = ""
+		}
+		if a, ok := agents.Named(m.agents(x.Cwd), cmpOr(name, "build")); !ok || !a.Primary() {
+			return proto.Session{}, proto.Errorf("bad_request", "%q is not a primary agent", name)
+		}
+		x.Agent = name
 	}
 	if u.Worktree != nil {
 		if *u.Worktree {
@@ -656,7 +666,12 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		return llm.Usage{}, err
 	}
 	set, _ := m.Settings(ctx)
+	list := m.agents(x.Cwd)
+	lead := m.primary(list, x)
 	main := target{x.Account, x.Model, opened}
+	if t, ok := m.agentTarget(x.Account, lead.Model); ok {
+		main = t
+	}
 	chain := &fallback{targets: []target{main}, moved: func(from, to target, err error) {
 		m.record(context.WithoutCancel(ctx), x.ID, proto.EventFallback, proto.Fallback{
 			From: from.account + "/" + from.model, To: to.account + "/" + to.model, Error: err.Error()})
@@ -678,7 +693,11 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	if m.MCP != nil {
 		turnTools = append(turnTools, m.MCP.Tools(ctx, x.Cwd)...)
 	}
-	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt + agentsPrompt(m.Skills.GlobalRoot(), x.Cwd)
+	turnTools = agents.FilterTools(turnTools, lead)
+	system := systemPrompt(x, m.Sandboxed) + catalog.Prompt + agentsPrompt(list)
+	if lead.Prompt != "" {
+		system += "\n\n" + lead.Prompt
+	}
 	var used llm.Usage
 	if at := m.compactAt(x.Account, x.Model); p.Compact && len(history) > 0 || at > 0 && tokens(history) > at {
 		req := llm.Request{Model: x.Model, System: system, Messages: history, Tools: turnTools.Specs(), Effort: x.Effort, SessionID: x.ID}
@@ -708,26 +727,32 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 		s := &subSink{m: m, sessionID: x.ID, callID: callID, task: taskID}
 		subTools := turnTools.Without(tools.Task.Name, tools.RunTasks.Name, tools.AskUser.Name)
 		subSys := system + subPrompt
-		maxSteps := 0
-		model := subModel
+		cfg := agent.Config{Model: subModel, Effort: subEffort, SessionID: x.ID, System: subSys}
+		via := subProvider
+		var policy *agents.Agent
 		if agentName != "" {
-			if custom, ok := agents.Find(m.Skills.GlobalRoot(), x.Cwd, agentName); ok {
-				subTools = agents.FilterTools(subTools, custom)
-				if custom.Prompt != "" {
-					subSys = subSys + "\n\n" + custom.Prompt
-				}
-				if custom.MaxSteps > 0 {
-					maxSteps = custom.MaxSteps
-				}
+			custom, ok := agents.Named(list, agentName)
+			if !ok || !custom.Sub() {
+				return "", fmt.Errorf("there is no subagent %q", agentName)
+			}
+			policy = &custom
+			subTools = agents.FilterTools(subTools, custom)
+			if custom.Prompt != "" {
+				cfg.System += "\n\n" + custom.Prompt
+			}
+			cfg.MaxSteps = custom.MaxSteps
+			cfg.Temperature, cfg.TopP = custom.Temperature, custom.TopP
+			if t, ok := m.agentTarget(x.Account, custom.Model); ok {
+				via, cfg.Model = t.provider, t.model
 			}
 		}
 		sa := &agent.Agent{
-			Provider: subProvider,
-			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: subTools, env: env},
+			Provider: via,
+			Tools:    &runner{m: m, sessionID: x.ID, run: r, tools: subTools, env: env, policy: policy},
 			Sink:     s,
 			Clock:    m.Clock,
 		}
-		u, err := sa.Run(ctx, agent.Config{Model: model, Effort: subEffort, SessionID: x.ID, System: subSys, MaxSteps: maxSteps}, nil, llm.Text(llm.User, prompt))
+		u, err := sa.Run(ctx, cfg, nil, llm.Text(llm.User, prompt))
 		subMu.Lock()
 		used = used.Add(u)
 		subMu.Unlock()
@@ -735,13 +760,14 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	}
 	ag := &agent.Agent{
 		Provider:   provider,
-		Tools:      &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: env, task: task},
+		Tools:      &runner{m: m, sessionID: x.ID, run: r, tools: turnTools, env: env, task: task, policy: &lead},
 		Sink:       sink{m: m, ctx: ctx, sessionID: x.ID},
 		Clock:      m.Clock,
 		Concurrent: func(name string) bool { return name == tools.Task.Name || name == tools.RunTasks.Name },
 	}
 	cfg := agent.Config{
-		Model: x.Model, Effort: x.Effort, SessionID: x.ID, System: system,
+		Model: main.model, Effort: x.Effort, SessionID: x.ID, System: system,
+		Temperature: lead.Temperature, TopP: lead.TopP, MaxSteps: lead.MaxSteps,
 		Steer: func() []llm.Part {
 			m.mu.Lock()
 			var steered []proto.Prompt
@@ -935,11 +961,10 @@ func promptParts(p proto.Prompt) []llm.Part {
 	return parts
 }
 
-func agentsPrompt(globalDir, cwd string) string {
-	list := agents.Load(globalDir, cwd)
+func agentsPrompt(list []agents.Agent) string {
 	var b strings.Builder
 	for _, a := range list {
-		if a.Hidden || (a.Mode != "subagent" && a.Mode != "all") {
+		if !a.Sub() {
 			continue
 		}
 		if b.Len() == 0 {

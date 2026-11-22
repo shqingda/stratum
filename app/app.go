@@ -39,7 +39,7 @@ type App struct {
 	mention    mention
 	slash      slash
 	rewind     rewind
-	escAt      time.Time // the last Esc in an empty composer, for a second one
+	escAt      time.Time   // the last Esc in an empty composer, for a second one
 	slashRun   func(i int) // runs the / menu's item i, as last shown
 	slashLen   int
 	filesKey   string // the folder and @ query the files were asked for
@@ -60,42 +60,42 @@ type App struct {
 		at         time.Time
 		said       bool // VoiceOver has been told
 	}
-	announcedSession   string
-	announcedApproval  string
-	announcedBusy      bool
-	cardCache          *lruCache[string, parsedCard]
-	keptUnread         string // marked unread while shown
-	showArchived       bool
-	drafts             drafts       // keeps each session's draft in the kernel
-	query              string                   // the sidebar's search
-	lists              map[string]*ui.ListState // per-session transcript scroll state
-	md                 markdown.Options
-	opened             map[string]bool // tool calls whose output shows
-	inWork             bool            // building a finished turn's folded work
-	noSide             bool            // the sidebar is hidden
+	announcedSession  string
+	announcedApproval string
+	announcedBusy     bool
+	cardCache         *lruCache[string, parsedCard]
+	keptUnread        string // marked unread while shown
+	showArchived      bool
+	drafts            drafts                   // keeps each session's draft in the kernel
+	query             string                   // the sidebar's search
+	lists             map[string]*ui.ListState // per-session transcript scroll state
+	md                markdown.Options
+	opened            map[string]bool // tool calls whose output shows
+	inWork            bool            // building a finished turn's folded work
+	noSide            bool            // the sidebar is hidden
 	// panelWas is whether the review panel was open last frame; sideMoved
 	// that opening it in a narrow window put the sidebar away, so that
 	// closing it brings the sidebar back.
 	panelWas, sideMoved bool
-	rvOverlay           bool    // review panel floats over main when window is very narrow
-	lastW               float32 // last window width seen by fitPanel
-	sideOpen            float32 // how far the sidebar is out, 0 to 1, on its way
-	rvOpen              float32 // how far the review inspector is out, 0 to 1
-	sideW               float32 // user-adjusted sidebar width, 0 means default
-	rvW                 float32 // user-adjusted review width, 0 means default
-	dockH               float32 // how tall the composer floating on the transcript was
-	hero                hero    // where the composer of an empty session stands
+	rvOverlay           bool                  // review panel floats over main when window is very narrow
+	lastW               float32               // last window width seen by fitPanel
+	sideOpen            float32               // how far the sidebar is out, 0 to 1, on its way
+	rvOpen              float32               // how far the review inspector is out, 0 to 1
+	sideW               float32               // user-adjusted sidebar width, 0 means default
+	rvW                 float32               // user-adjusted review width, 0 means default
+	dockH               float32               // how tall the composer floating on the transcript was
+	hero                hero                  // where the composer of an empty session stands
 	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
 	sys                 ui.Preferences        // the desktop's accessibility preferences, read each frame
 	focusSession        string                // the session the composer last took the focus for
 	overWas             bool                  // the palette, settings or automations showed last frame
 	removing            []string              // the sessions of the project the user asked to remove, waiting on Remove
 	removingName        string
-	pal                 bool    // the ⌘K palette shows
-	jump                int64   // a message to scroll to, from a search
-	jumpIn              string  // the session it is in
-	palSel              int     // its row chosen by the arrow keys
-	palScroll           bool    // scroll palette selection into view once after ↑/↓
+	pal                 bool   // the ⌘K palette shows
+	jump                int64  // a message to scroll to, from a search
+	jumpIn              string // the session it is in
+	palSel              int    // its row chosen by the arrow keys
+	palScroll           bool   // scroll palette selection into view once after ↑/↓
 	stats               map[string][2]int
 	rv                  review
 	pierre              pierreState
@@ -112,17 +112,17 @@ type App struct {
 	commitMsg   string
 	commitInput ui.Handle
 
-	searchInput                                             ui.Handle
-	composerInput                                           ui.Handle
-	closeWindow                                             func()
-	reconnect                                               func()
-	keyRepeat                                               bool
-	visibleSessions                                         []string
-	menuSession                                             string
-	modelMenu, effortMenu, modeMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
-	modelsRequested                                         bool
-	modelsPending, modelsAccount, modelsError               string
-	modelsLoadedAccount                                     string
+	searchInput                                                                                                   ui.Handle
+	composerInput                                                                                                 ui.Handle
+	closeWindow                                                                                                   func()
+	reconnect                                                                                                     func()
+	keyRepeat                                                                                                     bool
+	visibleSessions                                                                                               []string
+	menuSession                                                                                                   string
+	modelMenu, effortMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
+	modelsRequested                                                                                               bool
+	modelsPending, modelsAccount, modelsError                                                                     string
+	modelsLoadedAccount                                                                                           string
 
 	keyOpen, keyMenu bool
 	keyProvider, key string
@@ -141,11 +141,11 @@ type App struct {
 
 	attached        []attachment
 	mentionSessions []string
-	thumbs   *lruCache[string, ui.ImageSource] // of sent pictures, by entry key and index
-	pick     func() []string                   // the open panel
-	pickDir  func() string                     // the open panel, for a folder
-	update   func(func())                      // runs on the UI thread, as Serve was given
-	menuRuns []func(c *ui.Context)             // commands from the menu bar, for the next frame
+	thumbs          *lruCache[string, ui.ImageSource] // of sent pictures, by entry key and index
+	pick            func() []string                   // the open panel
+	pickDir         func() string                     // the open panel, for a folder
+	update          func(func())                      // runs on the UI thread, as Serve was given
+	menuRuns        []func(c *ui.Context)             // commands from the menu bar, for the next frame
 }
 
 // New returns an app over c, not connected yet.

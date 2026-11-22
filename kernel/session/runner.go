@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/shqingda/stratum/kernel/agents"
 	"github.com/shqingda/stratum/kernel/perm"
 	"github.com/shqingda/stratum/kernel/tools"
 	"github.com/shqingda/stratum/llm"
@@ -23,6 +24,8 @@ type runner struct {
 	tools     tools.Set
 	// task runs a sub-agent for a task call; nil in a sub-agent.
 	task func(ctx context.Context, callID, taskID, prompt, agentName string) (string, error)
+	// policy is the agent whose permission applies after the mode's.
+	policy *agents.Agent
 }
 
 func (r *runner) Specs() []llm.Tool { return r.tools.Specs() }
@@ -64,12 +67,18 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 		return llm.ToolResult{}, err
 	}
 	decision := perm.Decide(perm.Mode(x.Mode), req, r.env.Sandboxed)
+	if r.policy != nil {
+		decision = r.policy.Decide(req, decision, r.env.Sandboxed)
+	}
 	if decision == perm.AskUser && r.allowed(ctx, req) {
 		decision = perm.Allow
 	}
 	var changed string
 	switch decision {
 	case perm.Deny:
+		if r.policy != nil {
+			return fail("The %s agent's permission denies this call.", r.policy.Name)
+		}
 		return fail("Stratum does not allow this call.")
 	case perm.AskUser:
 		ans, err := r.ask(ctx, call, req)

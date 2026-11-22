@@ -102,7 +102,7 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 					}
 				})
 			})
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight+8).PassThrough().
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight + 8).PassThrough().
 				Material(glass.ScrollEdge{Background: stageBg})
 			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
 				ui.Text(c, locales.Automations()).FontSize(17).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg).SingleLine()

@@ -26,8 +26,8 @@ const (
 // review is the state of the review panel: what the session's turns
 // changed in files, and taking a turn's changes back.
 type review struct {
-	open bool
-	tab  string // "", "term", "plan", or "files"
+	open      bool
+	tab       string // "", "term", "plan", or "files"
 	fileQuery string
 	// uncommitted shows what git has not got, in place of a turn: turn,
 	// or the last one when 0.

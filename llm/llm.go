@@ -33,6 +33,10 @@ type Request struct {
 	// SessionID names the conversation, so providers that key their prompt
 	// cache by it (the ChatGPT backend) reuse the cached prefix.
 	SessionID string
+	// Temperature and TopP set the sampling when not nil, as an agent's
+	// definition asks. Providers that refuse them while the model reasons
+	// leave them out then; the ChatGPT backend never takes them.
+	Temperature, TopP *float64
 }
 
 // Role is who said a message.

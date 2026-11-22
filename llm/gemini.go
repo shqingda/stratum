@@ -141,6 +141,7 @@ func geminiBody(req Request) map[string]any {
 	if req.MaxTokens > 0 {
 		gen["maxOutputTokens"] = req.MaxTokens
 	}
+	setSampling(gen, req, "temperature", "topP")
 	if req.Effort != "" {
 		thinking := map[string]any{"includeThoughts": true}
 		if strings.Contains(req.Model, "gemini-2") {

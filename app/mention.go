@@ -19,11 +19,11 @@ import (
 // composer offers other sessions, folders, files and MCP resources.
 // Claude Desktop groups the first three; Claude Code adds @server:uri.
 type mention struct {
-	caret int    // the caret as the composer was last built
-	at    int    // the rune the @ is at, -1 with no such word
-	query string // what follows the @ up to the caret
-	sel   int
-	shut  int  // the @ Escape put away, +1
+	caret     int    // the caret as the composer was last built
+	at        int    // the rune the @ is at, -1 with no such word
+	query     string // what follows the @ up to the caret
+	sel       int
+	shut      int  // the @ Escape put away, +1
 	open      bool // the list shows
 	place     int  // where the caret goes next frame, +1
 	scrollSel bool // scroll selected row into view once after ↑/↓
@@ -31,7 +31,7 @@ type mention struct {
 
 // mentionItem is one row. text is what replaces the @ word, without the @.
 type mentionItem struct {
-	kind string // session, folder, file, resource
+	kind string // agent, session, folder, file, resource
 	text string
 	name string
 	note string
@@ -132,6 +132,8 @@ func (a *App) mentionMenu(c *ui.Context) {
 
 func mentionIcon(kind string) string {
 	switch kind {
+	case "agent":
+		return "cpu"
 	case "session":
 		return "message"
 	case "folder":
@@ -165,9 +167,11 @@ type mentionGroup struct {
 }
 
 func (a *App) mentionGroups() []mentionGroup {
-	var sessions, folders, files, resources []mentionItem
+	var agents, sessions, folders, files, resources []mentionItem
 	for _, it := range a.mentionItems() {
 		switch it.kind {
+		case "agent":
+			agents = append(agents, it)
 		case "session":
 			sessions = append(sessions, it)
 		case "folder":
@@ -184,6 +188,7 @@ func (a *App) mentionGroups() []mentionGroup {
 			groups = append(groups, mentionGroup{label, items})
 		}
 	}
+	add(locales.Agents(), agents)
 	add(locales.Sessions(), sessions)
 	add(locales.Folders(), folders)
 	add(locales.Files(), files)
@@ -203,6 +208,13 @@ func (a *App) mentionItems() []mentionItem {
 	q := strings.ToLower(a.mention.query)
 	var items []mentionItem
 	if a.C.Current != nil {
+		for _, ag := range subAgents(a.agentInfos()) {
+			note := agentNote(ag)
+			if q != "" && !strings.Contains(strings.ToLower(ag.Name+" "+note), q) {
+				continue
+			}
+			items = append(items, mentionItem{kind: "agent", text: ag.Name, name: ag.Name, note: note})
+		}
 		n := 0
 		for _, s := range a.C.Sessions {
 			if s.ID == a.C.Current.ID || s.Archived {

@@ -351,6 +351,12 @@ func (a *App) composerKey(k ui.TextKey) bool {
 	if a.mentionKey(k) || a.slashKey(k) {
 		return true
 	}
+	// Tab moves the session to the next primary agent, as in OpenCode;
+	// ⇧Tab stays the permission mode's, as in Claude Code.
+	if k.Key == ui.KeyTab && k.Mods == 0 && a.C.Current != nil && a.C.CanAct() {
+		a.cycleAgent(1)
+		return true
+	}
 	// ↑ in an empty composer brings back the last thing sent, to send
 	// again or change.
 	if k.Key == ui.KeyUp && k.Mods == 0 && strings.TrimSpace(text) == "" {

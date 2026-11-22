@@ -155,6 +155,7 @@ func migrateFlags(db *sql.DB) error {
 	rows.Close()
 	for _, col := range []struct{ name, def string }{
 		{"pinned", "INTEGER NOT NULL DEFAULT 0"}, {"archived", "INTEGER NOT NULL DEFAULT 0"}, {"mark", "TEXT NOT NULL DEFAULT ''"},
+		{"agent", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !has[col.name] {
 			if _, err := db.Exec(`ALTER TABLE sessions ADD COLUMN ` + col.name + ` ` + col.def); err != nil {
@@ -182,14 +183,16 @@ type Session struct {
 	Pinned   bool   `json:"pinned,omitempty"`
 	Archived bool   `json:"archived,omitempty"`
 	Mark     string `json:"mark,omitempty"`
+	// Agent is the primary agent that leads the turns; "" is build.
+	Agent string `json:"agent,omitempty"`
 }
 
-const sessionCols = `id, title, cwd, account, model, effort, mode, parent_id, created_at, updated_at, pinned, archived, mark`
+const sessionCols = `id, title, cwd, account, model, effort, mode, parent_id, created_at, updated_at, pinned, archived, mark, agent`
 
 func scanSession(row interface{ Scan(...any) error }) (Session, error) {
 	var x Session
 	var c, u int64
-	err := row.Scan(&x.ID, &x.Title, &x.Cwd, &x.Account, &x.Model, &x.Effort, &x.Mode, &x.ParentID, &c, &u, &x.Pinned, &x.Archived, &x.Mark)
+	err := row.Scan(&x.ID, &x.Title, &x.Cwd, &x.Account, &x.Model, &x.Effort, &x.Mode, &x.ParentID, &c, &u, &x.Pinned, &x.Archived, &x.Mark, &x.Agent)
 	if errors.Is(err, sql.ErrNoRows) {
 		return x, ErrNotFound
 	}
@@ -203,15 +206,15 @@ func (s *Store) CreateSession(ctx context.Context, x Session) error {
 	if x.Created.IsZero() {
 		x.Created = now
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		x.ID, x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, x.ParentID, x.Created.UnixMilli(), now.UnixMilli(), x.Pinned, x.Archived, x.Mark)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sessions (`+sessionCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		x.ID, x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, x.ParentID, x.Created.UnixMilli(), now.UnixMilli(), x.Pinned, x.Archived, x.Mark, x.Agent)
 	return err
 }
 
 // UpdateSession saves a session's settings, folder and title.
 func (s *Store) UpdateSession(ctx context.Context, x Session) error {
-	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET title=?, cwd=?, account=?, model=?, effort=?, mode=?, updated_at=? WHERE id=?`,
-		x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, time.Now().UnixMilli(), x.ID)
+	r, err := s.db.ExecContext(ctx, `UPDATE sessions SET title=?, cwd=?, account=?, model=?, effort=?, mode=?, agent=?, updated_at=? WHERE id=?`,
+		x.Title, x.Cwd, x.Account, x.Model, x.Effort, x.Mode, x.Agent, time.Now().UnixMilli(), x.ID)
 	if err == nil {
 		if n, _ := r.RowsAffected(); n == 0 {
 			err = ErrNotFound

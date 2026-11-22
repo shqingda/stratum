@@ -69,33 +69,33 @@ func Errorf(code, format string, args ...any) *Error {
 
 // Methods.
 const (
-	MethodInitialize      = "initialize"       // → Hello
-	MethodSessionCreate   = "session.create"   // SessionCreate → Session
-	MethodSessionList     = "session.list"     // → []Session
-	MethodSessionGet      = "session.get"      // SessionRef → Snapshot
-	MethodSessionUpdate   = "session.update"   // SessionUpdate → Session
-	MethodSessionDelete   = "session.delete"   // SessionRef → {}
-	MethodSessionFlag     = "session.flag"     // SessionFlag → Session
-	MethodSessionFork     = "session.fork"     // SessionRef → Session
-	MethodPrompt          = "prompt"           // Prompt → PromptResult
-	MethodCancel          = "cancel"           // SessionRef → {}
-	MethodEvents          = "events"           // EventsQuery → EventPage
-	MethodApprovalRespond = "approval.respond" // ApprovalAnswer → {}
-	MethodAccounts        = "accounts.list"    // → []Account
-	MethodModels          = "models.list"      // ModelsQuery → []Model
-	MethodReceipt         = "receipt.get"      // ReceiptRef → Receipt
-	MethodPreviewOpen     = "preview.open"     // PreviewRequest → PreviewSnapshot
-	MethodPreviewState    = "preview.state"    // {} → PreviewSnapshot
-	MethodAutomationList  = "automation.list"  // {} → AutomationList
+	MethodInitialize       = "initialize"        // → Hello
+	MethodSessionCreate    = "session.create"    // SessionCreate → Session
+	MethodSessionList      = "session.list"      // → []Session
+	MethodSessionGet       = "session.get"       // SessionRef → Snapshot
+	MethodSessionUpdate    = "session.update"    // SessionUpdate → Session
+	MethodSessionDelete    = "session.delete"    // SessionRef → {}
+	MethodSessionFlag      = "session.flag"      // SessionFlag → Session
+	MethodSessionFork      = "session.fork"      // SessionRef → Session
+	MethodPrompt           = "prompt"            // Prompt → PromptResult
+	MethodCancel           = "cancel"            // SessionRef → {}
+	MethodEvents           = "events"            // EventsQuery → EventPage
+	MethodApprovalRespond  = "approval.respond"  // ApprovalAnswer → {}
+	MethodAccounts         = "accounts.list"     // → []Account
+	MethodModels           = "models.list"       // ModelsQuery → []Model
+	MethodReceipt          = "receipt.get"       // ReceiptRef → Receipt
+	MethodPreviewOpen      = "preview.open"      // PreviewRequest → PreviewSnapshot
+	MethodPreviewState     = "preview.state"     // {} → PreviewSnapshot
+	MethodAutomationList   = "automation.list"   // {} → AutomationList
 	MethodAutomationUpsert = "automation.upsert" // Automation → Automation
 	MethodAutomationDelete = "automation.delete" // AutomationID → {}
-	MethodAutomationRun   = "automation.run"   // AutomationID → Automation
-	MethodHooksList       = "hooks.list"       // HooksQuery → HooksList
-	MethodHooksSave       = "hooks.save"       // HooksSave → HooksList
-	MethodPluginList      = "plugin.list"      // HooksQuery → PluginList
-	MethodPluginInstall   = "plugin.install"   // PluginInstall → PluginList
-	MethodPluginToggle    = "plugin.toggle"    // PluginToggle → PluginList
-	MethodPluginRemove    = "plugin.remove"    // PluginRemove → PluginList
+	MethodAutomationRun    = "automation.run"    // AutomationID → Automation
+	MethodHooksList        = "hooks.list"        // HooksQuery → HooksList
+	MethodHooksSave        = "hooks.save"        // HooksSave → HooksList
+	MethodPluginList       = "plugin.list"       // HooksQuery → PluginList
+	MethodPluginInstall    = "plugin.install"    // PluginInstall → PluginList
+	MethodPluginToggle     = "plugin.toggle"     // PluginToggle → PluginList
+	MethodPluginRemove     = "plugin.remove"     // PluginRemove → PluginList
 )
 
 // Hello answers initialize.
@@ -106,16 +106,19 @@ type Hello struct {
 
 // Session is a conversation in a workspace.
 type Session struct {
-	ID       string    `json:"id"`
-	Title    string    `json:"title"`
-	Cwd      string    `json:"cwd"`
-	Account  string    `json:"account"`
-	Model    string    `json:"model"`
-	Effort   string    `json:"effort,omitempty"`
-	Mode     string    `json:"mode"` // ask, auto, full
+	ID      string `json:"id"`
+	Title   string `json:"title"`
+	Cwd     string `json:"cwd"`
+	Account string `json:"account"`
+	Model   string `json:"model"`
+	Effort  string `json:"effort,omitempty"`
+	Mode    string `json:"mode"` // ask, auto, full
+	// Agent is the primary agent that leads the turns: build when empty,
+	// plan, or one of the folder's or the user's own.
+	Agent    string    `json:"agent,omitempty"`
 	ParentID string    `json:"parentId,omitempty"`
 	Created  time.Time `json:"created"`
-	Updated time.Time `json:"updated"`
+	Updated  time.Time `json:"updated"`
 	// State is set only in the list: "run" while a turn runs, "wait"
 	// while it waits for an approval.
 	State string `json:"state,omitempty"`
@@ -161,6 +164,7 @@ type SessionUpdate struct {
 	Model     *string `json:"model,omitempty"`
 	Effort    *string `json:"effort,omitempty"`
 	Mode      *string `json:"mode,omitempty"`
+	Agent     *string `json:"agent,omitempty"`
 	Worktree  *bool   `json:"worktree,omitempty"`
 }
 
@@ -406,11 +410,11 @@ type ApprovalAnswer struct {
 
 // Account is a signed-in provider account.
 type Account struct {
-	ID           string        `json:"id"` // provider or provider/label
-	Provider     string        `json:"provider"`
-	Name         string        `json:"name"`
-	Email        string        `json:"email,omitempty"`
-	Subscription bool          `json:"subscription"`
+	ID           string `json:"id"` // provider or provider/label
+	Provider     string `json:"provider"`
+	Name         string `json:"name"`
+	Email        string `json:"email,omitempty"`
+	Subscription bool   `json:"subscription"`
 	// Model is the provider's default model.
 	Model string        `json:"model,omitempty"`
 	Quota *AccountQuota `json:"quota,omitempty"`
@@ -432,12 +436,12 @@ type ModelsQuery struct {
 
 // Model is a model to pick.
 type Model struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Context   int     `json:"context"`
-	Reasoning bool    `json:"reasoning"`
-	Images    bool    `json:"images,omitempty"` // takes images
-	Default   bool    `json:"default,omitempty"`
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Context    int     `json:"context"`
+	Reasoning  bool    `json:"reasoning"`
+	Images     bool    `json:"images,omitempty"` // takes images
+	Default    bool    `json:"default,omitempty"`
 	Input      float64 `json:"input"`                // dollars per million tokens
 	Output     float64 `json:"output"`               // dollars per million tokens
 	CacheRead  float64 `json:"cacheRead,omitempty"`  // dollars per million tokens
@@ -812,6 +816,12 @@ type MCPTrust struct {
 type MCPList struct {
 	Servers []MCPServer `json:"servers"`
 	Skills  []SkillInfo `json:"skills,omitempty"` // the folder's and the user's skills
+	// Formatters format a file after the agent writes it: the folder's
+	// .stratum/formatters.json rules, then the built-in gofmt.
+	Formatters []FormatterInfo `json:"formatters,omitempty"`
+	// Agents are the built-in, plugin, user and folder agents: primary ones
+	// lead a session, subagents take tasks and @name in a message.
+	Agents []AgentInfo `json:"agents,omitempty"`
 	// Commands are prompts kept as files: .stratum/commands/*.md, .talos/commands/*.md
 	// and .claude/commands/*.md in the folder, then ~/.stratum/commands and
 	// ~/.talos/commands.
@@ -841,6 +851,26 @@ type MCPPrompt struct {
 
 // CommandInfo is a saved prompt the / menu offers; $ARGUMENTS in Body is
 // where what the user types after it goes.
+// FormatterInfo is one formatter rule.
+type FormatterInfo struct {
+	Name       string   `json:"name"`
+	Command    []string `json:"command"`
+	Extensions []string `json:"extensions"`
+	Disabled   bool     `json:"disabled,omitempty"`
+	BuiltIn    bool     `json:"builtIn,omitempty"`
+}
+
+// AgentInfo describes an agent for the composer and settings.
+type AgentInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Mode        string `json:"mode"` // primary, subagent or all
+	Model       string `json:"model,omitempty"`
+	Hidden      bool   `json:"hidden,omitempty"`
+	BuiltIn     bool   `json:"builtIn,omitempty"`
+	Source      string `json:"source,omitempty"` // the file that defines it
+}
+
 type CommandInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`

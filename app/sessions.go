@@ -98,7 +98,7 @@ func (a *App) archivedToast(c *ui.Context) {
 		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Exit: &ui.Motion{Y: 8, Opacity: 0}}).Children(func() {
 		sym(c, "archive", 14, p.Mute)
 		ui.Text(c, locales.ArchivedSession(u.title)).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		if a.textButton(c, "undo-archive", locales.Undo()).Tooltip(locales.Undo()+"  ⌘Z").Clicked() {
+		if a.textButton(c, "undo-archive", locales.Undo()).Tooltip(locales.Undo() + "  ⌘Z").Clicked() {
 			a.undoArchive()
 		}
 	})
@@ -142,7 +142,7 @@ func (a *App) toastHUD(c *ui.Context) {
 		a.toast.said = true
 	}
 	p := a.p
-	ui.Row(c).Absolute().Top(barHeight+8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
+	ui.Row(c).Absolute().Top(barHeight + 8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
 		pill := ui.Row(c.Key("toast-hud")).Height(32).Padding(0, 12).Gap(7).Radius(16).
 			Border(.5, p.Edge2).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Opacity: 0}, Exit: &ui.Motion{Y: -4, Opacity: 0}})

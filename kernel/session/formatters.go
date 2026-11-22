@@ -6,16 +6,47 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/shqingda/stratum/kernel/skills"
+	"github.com/shqingda/stratum/proto"
 )
 
 type formatterRule struct {
 	Command    []string `json:"command"`
 	Extensions []string `json:"extensions"`
 	Disabled   bool     `json:"disabled"`
+}
+
+// formatters lists what formats a file after the agent writes it: the
+// rules of the folder's formatters.json, then gofmt for .go files unless a
+// rule takes them.
+func formatters(cwd string) []proto.FormatterInfo {
+	var out []proto.FormatterInfo
+	goTaken := false
+	if b, err := os.ReadFile(filepath.Join(skills.ProjectDir(cwd), "formatters.json")); err == nil {
+		var rules map[string]formatterRule
+		if json.Unmarshal(b, &rules) == nil {
+			names := make([]string, 0, len(rules))
+			for name := range rules {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			for _, name := range names {
+				r := rules[name]
+				out = append(out, proto.FormatterInfo{Name: name, Command: r.Command, Extensions: r.Extensions, Disabled: r.Disabled})
+				for _, e := range r.Extensions {
+					goTaken = goTaken || strings.EqualFold(e, ".go") && !r.Disabled && len(r.Command) > 0
+				}
+			}
+		}
+	}
+	if !goTaken {
+		out = append(out, proto.FormatterInfo{Name: "gofmt", Command: []string{"gofmt", "-w"}, Extensions: []string{".go"}, BuiltIn: true})
+	}
+	return out
 }
 
 func (m *Manager) runFormatter(ctx context.Context, cwd, rawArgs string) {

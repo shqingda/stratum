@@ -46,7 +46,7 @@ func TestPreviewPaneAndAutomationsAndHooksPlugins(t *testing.T) {
 
 	// 3. Hooks & Plugins tabs in MCP/Extensions settings
 	a.settingsOpen, a.settingsPage = true, "mcp"
-	a.mcpUI.tab = 1
+	a.mcpUI.tab = 2
 	a.C.Hooks = &proto.HooksList{Hooks: []proto.HookEntry{{
 		Event: "PreToolUse", Matcher: "shell", Command: "echo check", Project: true, Editable: true,
 	}}}
@@ -55,7 +55,7 @@ func TestPreviewPaneAndAutomationsAndHooksPlugins(t *testing.T) {
 		t.Fatalf("hooks tab missing expected hook")
 	}
 
-	a.mcpUI.tab = 2
+	a.mcpUI.tab = 3
 	a.C.Plugins = &proto.PluginList{Plugins: []proto.PluginInfo{{
 		Name: "demo-pack", Version: "1.0.0", Enabled: true, Skills: 2, Hooks: 1,
 	}}}

@@ -21,9 +21,53 @@ type pluginManifest struct {
 	Version     string                     `json:"version"`
 	Description string                     `json:"description"`
 	Author      string                     `json:"author"`
-	Skills      []string                   `json:"skills"`
+	Skills      paths                      `json:"skills"`
+	Commands    paths                      `json:"commands"`
+	Agents      paths                      `json:"agents"`
 	Hooks       string                     `json:"hooks"`
 	MCPServers  map[string]json.RawMessage `json:"mcpServers"`
+}
+
+// paths are folders of a plugin, relative to it: one as a string, or a
+// list, as Claude Code's plugin.json allows.
+type paths []string
+
+func (p *paths) UnmarshalJSON(b []byte) error {
+	var one string
+	if json.Unmarshal(b, &one) == nil {
+		*p = paths{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return err
+	}
+	*p = many
+	return nil
+}
+
+// pluginDirs are the folders of enabled plugins that hold kind (commands
+// or agents): the manifest's, or the folder named kind.
+func (m *Manager) pluginDirs(cwd, kind string) []string {
+	disabled := m.disabledPlugins(context.Background())
+	var out []string
+	for _, p := range m.scanPluginDirs(cwd) {
+		man, ok := readPluginManifest(p.dir)
+		if !ok || disabled[man.Name] {
+			continue
+		}
+		roots := map[string]paths{"commands": man.Commands, "agents": man.Agents}[kind]
+		if len(roots) == 0 {
+			roots = paths{kind}
+		}
+		for _, r := range roots {
+			dir := filepath.Join(p.dir, r)
+			if info, err := os.Stat(dir); err == nil && info.IsDir() {
+				out = append(out, dir)
+			}
+		}
+	}
+	return out
 }
 
 func (m *Manager) globalPluginsDir() string {

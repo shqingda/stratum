@@ -186,7 +186,23 @@ func anthropicBody(req Request, opts anthropicOpts) map[string]any {
 			body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
 		}
 	}
+	if _, thinking := body["thinking"]; !thinking {
+		// Thinking takes neither: Anthropic refuses a changed temperature
+		// or top_p while the model thinks.
+		setSampling(body, req, "temperature", "top_p")
+	}
 	return body
+}
+
+// setSampling puts the request's temperature and top_p in body under the
+// provider's names.
+func setSampling(body map[string]any, req Request, temperature, topP string) {
+	if req.Temperature != nil {
+		body[temperature] = *req.Temperature
+	}
+	if req.TopP != nil {
+		body[topP] = *req.TopP
+	}
 }
 
 func anthropicMessages(msgs []Message, allowEmptySig bool) []any {

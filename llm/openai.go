@@ -504,6 +504,7 @@ func chatBody(req Request, compat ChatCompat) map[string]any {
 		body[cmp.Or(compat.MaxTokensField, "max_tokens")] = req.MaxTokens
 	}
 	chatThinking(body, req.Effort, compat)
+	setSampling(body, req, "temperature", "top_p")
 	if len(req.Tools) > 0 {
 		tools := make([]any, len(req.Tools))
 		for i, t := range req.Tools {

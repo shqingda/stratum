@@ -75,7 +75,14 @@ func (m *Manager) MCPList(ctx context.Context, q proto.MCPQuery) (proto.MCPList,
 			})
 		}
 	}
-	out.Commands = commands(q.Cwd)
+	out.Commands = commands(q.Cwd, m.pluginDirs(q.Cwd, "commands")...)
+	if q.Cwd != "" {
+		out.Formatters = formatters(q.Cwd)
+	}
+	for _, a := range m.agents(q.Cwd) {
+		out.Agents = append(out.Agents, proto.AgentInfo{Name: a.Name, Description: a.Description, Mode: a.Mode,
+			Model: a.Model, Hidden: a.Hidden, BuiltIn: a.BuiltIn, Source: a.Source})
+	}
 	if m.MCP == nil {
 		return out, nil
 	}
@@ -433,9 +440,10 @@ func copySkillDir(src, dst string) error {
 }
 
 // commands reads the saved prompts for cwd: the folder's own first, then
-// the user's; a name already taken is skipped. The first line is the
-// description, unless the file starts with front matter.
-func commands(cwd string) []proto.CommandInfo {
+// the user's, then those of plugins (extra); a name already taken is
+// skipped. The first line is the description, unless the file starts with
+// front matter.
+func commands(cwd string, extra ...string) []proto.CommandInfo {
 	var dirs []string
 	if cwd != "" {
 		dirs = append(dirs, filepath.Join(cwd, ".stratum", "commands"), filepath.Join(cwd, ".talos", "commands"), filepath.Join(cwd, ".claude", "commands"))
@@ -443,6 +451,7 @@ func commands(cwd string) []proto.CommandInfo {
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, ".stratum", "commands"), filepath.Join(home, ".talos", "commands"))
 	}
+	dirs = append(dirs, extra...)
 	var out []proto.CommandInfo
 	seen := map[string]bool{}
 	for _, dir := range dirs {

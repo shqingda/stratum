@@ -323,10 +323,10 @@ func captureWithCDP(ctx context.Context, bin, target string) (Snapshot, error) {
 		case "Runtime.exceptionThrown":
 			var ev struct {
 				ExceptionDetails struct {
-					Text         string `json:"text"`
-					URL          string `json:"url"`
-					LineNumber   int    `json:"lineNumber"`
-					Exception    struct {
+					Text       string `json:"text"`
+					URL        string `json:"url"`
+					LineNumber int    `json:"lineNumber"`
+					Exception  struct {
 						Description string `json:"description"`
 					} `json:"exception"`
 				} `json:"exceptionDetails"`

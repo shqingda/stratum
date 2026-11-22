@@ -208,7 +208,7 @@ func (a *App) transcript(c *ui.Context) {
 // user scrolls up through a long conversation.
 func (a *App) scrollBottomPill(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Absolute().Left(0).Right(0).Bottom(a.dockH+16).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
+	ui.Row(c).Absolute().Left(0).Right(0).Bottom(a.dockH + 16).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
 		b := ui.ButtonBase(c.Key("scroll-bottom")).Row().Height(32).Padding(0, 12).Gap(6).Radius(16).
 			AlignItems(ui.Center).Border(.5, p.Edge2).
 			Label(locales.ScrollToBottom()).Tooltip(locales.ScrollToBottom()).
@@ -773,7 +773,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	}
 	open := a.opened[e.CallID]
 	canOpen := e.Output != "" && !e.Skipped
-	row := ui.ButtonBase(c.Key("step:" + e.CallID)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
+	row := ui.ButtonBase(c.Key("step:"+e.CallID)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
 	if canOpen {
 		press(row)
 		focusRing(row, p)

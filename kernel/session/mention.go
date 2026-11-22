@@ -2,10 +2,14 @@ package session
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/shqingda/stratum/kernel/agents"
 	"github.com/shqingda/stratum/kernel/mcp"
 	"github.com/shqingda/stratum/kernel/store"
 	"github.com/shqingda/stratum/llm"
@@ -17,7 +21,8 @@ const mentionRunes = 4000
 // expandMentions attaches what @ words and /server:prompt commands name,
 // after the user's text. @session:<id> is that session's title and
 // dialogue, the latest part when it is long. @<server>:<uri> is an MCP
-// resource, the form Claude Code uses. A file @path is left for the model
+// resource, the form Claude Code uses. @<agent> hands the work to that
+// subagent, as OpenCode does. A file @path is left for the model
 // to read. The same word twice is attached once. The attachment is a
 // snapshot from this send.
 func (m *Manager) expandMentions(ctx context.Context, current store.Session, text string) string {
@@ -134,6 +139,9 @@ func (m *Manager) mentionBlock(ctx context.Context, current store.Session, word 
 			return m.sessionBlock(ctx, x), true
 		}
 	}
+	if block, ok := m.agentBlock(current, word); ok {
+		return block, true
+	}
 	server, uri, ok := strings.Cut(word, ":")
 	if !ok || server == "" || uri == "" || m.MCP == nil || !m.MCP.HasServer(current.Cwd, server) {
 		return "", false
@@ -145,6 +153,22 @@ func (m *Manager) mentionBlock(ctx context.Context, current store.Session, word 
 		body = err.Error()
 	}
 	return resourceBlock(server, uri, body), true
+}
+
+// agentBlock routes the message to a subagent named @word, as OpenCode
+// does; a file or folder of that name in the workspace wins.
+func (m *Manager) agentBlock(current store.Session, word string) (string, bool) {
+	if strings.ContainsAny(word, ":/.") {
+		return "", false
+	}
+	a, ok := agents.Named(m.agents(current.Cwd), word)
+	if !ok || !a.Sub() {
+		return "", false
+	}
+	if _, err := os.Lstat(filepath.Join(current.Cwd, word)); err == nil {
+		return "", false
+	}
+	return fmt.Sprintf("[The user asked for the %s subagent: hand this work to it with the task tool, agent %q, and report what it found.]", a.Name, a.Name), true
 }
 
 func (m *Manager) sessionBlock(ctx context.Context, x store.Session) string {

@@ -201,7 +201,7 @@ func TestMultiProviderDispatch(t *testing.T) {
 
 	store := &Memory{}
 	for _, id := range []string{"openrouter", "fireworks", "opencode", "opencode-go"} {
-		store.Set(id, Credential{Kind: KindAPIKey, Key: "k-"+id, BaseURL: srv.URL})
+		store.Set(id, Credential{Kind: KindAPIKey, Key: "k-" + id, BaseURL: srv.URL})
 	}
 
 	// OpenRouter: Anthropic model vs Chat Completions model.
@@ -228,8 +228,8 @@ func TestMultiProviderDispatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	llm.Collect(fwProv.Stream(context.Background(), llm.Request{
-		Model: "accounts/fireworks/models/deepseek-v4p1-flash",
-		Tools: []llm.Tool{{Name: "t", Description: "d"}},
+		Model:    "accounts/fireworks/models/deepseek-v4p1-flash",
+		Tools:    []llm.Tool{{Name: "t", Description: "d"}},
 		Messages: []llm.Message{llm.Text(llm.User, "hi")},
 	}), nil)
 	if last.path != "/v1/messages" || last.h.Get("x-api-key") != "k-fireworks" {

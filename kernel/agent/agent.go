@@ -66,6 +66,8 @@ type Event struct {
 type Config struct {
 	Model, System, Effort, SessionID string
 	MaxTokens                        int
+	// Temperature and TopP set the sampling; nil leaves the model's own.
+	Temperature, TopP *float64
 	// MaxSteps bounds the model requests of a turn; 50 when zero.
 	MaxSteps int
 	// MaxRetries bounds the retries of one request; 3 when zero.
@@ -144,6 +146,7 @@ func (a *Agent) request(ctx context.Context, cfg Config, msgs []llm.Message) (ll
 	req := llm.Request{
 		Model: cfg.Model, System: cfg.System, Messages: msgs, Tools: a.Tools.Specs(),
 		MaxTokens: cfg.MaxTokens, Effort: cfg.Effort, SessionID: cfg.SessionID,
+		Temperature: cfg.Temperature, TopP: cfg.TopP,
 	}
 	retries := cfg.MaxRetries
 	if retries <= 0 {

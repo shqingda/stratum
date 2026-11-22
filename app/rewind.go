@@ -13,11 +13,11 @@ import (
 // rewind is the /rewind menu: pick a prompt, then what to put back.
 // Claude Code offers the same three restores.
 type rewind struct {
-	open   bool
-	step   string // prompts, or actions
-	sel    int
-	seq    int64
-	prompt string
+	open      bool
+	step      string // prompts, or actions
+	sel       int
+	seq       int64
+	prompt    string
 	bubble    bool // opened from a message, so Esc closes
 	scrollSel bool // scroll selected row into view once after ↑/↓
 }

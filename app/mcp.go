@@ -41,14 +41,20 @@ func (a *App) mcpPage(c *ui.Context) {
 	p := a.p
 	st := &a.mcpUI
 	ui.Row(c).Margin(0, 0, 12, 0).AlignItems(ui.Center).Children(func() {
-		ui.Segmented(c, &st.tab, locales.McpServers(), locales.Hooks(), locales.Plugins()).Label(locales.SettingsMcp())
+		ui.Segmented(c, &st.tab, locales.McpServers(), locales.Agents(), locales.Hooks(), locales.Plugins(), locales.Formatters()).Label(locales.SettingsMcp())
 	})
 	switch st.tab {
 	case 1:
-		a.hooksSection(c)
+		a.agentsSection(c)
 		return
 	case 2:
+		a.hooksSection(c)
+		return
+	case 3:
 		a.pluginsSection(c)
+		return
+	case 4:
+		a.formattersSection(c)
 		return
 	}
 	l := a.C.MCP
@@ -351,9 +357,9 @@ func (a *App) skillRow(c *ui.Context, sk proto.SkillInfo) {
 	p := a.p
 	key := "skill-open:" + sk.Name
 	open := a.opened[key]
-	ui.Column(c.Key("skill:"+sk.Name)).Children(func() {
+	ui.Column(c.Key("skill:" + sk.Name)).Children(func() {
 		ui.Row(c).MinHeight(50).Padding(8, 12, 8, 14).Gap(12).AlignItems(ui.Center).Children(func() {
-			row := ui.ButtonBase(c.Key("skill-toggle-view:"+sk.Name)).Row().Grow(1).MinWidth(0).Gap(12).AlignItems(ui.Center).Justify(ui.Start).Label(sk.Name).Expanded(open)
+			row := ui.ButtonBase(c.Key("skill-toggle-view:" + sk.Name)).Row().Grow(1).MinWidth(0).Gap(12).AlignItems(ui.Center).Justify(ui.Start).Label(sk.Name).Expanded(open)
 			if row.Clicked() {
 				a.opened[key] = !open
 			}

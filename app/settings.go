@@ -157,7 +157,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 					}
 				})
 			})
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight+8).PassThrough().
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight + 8).PassThrough().
 				Material(glass.ScrollEdge{Background: stageBg})
 			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(barHeight).Padding(0, 24).AlignItems(ui.Center).DragWindow().Children(func() {
 				ui.Text(c, title).FontSize(17).FontWeight(600).LetterSpacing(-.25).TextColor(p.Fg).SingleLine()
@@ -206,23 +206,22 @@ func group(c *ui.Context, p *Palette, children func()) {
 
 // rows draws the rows of a group, with a hairline between two.
 type rows struct {
-	c *ui.Context
 	p *Palette
 	n int
 }
 
-func (r *rows) sep() {
+func (r *rows) sep(c *ui.Context) {
 	if r.n > 0 {
-		ui.Box(r.c).Height(.5).Shrink(0).Background(r.p.Edge)
+		ui.Box(c).Height(.5).Shrink(0).Background(r.p.Edge)
 	}
 	r.n++
 }
 
 // row is a label, with a line under it if sub is set, and its control on
 // the right.
-func (r *rows) row(key, label, sub string, control func()) {
-	r.sep()
-	c, p := r.c, r.p
+func (r *rows) row(c *ui.Context, key, label, sub string, control func()) {
+	r.sep(c)
+	p := r.p
 	ui.Row(c.Key(key)).MinHeight(46).Padding(11, 10, 11, 12).Gap(16).AlignItems(ui.Center).Children(func() {
 		ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
 			ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg)
@@ -235,10 +234,10 @@ func (r *rows) row(key, label, sub string, control func()) {
 }
 
 // toggle is a row with a switch; set saves the new value.
-func (r *rows) toggle(key, label string, on, disabled bool, set func(bool)) {
-	r.row(key, label, "", func() {
+func (r *rows) toggle(c *ui.Context, key, label string, on, disabled bool, set func(bool)) {
+	r.row(c, key, label, "", func() {
 		v := on
-		ui.Switch(r.c, &v).Label(label).Disabled(disabled)
+		ui.Switch(c, &v).Label(label).Disabled(disabled)
 		if v != on {
 			set(v)
 		}
@@ -254,8 +253,8 @@ func (a *App) generalPage(c *ui.Context) {
 	p := a.p
 	set := a.settings()
 	group(c, p, func() {
-		r := rows{c: c, p: p}
-		r.row("set-lang", locales.Language(), "", func() {
+		r := rows{p: p}
+		r.row(c, "set-lang", locales.Language(), "", func() {
 			chosen := a.locale.Chosen()
 			label := languages()[0].label
 			for _, l := range languages() {
@@ -275,8 +274,8 @@ func (a *App) generalPage(c *ui.Context) {
 
 	section(c, p, locales.WhileWorking(), false)
 	group(c, p, func() {
-		r := rows{c: c, p: p}
-		r.row("set-enter", locales.ReturnKey(), "", func() {
+		r := rows{p: p}
+		r.row(c, "set-enter", locales.ReturnKey(), "", func() {
 			i := map[bool]int{false: 0, true: 1}[set.EnterSteers]
 			if ui.Segmented(c, &i, locales.QueueIt(), locales.SendRightAway()).Label(locales.ReturnKey()).Changed() {
 				s := set
@@ -289,11 +288,11 @@ func (a *App) generalPage(c *ui.Context) {
 
 	section(c, p, locales.Notifications(), false)
 	group(c, p, func() {
-		r := rows{c: c, p: p}
+		r := rows{p: p}
 		for _, n := range []struct{ kind, label string }{
 			{"wait", locales.NotifyWaitSetting()}, {"done", locales.NotifyDoneSetting()}, {"fail", locales.NotifyFailSetting()}, {"badge", locales.DockBadge()},
 		} {
-			r.toggle("set-quiet:"+n.kind, n.label, !slices.Contains(set.Quiet, n.kind), false, func(on bool) {
+			r.toggle(c, "set-quiet:"+n.kind, n.label, !slices.Contains(set.Quiet, n.kind), false, func(on bool) {
 				s := set
 				s.Quiet = slices.DeleteFunc(slices.Clone(set.Quiet), func(k string) bool { return k == n.kind })
 				if !on {
@@ -302,7 +301,7 @@ func (a *App) generalPage(c *ui.Context) {
 				a.do(a.C.SaveSettings(s))
 			})
 		}
-		r.row("set-notify-when", locales.NotifyWhen(), "", func() {
+		r.row(c, "set-notify-when", locales.NotifyWhen(), "", func() {
 			whens := []string{"", "always", "never"}
 			i := max(slices.Index(whens, set.NotifyWhen), 0)
 			if ui.Segmented(c, &i, locales.NotifyInBackground(), locales.NotifyAlways(), locales.NotifyNever()).Label(locales.NotifyWhen()).Changed() {
@@ -318,7 +317,7 @@ func (a *App) appearancePage(c *ui.Context) {
 	p := a.p
 	set := a.settings()
 	pick := func(r *rows, key, label string, values []string, current string, names []string, save func(*proto.Settings, string)) {
-		r.row(key, label, "", func() {
+		r.row(c, key, label, "", func() {
 			i := max(slices.Index(values, current), 0)
 			if ui.Segmented(c, &i, names...).Label(label).Changed() {
 				s := set
@@ -328,12 +327,12 @@ func (a *App) appearancePage(c *ui.Context) {
 		})
 	}
 	group(c, p, func() {
-		r := &rows{c: c, p: p}
+		r := &rows{p: p}
 		pick(r, "set-theme", locales.Appearance(), []string{"", "light", "dark"}, set.Theme,
 			[]string{locales.ThemeAuto(), locales.ThemeLight(), locales.ThemeDark()}, func(s *proto.Settings, v string) { s.Theme = v })
 		pick(r, "set-size", locales.TextSize(), []string{"small", "", "large"}, set.TextSize,
 			[]string{locales.TextSmall(), locales.TextDefault(), locales.TextLarge()}, func(s *proto.Settings, v string) { s.TextSize = v })
-		r.toggle("set-reduce-motion", locales.ReduceMotion(), set.ReduceMotion, false, func(on bool) {
+		r.toggle(c, "set-reduce-motion", locales.ReduceMotion(), set.ReduceMotion, false, func(on bool) {
 			s := set
 			s.ReduceMotion = on
 			a.do(a.C.SaveSettings(s))
@@ -342,7 +341,7 @@ func (a *App) appearancePage(c *ui.Context) {
 	note(c, p, locales.ReduceMotionNote())
 	section(c, p, locales.Conversation(), false)
 	group(c, p, func() {
-		pick(&rows{c: c, p: p}, "set-detail", locales.FinishedTurns(), []string{"", "thinking", "all"}, set.Detail,
+		pick(&rows{p: p}, "set-detail", locales.FinishedTurns(), []string{"", "thinking", "all"}, set.Detail,
 			[]string{locales.DetailPlain(), locales.DetailThinking(), locales.DetailAll()}, func(s *proto.Settings, v string) { s.Detail = v })
 	})
 	note(c, p, locales.DetailNote())
@@ -405,9 +404,9 @@ func (a *App) accountsPage(c *ui.Context) {
 		a.addingAccount = false // the sign-in went through
 	}
 	group(c, p, func() {
-		r := rows{c: c, p: p}
+		r := rows{p: p}
 		for _, acc := range a.C.Accounts {
-			r.sep()
+			r.sep(c)
 			a.accountRow(c, acc)
 		}
 	})
@@ -494,9 +493,9 @@ func (a *App) modelsPage(c *ui.Context) {
 	set := a.settings()
 	section(c, p, locales.NewSessions(), true)
 	group(c, p, func() {
-		r := rows{c: c, p: p}
-		r.row("set-model-row", locales.DefaultModel(), locales.DefaultModelNote(), func() { a.defaultModel(c, set) })
-		r.row("set-effort-row", locales.ReasoningEffort(), "", func() {
+		r := rows{p: p}
+		r.row(c, "set-model-row", locales.DefaultModel(), locales.DefaultModelNote(), func() { a.defaultModel(c, set) })
+		r.row(c, "set-effort-row", locales.ReasoningEffort(), "", func() {
 			a.picker(c, "set-effort", "", effortLabel(set.Effort)).PopoverMenuButton(func(m *ui.Menu) {
 				for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
 					if m.Item(effortLabel(effort)).ID("set-effort:" + effort).Checked(set.Effort == effort).Chosen() {
@@ -511,11 +510,11 @@ func (a *App) modelsPage(c *ui.Context) {
 
 	section(c, p, locales.BackgroundTasks(), false)
 	group(c, p, func() {
-		r := rows{c: c, p: p}
-		r.row("role:sub", locales.Subtasks(), locales.SubtasksNote(), func() {
+		r := rows{p: p}
+		r.row(c, "role:sub", locales.Subtasks(), locales.SubtasksNote(), func() {
 			a.roleModel(c, "sub", set.Sub, &a.subMenu, func(ref *proto.ModelRef) { s := set; s.Sub = ref; a.do(a.C.SaveSettings(s)) })
 		})
-		r.row("role:light", locales.TitlesAndSummaries(), locales.LightNote(), func() {
+		r.row(c, "role:light", locales.TitlesAndSummaries(), locales.LightNote(), func() {
 			a.roleModel(c, "light", set.Light, &a.lightMenu, func(ref *proto.ModelRef) { s := set; s.Light = ref; a.do(a.C.SaveSettings(s)) })
 		})
 	})
@@ -528,8 +527,8 @@ func (a *App) modelsPage(c *ui.Context) {
 		}
 	}
 	group(c, p, func() {
-		r := rows{c: c, p: p}
-		r.toggle("set-fallback", locales.SwitchAccount(), set.Fallback && len(names) > 0, len(names) == 0, func(on bool) {
+		r := rows{p: p}
+		r.toggle(c, "set-fallback", locales.SwitchAccount(), set.Fallback && len(names) > 0, len(names) == 0, func(on bool) {
 			s := set
 			s.Fallback = on
 			a.do(a.C.SaveSettings(s))
@@ -676,13 +675,13 @@ func (a *App) permissionsPage(c *ui.Context) {
 	}).Label(locales.NewSessionPermissions())
 	section(c, p, locales.AlwaysAllowed(), false)
 	group(c, p, func() {
-		r := rows{c: c, p: p}
+		r := rows{p: p}
 		if len(set.Rules) == 0 {
 			ui.Text(c, locales.NoRules()).FontSize(12.5).TextColor(p.Mute).Padding(11, 12)
 		}
 		for i, rule := range set.Rules {
 			what := ruleText(rule)
-			r.row(fmt.Sprintf("rule:%d:%s:%s", i, rule.Tool, rule.Prefix), what, "", func() {
+			r.row(c, fmt.Sprintf("rule:%d:%s:%s", i, rule.Tool, rule.Prefix), what, "", func() {
 				if a.iconButton(c, fmt.Sprintf("rule-x:%d", i), "x", locales.RemoveRule(what)).Clicked() {
 					s := set
 					s.Rules = slices.Delete(slices.Clone(set.Rules), i, i+1)
@@ -768,9 +767,9 @@ func (a *App) shortcutsPage(c *ui.Context) {
 		found = true
 		section(c, p, g.group, false)
 		group(c, p, func() {
-			r := rows{c: c, p: p}
+			r := rows{p: p}
 			for _, k := range keys {
-				r.row("key:"+k.label, k.label, "", func() {
+				r.row(c, "key:"+k.label, k.label, "", func() {
 					ui.Text(c, k.key).FontSize(12.5).TextColor(p.Fg2)
 				})
 			}

@@ -5489,3 +5489,163 @@ func Raw() string { return In(i18n.Locale()).Raw() }
 func (msgs Messages) Raw() string {
 	return Catalog.Format(msgs.locale, "raw", nil)
 }
+
+// Agents says "代理"
+// in the language the app shows.
+func Agents() string { return In(i18n.Locale()).Agents() }
+
+// Agents says "代理"
+// in the language of msgs.
+func (msgs Messages) Agents() string {
+	return Catalog.Format(msgs.locale, "agents", nil)
+}
+
+// AgentBuild says "构建"
+// in the language the app shows.
+func AgentBuild() string { return In(i18n.Locale()).AgentBuild() }
+
+// AgentBuild says "构建"
+// in the language of msgs.
+func (msgs Messages) AgentBuild() string {
+	return Catalog.Format(msgs.locale, "agentBuild", nil)
+}
+
+// AgentPlan says "规划"
+// in the language the app shows.
+func AgentPlan() string { return In(i18n.Locale()).AgentPlan() }
+
+// AgentPlan says "规划"
+// in the language of msgs.
+func (msgs Messages) AgentPlan() string {
+	return Catalog.Format(msgs.locale, "agentPlan", nil)
+}
+
+// AgentGeneral says "通用"
+// in the language the app shows.
+func AgentGeneral() string { return In(i18n.Locale()).AgentGeneral() }
+
+// AgentGeneral says "通用"
+// in the language of msgs.
+func (msgs Messages) AgentGeneral() string {
+	return Catalog.Format(msgs.locale, "agentGeneral", nil)
+}
+
+// AgentExplore says "探索"
+// in the language the app shows.
+func AgentExplore() string { return In(i18n.Locale()).AgentExplore() }
+
+// AgentExplore says "探索"
+// in the language of msgs.
+func (msgs Messages) AgentExplore() string {
+	return Catalog.Format(msgs.locale, "agentExplore", nil)
+}
+
+// AgentBuildNote says "可以改文件、运行命令"
+// in the language the app shows.
+func AgentBuildNote() string { return In(i18n.Locale()).AgentBuildNote() }
+
+// AgentBuildNote says "可以改文件、运行命令"
+// in the language of msgs.
+func (msgs Messages) AgentBuildNote() string {
+	return Catalog.Format(msgs.locale, "agentBuildNote", nil)
+}
+
+// AgentPlanNote says "只读：看代码、出计划，不改文件"
+// in the language the app shows.
+func AgentPlanNote() string { return In(i18n.Locale()).AgentPlanNote() }
+
+// AgentPlanNote says "只读：看代码、出计划，不改文件"
+// in the language of msgs.
+func (msgs Messages) AgentPlanNote() string {
+	return Catalog.Format(msgs.locale, "agentPlanNote", nil)
+}
+
+// AgentGeneralNote says "子代理：多步调研和独立的实现任务"
+// in the language the app shows.
+func AgentGeneralNote() string { return In(i18n.Locale()).AgentGeneralNote() }
+
+// AgentGeneralNote says "子代理：多步调研和独立的实现任务"
+// in the language of msgs.
+func (msgs Messages) AgentGeneralNote() string {
+	return Catalog.Format(msgs.locale, "agentGeneralNote", nil)
+}
+
+// AgentExploreNote says "子代理：快速搜索和阅读代码，不改文件"
+// in the language the app shows.
+func AgentExploreNote() string { return In(i18n.Locale()).AgentExploreNote() }
+
+// AgentExploreNote says "子代理：快速搜索和阅读代码，不改文件"
+// in the language of msgs.
+func (msgs Messages) AgentExploreNote() string {
+	return Catalog.Format(msgs.locale, "agentExploreNote", nil)
+}
+
+// NextAgent says "下一个代理"
+// in the language the app shows.
+func NextAgent() string { return In(i18n.Locale()).NextAgent() }
+
+// NextAgent says "下一个代理"
+// in the language of msgs.
+func (msgs Messages) NextAgent() string {
+	return Catalog.Format(msgs.locale, "nextAgent", nil)
+}
+
+// PrimaryAgents says "主代理"
+// in the language the app shows.
+func PrimaryAgents() string { return In(i18n.Locale()).PrimaryAgents() }
+
+// PrimaryAgents says "主代理"
+// in the language of msgs.
+func (msgs Messages) PrimaryAgents() string {
+	return Catalog.Format(msgs.locale, "primaryAgents", nil)
+}
+
+// Subagents says "子代理"
+// in the language the app shows.
+func Subagents() string { return In(i18n.Locale()).Subagents() }
+
+// Subagents says "子代理"
+// in the language of msgs.
+func (msgs Messages) Subagents() string {
+	return Catalog.Format(msgs.locale, "subagents", nil)
+}
+
+// BuiltIn says "内置"
+// in the language the app shows.
+func BuiltIn() string { return In(i18n.Locale()).BuiltIn() }
+
+// BuiltIn says "内置"
+// in the language of msgs.
+func (msgs Messages) BuiltIn() string {
+	return Catalog.Format(msgs.locale, "builtIn", nil)
+}
+
+// AgentsNote says "主代理带领会话，在输入框按 Tab 切换；子代理接手任务，在消息里写 @名字 …"
+// in the language the app shows.
+func AgentsNote() string { return In(i18n.Locale()).AgentsNote() }
+
+// AgentsNote says "主代理带领会话，在输入框按 Tab 切换；子代理接手任务，在消息里写 @名字 …"
+// in the language of msgs.
+func (msgs Messages) AgentsNote() string {
+	return Catalog.Format(msgs.locale, "agentsNote", nil)
+}
+
+// Formatters says "格式化"
+// in the language the app shows.
+func Formatters() string { return In(i18n.Locale()).Formatters() }
+
+// Formatters says "格式化"
+// in the language of msgs.
+func (msgs Messages) Formatters() string {
+	return Catalog.Format(msgs.locale, "formatters", nil)
+}
+
+// FormattersNote says "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。"
+// in the language the app shows.
+func FormattersNote() string { return In(i18n.Locale()).FormattersNote() }
+
+// FormattersNote says "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。"
+// in the language of msgs.
+func (msgs Messages) FormattersNote() string {
+	return Catalog.Format(msgs.locale, "formattersNote", nil)
+}
