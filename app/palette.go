@@ -224,13 +224,13 @@ func (a *App) palette(c *ui.Context) {
 	}
 	ui.DialogBase(c, &a.pal, func(backdrop, panel ui.Element) {
 		scrim := ui.RGBA(18, 19, 26, .18)
-		if p == dark {
+		if p.Dark {
 			scrim = ui.RGBA(6, 7, 10, .45)
 		}
 		backdrop.Background(scrim).Justify(ui.Start).Padding(84, 16, 16, 16)
 		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label(locales.CommandPalette()).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -8, Scale: .98, Opacity: 0}, Duration: 170 * time.Millisecond})
-		if p == dark {
+		if p.Dark {
 			panel.Shadow(0, 0, 0, .5, ui.RGBA(0, 0, 0, .8)).Shadow(0, 18, 48, -8, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .08))
 		} else {
 			panel.Shadow(0, 0, 0, .5, ink.Alpha(.14)).Shadow(0, 12, 32, -8, ink.Alpha(.22))

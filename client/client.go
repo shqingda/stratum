@@ -19,6 +19,7 @@
 package client
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -199,6 +200,7 @@ type Client struct {
 	want      string // session to show on (re)connect
 	modelsReq string
 	afterSync func() []proto.Command
+	decoded   any
 }
 
 // New returns a client for the workspace at cwd that has not connected
@@ -358,6 +360,22 @@ func (c *Client) checkUnknown() []proto.Command {
 	return cmds
 }
 
+// PreDecodeFrame decodes heavy response payloads (such as EventPage) on a
+// background goroutine so Receive does not unmarshal them on the UI thread.
+func PreDecodeFrame(f *proto.Frame) {
+	if f == nil || f.Type != proto.FrameResponse || f.Error != nil || len(f.Result) == 0 {
+		return
+	}
+	res := bytes.TrimSpace(f.Result)
+	if !bytes.HasPrefix(res, []byte(`{"events":`)) {
+		return
+	}
+	var page proto.EventPage
+	if json.Unmarshal(res, &page) == nil {
+		f.Decoded = &page
+	}
+}
+
 func (c *Client) response(f proto.Frame) []proto.Command {
 	p, ok := c.pending[f.ID]
 	if !ok {
@@ -376,6 +394,8 @@ func (c *Client) response(f proto.Frame) []proto.Command {
 		return nil
 	}
 	if p.done != nil {
+		c.decoded = f.Decoded
+		defer func() { c.decoded = nil }()
 		return p.done(f.Result)
 	}
 	return nil
@@ -514,7 +534,9 @@ func (c *Client) catchUp() proto.Command {
 			return nil
 		}
 		var page proto.EventPage
-		if err := json.Unmarshal(r, &page); err != nil {
+		if dp, ok := c.decoded.(*proto.EventPage); ok && dp != nil {
+			page = *dp
+		} else if err := json.Unmarshal(r, &page); err != nil {
 			c.fail(locales.ReadEventsFailed(err.Error()))
 			return nil
 		}

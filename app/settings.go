@@ -84,7 +84,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		topGap := float32(barHeight)
 		if vibrant {
 			tint := ui.RGBA(244, 245, 248, .38)
-			if p == dark {
+			if p.Dark {
 				tint = ui.RGBA(18, 18, 20, .48)
 			}
 			side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)

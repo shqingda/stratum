@@ -1,0 +1,19 @@
+{
+  "name": "talos-pierre-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "esbuild src/main.ts --bundle --format=iife --minify --outfile=dist/bundle.js && cp src/index.html dist/index.html && cp src/style.css dist/style.css"
+  },
+  "dependencies": {
+    "@pierre/diffs": "^1.6.4",
+    "@pierre/trees": "^1.0.0",
+    "marked": "^15.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/talos/app"
+	"github.com/shqingda/talos/app/web"
 	"github.com/shqingda/talos/client"
 	"github.com/shqingda/talos/kernel/boot"
 	"github.com/shqingda/talos/llm/auth"
@@ -53,6 +54,8 @@ func main() {
 		cwd = seed(ctx, k, demo, cwd)
 	}
 	a := app.New(client.New(cwd))
+	mygo.SetFrontend(web.Assets())
+	mygo.BindAs("Pierre", a.PierreBridge())
 	mygo.Use(native.Plugin) // checks a day apart; builds without updates never do
 	mygo.App.WhenReady(func() {
 		mygo.App.SetMenu(menu(a))
@@ -68,6 +71,17 @@ func main() {
 			Vibrancy:       mygo.VibrancyGlass,
 			Content:        ui.View(a.View),
 		})
+		if mygo.WebViewAvailable() {
+			wv, err := win.NewWebView(mygo.WebViewOptions{
+				URL:         "/index.html",
+				Transparent: true,
+			})
+			if err != nil {
+				log.Printf("pierre webview unavailable, using native fallback: %v", err)
+			} else {
+				a.SetWebView(wv)
+			}
+		}
 		a.SetCloseWindow(win.Close)
 		a.Serve(ctx, k.Server, win.Update)
 		a.UseDesktop()

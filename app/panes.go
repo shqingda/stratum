@@ -46,13 +46,13 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 		pos := track.Spring("tab-pos", float32(activeIdx), springDefault) // critically damped: a tap carries no momentum
 		track.Children(func() {
 			thumbBg := p.Card
-			if p == dark {
+			if p.Dark {
 				thumbBg = ui.Hex("#2C2C31")
 			}
 			if trackW > 4 {
 				segW := (trackW - 4) / float32(len(tabs))
 				thumb := ui.Box(c.Key("rv-thumb")).Absolute().Top(2).Bottom(2).Left(2 + pos*segW).Width(segW).Radius(7).Background(thumbBg).PassThrough().ZIndex(0)
-				if p == dark {
+				if p.Dark {
 					thumb.Border(.5, ui.RGBA(255, 255, 255, .14))
 				}
 				rim(thumb, p)
@@ -68,7 +68,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 				if on {
 					if trackW <= 4 {
 						b.Background(thumbBg)
-						if p == dark {
+						if p.Dark {
 							b.Border(.5, ui.RGBA(255, 255, 255, .14))
 						}
 						rim(b, p)
@@ -225,6 +225,11 @@ func (a *App) filesPane(c *ui.Context) {
 	cur := a.C.Current
 	if cur == nil {
 		a.reviewNote(c, locales.NoOpenSession())
+		return
+	}
+	if a.pierre.wv != nil {
+		a.syncPierre("files", nil)
+		ui.WebView(c, a.pierre.wv).Grow(1)
 		return
 	}
 	w, _ := c.Size()

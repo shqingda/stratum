@@ -848,19 +848,12 @@ func (m *Manager) Close() {
 // turns and answers their unanswered tool calls, so their conversations
 // are well formed.
 func (m *Manager) Recover(ctx context.Context) error {
-	xs, err := m.Store.Sessions(ctx)
+	ids, err := m.Store.OpenTurnSessions(ctx, proto.EventTurnStart, proto.EventTurnEnd)
 	if err != nil {
 		return err
 	}
-	for _, x := range xs {
-		evs, err := m.Store.Events(ctx, x.ID, 0, 0, proto.EventTurnStart, proto.EventTurnEnd)
-		if err != nil {
-			return err
-		}
-		if len(evs) == 0 || evs[len(evs)-1].Type != proto.EventTurnStart {
-			continue
-		}
-		msgs, err := m.Store.Messages(ctx, x.ID)
+	for _, id := range ids {
+		msgs, err := m.Store.Messages(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -870,10 +863,10 @@ func (m *Manager) Recover(ctx context.Context) error {
 				for _, c := range calls {
 					res.Parts = append(res.Parts, llm.Part{ToolResult: &llm.ToolResult{CallID: c.ID, Name: c.Name, Content: agent.Interrupted, IsError: true}})
 				}
-				m.record(ctx, x.ID, proto.EventMessage, res)
+				m.record(ctx, id, proto.EventMessage, res)
 			}
 		}
-		m.record(ctx, x.ID, proto.EventTurnEnd, proto.TurnEnd{Error: "Talos quit before the turn finished."})
+		m.record(ctx, id, proto.EventTurnEnd, proto.TurnEnd{Error: "Talos quit before the turn finished."})
 	}
 	return nil
 }

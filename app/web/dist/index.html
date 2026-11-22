@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Talos</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="root">
+    <div id="diffs-view" class="view hidden"></div>
+    <div id="files-view" class="view hidden">
+      <div id="files-main">
+        <div id="files-bar">
+          <div id="files-tabs"></div>
+          <div id="files-actions">
+            <div id="md-toggle" class="seg hidden">
+              <button id="md-preview-btn" type="button" class="seg-btn active">Preview</button>
+              <button id="md-raw-btn" type="button" class="seg-btn">Raw</button>
+            </div>
+            <button id="open-ext-btn" type="button" class="icon-btn hidden" title="Open externally">↗</button>
+            <button id="tree-toggle-btn" type="button" class="icon-btn" title="Toggle Workspace Tree">◫</button>
+          </div>
+        </div>
+        <div id="files-crumb" class="hidden"></div>
+        <div id="files-body">
+          <div id="files-empty">Select a file from the workspace tree to preview</div>
+          <div id="files-code" class="hidden"></div>
+          <div id="files-md" class="hidden markdown-body"></div>
+        </div>
+      </div>
+      <aside id="tree-pane">
+        <div id="tree-host"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="find-bar" class="hidden">
+    <input id="find-input" type="text" placeholder="Find in view..." />
+    <span id="find-count"></span>
+    <button id="find-prev" type="button" class="icon-btn" title="Previous">↑</button>
+    <button id="find-next" type="button" class="icon-btn" title="Next">↓</button>
+    <button id="find-close" type="button" class="icon-btn" title="Close">✕</button>
+  </div>
+
+  <div id="remark-modal" class="hidden">
+    <div class="remark-card">
+      <div class="remark-title" id="remark-title">Add line comment</div>
+      <textarea id="remark-text" rows="3" placeholder="Comment for the agent..."></textarea>
+      <div class="remark-actions">
+        <button id="remark-cancel" type="button" class="btn">Cancel</button>
+        <button id="remark-submit" type="button" class="btn btn-primary">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/bundle.js"></script>
+</body>
+</html>

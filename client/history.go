@@ -30,8 +30,13 @@ func (c *Client) LoadOlder() ([]proto.Command, error) {
 	q := proto.EventsQuery{SessionID: session, Before: c.first, Limit: tailSize}
 	return []proto.Command{c.read(proto.MethodEvents, q, func(r json.RawMessage) []proto.Command {
 		c.LoadingOlder = false
+		if c.Current == nil || c.Current.ID != session {
+			return nil
+		}
 		var page proto.EventPage
-		if c.Current == nil || c.Current.ID != session || json.Unmarshal(r, &page) != nil {
+		if dp, ok := c.decoded.(*proto.EventPage); ok && dp != nil {
+			page = *dp
+		} else if json.Unmarshal(r, &page) != nil {
 			return nil
 		}
 		events := page.Events
@@ -43,7 +48,15 @@ func (c *Client) LoadOlder() ([]proto.Command, error) {
 			return nil
 		}
 		c.first = events[0].Seq
-		c.rebuild(append(events, c.log...))
+		tmp := &Client{nextKey: c.nextKey}
+		for _, e := range events {
+			tmp.event(e)
+		}
+		c.nextKey = tmp.nextKey
+		c.Entries = append(tmp.Entries, c.Entries...)
+		c.Turns = append(tmp.Turns, c.Turns...)
+		c.Usage = c.Usage.Add(tmp.Usage)
+		c.log = append(events, c.log...)
 		return nil
 	})}, nil
 }

@@ -41,7 +41,7 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 		// Window VibrancyGlass provides the single native glass layer; add a
 		// Tinted frost wash and one right hairline so there are no nested frames.
 		tint := ui.RGBA(244, 245, 248, .38)
-		if p == dark {
+		if p.Dark {
 			tint = ui.RGBA(18, 18, 20, .48)
 		}
 		side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
@@ -92,7 +92,7 @@ func (a *App) sideToggle(c *ui.Context) {
 	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
 	bg := ui.RGBA(255, 255, 255, .94)
 	shadow := ui.RGBA(0, 0, 0, .08)
-	if p == dark {
+	if p.Dark {
 		bg = ui.RGBA(38, 38, 42, .90)
 		shadow = ui.RGBA(0, 0, 0, .36)
 	}
@@ -371,7 +371,7 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	row.Transition(ui.ElementTransition{Position: true, Colors: true, Shadows: true, Duration: 180 * time.Millisecond})
 	focusRing(row, p)
 	switch {
-	case on && p == dark:
+	case on && p.Dark:
 		row.Background(p.Sel)
 	case on:
 		// The open session is a pill of paper raised off the sidebar.

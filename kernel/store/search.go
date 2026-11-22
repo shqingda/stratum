@@ -17,8 +17,35 @@ const searchSchema = `CREATE VIRTUAL TABLE IF NOT EXISTS message_search USING ft
 	session_id UNINDEXED, seq UNINDEXED, role UNINDEXED, text, tokenize='trigram'
 );`
 
-func migrateSearch(db *sql.DB) error {
-	ctx := context.Background()
+func (s *Store) runSearchMigration(ctx context.Context) {
+	defer s.bgWG.Done()
+	defer close(s.searchDone)
+	err := migrateSearch(ctx, s.db)
+	s.searchMu.Lock()
+	s.searchErr = err
+	if err == nil {
+		s.searchReady.Store(true)
+	}
+	s.searchMu.Unlock()
+}
+
+// WaitSearchReady blocks until background FTS migration completes or ctx ends.
+func (s *Store) WaitSearchReady(ctx context.Context) error {
+	if s.searchReady.Load() {
+		return nil
+	}
+	select {
+	case <-s.searchDone:
+		s.searchMu.Lock()
+		err := s.searchErr
+		s.searchMu.Unlock()
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func migrateSearch(ctx context.Context, db *sql.DB) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -88,6 +115,9 @@ type SearchHit struct {
 // first. Trigrams cannot match a query of fewer than three characters, as
 // a two-character Chinese word: that one is looked for as a substring.
 func (s *Store) Search(ctx context.Context, query, sessionID string, limit int) ([]SearchHit, error) {
+	if err := s.WaitSearchReady(ctx); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(query) == "" {
 		return []SearchHit{}, nil
 	}

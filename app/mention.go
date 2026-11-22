@@ -356,7 +356,7 @@ var (
 
 // skillAccent returns the Claude-style crisp blue highlight for /skill tokens.
 func skillAccent(p *Palette) ui.Color {
-	if p == dark {
+	if p.Dark {
 		return ui.Hex("#6BAEFF")
 	}
 	return ui.Hex("#1D5BB8")

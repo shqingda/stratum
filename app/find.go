@@ -14,13 +14,20 @@ import (
 // find is ⌘F: the rows of the session that hold some words, one at a
 // time.
 type find struct {
-	on    bool
-	query string
-	input ui.Handle
-	hits  []int // rows of the transcript, in order
-	at    int   // the hit shown
-	move  bool  // scroll to it next frame
-	of    string
+	on         bool
+	query      string
+	input      ui.Handle
+	hits       []int // rows of the transcript, in order
+	at         int   // the hit shown
+	move       bool  // scroll to it next frame
+	of         string
+	idxSession string
+	idx        map[int]findLower
+}
+
+type findLower struct {
+	textLen, detailLen, outLen int
+	text, detail, output       string
 }
 
 func (a *App) openFind(c *ui.Context) {
@@ -51,9 +58,36 @@ func (a *App) findIn(items []item) {
 	if !f.on || q == "" {
 		return
 	}
+	sid := a.sessionID()
+	if f.idx == nil || f.idxSession != sid {
+		f.idx = map[int]findLower{}
+		f.idxSession = sid
+	}
+	lower := func(e *client.Entry) findLower {
+		fl, ok := f.idx[e.Key]
+		if ok && fl.textLen == len(e.Text) && fl.detailLen == len(e.Detail) && fl.outLen == len(e.Output) {
+			return fl
+		}
+		fl = findLower{
+			textLen:   len(e.Text),
+			detailLen: len(e.Detail),
+			outLen:    len(e.Output),
+			text:      strings.ToLower(e.Text),
+		}
+		if e.Role == client.Tool {
+			fl.detail = strings.ToLower(e.Detail)
+			fl.output = strings.ToLower(e.Output)
+		}
+		f.idx[e.Key] = fl
+		return fl
+	}
 	has := func(e *client.Entry) bool {
-		return e != nil && (strings.Contains(strings.ToLower(e.Text), q) ||
-			e.Role == client.Tool && (strings.Contains(strings.ToLower(e.Detail), q) || strings.Contains(strings.ToLower(e.Output), q)))
+		if e == nil {
+			return false
+		}
+		fl := lower(e)
+		return strings.Contains(fl.text, q) ||
+			e.Role == client.Tool && (strings.Contains(fl.detail, q) || strings.Contains(fl.output, q))
 	}
 	any := func(es []*client.Entry) bool {
 		for _, e := range es {

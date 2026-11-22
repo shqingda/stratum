@@ -8,6 +8,7 @@ import (
 // Palette is the Mono palette of design/mockups.html: ink and paper for
 // everything, blue only for what is alive.
 type Palette struct {
+	Dark                    bool
 	Bg, Side, Pane, Card    ui.Color // Bg is the window, under the sheets
 	Sheet                   ui.Color // the paper the transcript is on
 	Fg, Fg2, Mute, Faint    ui.Color
@@ -24,7 +25,8 @@ var (
 	neutralAsh = ui.Hex("#A1A1AA") // dark lines and fills are neutral gray, zero blue cast
 
 	light = &Palette{
-		Bg: ui.Hex("#ECEEF2"), Side: ui.RGBA(232, 234, 239, .86), Pane: ui.Hex("#FBFBFC"), Card: ui.Hex("#FFFFFF"), Sheet: ui.Hex("#FBFBFC"),
+		Dark: false,
+		Bg:   ui.Hex("#ECEEF2"), Side: ui.RGBA(232, 234, 239, .86), Pane: ui.Hex("#FBFBFC"), Card: ui.Hex("#FFFFFF"), Sheet: ui.Hex("#FBFBFC"),
 		Fg: ink, Fg2: ui.Hex("#5B6272"), Mute: ui.Hex("#8A91A0"), Faint: ui.Hex("#B7BCC6"),
 		Edge: ink.Alpha(.10), Edge2: ink.Alpha(.16), Sel: ink.Alpha(.055), Hover: ink.Alpha(.035), Chip: ink.Alpha(.05), Bubble: ink.Alpha(.06),
 		Acc: ink, OnAcc: ui.Hex("#F4F5F7"),
@@ -32,7 +34,8 @@ var (
 		Plus: ui.Hex("#3B7356"), Minus: ui.Hex("#A8474B"),
 	}
 	dark = &Palette{
-		Bg: ui.Hex("#09090A"), Side: ui.RGBA(18, 18, 19, .90), Pane: ui.Hex("#111112"), Card: ui.Hex("#18181A"), Sheet: ui.Hex("#0D0D0E"),
+		Dark: true,
+		Bg:   ui.Hex("#09090A"), Side: ui.RGBA(18, 18, 19, .90), Pane: ui.Hex("#111112"), Card: ui.Hex("#18181A"), Sheet: ui.Hex("#0D0D0E"),
 		Fg: pureWhite, Fg2: ui.Hex("#A1A1AA"), Mute: ui.Hex("#71717A"), Faint: ui.Hex("#3F3F46"),
 		Edge: neutralAsh.Alpha(.11), Edge2: neutralAsh.Alpha(.18), Sel: neutralAsh.Alpha(.10), Hover: neutralAsh.Alpha(.055), Chip: neutralAsh.Alpha(.08), Bubble: neutralAsh.Alpha(.12),
 		Acc: pureWhite, OnAcc: ui.Hex("#09090A"),
@@ -47,6 +50,40 @@ func PaletteFor(isDark bool) *Palette {
 		return dark
 	}
 	return light
+}
+
+// PaletteLerp smoothly interpolates between light (0) and dark (1).
+func PaletteLerp(t float32) *Palette {
+	if t <= 0.001 {
+		return light
+	}
+	if t >= 0.999 {
+		return dark
+	}
+	return &Palette{
+		Dark:   t >= 0.5,
+		Bg:     light.Bg.Mix(dark.Bg, t),
+		Side:   light.Side.Mix(dark.Side, t),
+		Pane:   light.Pane.Mix(dark.Pane, t),
+		Card:   light.Card.Mix(dark.Card, t),
+		Sheet:  light.Sheet.Mix(dark.Sheet, t),
+		Fg:     light.Fg.Mix(dark.Fg, t),
+		Fg2:    light.Fg2.Mix(dark.Fg2, t),
+		Mute:   light.Mute.Mix(dark.Mute, t),
+		Faint:  light.Faint.Mix(dark.Faint, t),
+		Edge:   light.Edge.Mix(dark.Edge, t),
+		Edge2:  light.Edge2.Mix(dark.Edge2, t),
+		Sel:    light.Sel.Mix(dark.Sel, t),
+		Hover:  light.Hover.Mix(dark.Hover, t),
+		Chip:   light.Chip.Mix(dark.Chip, t),
+		Bubble: light.Bubble.Mix(dark.Bubble, t),
+		Acc:    light.Acc.Mix(dark.Acc, t),
+		OnAcc:  light.OnAcc.Mix(dark.OnAcc, t),
+		Live:   light.Live.Mix(dark.Live, t),
+		LiveBg: light.LiveBg.Mix(dark.LiveBg, t),
+		Plus:   light.Plus.Mix(dark.Plus, t),
+		Minus:  light.Minus.Mix(dark.Minus, t),
+	}
 }
 
 // Theme maps a palette onto mygo's widgets, so stock controls match.
@@ -84,7 +121,7 @@ func Theme(p *Palette, isDark bool) *ui.Theme {
 // raise lifts a sheet or a card off what is under it: a hairline edge and
 // a soft shadow, deeper in the dark.
 func raise(e ui.Element, p *Palette) ui.Element {
-	if p == dark {
+	if p.Dark {
 		return e.Shadow(0, 0, 0, .5, neutralAsh.Alpha(.12)).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 8, 24, -10, ui.RGBA(0, 0, 0, .5))
 	}
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.10)).Shadow(0, 1, 2, 0, ink.Alpha(.05)).Shadow(0, 6, 20, -8, ink.Alpha(.10))
@@ -93,7 +130,7 @@ func raise(e ui.Element, p *Palette) ui.Element {
 // lift lifts what floats over the transcript, the composer and what
 // waits on the user, a layer higher than raise.
 func lift(e ui.Element, p *Palette) ui.Element {
-	if p == dark {
+	if p.Dark {
 		return e.Shadow(0, 0, 0, .5, neutralAsh.Alpha(.16)).Shadow(0, 2, 6, 0, ui.RGBA(0, 0, 0, .3)).Shadow(0, 20, 44, -16, ui.RGBA(0, 0, 0, .6))
 	}
 	return e.Shadow(0, 0, 0, .5, ink.Alpha(.12)).Shadow(0, 2, 6, 0, ink.Alpha(.06)).Shadow(0, 18, 40, -16, ink.Alpha(.22))
@@ -174,7 +211,7 @@ func (a *App) glass(e ui.Element, g glass.Glass) ui.Element {
 
 func tintedGlass(p *Palette) glass.Glass {
 	tint := ui.RGBA(244, 245, 248, .28)
-	if p == dark {
+	if p.Dark {
 		tint = ui.RGBA(20, 20, 22, .36)
 	}
 	return glass.Glass{Tint: tint, Native: true}
@@ -184,7 +221,7 @@ func tintedGlass(p *Palette) glass.Glass {
 // the app surface beneath it (Native: false) like Safari's luminous toolbar pill.
 func glassButton(p *Palette) glass.Glass {
 	tint := ui.RGBA(255, 255, 255, .52)
-	if p == dark {
+	if p.Dark {
 		tint = ui.RGBA(48, 48, 52, .48)
 	}
 	return glass.Glass{Tint: tint, Interactive: true}
@@ -194,14 +231,14 @@ func glassButton(p *Palette) glass.Glass {
 // composer card so scrolling transcript softly blooms behind it while text stays crisp.
 func composerGlass(p *Palette) glass.Glass {
 	tint := ui.RGBA(255, 255, 255, .74)
-	if p == dark {
+	if p.Dark {
 		tint = ui.RGBA(28, 28, 31, .76)
 	}
 	return glass.Glass{Tint: tint}
 }
 
 func specular(p *Palette) ui.Color {
-	if p == dark {
+	if p.Dark {
 		return ui.RGBA(255, 255, 255, .13)
 	}
 	return ui.RGBA(255, 255, 255, .72)
@@ -234,7 +271,7 @@ func folderColor(name string, isDark bool) ui.Color {
 
 // folderDot draws a soft colored halo dot representing a project folder.
 func folderDot(c *ui.Context, p *Palette, name string) {
-	col := folderColor(name, p == dark)
+	col := folderColor(name, p.Dark)
 	ui.Box(c).Size(15, 15).Radius(7.5).Background(col.Alpha(.15)).Center().Shrink(0).Children(func() {
 		ui.Box(c).Size(6.5, 6.5).Radius(3.25).Background(col)
 	})

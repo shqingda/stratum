@@ -687,3 +687,43 @@ func TestUnwrap(t *testing.T) {
 		}
 	}
 }
+
+func TestPreDecodeFrameAndLoadOlderPreservesEntries(t *testing.T) {
+	c := newClient("/w", "t")
+	init := one(t, c.Receive(proto.Frame{Type: proto.FrameReady, Version: proto.Version, Instance: "i1"}), proto.MethodInitialize)
+	list := one(t, c.Receive(resp(init.ID, proto.Hello{Version: proto.Version})), proto.MethodSessionList)
+	get := one(t, c.Receive(resp(list.ID, []proto.Session{sess(sid, "/w")})), proto.MethodSessionGet)
+	events := one(t, c.Receive(resp(get.ID, proto.Snapshot{Session: sess(sid, "/w"), Revision: 1000})), proto.MethodEvents)
+
+	f1 := resp(events.ID, proto.EventPage{Events: []proto.Event{
+		event(ev(602, proto.EventTurnStart, nil)),
+		event(ev(603, proto.EventMessage, msg(llm.User, "recent"))),
+		event(ev(604, proto.EventTurnEnd, proto.TurnEnd{})),
+	}})
+	PreDecodeFrame(&f1)
+	if _, ok := f1.Decoded.(*proto.EventPage); !ok {
+		t.Fatalf("PreDecodeFrame did not decode EventPage: %T", f1.Decoded)
+	}
+	c.Receive(f1)
+	if len(c.Entries) != 1 {
+		t.Fatalf("entries = %d", len(c.Entries))
+	}
+	origPtr := c.Entries[0]
+	origKey := origPtr.Key
+
+	cmds, _ := c.LoadOlder()
+	older := one(t, cmds, proto.MethodEvents)
+	f2 := resp(older.ID, proto.EventPage{More: false, Events: []proto.Event{
+		event(ev(501, proto.EventTurnStart, nil)),
+		event(ev(502, proto.EventMessage, msg(llm.User, "old"))),
+		event(ev(503, proto.EventTurnEnd, proto.TurnEnd{})),
+	}})
+	PreDecodeFrame(&f2)
+	c.Receive(f2)
+	if len(c.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2", len(c.Entries))
+	}
+	if c.Entries[1] != origPtr || c.Entries[1].Key != origKey {
+		t.Fatalf("LoadOlder replaced existing entry pointer or key: %p != %p", c.Entries[1], origPtr)
+	}
+}

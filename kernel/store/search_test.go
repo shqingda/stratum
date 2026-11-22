@@ -234,10 +234,15 @@ func TestSearchMigration(t *testing.T) {
 
 func TestSearchMigrationRollback(t *testing.T) {
 	path := legacySearchDB(t, true)
-	if s, err := Open(path); err == nil {
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WaitSearchReady(context.Background()); err == nil {
 		s.Close()
 		t.Fatal("malformed legacy message silently ignored")
 	}
+	s.Close()
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		t.Fatal(err)
@@ -252,5 +257,26 @@ func TestSearchMigrationRollback(t *testing.T) {
 	}
 	if err := db.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&events); err != nil || events != 2 {
 		t.Fatalf("migration lost source events: %d %v", events, err)
+	}
+}
+
+func TestOpenTurnSessions(t *testing.T) {
+	s := searchStore(t)
+	ctx := context.Background()
+	if _, err := s.Append(ctx, "first", "turn.start", map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Append(ctx, "second", "turn.start", map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Append(ctx, "second", "turn.end", map[string]any{}); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := s.OpenTurnSessions(ctx, "turn.start", "turn.end")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 1 || ids[0] != "first" {
+		t.Fatalf("OpenTurnSessions = %v, want [first]", ids)
 	}
 }

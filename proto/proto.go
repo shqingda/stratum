@@ -49,6 +49,9 @@ type Frame struct {
 	Error  *Error          `json:"error,omitempty"`
 	// event
 	Event *Event `json:"event,omitempty"`
+	// Decoded holds an optional pre-decoded payload (e.g. *EventPage)
+	// populated off the UI thread.
+	Decoded any `json:"-"`
 }
 
 // Error is a failed command.

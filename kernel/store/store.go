@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -24,6 +26,13 @@ var ErrNotFound = errors.New("store: not found")
 // Store is the database.
 type Store struct {
 	db *sql.DB
+
+	searchReady atomic.Bool
+	searchMu    sync.Mutex
+	searchDone  chan struct{}
+	searchErr   error
+	bgCancel    context.CancelFunc
+	bgWG        sync.WaitGroup
 }
 
 const schema = `
@@ -97,18 +106,38 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	if err := migrateSearch(db); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("store: search migration: %w", err)
-	}
 	if err := migrateFlags(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("store: flags migration: %w", err)
 	}
-	return &Store{db: db}, nil
+	s := &Store{
+		db:         db,
+		searchDone: make(chan struct{}),
+	}
+	var version int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("store: user_version: %w", err)
+	}
+	if version >= 2 {
+		s.searchReady.Store(true)
+		close(s.searchDone)
+		return s, nil
+	}
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	s.bgCancel = bgCancel
+	s.bgWG.Add(1)
+	go s.runSearchMigration(bgCtx)
+	return s, nil
 }
 
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	if s.bgCancel != nil {
+		s.bgCancel()
+	}
+	s.bgWG.Wait()
+	return s.db.Close()
+}
 
 // migrateFlags adds the sidebar's columns to a sessions table made
 // before them.
@@ -301,8 +330,16 @@ func (s *Store) Append(ctx context.Context, sessionID, typ string, data any) (Ev
 		return Event{}, err
 	}
 	if typ == MessageEvent {
-		if err := indexMessage(ctx, tx, sessionID, seq, b); err != nil {
-			return Event{}, err
+		ready := s.searchReady.Load()
+		if !ready {
+			s.searchMu.Lock()
+			ready = s.searchReady.Load()
+			s.searchMu.Unlock()
+		}
+		if ready {
+			if err := indexMessage(ctx, tx, sessionID, seq, b); err != nil {
+				return Event{}, err
+			}
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE sessions SET updated_at=? WHERE id=?`, now.UnixMilli(), sessionID); err != nil {
@@ -422,6 +459,34 @@ func (s *Store) GetReceipt(ctx context.Context, id string) (Receipt, error) {
 	}
 	r.At = time.UnixMilli(at)
 	return r, err
+}
+
+// OpenTurnSessions returns the IDs of all sessions whose latest turn event
+// is startType (i.e. left mid-turn without a matching endType).
+func (s *Store) OpenTurnSessions(ctx context.Context, startType, endType string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT e.session_id
+		FROM events e
+		INNER JOIN (
+			SELECT session_id, MAX(seq) AS max_seq
+			FROM events
+			WHERE type IN (?, ?)
+			GROUP BY session_id
+		) last ON e.session_id = last.session_id AND e.seq = last.max_seq
+		WHERE e.type = ?`, startType, endType, startType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func repeat(s string, n int) string {

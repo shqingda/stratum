@@ -99,7 +99,7 @@ type parsedCard struct {
 
 func (a *App) cachedCard(e *client.Entry) parsedCard {
 	if e.CallID != "" && a.cardCache != nil {
-		if pc, ok := a.cardCache[e.CallID]; ok && pc.argsLen == len(e.Args) && pc.outLen == len(e.Output) {
+		if pc, ok := a.cardCache.Get(e.CallID); ok && pc.argsLen == len(e.Args) && pc.outLen == len(e.Output) {
 			return pc
 		}
 	}
@@ -145,11 +145,9 @@ func (a *App) cachedCard(e *client.Entry) parsedCard {
 	}
 	if e.CallID != "" {
 		if a.cardCache == nil {
-			a.cardCache = make(map[string]parsedCard, 64)
-		} else if len(a.cardCache) >= 512 {
-			clear(a.cardCache)
+			a.cardCache = newLRU[string, parsedCard](512)
 		}
-		a.cardCache[e.CallID] = pc
+		a.cardCache.Put(e.CallID, pc)
 	}
 	return pc
 }

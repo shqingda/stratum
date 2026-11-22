@@ -1,6 +1,7 @@
 package app
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"maps"
 	"os/exec"
@@ -37,7 +38,7 @@ type review struct {
 	wsRead int
 	sel    string // client.DiffKey of the file shown
 	asked  map[string]bool
-	diffs  map[string]*fileDiff
+	diffs  *lruCache[string, *fileDiff]
 	// computing are the large diffs being worked out off the UI thread.
 	computing map[string]bool
 	// The diffs show one under another, as a List of items: jump is the
@@ -74,6 +75,7 @@ type review struct {
 
 // fileDiff is a file's change cut into hunks, computed once.
 type fileDiff struct {
+	hash           [32]byte
 	status         byte // 'A', 'D' or 'M'
 	hunks          []hunk
 	old, new       []string
@@ -82,8 +84,27 @@ type fileDiff struct {
 	gaveUp         bool
 }
 
+func diffHash(d proto.ChangeDiff) [32]byte {
+	h := sha256.New()
+	if d.Before != nil {
+		h.Write([]byte{1})
+		h.Write([]byte(*d.Before))
+	} else {
+		h.Write([]byte{0})
+	}
+	if d.After != nil {
+		h.Write([]byte{1})
+		h.Write([]byte(*d.After))
+	} else {
+		h.Write([]byte{0})
+	}
+	var sum [32]byte
+	copy(sum[:], h.Sum(nil))
+	return sum
+}
+
 func newFileDiff(d proto.ChangeDiff) *fileDiff {
-	f := &fileDiff{status: 'M'}
+	f := &fileDiff{hash: diffHash(d), status: 'M'}
 	switch {
 	case d.Before == nil:
 		f.status = 'A'
@@ -139,7 +160,7 @@ func (a *App) syncReview() {
 	// what they changed under them.
 	if ch.Stale && !ch.Loading && (r.open || !a.C.Busy && slices.ContainsFunc(a.C.Turns, func(t client.Turn) bool { return t.Done })) {
 		clear(r.asked)
-		clear(r.diffs)
+		r.diffs.Clear()
 		a.quiet(a.C.ListChanges())
 		return
 	}
@@ -151,15 +172,34 @@ func (a *App) syncReview() {
 	}
 	if r.wsRead != a.C.Workspace.Read {
 		r.wsRead = a.C.Workspace.Read
-		for _, prefix := range []string{client.DiffKey(0, ""), client.DiffKey(-1, "")} {
-			maps.DeleteFunc(r.diffs, func(k string, _ *fileDiff) bool { return strings.HasPrefix(k, prefix) })
+		uncommittedPrefix := client.DiffKey(0, "")
+		branchPrefix := client.DiffKey(-1, "")
+		for _, prefix := range []string{uncommittedPrefix, branchPrefix} {
 			maps.DeleteFunc(r.asked, func(k string, _ bool) bool { return strings.HasPrefix(k, prefix) })
 		}
+		liveUncommitted := make(map[string]bool, len(a.C.Workspace.Files))
+		for _, f := range a.C.Workspace.Files {
+			liveUncommitted[uncommittedPrefix+f.Path] = true
+		}
+		liveBranch := make(map[string]bool, len(a.C.Workspace.BaseFiles))
+		for _, f := range a.C.Workspace.BaseFiles {
+			liveBranch[branchPrefix+f.Path] = true
+		}
+		r.diffs.DeleteFunc(func(k string, _ *fileDiff) bool {
+			if strings.HasPrefix(k, uncommittedPrefix) {
+				return !liveUncommitted[k]
+			}
+			if strings.HasPrefix(k, branchPrefix) {
+				return !liveBranch[k]
+			}
+			return false
+		})
 	}
 	for _, t := range a.shownTurns() {
 		for _, f := range t.Files {
 			key := client.DiffKey(t.TurnSeq, f.Path)
-			if !r.asked[key] && a.fileDiff(key) == nil {
+			_, hasSrc := a.diffSource(key)
+			if !r.asked[key] && !hasSrc {
 				r.asked[key] = true
 				switch t.TurnSeq {
 				case 0:
@@ -208,11 +248,16 @@ func (a *App) shownTurns() []proto.ChangeTurn {
 const syncDiffBytes = 64 << 10
 
 func (a *App) fileDiff(key string) *fileDiff {
-	if f, ok := a.rv.diffs[key]; ok {
-		return f
+	if a.rv.diffs == nil {
+		a.rv.diffs = newLRU[string, *fileDiff](64)
 	}
-	d, ok := a.diffSource(key)
-	if !ok {
+	d, hasSrc := a.diffSource(key)
+	if f, cached := a.rv.diffs.Get(key); cached {
+		if !hasSrc || f.hash == diffHash(d) {
+			return f
+		}
+	}
+	if !hasSrc {
 		return nil
 	}
 	size := 0
@@ -224,7 +269,7 @@ func (a *App) fileDiff(key string) *fileDiff {
 	}
 	if size <= syncDiffBytes || a.update == nil {
 		f := newFileDiff(d)
-		a.rv.diffs[key] = f
+		a.rv.diffs.Put(key, f)
 		return f
 	}
 	if a.rv.computing == nil {
@@ -238,7 +283,7 @@ func (a *App) fileDiff(key string) *fileDiff {
 				delete(a.rv.computing, key)
 				// The file may have changed again meanwhile.
 				if cur, ok := a.diffSource(key); ok && cur.Before == d.Before && cur.After == d.After {
-					a.rv.diffs[key] = f
+					a.rv.diffs.Put(key, f)
 				}
 			})
 		}()
@@ -329,7 +374,27 @@ func (a *App) reviewPanel(c *ui.Context) {
 		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 			a.scope(c)
 			ui.Spacer(c)
-			if fileCount(turns) > 1 {
+			if a.pierre.wv != nil {
+				split := a.pierre.diffStyle == "split"
+				label := "Unified"
+				if split {
+					label = "Split"
+				}
+				b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Background(p.Chip).Label(label)
+				press(b)
+				focusRing(b, p)
+				b.Children(func() {
+					ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				})
+				if b.Clicked() {
+					if split {
+						a.pierre.diffStyle = "unified"
+					} else {
+						a.pierre.diffStyle = "split"
+					}
+					a.pierre.lastDiffsSig = ""
+				}
+			} else if fileCount(turns) > 1 {
 				a.foldAll(c, turns)
 			}
 			add, del := a.totals(turns)
@@ -351,8 +416,13 @@ func (a *App) reviewPanel(c *ui.Context) {
 		case a.rv.branch && len(turns) == 0:
 			a.reviewNote(c, locales.NoBranchChanges(a.C.Workspace.Base))
 		case a.rv.uncommitted || a.rv.branch:
-			a.reviewFiles(c, turns)
-			a.reviewDiff(c, turns)
+			if a.pierre.wv != nil {
+				a.syncPierre("diffs", turns)
+				ui.WebView(c, a.pierre.wv).Grow(1)
+			} else {
+				a.reviewFiles(c, turns)
+				a.reviewDiff(c, turns)
+			}
 		case ch.Err != "" && len(ch.Turns) == 0:
 			a.reviewNote(c, locales.ChangesLoadFailed(ch.Err))
 		case len(ch.Turns) == 0 && (ch.Loading || ch.Stale):
@@ -360,8 +430,13 @@ func (a *App) reviewPanel(c *ui.Context) {
 		case len(ch.Turns) == 0:
 			a.reviewNote(c, locales.NoChangesYet())
 		default:
-			a.reviewFiles(c, turns)
-			a.reviewDiff(c, turns)
+			if a.pierre.wv != nil {
+				a.syncPierre("diffs", turns)
+				ui.WebView(c, a.pierre.wv).Grow(1)
+			} else {
+				a.reviewFiles(c, turns)
+				a.reviewDiff(c, turns)
+			}
 		}
 		if a.C.Current != nil {
 			a.remarksBar(c)

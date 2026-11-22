@@ -44,7 +44,7 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
 		if vibrant {
 			tint := ui.RGBA(244, 245, 248, .38)
-			if p == dark {
+			if p.Dark {
 				tint = ui.RGBA(18, 18, 20, .48)
 			}
 			side.Background(tint).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
@@ -231,7 +231,7 @@ func (a *App) automationDeleteDialog(c *ui.Context) {
 	p := a.p
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
 		scrim := ui.RGBA(12, 12, 14, .18)
-		if p == dark {
+		if p.Dark {
 			scrim = ui.RGBA(0, 0, 0, .42)
 		}
 		backdrop.Background(scrim)

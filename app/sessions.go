@@ -175,7 +175,7 @@ func (a *App) deleteDialog(c *ui.Context) {
 	p := a.p
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
 		scrim := ui.RGBA(12, 12, 14, .18)
-		if p == dark {
+		if p.Dark {
 			scrim = ui.RGBA(0, 0, 0, .42)
 		}
 		backdrop.Background(scrim)
@@ -207,7 +207,7 @@ func (a *App) removeProjectDialog(c *ui.Context) {
 	head := locales.RemoveProjectTitle(a.removingName)
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
 		scrim := ui.RGBA(12, 12, 14, .18)
-		if p == dark {
+		if p.Dark {
 			scrim = ui.RGBA(0, 0, 0, .42)
 		}
 		backdrop.Background(scrim)

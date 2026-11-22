@@ -303,7 +303,7 @@ func (a *App) contextRing(c *ui.Context) {
 	window := m.Context
 	pct := min(100, (a.C.LastInput*100+window/2)/window)
 	isDark := 0
-	if p == dark {
+	if p.Dark {
 		isDark = 1
 	}
 	key := [2]int{pct, isDark}

@@ -59,7 +59,10 @@ type App struct {
 		at         time.Time
 		said       bool // VoiceOver has been told
 	}
-	cardCache          map[string]parsedCard
+	announcedSession   string
+	announcedApproval  string
+	announcedBusy      bool
+	cardCache          *lruCache[string, parsedCard]
 	keptUnread         string // marked unread while shown
 	showArchived       bool
 	drafts             drafts       // keeps each session's draft in the kernel
@@ -93,6 +96,7 @@ type App struct {
 	palScroll           bool    // scroll palette selection into view once after ↑/↓
 	stats               map[string][2]int
 	rv                  review
+	pierre              pierreState
 	seen                map[string]time.Time // when approvals first showed
 	openIn              func(app, dir string) error
 	openURL             func(url string) error
@@ -135,17 +139,17 @@ type App struct {
 
 	attached        []attachment
 	mentionSessions []string
-	thumbs   map[string]ui.ImageSource // of sent pictures, by entry key and index
-	pick     func() []string           // the open panel
-	pickDir  func() string             // the open panel, for a folder
-	update   func(func())              // runs on the UI thread, as Serve was given
-	menuRuns []func(c *ui.Context)     // commands from the menu bar, for the next frame
+	thumbs   *lruCache[string, ui.ImageSource] // of sent pictures, by entry key and index
+	pick     func() []string                   // the open panel
+	pickDir  func() string                     // the open panel, for a folder
+	update   func(func())                      // runs on the UI thread, as Serve was given
+	menuRuns []func(c *ui.Context)             // commands from the menu bar, for the next frame
 }
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
 	a := &App{C: c, now: time.Now, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
-		rv: review{asked: map[string]bool{}, diffs: map[string]*fileDiff{}}}
+		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
 	return a
 }
@@ -232,6 +236,7 @@ func (a *App) Serve(ctx context.Context, srv *rpc.Server, update func(func())) {
 			if json.Unmarshal(sc.Bytes(), &f) != nil {
 				continue
 			}
+			client.PreDecodeFrame(&f)
 			update(func() { a.receive(f) })
 		}
 		err := sc.Err()
@@ -271,15 +276,20 @@ func (a *App) quiet(cmds []proto.Command, err error) {
 func (a *App) View(c *ui.Context) {
 	a.syncMenus()
 	a.syncReview()
-	isDark := c.Theme().Dark
-	a.p = PaletteFor(isDark)
-	c.SetTheme(Theme(a.p, isDark))
-	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
-		c.SetZoom(z)
-	}
 	a.sys = c.Preferences()
 	if a.reduceMotion() {
 		c.DisableAnimations()
+	}
+	isDark := c.Theme().Dark
+	darkTarget := float32(0)
+	if isDark {
+		darkTarget = 1
+	}
+	themeMix := c.Root().Spring("theme", darkTarget, springDefault)
+	a.p = PaletteLerp(themeMix)
+	c.SetTheme(Theme(a.p, a.p.Dark))
+	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
+		c.SetZoom(z)
 	}
 	vibrant := c.Vibrancy()
 	if vibrant {
@@ -293,6 +303,11 @@ func (a *App) View(c *ui.Context) {
 	a.runMenu(c)
 	a.syncDraft(c)
 	a.markSeen(c)
+	a.syncAnnounce(c)
+	if a.pierre.focusComposerNext {
+		a.pierre.focusComposerNext = false
+		a.composerInput.Focus(c)
+	}
 	if a.settingsOpen {
 		ui.Box(c.Key("view-settings")).Fill().
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
@@ -567,4 +582,42 @@ func (a *App) closeOrDismiss() {
 // then leaves alone.
 func (a *App) toggleSide() {
 	a.noSide, a.sideMoved = !a.noSide, false
+}
+
+// syncAnnounce informs VoiceOver when a new approval arrives or a turn ends.
+func (a *App) syncAnnounce(c *ui.Context) {
+	sid := a.sessionID()
+	if sid != a.announcedSession {
+		a.announcedSession = sid
+		a.announcedBusy = a.C.Busy
+		a.announcedApproval = ""
+		if len(a.C.Approvals) > 0 {
+			a.announcedApproval = a.C.Approvals[0].ID
+		}
+		return
+	}
+	if len(a.C.Approvals) > 0 {
+		id := a.C.Approvals[0].ID
+		if id != a.announcedApproval {
+			a.announcedApproval = id
+			c.Announce(locales.NotifyWait())
+		}
+	} else {
+		a.announcedApproval = ""
+	}
+	if a.announcedBusy && !a.C.Busy && len(a.C.Approvals) == 0 {
+		failed := a.C.Current != nil && a.C.Current.Mark == "fail"
+		if !failed {
+			if n := len(a.C.Entries); n > 0 {
+				last := a.C.Entries[n-1]
+				failed = last.Role == client.Notice && last.Note == "fail"
+			}
+		}
+		if failed {
+			c.Announce(locales.NotifyFail())
+		} else {
+			c.Announce(locales.NotifyDone())
+		}
+	}
+	a.announcedBusy = a.C.Busy
 }

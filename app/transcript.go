@@ -541,10 +541,10 @@ func (a *App) empty(c *ui.Context) {
 			}
 			emptyState(c, p, "plug-connected-x", locales.KernelDisconnected(), subtitle, action)
 		case a.C.Phase != client.Ready:
-			heroMark(c, 52, p == dark).Opacity(.5)
+			heroMark(c, 52, p.Dark).Opacity(.5)
 			ui.Text(c, phaseText(a.C.Phase)+"…").FontSize(14).TextColor(p.Mute).Margin(14, 0, 0, 0)
 		case a.C.Current == nil:
-			heroMark(c, 52, p == dark)
+			heroMark(c, 52, p.Dark)
 			ui.Text(c, locales.StartNewSession()).FontSize(16).FontWeight(500).TextColor(p.Fg2).Margin(14, 0, 0, 0)
 			ui.Box(c).Margin(6, 0, 0, 0).Children(func() {
 				if a.pushButton(c, "empty-new-session", locales.NewSession()).Clicked() {
@@ -561,7 +561,7 @@ func (a *App) empty(c *ui.Context) {
 // subtle contact shadow, and spring hover lift.
 func (a *App) heroEmblem(c *ui.Context, size float32) {
 	p := a.p
-	isDark := p == dark
+	isDark := p.Dark
 	shadow := ui.RGBA(12, 14, 22, .08)
 	if isDark {
 		shadow = ui.RGBA(0, 0, 0, .28)

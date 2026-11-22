@@ -184,16 +184,16 @@ func (a *App) noImages() bool {
 
 // sentImages are the pictures of a user message, small.
 func (a *App) sentImages(c *ui.Context, e *client.Entry) {
-	if a.thumbs == nil || len(a.thumbs) > 64 {
-		a.thumbs = map[string]ui.ImageSource{}
+	if a.thumbs == nil {
+		a.thumbs = newLRU[string, ui.ImageSource](64)
 	}
 	ui.Row(c).Wrap().Gap(6).Children(func() {
 		for i := range e.Images {
 			key := fmt.Sprint(e.Key, ":", i)
-			src, ok := a.thumbs[key]
+			src, ok := a.thumbs.Get(key)
 			if !ok {
 				src, _ = ui.DecodeImage(e.Images[i].Data)
-				a.thumbs[key] = src
+				a.thumbs.Put(key, src)
 			}
 			if src == nil {
 				continue
