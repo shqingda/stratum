@@ -57,7 +57,7 @@ func chat(ctx context.Context, store auth.Store, args []string) (err error) {
 			}
 			switch len(names) {
 			case 0:
-				return errors.New("not signed in; run talosd login <provider>, or chat -demo")
+				return errors.New("not signed in; run stratumd login <provider>, or chat -demo")
 			case 1:
 				*account = names[0]
 			default:
@@ -97,7 +97,7 @@ func chat(ctx context.Context, store auth.Store, args []string) (err error) {
 	if *model == "" {
 		*model = llm.DefaultModel(provider)
 		if *model == "" && !*demo {
-			return fmt.Errorf("%s has no default model; pass -model (talosd models %s lists them)", provider, provider)
+			return fmt.Errorf("%s has no default model; pass -model (stratumd models %s lists them)", provider, provider)
 		}
 	}
 	root, err := os.OpenRoot(*dir)
@@ -118,14 +118,14 @@ func chat(ctx context.Context, store auth.Store, args []string) (err error) {
 			Model:     *model,
 			Effort:    *effort,
 			SessionID: sessionID(),
-			System:    "You are Talos, a coding agent. You can read files in " + abs + " with the tools. Answer briefly.",
+			System:    "You are Stratum, a coding agent. You can read files in " + abs + " with the tools. Answer briefly.",
 			Tools:     tools,
 		},
 	}
 	if *prompt != "" {
 		return c.turn(ctx, *prompt)
 	}
-	fmt.Printf("Talos · %s · %s  (Ctrl-D to quit)\n", or(*account, "demo"), *model)
+	fmt.Printf("Stratum · %s · %s  (Ctrl-D to quit)\n", or(*account, "demo"), *model)
 	for {
 		fmt.Print("\n› ")
 		line, err := readLine()

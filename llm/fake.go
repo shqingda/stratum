@@ -23,7 +23,7 @@ func (d Demo) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
 			last = req.Messages[i].PlainText()
 		}
 	}
-	reply := "Talos is in offline demo mode. Sign in to a model provider to get real answers.\n\nYou wrote: " + last
+	reply := "Stratum is in offline demo mode. Sign in to a model provider to get real answers.\n\nYou wrote: " + last
 	return (&Script{Turns: []Turn{{Text: reply}}, Delay: d.Delay, Loop: true}).Stream(ctx, req)
 }
 

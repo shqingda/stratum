@@ -210,7 +210,7 @@ func TestSandboxEscapeNetwork(t *testing.T) {
 				}
 			}
 		}()
-		args := []string{"+tries=1", "+time=1", "+noedns", "@127.0.0.1", "-p", fmt.Sprint(dns.LocalAddr().(*net.UDPAddr).Port), "talos-escape.example.invalid", "A"}
+		args := []string{"+tries=1", "+time=1", "+noedns", "@127.0.0.1", "-p", fmt.Sprint(dns.LocalAddr().(*net.UDPAddr).Port), "stratum-escape.example.invalid", "A"}
 		if out, err := exec.Command("/usr/bin/dig", args...).CombinedOutput(); err != nil || queries.Load() != 1 {
 			t.Fatalf("local DNS control failed: %v %s", err, out)
 		}
@@ -225,16 +225,16 @@ func TestSandboxEscapeNetwork(t *testing.T) {
 
 func TestSandboxEscapeEnvironment(t *testing.T) {
 	root, _, _ := escapeSetup(t)
-	keys := []string{"OPENAI_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "TALOS_ESCAPE_TOKEN"}
+	keys := []string{"OPENAI_API_KEY", "GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "STRATUM_ESCAPE_TOKEN"}
 	for _, key := range keys {
 		t.Setenv(key, "synthetic-escape-secret")
 	}
-	t.Setenv("TALOS_ESCAPE_VISIBLE", "visible-control")
+	t.Setenv("STRATUM_ESCAPE_VISIBLE", "visible-control")
 	out, err := escapeRun(t, root, "/usr/bin/env")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "TALOS_ESCAPE_VISIBLE=visible-control\n") {
+	if !strings.Contains(out, "STRATUM_ESCAPE_VISIBLE=visible-control\n") {
 		t.Fatal("env did not run normally")
 	}
 	for _, key := range keys {
@@ -275,7 +275,7 @@ func TestSandboxEscapeLaunch(t *testing.T) {
 		}
 		marker := filepath.Join(outside, "open-marker")
 		escapeWrite(t, filepath.Join(bin, "probe"), "#!/bin/sh\nprintf escaped > "+escapeQuote(marker)+"\n", 0o700)
-		escapeWrite(t, filepath.Join(app, "Contents", "Info.plist"), `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>probe</string><key>CFBundleIdentifier</key><string>invalid.example.talos.escapeprobe</string><key>CFBundlePackageType</key><string>APPL</string><key>LSBackgroundOnly</key><true/></dict></plist>`, 0o600)
+		escapeWrite(t, filepath.Join(app, "Contents", "Info.plist"), `<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>probe</string><key>CFBundleIdentifier</key><string>invalid.example.stratum.escapeprobe</string><key>CFBundlePackageType</key><string>APPL</string><key>LSBackgroundOnly</key><true/></dict></plist>`, 0o600)
 		// A successful control proves the app is runnable without touching a real app or document.
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

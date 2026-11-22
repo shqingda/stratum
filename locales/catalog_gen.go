@@ -2502,11 +2502,11 @@ func (msgs Messages) McpEmpty() string {
 	return Catalog.Format(msgs.locale, "mcpEmpty", nil)
 }
 
-// McpNote says "全局的服务器写在 ~/.talos/mcp.json，项目的写在项目的 .mcp.json…"
+// McpNote says "全局的服务器写在 ~/.stratum/mcp.json，项目的写在项目的 .mcp.json…"
 // in the language the app shows.
 func McpNote() string { return In(i18n.Locale()).McpNote() }
 
-// McpNote says "全局的服务器写在 ~/.talos/mcp.json，项目的写在项目的 .mcp.json…"
+// McpNote says "全局的服务器写在 ~/.stratum/mcp.json，项目的写在项目的 .mcp.json…"
 // in the language of msgs.
 func (msgs Messages) McpNote() string {
 	return Catalog.Format(msgs.locale, "mcpNote", nil)

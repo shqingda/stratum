@@ -66,7 +66,7 @@ type Store interface {
 // Keychain stores credentials in the macOS keychain under one service. The
 // keychain cannot list items by service, so an index item names them.
 type Keychain struct {
-	Service string // "talos" when empty
+	Service string // "talos", the name from before the rename, when empty
 	mu      sync.Mutex
 }
 

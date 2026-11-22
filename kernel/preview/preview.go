@@ -108,7 +108,7 @@ func (m *Manager) Open(ctx context.Context, rawURL string) (Snapshot, error) {
 	var snap Snapshot
 	if m.Runner != nil {
 		snap, err = m.Runner(ctx, target)
-	} else if os.Getenv("TALOS_DEMO") != "" {
+	} else if os.Getenv("STRATUM_DEMO") != "" {
 		snap = demoSnapshot(target)
 	} else if bin := m.browserBin(); bin != "" {
 		snap, err = captureWithCDP(ctx, bin, target)
@@ -167,7 +167,7 @@ func findBrowser() string {
 func demoSnapshot(target string) Snapshot {
 	return Snapshot{
 		URL:        target,
-		Title:      "Talos Local Preview (Demo)",
+		Title:      "Stratum Local Preview (Demo)",
 		Status:     200,
 		Screenshot: renderPlaceholderPNG(800, 480, color.RGBA{244, 246, 250, 255}, color.RGBA{59, 130, 246, 255}),
 		UpdatedAt:  time.Now(),
@@ -238,7 +238,7 @@ func renderPlaceholderPNG(w, h int, bg, accent color.RGBA) []byte {
 }
 
 func captureWithCDP(ctx context.Context, bin, target string) (Snapshot, error) {
-	userDir, err := os.MkdirTemp("", "talos-preview-*")
+	userDir, err := os.MkdirTemp("", "stratum-preview-*")
 	if err != nil {
 		return Snapshot{}, err
 	}

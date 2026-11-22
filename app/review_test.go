@@ -49,7 +49,7 @@ func TestReviewAgainstKernel(t *testing.T) {
 	}}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	k, err := boot.Start(ctx, boot.Options{DB: filepath.Join(t.TempDir(), "talos.db"), Creds: &auth.Memory{}, Script: script})
+	k, err := boot.Start(ctx, boot.Options{DB: filepath.Join(t.TempDir(), "stratum.db"), Creds: &auth.Memory{}, Script: script})
 	if err != nil {
 		t.Fatal(err)
 	}

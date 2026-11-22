@@ -34,7 +34,7 @@ func TestSessionInstructionsSkillsAndRefresh(t *testing.T) {
 		writeSkillFixture(t, source.path, source.text+"\n")
 	}
 	globalSkill := filepath.Join(global, "skills", "installed")
-	localSkill := filepath.Join(cwd, ".talos", "skills", "local")
+	localSkill := filepath.Join(cwd, ".stratum", "skills", "local")
 	marker := filepath.Join(base, "must-not-execute")
 	globalBody := "GLOBAL_SKILL_BODY_ONLY"
 	localBody := "LOCAL_SKILL_BODY_ONLY\n$(touch " + marker + ")"
@@ -123,7 +123,7 @@ func TestSessionSkillCatalogIsolation(t *testing.T) {
 	for _, account := range []string{"a", "b"} {
 		cwd := filepath.Join(base, account)
 		writeSkillFixture(t, filepath.Join(cwd, "AGENTS.md"), "POLICY_"+account)
-		writeSkillFixture(t, filepath.Join(cwd, ".talos", "skills", "private", "SKILL.md"), skillDocument("private", "Only workspace "+account+" metadata.", "PRIVATE_BODY_"+account))
+		writeSkillFixture(t, filepath.Join(cwd, ".stratum", "skills", "private", "SKILL.md"), skillDocument("private", "Only workspace "+account+" metadata.", "PRIVATE_BODY_"+account))
 		sessions[account] = skillsTestSession(t, m, cwd, account)
 	}
 	for _, account := range []string{"a", "b", "a"} {
@@ -146,14 +146,14 @@ func TestSessionSkillCatalogIsolation(t *testing.T) {
 		if start > 0 {
 			callID = "a-again"
 		}
-		dir := filepath.Join(sessions[account].Cwd, ".talos", "skills", "private")
+		dir := filepath.Join(sessions[account].Cwd, ".stratum", "skills", "private")
 		checkSkillResult(t, script.Requests[start+1], callID, "private", "PRIVATE_BODY_"+account, dir)
 	}
 }
 
 func skillsTestManager(t *testing.T, global string, scripts map[string]*llm.Script) *Manager {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "talos.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "stratum.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

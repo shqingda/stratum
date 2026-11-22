@@ -243,7 +243,7 @@ func TestTask8SearchFocusViews(t *testing.T) {
 		tt := task8Tester(a, dark)
 		tt.Key(ui.Cmd, ui.KeyK)
 		tt.Type("client")
-		if !tt.Focused("搜索") || !tt.HasText("talos · 3 时") || tt.HasText("site · ") {
+		if !tt.Focused("搜索") || !tt.HasText("stratum · 3 时") || tt.HasText("site · ") {
 			t.Fatalf("search focus/filter failed: %q", tt.Texts())
 		}
 		appearance := map[bool]string{false: "light", true: "dark"}[dark]
@@ -612,7 +612,7 @@ func TestMentionGroups(t *testing.T) {
 	if strings.Join(texts, ",") != want {
 		t.Fatalf("%s", strings.Join(texts, ","))
 	}
-	if groups[0].items[0].note != "talos" {
+	if groups[0].items[0].note != "stratum" {
 		t.Fatalf("note %q", groups[0].items[0].note)
 	}
 	a.mention.query = "沙箱"

@@ -14,9 +14,9 @@ import (
 )
 
 // TestMain is also the MCP server the tests start: the test binary run
-// with TALOS_TEST_MCP set serves an echo tool on stdio.
+// with STRATUM_TEST_MCP set serves an echo tool on stdio.
 func TestMain(m *testing.M) {
-	if os.Getenv("TALOS_TEST_MCP") != "" {
+	if os.Getenv("STRATUM_TEST_MCP") != "" {
 		s := sdk.NewServer(&sdk.Implementation{Name: "echo", Version: "1"}, nil)
 		type in struct {
 			Text string `json:"text"`
@@ -49,7 +49,7 @@ func writeConfig(t *testing.T, path string, names ...string) {
 	t.Helper()
 	servers := map[string]Server{}
 	for _, n := range names {
-		servers[n] = Server{Command: os.Args[0], Env: map[string]string{"TALOS_TEST_MCP": "1"}}
+		servers[n] = Server{Command: os.Args[0], Env: map[string]string{"STRATUM_TEST_MCP": "1"}}
 	}
 	b, _ := json.Marshal(map[string]any{"mcpServers": servers})
 	if err := os.WriteFile(path, b, 0o644); err != nil {
@@ -103,8 +103,8 @@ func TestHub(t *testing.T) {
 	if len(prompts) != 2 || prompts[0].Server != "echo" || prompts[0].Name != "greet" || len(prompts[0].Arguments) != 1 || prompts[0].Arguments[0] != "who" {
 		t.Fatalf("prompts %+v", prompts)
 	}
-	pr, err := h.GetPrompt(ctx, cwd, "echo", "greet", []string{"Talos"})
-	if err != nil || pr != "hello Talos" {
+	pr, err := h.GetPrompt(ctx, cwd, "echo", "greet", []string{"Stratum"})
+	if err != nil || pr != "hello Stratum" {
 		t.Fatalf("get prompt %q %v", pr, err)
 	}
 }

@@ -1,4 +1,4 @@
-// Command talosd is Talos without a window: sign in to model providers and
+// Command stratumd is Stratum without a window: sign in to model providers and
 // chat with a model from the terminal. Later milestones add --rpc, the
 // kernel served over stdio.
 package main
@@ -22,10 +22,10 @@ import (
 	"github.com/shqingda/stratum/llm/auth"
 )
 
-const usage = `usage: talosd <command> [flags]
+const usage = `usage: stratumd <command> [flags]
 
 commands:
-  login <provider>   sign in; talosd login -h lists the providers
+  login <provider>   sign in; stratumd login -h lists the providers
   logout <account>   forget an account's credential
   accounts           list signed-in accounts
   models [provider]  list models (* marks the default)
@@ -47,7 +47,7 @@ func main() {
 		err = login(ctx, store, args)
 	case "logout":
 		if len(args) != 1 {
-			err = errors.New("usage: talosd logout <account>")
+			err = errors.New("usage: stratumd logout <account>")
 		} else {
 			err = store.Delete(args[0])
 		}
@@ -65,7 +65,7 @@ func main() {
 		err = fmt.Errorf("unknown command %q\n\n%s", cmd, usage)
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "talosd:", err)
+		fmt.Fprintln(os.Stderr, "stratumd:", err)
 		os.Exit(1)
 	}
 }
@@ -79,7 +79,7 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 	base := fs.String("base-url", "", "the endpoint address (required for custom)")
 	api := fs.String("api", "chat", "custom: the protocol, chat, anthropic, responses, or gemini")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: talosd login <provider> [flags]\n\nproviders:")
+		fmt.Fprintln(os.Stderr, "usage: stratumd login <provider> [flags]\n\nproviders:")
 		for _, p := range auth.Providers {
 			fmt.Fprintf(os.Stderr, "  %-30s %s%s\n", p.ID, p.Name, loginsNote(p))
 		}
@@ -94,7 +94,7 @@ func login(ctx context.Context, store auth.Store, args []string) error {
 	fs.Parse(args[1:])
 	p, ok := auth.Lookup(id)
 	if !ok || strings.Contains(id, "/") {
-		return fmt.Errorf("unknown provider %q; run talosd login -h", id)
+		return fmt.Errorf("unknown provider %q; run stratumd login -h", id)
 	}
 	account := id
 	if *as != "" {
@@ -191,7 +191,7 @@ func accounts(store auth.Store) error {
 		return err
 	}
 	if len(names) == 0 {
-		fmt.Println("No accounts. Sign in with: talosd login <provider>")
+		fmt.Println("No accounts. Sign in with: stratumd login <provider>")
 	}
 	for _, n := range names {
 		c, err := store.Get(n)

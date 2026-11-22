@@ -14,7 +14,7 @@ import (
 )
 
 func TestRPCSearchAndHistory(t *testing.T) {
-	k := start(t, filepath.Join(t.TempDir(), "talos.db"), []llm.Turn{
+	k := start(t, filepath.Join(t.TempDir(), "stratum.db"), []llm.Turn{
 		{Text: "The orange nebula is ready."},
 		{Text: "藍色星球有深藍海洋。"},
 		{Text: "The violet comet is visible."},

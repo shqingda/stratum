@@ -13,7 +13,7 @@ import (
 func TestMemoryToolAndLoader(t *testing.T) {
 	root := t.TempDir()
 	global := t.TempDir()
-	t.Setenv("TALOS_MEMORY_DIR", global)
+	t.Setenv("STRATUM_MEMORY_DIR", global)
 
 	env := Env{Root: root}
 	out, err := call(t, env, Memory, map[string]any{"action": "read"})

@@ -12,7 +12,7 @@ import (
 
 func TestStore(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "talos.db")
+	path := filepath.Join(t.TempDir(), "stratum.db")
 	s, err := Open(path)
 	if err != nil {
 		t.Fatal(err)

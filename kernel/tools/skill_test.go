@@ -14,7 +14,7 @@ import (
 
 func TestSkillReadsInstalledSnapshot(t *testing.T) {
 	env := Env{Root: t.TempDir()}
-	dir := filepath.Join(t.TempDir(), ".talos", "skills", "review")
+	dir := filepath.Join(t.TempDir(), ".stratum", "skills", "review")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
 	}

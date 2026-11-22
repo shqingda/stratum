@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	"github.com/shqingda/stratum/kernel/perm"
+	"github.com/shqingda/stratum/kernel/skills"
 )
 
 // Memory reads and writes cross-session MEMORY.md files (project or global).
 var Memory = &Tool{
 	Name:        "memory",
-	Description: "Read or update persistent cross-session memory stored in MEMORY.md (project .talos/MEMORY.md or global ~/.talos/MEMORY.md). Use it to remember user preferences, project conventions, and decisions across sessions.",
+	Description: "Read or update persistent cross-session memory stored in MEMORY.md (project .stratum/MEMORY.md or global ~/.stratum/MEMORY.md). Use it to remember user preferences, project conventions, and decisions across sessions.",
 	Schema: schema(`{"type":"object","properties":{
 		"action":{"type":"string","enum":["read","append","replace"],"description":"Whether to read, append to, or replace memory."},
 		"scope":{"type":"string","enum":["project","global"],"description":"Memory scope (defaults to project)."},
@@ -106,15 +107,14 @@ var Memory = &Tool{
 func memoryTarget(env Env, scope string) (string, error) {
 	switch scope {
 	case "", "project":
-		return filepath.Join(env.Root, ".talos", "MEMORY.md"), nil
+		return filepath.Join(skills.ProjectDir(env.Root), "MEMORY.md"), nil
 	case "global":
-		dir := os.Getenv("TALOS_MEMORY_DIR")
+		dir := os.Getenv("STRATUM_MEMORY_DIR")
 		if dir == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", err
-			}
-			dir = filepath.Join(home, ".talos")
+			dir = skills.DefaultRoot()
+		}
+		if dir == "" {
+			return "", errors.New("memory: no home directory")
 		}
 		return filepath.Join(dir, "MEMORY.md"), nil
 	default:

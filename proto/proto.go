@@ -1,4 +1,4 @@
-// Package proto is Talos's protocol between a client (the app, a test)
+// Package proto is Stratum's protocol between a client (the app, a test)
 // and the kernel: JSON lines. A client sends commands; the kernel answers
 // each with a response and streams events.
 //
@@ -812,8 +812,9 @@ type MCPTrust struct {
 type MCPList struct {
 	Servers []MCPServer `json:"servers"`
 	Skills  []SkillInfo `json:"skills,omitempty"` // the folder's and the user's skills
-	// Commands are prompts kept as files: .talos/commands/*.md and
-	// .claude/commands/*.md in the folder, then ~/.talos/commands.
+	// Commands are prompts kept as files: .stratum/commands/*.md, .talos/commands/*.md
+	// and .claude/commands/*.md in the folder, then ~/.stratum/commands and
+	// ~/.talos/commands.
 	Commands []CommandInfo `json:"commands,omitempty"`
 	// Resources are what connected servers offer for @server:uri.
 	Resources []MCPResource `json:"resources,omitempty"`

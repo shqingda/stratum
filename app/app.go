@@ -1,4 +1,4 @@
-// Package app is Talos's window: a sidebar of sessions, the transcript of
+// Package app is Stratum's window: a sidebar of sessions, the transcript of
 // the one shown and the composer under it, drawn with mygo's native UI
 // over a client.Client.
 package app
@@ -366,7 +366,7 @@ func (a *App) View(c *ui.Context) {
 }
 
 // reduceMotion is whether to keep still what would move: as the user set
-// in Talos, or in macOS (Accessibility › Display › Reduce motion).
+// in Stratum, or in macOS (Accessibility › Display › Reduce motion).
 func (a *App) reduceMotion() bool {
 	return a.settings().ReduceMotion || a.sys.ReduceMotion
 }

@@ -89,4 +89,4 @@ done
 
 echo "demo folder: $root"
 cd "$project"
-TALOS_DEMO=$root exec go tool mygo dev
+STRATUM_DEMO=$root exec go tool mygo dev

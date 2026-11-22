@@ -1,5 +1,5 @@
 // Package rpc serves the protocol over a stream of JSON lines: stdio for
-// talosd --rpc, a pipe in tests. The app talks the same commands and
+// stratumd --rpc, a pipe in tests. The app talks the same commands and
 // frames over an in-process channel.
 package rpc
 

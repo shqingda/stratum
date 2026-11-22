@@ -9,7 +9,7 @@ import (
 )
 
 func TestPreviewManagerAndDemo(t *testing.T) {
-	t.Setenv("TALOS_DEMO", "1")
+	t.Setenv("STRATUM_DEMO", "1")
 	m := &Manager{}
 	snap, err := m.Open(context.Background(), "localhost:5173")
 	if err != nil {

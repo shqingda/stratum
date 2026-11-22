@@ -15,7 +15,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if os.Getenv("TALOS_FAKE_LSP") == "1" {
+	if os.Getenv("STRATUM_FAKE_LSP") == "1" {
 		runFakeLSP()
 		return
 	}
@@ -160,7 +160,7 @@ func runFakeLSP() {
 }
 
 func TestLSPPersistentLifecycle(t *testing.T) {
-	t.Setenv("TALOS_FAKE_LSP", "1")
+	t.Setenv("STRATUM_FAKE_LSP", "1")
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

@@ -23,7 +23,7 @@ func TestRPCChangesRevertRedo(t *testing.T) {
 	if err := os.WriteFile(edited, []byte(before), 0600); err != nil {
 		t.Fatal(err)
 	}
-	db := filepath.Join(t.TempDir(), "talos.db")
+	db := filepath.Join(t.TempDir(), "stratum.db")
 	k := start(t, db, []llm.Turn{
 		{Calls: []llm.ToolCall{
 			call("create", "write_file", map[string]string{"path": "created.txt", "content": content}),

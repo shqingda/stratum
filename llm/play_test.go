@@ -8,7 +8,7 @@ import (
 
 func TestPlaySummaryRequest(t *testing.T) {
 	req := Request{
-		System: "You are Talos.",
+		System: "You are Stratum.",
 		Messages: []Message{
 			Text(User, "讲讲这个仓库"),
 			Text(Assistant, "这是一个 Go 包。"),

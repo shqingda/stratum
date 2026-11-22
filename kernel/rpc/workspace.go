@@ -20,7 +20,7 @@ import (
 var ghRun = defaultGH
 
 func defaultGH(ctx context.Context, cwd string, args ...string) ([]byte, error) {
-	if os.Getenv("TALOS_DEMO") != "" {
+	if os.Getenv("STRATUM_DEMO") != "" {
 		return nil, errors.New("gh is disabled in demo mode")
 	}
 	cmd := exec.CommandContext(ctx, "gh", args...)

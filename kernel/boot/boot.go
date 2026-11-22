@@ -1,10 +1,11 @@
 // Package boot assembles a kernel: the store, the session manager and the
-// RPC server over them. talosd serves it on stdio; the desktop app serves
+// RPC server over them. stratumd serves it on stdio; the desktop app serves
 // it on in-process pipes, so both run the same kernel the same way.
 package boot
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -41,10 +42,25 @@ type Kernel struct {
 	autoCancel context.CancelFunc
 }
 
-// LoadCatalog reads the model catalog (models.dev), cached in Talos's data
+// LoadCatalog reads the model catalog (models.dev), cached in Stratum's data
 // directory for a day, so that model lists and defaults are current.
 func LoadCatalog(ctx context.Context) {
 	llm.LoadCatalog(ctx, filepath.Join(auth.Dir, "models", "models.dev.json"), 24*time.Hour, auth.CatalogNames())
+}
+
+// DBPath is the database in auth.Dir: stratum.db, or talos.db from before
+// the rename while there is no stratum.db.
+func DBPath() string {
+	db, legacy := filepath.Join(auth.Dir, "stratum.db"), filepath.Join(auth.Dir, "talos.db")
+	if !fileExists(db) && fileExists(legacy) {
+		return legacy
+	}
+	return db
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Start opens the store, recovers turns cut short and builds the server.
@@ -181,7 +197,7 @@ func (k *Kernel) Close() error {
 	return k.store.Close()
 }
 
-// login signs in to a provider the way talosd login does, without a
+// login signs in to a provider the way stratumd login does, without a
 // second account label or a custom endpoint.
 func login(ctx context.Context, q proto.Login, progress func(proto.LoginProgress), open func(string) error) (auth.Credential, error) {
 	p, ok := auth.Lookup(q.Provider)

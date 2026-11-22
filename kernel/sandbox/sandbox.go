@@ -43,6 +43,7 @@ const profile = `(version 1)
   (subpath (string-append (param "HOME") "/.ssh"))
   (subpath (string-append (param "HOME") "/.aws"))
   (subpath (string-append (param "HOME") "/.gnupg"))
+  (subpath (string-append (param "HOME") "/.stratum"))
   (subpath (string-append (param "HOME") "/.talos"))
   (subpath (string-append (param "HOME") "/.config/gh"))
   (subpath (string-append (param "HOME") "/.docker"))
@@ -73,7 +74,7 @@ func Command(ctx context.Context, root, line string) (cmd *exec.Cmd, tmp string,
 		return nil, "", err
 	}
 	root, _ = filepath.Abs(root)
-	tmp, err = os.MkdirTemp("", "talos-exec-")
+	tmp, err = os.MkdirTemp("", "stratum-exec-")
 	if err != nil {
 		return nil, "", err
 	}

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Play is the provider of the demo environment (TALOS_DEMO=1): it acts out
+// Play is the provider of the demo environment (STRATUM_DEMO=1): it acts out
 // a scene picked by words in the user's message, at a model's pace, with
 // real tool calls on the demo repository, so every state of the app can be
 // seen without an account. The scenes are written for scripts/demo.sh's

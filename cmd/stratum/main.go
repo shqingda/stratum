@@ -1,5 +1,5 @@
-// Command talos is the desktop app: the kernel and the window in one
-// process, talking over in-process pipes as talosd does over stdio.
+// Command stratum is the desktop app: the kernel and the window in one
+// process, talking over in-process pipes as stratumd does over stdio.
 package main
 
 import (
@@ -26,9 +26,6 @@ func main() {
 	defer cancel()
 	opts := boot.Options{Creds: &auth.Keychain{}}
 	demo := os.Getenv("STRATUM_DEMO")
-	if demo == "" {
-		demo = os.Getenv("TALOS_DEMO")
-	}
 	if demo != "" {
 		// The demo keeps out of ~/.stratum and the keychain: a fresh data
 		// directory and one scripted account.
@@ -42,13 +39,7 @@ func main() {
 	if err := os.MkdirAll(auth.Dir, 0o700); err != nil {
 		log.Fatal(err)
 	}
-	opts.DB = filepath.Join(auth.Dir, "stratum.db")
-	if _, err := os.Stat(opts.DB); err != nil {
-		legacyDB := filepath.Join(auth.Dir, "talos.db")
-		if _, lerr := os.Stat(legacyDB); lerr == nil {
-			opts.DB = legacyDB
-		}
-	}
+	opts.DB = boot.DBPath()
 	k, err := boot.Start(ctx, opts)
 	if err != nil {
 		log.Fatal(err)

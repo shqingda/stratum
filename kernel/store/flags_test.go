@@ -11,7 +11,7 @@ import (
 // session's flags leaves its time.
 func TestFlags(t *testing.T) {
 	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "talos.db")
+	path := filepath.Join(t.TempDir(), "stratum.db")
 	old, err := sql.Open("sqlite", "file:"+path)
 	if err != nil {
 		t.Fatal(err)

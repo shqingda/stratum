@@ -26,7 +26,8 @@ type OpenAI struct {
 
 const openaiName = "openai"
 
-// Originator names Talos to the ChatGPT backend.
+// Originator names the app to the ChatGPT backend. It keeps the app's name
+// from before the rename to Stratum.
 const Originator = "talos"
 
 func (p *OpenAI) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {

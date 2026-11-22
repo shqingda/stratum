@@ -43,10 +43,10 @@ func TestHooksEditorAndPluginSystem(t *testing.T) {
 
 	// Build a local plugin package with manifest, skill, and hook.
 	srcPlugin := filepath.Join(t.TempDir(), "my-pack")
-	_ = os.MkdirAll(filepath.Join(srcPlugin, ".talos-plugin"), 0o755)
+	_ = os.MkdirAll(filepath.Join(srcPlugin, ".stratum-plugin"), 0o755)
 	_ = os.MkdirAll(filepath.Join(srcPlugin, "skills", "lint"), 0o755)
 	_ = os.MkdirAll(filepath.Join(srcPlugin, "hooks"), 0o755)
-	_ = os.WriteFile(filepath.Join(srcPlugin, ".talos-plugin", "plugin.json"), []byte(`{"name":"my-pack","version":"1.0.0","description":"Demo pack","mcpServers":{"pack-srv":{"command":"echo","args":["hi"]}}}`), 0o644)
+	_ = os.WriteFile(filepath.Join(srcPlugin, ".stratum-plugin", "plugin.json"), []byte(`{"name":"my-pack","version":"1.0.0","description":"Demo pack","mcpServers":{"pack-srv":{"command":"echo","args":["hi"]}}}`), 0o644)
 	_ = os.WriteFile(filepath.Join(srcPlugin, "skills", "lint", "SKILL.md"), []byte("---\nname: lint\ndescription: lint skill\n---\nRun lint."), 0o644)
 	_ = os.WriteFile(filepath.Join(srcPlugin, "hooks", "hooks.json"), []byte(`{"hooks":{"PostToolUse":[{"matcher":"write_file","hooks":[{"type":"command","command":"echo plugin-post"}]}]}}`), 0o644)
 

@@ -264,7 +264,7 @@ func writeAtomic(root *os.Root, name string, data []byte) error {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	tmp := ".talos-" + rand.Text()
+	tmp := ".stratum-" + rand.Text()
 	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err

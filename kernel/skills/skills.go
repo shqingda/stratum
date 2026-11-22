@@ -48,20 +48,48 @@ type SkillDir struct {
 }
 
 type Loader struct {
-	GlobalDir      string // ~/.talos when empty
+	GlobalDir      string // DefaultRoot() when empty
 	Disabled       func(name string) bool
 	ExtraSkillDirs func(cwd string) []SkillDir
 	mu             sync.Mutex
 	cache          map[string]cached
 }
 
-// GlobalRoot returns the resolved global Talos directory (~/.talos by default).
+// DefaultRoot is the user's own Stratum directory: ~/.stratum, or ~/.talos
+// from before the rename while there is no ~/.stratum. auth.Dir follows
+// the same rule. It is empty when the home directory is unknown.
+func DefaultRoot() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return dotDir(home)
+}
+
+// ProjectDir is a folder's own Stratum directory: cwd/.stratum, or
+// cwd/.talos from before the rename while there is no .stratum. Files that
+// Stratum writes for the folder go there.
+func ProjectDir(cwd string) string { return dotDir(cwd) }
+
+func dotDir(base string) string {
+	dir, legacy := filepath.Join(base, ".stratum"), filepath.Join(base, ".talos")
+	if !exists(dir) && exists(legacy) {
+		return legacy
+	}
+	return dir
+}
+
+func exists(path string) bool {
+	_, err := os.Lstat(path)
+	return err == nil
+}
+
+// GlobalRoot returns the resolved global Stratum directory (DefaultRoot
+// unless GlobalDir is set).
 func (l *Loader) GlobalRoot() string {
 	global := l.GlobalDir
 	if global == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			global = filepath.Join(home, ".talos")
-		}
+		global = DefaultRoot()
 	}
 	if global != "" {
 		if abs, err := filepath.Abs(global); err == nil {
@@ -139,19 +167,21 @@ func (l *Loader) LoadAll(cwd string) *Catalog {
 	for _, dir := range projectDirs(cwd) {
 		agents(dir)
 	}
-	memory := func(path string) {
+	memory := func(path string, read func() ([]byte, bool)) {
 		if !seen[path] {
 			seen[path] = true
-			if data, ok := readRegular(path); ok {
+			if data, ok := read(); ok {
 				files = append(files, source{path: path, data: data, agents: true, memory: true})
 			}
 		}
 	}
 	if global != "" {
-		memory(filepath.Join(global, "MEMORY.md"))
+		path := filepath.Join(global, "MEMORY.md")
+		memory(path, func() ([]byte, bool) { return readRegular(path) })
 	}
-	memory(filepath.Join(cwd, ".stratum", "MEMORY.md"))
-	memory(filepath.Join(cwd, ".talos", "MEMORY.md"))
+	for _, dir := range []string{".stratum", ".talos"} {
+		memory(filepath.Join(cwd, dir, "MEMORY.md"), func() ([]byte, bool) { return readIn(cwd, dir, "MEMORY.md") })
+	}
 	if l.GlobalDir == "" {
 		if home, err := os.UserHomeDir(); err == nil {
 			files = append(files, skillFiles(false, home, ".agents", "skills")...)
@@ -318,6 +348,24 @@ func openChild(root *os.Root, name string) (*os.Root, error) {
 		return nil, errors.New("directory changed while loading skills")
 	}
 	return child, nil
+}
+
+// readIn reads base/dir/name. Neither dir nor name may be a link, so a
+// folder's own .stratum cannot lead the read outside the folder.
+func readIn(base, dir, name string) ([]byte, bool) {
+	path := filepath.Join(base, dir, name)
+	root, err := os.OpenRoot(base)
+	if err != nil {
+		return readOpened(path, nil, err)
+	}
+	defer root.Close()
+	child, err := openChild(root, dir)
+	if err != nil {
+		return readOpened(path, nil, err)
+	}
+	defer child.Close()
+	f, err := child.OpenFile(name, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	return readOpened(path, f, err)
 }
 
 func readRegular(path string) ([]byte, bool) {

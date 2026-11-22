@@ -48,7 +48,7 @@ var WebFetch = &Tool{
 		if err != nil {
 			return "", err
 		}
-		req.Header.Set("User-Agent", "Talos")
+		req.Header.Set("User-Agent", "Stratum")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return "", err
@@ -123,7 +123,7 @@ var WebSearch = &Tool{
 		if strings.TrimSpace(a.Query) == "" {
 			return "", fmt.Errorf("web_search: query is required")
 		}
-		if os.Getenv("TALOS_DEMO") != "" && searchURL == defaultSearchURL {
+		if os.Getenv("STRATUM_DEMO") != "" && searchURL == defaultSearchURL {
 			return fmt.Sprintf("1. Demo result for %s\n   https://example.com/demo\n   Demo environment search result.", a.Query), nil
 		}
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -133,7 +133,7 @@ var WebSearch = &Tool{
 		if err != nil {
 			return "", err
 		}
-		req.Header.Set("User-Agent", "Talos")
+		req.Header.Set("User-Agent", "Stratum")
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return "", err

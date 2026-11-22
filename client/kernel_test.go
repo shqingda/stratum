@@ -85,7 +85,7 @@ func (k *conn) do(cmds []proto.Command, err error) {
 func TestAgainstKernel(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("todo: ship\n"), 0o644)
-	st, err := store.Open(filepath.Join(t.TempDir(), "talos.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "stratum.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

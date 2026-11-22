@@ -16,7 +16,7 @@ func TestChangesAgainstKernel(t *testing.T) {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	notes := filepath.Join(dir, "notes.txt")
 	os.WriteFile(notes, []byte("todo: ship\n"), 0o644)
-	st, err := store.Open(filepath.Join(t.TempDir(), "talos.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "stratum.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestRevertedFiles(t *testing.T) {
 func TestNewSessionInAgainstKernel(t *testing.T) {
 	dir, _ := filepath.EvalSymlinks(t.TempDir())
 	other, _ := filepath.EvalSymlinks(t.TempDir())
-	st, err := store.Open(filepath.Join(t.TempDir(), "talos.db"))
+	st, err := store.Open(filepath.Join(t.TempDir(), "stratum.db"))
 	if err != nil {
 		t.Fatal(err)
 	}

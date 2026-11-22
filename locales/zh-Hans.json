@@ -343,7 +343,7 @@
   "mcpServers": "MCP 服务器",
   "mcpConfigError": "配置没读成：{error}",
   "mcpEmpty": "还没有 MCP 服务器。配置文件这样写：",
-  "mcpNote": "全局的服务器写在 ~/.talos/mcp.json，项目的写在项目的 .mcp.json。项目里的需要你启用后才会运行。",
+  "mcpNote": "全局的服务器写在 ~/.stratum/mcp.json，项目的写在项目的 .mcp.json。项目里的需要你启用后才会运行。",
   "mcpConnectFailed": "连接失败：{error}",
   "toolCount": "{count} 个工具",
   "@toolCount": {

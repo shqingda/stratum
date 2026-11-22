@@ -12,7 +12,7 @@ func TestLoadCustomMarkdownAndJSONAgents(t *testing.T) {
 	globalDir := t.TempDir()
 	cwd := t.TempDir()
 
-	if err := os.MkdirAll(filepath.Join(cwd, ".talos", "agents"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(cwd, ".stratum", "agents"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	md := `---
@@ -26,7 +26,7 @@ permissions:
 ---
 
 You are a documentation assistant.`
-	if err := os.WriteFile(filepath.Join(cwd, ".talos", "agents", "docs-writer.md"), []byte(md), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cwd, ".stratum", "agents", "docs-writer.md"), []byte(md), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

@@ -180,7 +180,7 @@ func TestFileToolsEscapeTOCTOU(t *testing.T) {
 func TestFileToolsSensitiveAccess(t *testing.T) {
 	env, _ := escapeDirs(t)
 	for _, tool := range []*Tool{ReadFile, WriteFile, EditFile} {
-		for _, path := range []string{".env", ".env.local", ".ssh/id_ed25519", ".git/config", ".aws/config", ".gnupg/config", ".talos/config", ".npmrc", ".netrc", "secrets.json", "credential.json", "api_token.txt", "password.txt", "server.pem", "server.key", "identity.p12"} {
+		for _, path := range []string{".env", ".env.local", ".ssh/id_ed25519", ".git/config", ".aws/config", ".gnupg/config", ".stratum/config", ".talos/config", ".npmrc", ".netrc", "secrets.json", "credential.json", "api_token.txt", "password.txt", "server.pem", "server.key", "identity.p12"} {
 			t.Run(tool.Name+"/"+path, func(t *testing.T) {
 				tool := Set{tool}.Get(tool.Name)
 				req, err := tool.Access(env, escapeArgs(t, path))

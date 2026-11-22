@@ -1,6 +1,6 @@
 # Recorded Responses fixtures
 
-19 fixtures recorded on 2026-11-12 using Talos's adapters and the user's subscription
+19 fixtures recorded on 2026-11-12 using Stratum's adapters (then named Talos) and the user's subscription
 accounts. Request headers were never recorded. `scrub.go` removes credentials,
 account/organization/user identifiers and email addresses before fixtures enter
 this directory. SSE framing and other response bytes are retained.
@@ -19,7 +19,7 @@ pre-fix Codex limit recording has one explicitly checked difference, described b
 | xAI / X subscription | grok-build-0.1 | text, tool, thinking-default, effort-unsupported |
 | xAI / X subscription | grok-4.7 | thinking-low, thinking |
 
-The models were selected from `talosd models`: gpt-6-luna is the least expensive
+The models were selected from `stratumd models`: gpt-6-luna is the least expensive
 Codex model, and grok-build-0.1 is the least expensive xAI model. OpenAI's cheaper
 gpt-5-nano was rejected for the ChatGPT subscription, so its successful samples
 use gpt-6-luna. The rejected request is retained as model-unavailable.
@@ -68,7 +68,7 @@ their tool calls and usage are asserted.
 
 ## Recording and checking
 
-`talosd chat --record <private-directory> ...` records numbered files while the
+`stratumd chat --record <private-directory> ...` records numbered files while the
 adapter reads the stream. Finish the request before scrubbing: the scrubber uses
 atomic file replacement, which must not run against a file still being recorded.
 The exact requests for the scenarios above are in `fixtureRequest` in the tests;

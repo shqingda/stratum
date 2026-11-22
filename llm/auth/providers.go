@@ -25,7 +25,7 @@ type Method struct {
 	Flow         Flow
 }
 
-// Methods are the sign-ins Talos knows, by id.
+// Methods are the sign-ins Stratum knows, by id.
 var Methods = map[string]*Method{
 	"chatgpt":    {ID: "chatgpt", Label: "Sign in with ChatGPT", Subscription: true, Flow: &ChatGPT{}},
 	"codex":      {ID: "codex", Label: "Sign in with ChatGPT (Codex)", Subscription: true, Flow: &Codex{}},
@@ -342,7 +342,7 @@ func quotaHTTPClient(account string) *http.Client {
 	return &http.Client{Transport: &quotaTransport{account: account}}
 }
 
-// CatalogNames maps models.dev's provider ids to Talos's, for
+// CatalogNames maps models.dev's provider ids to Stratum's, for
 // llm.LoadCatalog.
 func CatalogNames() map[string]string {
 	m := map[string]string{}

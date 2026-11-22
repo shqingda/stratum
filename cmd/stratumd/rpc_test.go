@@ -17,15 +17,15 @@ import (
 	"github.com/shqingda/stratum/proto"
 )
 
-var talosd string // the binary under test
+var stratumd string // the binary under test
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "talosd-test")
+	dir, err := os.MkdirTemp("", "stratumd-test")
 	if err != nil {
 		panic(err)
 	}
-	talosd = filepath.Join(dir, "talosd")
-	if out, err := exec.Command("go", "build", "-o", talosd, ".").CombinedOutput(); err != nil {
+	stratumd = filepath.Join(dir, "stratumd")
+	if out, err := exec.Command("go", "build", "-o", stratumd, ".").CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "build: %v\n%s", err, out)
 		os.Exit(1)
 	}
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// kernel is a running talosd rpc driven through its stdio.
+// kernel is a running stratumd rpc driven through its stdio.
 type kernel struct {
 	t      *testing.T
 	cmd    *exec.Cmd
@@ -52,7 +52,7 @@ func start(t *testing.T, db string, turns []llm.Turn) *kernel {
 	script := filepath.Join(t.TempDir(), "script.json")
 	b, _ := json.Marshal(turns)
 	os.WriteFile(script, b, 0o600)
-	cmd := exec.Command(talosd, "rpc", "-db", db, "-script", script)
+	cmd := exec.Command(stratumd, "rpc", "-db", db, "-script", script)
 	in, _ := cmd.StdinPipe()
 	out, _ := cmd.StdoutPipe()
 	cmd.Stderr = os.Stderr
@@ -162,10 +162,10 @@ func gitRepo(t *testing.T) string {
 // the tests (approved), answer.
 func TestRPCFixBug(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds and runs talosd")
+		t.Skip("builds and runs stratumd")
 	}
 	repo := gitRepo(t)
-	db := filepath.Join(t.TempDir(), "talos.db")
+	db := filepath.Join(t.TempDir(), "stratum.db")
 	k := start(t, db, []llm.Turn{
 		{Text: "Reading the code.", Calls: []llm.ToolCall{call("c1", "read_file", map[string]string{"path": "add.go"})}},
 		{Text: "Add subtracts; fixing.", Calls: []llm.ToolCall{call("c2", "edit_file", map[string]string{"path": "add.go", "old_text": "a - b", "new_text": "a + b"})}},
@@ -259,10 +259,10 @@ func TestRPCFixBug(t *testing.T) {
 // next kernel ends the turn and answers the call.
 func TestRPCRestart(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds and runs talosd")
+		t.Skip("builds and runs stratumd")
 	}
 	repo := gitRepo(t)
-	db := filepath.Join(t.TempDir(), "talos.db")
+	db := filepath.Join(t.TempDir(), "stratum.db")
 	k := start(t, db, []llm.Turn{
 		{Calls: []llm.ToolCall{call("w1", "write_file", map[string]string{"path": "x.txt", "content": "x"})}},
 	})
@@ -315,10 +315,10 @@ func TestRPCRestart(t *testing.T) {
 // TestRPCQueueAndCancel queues a prompt into a running turn, then stops it.
 func TestRPCQueueAndCancel(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds and runs talosd")
+		t.Skip("builds and runs stratumd")
 	}
 	repo := gitRepo(t)
-	k := start(t, filepath.Join(t.TempDir(), "talos.db"), []llm.Turn{
+	k := start(t, filepath.Join(t.TempDir(), "stratum.db"), []llm.Turn{
 		{Calls: []llm.ToolCall{call("s1", "shell", map[string]string{"command": "sleep 30"})}},
 	})
 	var s proto.Session

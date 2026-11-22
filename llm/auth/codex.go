@@ -26,7 +26,8 @@ type Interaction struct {
 }
 
 // Codex signs in with a ChatGPT account, whose plan pays for Codex models.
-// The flow is the one OpenAI's Codex CLI uses; Talos names itself in it.
+// The flow is the one OpenAI's Codex CLI uses; the app names itself in it
+// as "talos", its name from before the rename to Stratum.
 type Codex struct {
 	AuthBase string // https://auth.openai.com when empty
 	HTTP     *http.Client

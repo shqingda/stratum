@@ -27,12 +27,7 @@ type pluginManifest struct {
 }
 
 func (m *Manager) globalPluginsDir() string {
-	global := m.Skills.GlobalDir
-	if global == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			global = filepath.Join(home, ".talos")
-		}
-	}
+	global := m.Skills.GlobalRoot()
 	if global == "" {
 		return ""
 	}
@@ -75,6 +70,7 @@ func (m *Manager) setPluginDisabled(ctx context.Context, name string, disabled b
 
 func readPluginManifest(dir string) (pluginManifest, bool) {
 	candidates := []string{
+		filepath.Join(dir, ".stratum-plugin", "plugin.json"),
 		filepath.Join(dir, ".talos-plugin", "plugin.json"),
 		filepath.Join(dir, ".claude-plugin", "plugin.json"),
 		filepath.Join(dir, "plugin.json"),
@@ -107,7 +103,7 @@ func (m *Manager) scanPluginDirs(cwd string) []struct {
 		roots = append(roots, struct {
 			dir     string
 			project bool
-		}{filepath.Join(cwd, ".talos", "plugins"), true})
+		}{filepath.Join(skills.ProjectDir(cwd), "plugins"), true})
 	}
 	if gd := m.globalPluginsDir(); gd != "" {
 		roots = append(roots, struct {
@@ -275,7 +271,7 @@ func (m *Manager) InstallPlugin(ctx context.Context, p proto.PluginInstall) (pro
 		if strings.TrimSpace(p.Cwd) == "" {
 			return proto.PluginList{}, proto.Errorf("bad_request", "cwd is required for project plugin")
 		}
-		baseDir = filepath.Join(p.Cwd, ".talos", "plugins")
+		baseDir = filepath.Join(skills.ProjectDir(p.Cwd), "plugins")
 	} else {
 		baseDir = m.globalPluginsDir()
 	}

@@ -40,24 +40,24 @@ func TestSandbox(t *testing.T) {
 	denied := map[string]string{
 		"outside":   "echo x > " + filepath.Join(outside, "x"),
 		"symlink":   "echo x > escape/x",
-		"dotdot":    "echo x > ../talos-escape-test",
+		"dotdot":    "echo x > ../stratum-escape-test",
 		".git":      "echo x > .git/config",
 		"network":   "/usr/bin/curl -sS -m 5 https://example.com",
-		"home file": "echo x > ~/talos-sandbox-test",
+		"home file": "echo x > ~/stratum-sandbox-test",
 	}
 	for name, line := range denied {
 		if out, err := run(t, root, line); err == nil {
 			t.Errorf("%s: allowed: %s", name, out)
 		}
 	}
-	for _, p := range []string{filepath.Join(outside, "x"), filepath.Join(filepath.Dir(root), "talos-escape-test")} {
+	for _, p := range []string{filepath.Join(outside, "x"), filepath.Join(filepath.Dir(root), "stratum-escape-test")} {
 		if _, err := os.Stat(p); err == nil {
 			t.Errorf("%s was written", p)
 		}
 	}
 	home, _ := os.UserHomeDir()
-	if _, err := os.Stat(filepath.Join(home, "talos-sandbox-test")); err == nil {
-		os.Remove(filepath.Join(home, "talos-sandbox-test"))
+	if _, err := os.Stat(filepath.Join(home, "stratum-sandbox-test")); err == nil {
+		os.Remove(filepath.Join(home, "stratum-sandbox-test"))
 		t.Error("wrote the home directory")
 	}
 	if _, err := os.Stat(filepath.Join(home, ".ssh")); err == nil {

@@ -70,7 +70,7 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	var changed string
 	switch decision {
 	case perm.Deny:
-		return fail("Talos does not allow this call.")
+		return fail("Stratum does not allow this call.")
 	case perm.AskUser:
 		ans, err := r.ask(ctx, call, req)
 		if err != nil {

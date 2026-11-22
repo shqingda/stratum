@@ -401,7 +401,7 @@ func readFile(root *os.Root, name string) ([]byte, os.FileMode, error) {
 }
 
 func replace(root *os.Root, name string, before, after []byte, mode os.FileMode) error {
-	tmp := ".talos-restore-" + rand.Text()
+	tmp := ".stratum-restore-" + rand.Text()
 	if after != nil {
 		f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err != nil {

@@ -112,7 +112,7 @@ func TestInstructionsTruncateUTF8AndKeepSkillList(t *testing.T) {
 	base := tempDir(t)
 	cwd := filepath.Join(base, "workspace")
 	write(t, filepath.Join(cwd, "AGENTS.md"), strings.Repeat("中文说明", 10000))
-	write(t, filepath.Join(cwd, ".talos", "skills", "one", "SKILL.md"), skillText("one", "One line description.", "BODY_MUST_NOT_APPEAR"))
+	write(t, filepath.Join(cwd, ".stratum", "skills", "one", "SKILL.md"), skillText("one", "One line description.", "BODY_MUST_NOT_APPEAR"))
 	catalog := (&Loader{GlobalDir: filepath.Join(base, "global")}).Load(cwd)
 	at := strings.Index(catalog.Prompt, "\nAvailable skills")
 	if at < 0 || at > agentsLimit || !utf8.ValidString(catalog.Prompt) || !strings.Contains(catalog.Prompt[:at], "truncated at 32 KiB") {
@@ -187,13 +187,13 @@ func TestSkillsOverrideAndSnapshots(t *testing.T) {
 	global, cwd := filepath.Join(base, "global"), filepath.Join(base, "workspace")
 	write(t, filepath.Join(global, "skills", "directory-name", "SKILL.md"), skillText("shared", "Global summary.", "GLOBAL_BODY"))
 	write(t, filepath.Join(global, "skills", "z", "SKILL.md"), skillText("z-last", "Last summary.", "LAST_BODY"))
-	local := filepath.Join(cwd, ".talos", "skills", "other-directory", "SKILL.md")
+	local := filepath.Join(cwd, ".stratum", "skills", "other-directory", "SKILL.md")
 	write(t, local, skillText("shared", "Local summary.", "LOCAL_BODY"))
 	var logged bytes.Buffer
 	oldLog := log.Writer()
 	log.SetOutput(&logged)
 	defer log.SetOutput(oldLog)
-	write(t, filepath.Join(cwd, ".talos", "skills", "bad", "SKILL.md"), "---\nname: invalid\n---\nINVALID_BODY")
+	write(t, filepath.Join(cwd, ".stratum", "skills", "bad", "SKILL.md"), "---\nname: invalid\n---\nINVALID_BODY")
 	l := &Loader{GlobalDir: global}
 	first := l.Load(cwd)
 	if got := []string{first.Skills[0].Name, first.Skills[1].Name}; !reflect.DeepEqual(got, []string{"shared", "z-last"}) {
@@ -281,7 +281,7 @@ func TestCacheRefreshesContentAndMembership(t *testing.T) {
 	if fourth == third || strings.Contains(fourth.Prompt, "new root instructions") {
 		t.Fatal("deleted AGENTS file remained cached")
 	}
-	newSkill := filepath.Join(cwd, ".talos", "skills", "new", "SKILL.md")
+	newSkill := filepath.Join(cwd, ".stratum", "skills", "new", "SKILL.md")
 	write(t, newSkill, skillText("new", "New summary.", "body"))
 	fifth := l.Load(cwd)
 	if _, ok := fifth.Find("new"); !ok || fifth == fourth {
@@ -295,6 +295,8 @@ func TestCacheRefreshesContentAndMembership(t *testing.T) {
 	}
 }
 
+// The files sit in ~/.talos, from before the rename: with no ~/.stratum
+// the zero-value loader still reads them.
 func TestDefaultGlobalAndNoExecution(t *testing.T) {
 	home, cwd := tempDir(t), tempDir(t)
 	t.Setenv("HOME", home)
@@ -320,13 +322,13 @@ func TestSymlinkInstructionsAreIgnored(t *testing.T) {
 	cwd, global := filepath.Join(base, "workspace"), filepath.Join(base, "global")
 	outside := filepath.Join(base, "outside", "SKILL.md")
 	write(t, outside, skillText("secret", "Must not load.", "PRIVATE_BODY"))
-	if err := os.MkdirAll(filepath.Join(cwd, ".talos", "skills", "file-link"), 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(cwd, ".stratum", "skills", "file-link"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for link, target := range map[string]string{
-		filepath.Join(cwd, "AGENTS.md"):                                 outside,
-		filepath.Join(cwd, ".talos", "skills", "file-link", "SKILL.md"): outside,
-		filepath.Join(cwd, ".talos", "skills", "directory-link"):        filepath.Dir(outside),
+		filepath.Join(cwd, "AGENTS.md"):                                   outside,
+		filepath.Join(cwd, ".stratum", "skills", "file-link", "SKILL.md"): outside,
+		filepath.Join(cwd, ".stratum", "skills", "directory-link"):        filepath.Dir(outside),
 	} {
 		if err := os.Symlink(target, link); err != nil {
 			t.Fatal(err)
@@ -347,19 +349,66 @@ func TestSymlinkInstructionsAreIgnored(t *testing.T) {
 	}
 }
 
-func TestWorkspaceTalosSymlinkIsIgnored(t *testing.T) {
+func TestWorkspaceDirSymlinkIsIgnored(t *testing.T) {
+	for _, name := range []string{".stratum", ".talos"} {
+		base := tempDir(t)
+		cwd, outside := filepath.Join(base, "workspace"), filepath.Join(base, "outside")
+		if err := os.Mkdir(cwd, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		write(t, filepath.Join(outside, "skills", "linked", "SKILL.md"), skillText("linked", "External summary.", "PRIVATE_BODY"))
+		write(t, filepath.Join(outside, "MEMORY.md"), "PRIVATE_MEMORY")
+		if err := os.Symlink(outside, filepath.Join(cwd, name)); err != nil {
+			t.Fatal(err)
+		}
+		catalog := (&Loader{GlobalDir: filepath.Join(base, "global")}).Load(cwd)
+		if len(catalog.Skills) != 0 || catalog.Prompt != "" {
+			t.Fatalf("workspace %s symlink loaded external instructions", name)
+		}
+	}
+}
+
+func TestMemoryFilesAreRead(t *testing.T) {
 	base := tempDir(t)
-	cwd, outside := filepath.Join(base, "workspace"), filepath.Join(base, "outside")
-	if err := os.Mkdir(cwd, 0o700); err != nil {
-		t.Fatal(err)
+	cwd, global := filepath.Join(base, "workspace"), filepath.Join(base, "global")
+	write(t, filepath.Join(global, "MEMORY.md"), "GLOBAL_MEMORY")
+	write(t, filepath.Join(cwd, ".stratum", "MEMORY.md"), "PROJECT_MEMORY")
+	write(t, filepath.Join(cwd, ".talos", "MEMORY.md"), "LEGACY_MEMORY")
+	prompt := (&Loader{GlobalDir: global}).Load(cwd).Prompt
+	for _, want := range []string{"GLOBAL_MEMORY", "PROJECT_MEMORY", "LEGACY_MEMORY"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("prompt lacks %s:\n%s", want, prompt)
+		}
 	}
-	write(t, filepath.Join(outside, "skills", "linked", "SKILL.md"), skillText("linked", "External summary.", "PRIVATE_BODY"))
-	if err := os.Symlink(outside, filepath.Join(cwd, ".talos")); err != nil {
-		t.Fatal(err)
+}
+
+// The folder and the user keep their Stratum files in .stratum; a .talos
+// from before the rename serves only while there is no .stratum.
+func TestStratumDirFallsBackToTalos(t *testing.T) {
+	home := tempDir(t)
+	t.Setenv("HOME", home)
+	cwd := tempDir(t)
+	if got := ProjectDir(cwd); got != filepath.Join(cwd, ".stratum") {
+		t.Fatalf("empty folder: %s", got)
 	}
-	catalog := (&Loader{GlobalDir: filepath.Join(base, "global")}).Load(cwd)
-	if len(catalog.Skills) != 0 || catalog.Prompt != "" {
-		t.Fatal("workspace .talos symlink loaded external instructions")
+	if got := DefaultRoot(); got != filepath.Join(home, ".stratum") {
+		t.Fatalf("empty home: %s", got)
+	}
+	write(t, filepath.Join(cwd, ".talos", "hooks.json"), "{}")
+	write(t, filepath.Join(home, ".talos", "hooks.json"), "{}")
+	if got := ProjectDir(cwd); got != filepath.Join(cwd, ".talos") {
+		t.Fatalf("legacy folder: %s", got)
+	}
+	if got := (&Loader{}).GlobalRoot(); got != filepath.Join(home, ".talos") {
+		t.Fatalf("legacy home: %s", got)
+	}
+	write(t, filepath.Join(cwd, ".stratum", "hooks.json"), "{}")
+	write(t, filepath.Join(home, ".stratum", "hooks.json"), "{}")
+	if got := ProjectDir(cwd); got != filepath.Join(cwd, ".stratum") {
+		t.Fatalf("both in folder: %s", got)
+	}
+	if got := DefaultRoot(); got != filepath.Join(home, ".stratum") {
+		t.Fatalf("both in home: %s", got)
 	}
 }
 

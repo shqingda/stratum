@@ -278,7 +278,7 @@ func dial(ctx context.Context, cwd string, e Entry, logs *logRing) (*sdk.ClientS
 	default:
 		return nil, nil, nil, nil, errors.New("neither command nor url is set")
 	}
-	client := sdk.NewClient(&sdk.Implementation{Name: "talos", Version: "0.2.0"}, nil)
+	client := sdk.NewClient(&sdk.Implementation{Name: "stratum", Version: "0.2.0"}, nil)
 	session, err := client.Connect(ctx, t, nil)
 	if err != nil {
 		return nil, nil, nil, nil, err

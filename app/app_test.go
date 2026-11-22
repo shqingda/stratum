@@ -23,9 +23,9 @@ func working() *App {
 	c.Phase = client.Ready
 	c.Sessions = []proto.Session{
 		{ID: "1", Title: "修复 Add 测试", Cwd: "/Users/me/Projects/calc", Model: "gpt-6-luna", Effort: "medium", Mode: "ask", Updated: now.Add(-2 * time.Minute)},
-		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-40 * time.Minute)},
-		{ID: "3", Title: "client 按日志重建", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-3 * time.Hour)},
-		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-26 * time.Hour)},
+		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-40 * time.Minute)},
+		{ID: "3", Title: "client 按日志重建", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-3 * time.Hour)},
+		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-26 * time.Hour)},
 		{ID: "5", Title: "首页文案改写", Cwd: "/Users/me/Projects/site", Updated: now.Add(-80 * time.Hour)},
 	}
 	c.Current = &c.Sessions[0]
@@ -86,10 +86,10 @@ func TestViews(t *testing.T) {
 	}
 }
 
-// snapshot writes what the tester shows to $TALOS_SNAPSHOTS/name.png, to
+// snapshot writes what the tester shows to $STRATUM_SNAPSHOTS/name.png, to
 // look at.
 func snapshot(t *testing.T, tt *ui.Tester, name string) {
-	dir := os.Getenv("TALOS_SNAPSHOTS")
+	dir := os.Getenv("STRATUM_SNAPSHOTS")
 	if dir == "" {
 		return
 	}

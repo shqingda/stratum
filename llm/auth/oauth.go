@@ -72,7 +72,7 @@ func listenCallback(port int, path, state string) (*callback, error) {
 		}
 		if state != "" && q.Get("state") != state {
 			w.WriteHeader(http.StatusBadRequest)
-			page(w, "Sign-in failed", "The sign-in did not come from Talos. Start it again from the app.")
+			page(w, "Sign-in failed", "The sign-in did not come from Stratum. Start it again from the app.")
 			return
 		}
 		if q.Get("code") == "" {
@@ -80,7 +80,7 @@ func listenCallback(port int, path, state string) (*callback, error) {
 			page(w, "Sign-in failed", "No authorization code came back.")
 			return
 		}
-		page(w, "Signed in", "You can close this tab and return to Talos.")
+		page(w, "Signed in", "You can close this tab and return to Stratum.")
 		select {
 		case cb.got <- q:
 		default:

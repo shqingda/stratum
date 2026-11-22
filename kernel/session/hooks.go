@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shqingda/stratum/kernel/skills"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -53,17 +54,11 @@ func (m *Manager) hookFiles(cwd string) []string {
 	var files []string
 	if cwd != "" {
 		files = append(files,
-			filepath.Join(cwd, ".talos", "hooks.json"),
+			filepath.Join(skills.ProjectDir(cwd), "hooks.json"),
 			filepath.Join(cwd, ".claude", "settings.json"),
 		)
 	}
-	global := m.Skills.GlobalDir
-	if global == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			global = filepath.Join(home, ".talos")
-		}
-	}
-	if global != "" {
+	if global := m.Skills.GlobalRoot(); global != "" {
 		files = append(files, filepath.Join(global, "hooks.json"))
 	}
 	files = append(files, m.pluginHookFiles(cwd)...)
@@ -125,7 +120,7 @@ func runHookCommand(ctx context.Context, cwd, sessionID, command string, payload
 	in, _ := json.Marshal(payload)
 	cmd := exec.CommandContext(runCtx, "sh", "-c", command)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "TALOS_SESSION_ID="+sessionID, "CLAUDE_PROJECT_DIR="+cwd)
+	cmd.Env = append(os.Environ(), "STRATUM_SESSION_ID="+sessionID, "TALOS_SESSION_ID="+sessionID, "CLAUDE_PROJECT_DIR="+cwd)
 	cmd.Stdin = bytes.NewReader(in)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
@@ -227,12 +222,7 @@ func (m *Manager) runStopHooks(ctx context.Context, cwd, sessionID string) {
 // and enabled plugins, indicating which entries are directly editable.
 func (m *Manager) ListHooks(ctx context.Context, cwd string) (proto.HooksList, error) {
 	var out proto.HooksList
-	global := m.Skills.GlobalDir
-	if global == "" {
-		if home, err := os.UserHomeDir(); err == nil {
-			global = filepath.Join(home, ".talos")
-		}
-	}
+	global := m.Skills.GlobalRoot()
 	type sourceFile struct {
 		path     string
 		project  bool
@@ -241,7 +231,7 @@ func (m *Manager) ListHooks(ctx context.Context, cwd string) (proto.HooksList, e
 	var sources []sourceFile
 	if cwd != "" {
 		sources = append(sources,
-			sourceFile{filepath.Join(cwd, ".talos", "hooks.json"), true, true},
+			sourceFile{filepath.Join(skills.ProjectDir(cwd), "hooks.json"), true, true},
 			sourceFile{filepath.Join(cwd, ".claude", "settings.json"), true, false},
 		)
 	}
@@ -305,24 +295,19 @@ func (m *Manager) ListHooks(ctx context.Context, cwd string) (proto.HooksList, e
 	return out, nil
 }
 
-// SaveHooks writes the editable hooks for project (.talos/hooks.json) or
-// global (~/.talos/hooks.json) scope and returns the updated hook list.
+// SaveHooks writes the editable hooks for project (.stratum/hooks.json) or
+// global (~/.stratum/hooks.json) scope and returns the updated hook list.
 func (m *Manager) SaveHooks(ctx context.Context, s proto.HooksSave) (proto.HooksList, error) {
 	var target string
 	if s.Project {
 		if strings.TrimSpace(s.Cwd) == "" {
 			return proto.HooksList{}, proto.Errorf("bad_request", "cwd is required for project hooks")
 		}
-		target = filepath.Join(s.Cwd, ".talos", "hooks.json")
+		target = filepath.Join(skills.ProjectDir(s.Cwd), "hooks.json")
 	} else {
-		global := m.Skills.GlobalDir
+		global := m.Skills.GlobalRoot()
 		if global == "" {
-			if home, err := os.UserHomeDir(); err == nil {
-				global = filepath.Join(home, ".talos")
-			}
-		}
-		if global == "" {
-			return proto.HooksList{}, proto.Errorf("internal", "cannot determine global talos dir")
+			return proto.HooksList{}, proto.Errorf("internal", "cannot determine global stratum dir")
 		}
 		target = filepath.Join(global, "hooks.json")
 	}

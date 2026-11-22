@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/shqingda/stratum/kernel/skills"
 )
 
 type formatterRule struct {
@@ -35,9 +37,9 @@ func (m *Manager) runFormatter(ctx context.Context, cwd, rawArgs string) {
 		return
 	}
 
-	// Check .talos/formatters.json if present; otherwise use built-in gofmt for .go.
+	// Check .stratum/formatters.json if present; otherwise use built-in gofmt for .go.
 	var cmdArgs []string
-	cfgPath := filepath.Join(cwd, ".talos", "formatters.json")
+	cfgPath := filepath.Join(skills.ProjectDir(cwd), "formatters.json")
 	if b, err := os.ReadFile(cfgPath); err == nil {
 		var rules map[string]formatterRule
 		if json.Unmarshal(b, &rules) == nil {

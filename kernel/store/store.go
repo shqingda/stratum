@@ -1,6 +1,6 @@
 // Package store is the only package that touches SQLite. It keeps
 // sessions, an append-only log of each session's events, and receipts of
-// commands, in ~/.talos/talos.db.
+// commands, in ~/.stratum/stratum.db.
 package store
 
 import (

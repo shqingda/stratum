@@ -24,10 +24,10 @@ func screen1() *App {
 	c := a.C
 	c.Sessions = []proto.Session{
 		c.Sessions[0],
-		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-2 * time.Minute)},
-		{ID: "3", Title: "client 按日志重建", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-3 * time.Hour)},
-		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-26 * time.Hour)},
-		{ID: "6", Title: "models.dev 目录合并", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-27 * time.Hour)},
+		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-2 * time.Minute)},
+		{ID: "3", Title: "client 按日志重建", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-3 * time.Hour)},
+		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-26 * time.Hour)},
+		{ID: "6", Title: "models.dev 目录合并", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-27 * time.Hour)},
 		{ID: "7", Title: "给 Sub 补表驱动测试", Cwd: "/Users/me/Projects/calc", Updated: now.Add(-72 * time.Hour)},
 		{ID: "5", Title: "首页文案改写", Cwd: "/Users/me/Projects/site", Updated: now.Add(-73 * time.Hour)},
 		{ID: "8", Title: "把 OG 图换成新标志", Cwd: "/Users/me/Projects/site", Updated: now.Add(-30 * 24 * time.Hour)},
@@ -86,8 +86,8 @@ func screen2() *App {
 	c.Marks = map[string]string{"2": "run"}
 	c.Sessions = []proto.Session{
 		{ID: "1", Title: "修复 Add 测试", Cwd: "/Users/me/Projects/calc", Model: "gpt-6-luna", Effort: "medium", Mode: "ask", Updated: now.Add(-10 * time.Second)},
-		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-2 * time.Minute)},
-		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-26 * time.Hour)},
+		{ID: "2", Title: "沙箱 profile 收紧到只读 .git", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-2 * time.Minute)},
+		{ID: "4", Title: "协议定稿：回执与快照", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-26 * time.Hour)},
 		{ID: "7", Title: "给 Sub 补表驱动测试", Cwd: "/Users/me/Projects/calc", Updated: now.Add(-72 * time.Hour)},
 		{ID: "5", Title: "首页文案改写", Cwd: "/Users/me/Projects/site", Updated: now.Add(-73 * time.Hour)},
 	}
@@ -127,7 +127,7 @@ func screen3() *App {
 func screen4() *App {
 	a := screen2()
 	a.draft = ""
-	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "11", Title: "测试里跑 go test 要进沙箱", Cwd: "/Users/me/Projects/talos", Updated: now.Add(-8 * 24 * time.Hour)})
+	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "11", Title: "测试里跑 go test 要进沙箱", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-8 * 24 * time.Hour)})
 	a.pal, a.query = true, "沙箱"
 	return a
 }

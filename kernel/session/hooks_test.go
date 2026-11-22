@@ -28,18 +28,18 @@ func TestHooks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := os.MkdirAll(filepath.Join(s.Cwd, ".talos"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(s.Cwd, ".stratum"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(s.Cwd, ".claude"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Flat .talos/hooks.json: PreToolUse blocks blocked.txt, Stop writes stop.txt.
+	// Flat .stratum/hooks.json: PreToolUse blocks blocked.txt, Stop writes stop.txt.
 	hooksJSON := `{
   "PreToolUse": [{"matcher": "write_file|edit_file", "command": "input=$(cat); case \"$input\" in *blocked.txt*) echo 'no blocked.txt' >&2; exit 2;; esac"}],
-  "Stop": [{"command": "printf '%s' \"$TALOS_SESSION_ID\" > stop.txt"}]
+  "Stop": [{"command": "printf '%s %s' \"$STRATUM_SESSION_ID\" \"$TALOS_SESSION_ID\" > stop.txt"}]
 }`
-	if err := os.WriteFile(filepath.Join(s.Cwd, ".talos", "hooks.json"), []byte(hooksJSON), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(s.Cwd, ".stratum", "hooks.json"), []byte(hooksJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// Nested .claude/settings.json: PostToolUse marks post.txt and emits stdout note.
@@ -76,7 +76,7 @@ func TestHooks(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(s.Cwd, "allowed.txt")); err != nil || string(b) != "ok" {
 		t.Fatalf("allowed.txt = %q %v", b, err)
 	}
-	if b, err := os.ReadFile(filepath.Join(s.Cwd, "stop.txt")); err != nil || string(b) != s.ID {
+	if b, err := os.ReadFile(filepath.Join(s.Cwd, "stop.txt")); err != nil || string(b) != s.ID+" "+s.ID {
 		t.Fatalf("stop.txt = %q %v", b, err)
 	}
 	if b, err := os.ReadFile(filepath.Join(s.Cwd, "post.json")); err != nil || !strings.Contains(string(b), `"PostToolUse"`) {

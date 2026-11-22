@@ -8,8 +8,8 @@ import (
 )
 
 func TestInstalledSkillPermissionIsNarrow(t *testing.T) {
-	outside := workspace.Path{Abs: "/home/example/.talos/skills/review/SKILL.md"}
-	inside := workspace.Path{Abs: "/workspace/.talos/skills/review/SKILL.md", Inside: true, Rel: ".talos/skills/review/SKILL.md"}
+	outside := workspace.Path{Abs: "/home/example/.stratum/skills/review/SKILL.md"}
+	inside := workspace.Path{Abs: "/workspace/.stratum/skills/review/SKILL.md", Inside: true, Rel: ".stratum/skills/review/SKILL.md"}
 	for _, tt := range []struct {
 		name string
 		req  Request

@@ -27,7 +27,7 @@ func (m *Manager) worktreeDir() string {
 	if m.WorktreeDir != "" {
 		return m.WorktreeDir
 	}
-	return filepath.Join(os.TempDir(), "talos-worktrees")
+	return filepath.Join(os.TempDir(), "stratum-worktrees")
 }
 
 func (m *Manager) worktreeMetaOf(ctx context.Context, sessionID string) (worktreeMeta, bool) {
@@ -93,7 +93,7 @@ func (m *Manager) enableWorktree(ctx context.Context, x *store.Session) error {
 	}
 	wtBase := filepath.Join(m.worktreeDir(), idPrefix)
 	wtPath := filepath.Join(wtBase, filepath.Base(repoTop))
-	branch := "talos/" + brSuffix
+	branch := "stratum/" + brSuffix
 	if err := os.MkdirAll(wtBase, 0o755); err != nil {
 		return err
 	}

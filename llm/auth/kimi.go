@@ -31,7 +31,7 @@ const (
 func (k *Kimi) base() string {
 	host := strings.TrimSpace(k.AuthBase)
 	if host == "" {
-		host = strings.TrimSpace(os.Getenv("TALOS_KIMI_OAUTH_HOST"))
+		host = strings.TrimSpace(os.Getenv("STRATUM_KIMI_OAUTH_HOST"))
 	}
 	if host == "" {
 		host = strings.TrimSpace(os.Getenv("KIMI_CODE_OAUTH_HOST"))

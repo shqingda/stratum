@@ -130,7 +130,7 @@ func (m *Manager) mcpConfigPath(cwd string, project bool) (string, error) {
 	return m.MCP.UserFile, nil
 }
 
-// MCPSave adds or updates an MCP server in ~/.talos/mcp.json or <cwd>/.mcp.json.
+// MCPSave adds or updates an MCP server in ~/.stratum/mcp.json or <cwd>/.mcp.json.
 func (m *Manager) MCPSave(ctx context.Context, s proto.MCPSave) (proto.MCPList, error) {
 	if m.MCP == nil {
 		return proto.MCPList{}, proto.Errorf("bad_request", "MCP is off")
@@ -193,7 +193,7 @@ func (m *Manager) MCPSave(ctx context.Context, s proto.MCPSave) (proto.MCPList, 
 	return m.MCPList(ctx, proto.MCPQuery{Cwd: s.Cwd})
 }
 
-// MCPRemove deletes an MCP server from ~/.talos/mcp.json or <cwd>/.mcp.json.
+// MCPRemove deletes an MCP server from ~/.stratum/mcp.json or <cwd>/.mcp.json.
 func (m *Manager) MCPRemove(ctx context.Context, r proto.MCPRemove) (proto.MCPList, error) {
 	if m.MCP == nil {
 		return proto.MCPList{}, proto.Errorf("bad_request", "MCP is off")
@@ -263,7 +263,7 @@ func (m *Manager) skillsRoot(cwd string, project bool) (string, error) {
 		if strings.TrimSpace(cwd) == "" {
 			return "", proto.Errorf("bad_request", "cwd is required for a project skill")
 		}
-		return filepath.Join(cwd, ".talos", "skills"), nil
+		return filepath.Join(skills.ProjectDir(cwd), "skills"), nil
 	}
 	global := m.Skills.GlobalRoot()
 	if global == "" {
@@ -332,7 +332,7 @@ func formatSkillDoc(name, desc, body string) string {
 func installSkillsFromSource(ctx context.Context, src, targetRoot string) error {
 	srcDir := src
 	if info, err := os.Stat(src); err != nil || !info.IsDir() {
-		tmp, err := os.MkdirTemp("", "talos-skill-src-*")
+		tmp, err := os.MkdirTemp("", "stratum-skill-src-*")
 		if err != nil {
 			return err
 		}

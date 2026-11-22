@@ -246,7 +246,7 @@
   "mcpServers": "MCP servers",
   "mcpConfigError": "Couldn’t read the config: {error}",
   "mcpEmpty": "No MCP servers yet. Write the config file like this:",
-  "mcpNote": "Global servers go in ~/.talos/mcp.json, a project’s in its .mcp.json. A project’s servers run only after you enable them.",
+  "mcpNote": "Global servers go in ~/.stratum/mcp.json, a project’s in its .mcp.json. A project’s servers run only after you enable them.",
   "mcpConnectFailed": "Couldn’t connect: {error}",
   "toolCount": "{count, plural, one {# tool} other {# tools}}",
   "addMcpServer": "Add Server",

@@ -292,12 +292,12 @@ func DefaultModel(provider string) string {
 	return ""
 }
 
-// ModelsDevURL is the catalog of models Talos refreshes from.
+// ModelsDevURL is the catalog of models Stratum refreshes from.
 const ModelsDevURL = "https://models.dev/api.json"
 
 // LoadCatalog fills the catalog from models.dev, through a copy cached at
 // path that is refetched once older than maxAge. names maps models.dev's
-// provider ids to Talos's. When the fetch fails the cached copy serves, and
+// provider ids to Stratum's. When the fetch fails the cached copy serves, and
 // without one the built-in list stays.
 func LoadCatalog(ctx context.Context, path string, maxAge time.Duration, names map[string]string) error {
 	data, err := os.ReadFile(path)
@@ -395,13 +395,13 @@ func parseModelsDev(data []byte, names map[string]string) ([]Model, error) {
 		return nil, fmt.Errorf("models.dev: %w", err)
 	}
 	var out []Model
-	for dev, talos := range names {
+	for dev, ours := range names {
 		for _, m := range doc[dev].Models {
 			if !m.ToolCall || (m.Type != "" && m.Type != "chat") || !slices.Contains(m.Modalities.Output, "text") {
 				continue
 			}
 			out = append(out, Model{
-				ID: m.ID, Provider: talos, Name: m.Name,
+				ID: m.ID, Provider: ours, Name: m.Name,
 				Context: m.Limit.Context, MaxOutput: m.Limit.Output,
 				Reasoning: m.Reasoning, Images: slices.Contains(m.Modalities.Input, "image"),
 				Price:    Price{m.Cost.Input, m.Cost.Output, m.Cost.CacheRead, m.Cost.CacheWrite},
