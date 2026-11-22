@@ -455,6 +455,23 @@ func (a *App) accountRow(c *ui.Context, acc proto.Account) {
 	})
 }
 
+func formatQuotaReset(now time.Time, q *proto.AccountQuota) string {
+	if q == nil || q.ResetAt.IsZero() || !q.ResetAt.After(now) {
+		return ""
+	}
+	d := q.ResetAt.Sub(now)
+	var dur string
+	switch {
+	case d >= 24*time.Hour:
+		dur = q.ResetAt.Local().Format("01-02")
+	case d >= time.Hour:
+		dur = locales.AgoHours(int(d / time.Hour))
+	default:
+		dur = locales.AgoMinutes(max(1, int(d/time.Minute)))
+	}
+	return locales.QuotaResetsIn(dur)
+}
+
 func formatQuota(now time.Time, p *Palette, q *proto.AccountQuota) (string, ui.Color) {
 	if q == nil || q.RemainingPct < 0 {
 		return "", p.Mute
@@ -466,18 +483,8 @@ func formatQuota(now time.Time, p *Palette, q *proto.AccountQuota) (string, ui.C
 		col = p.Live
 	}
 	text := locales.QuotaRemaining(q.RemainingPct)
-	if !q.ResetAt.IsZero() && q.ResetAt.After(now) {
-		d := q.ResetAt.Sub(now)
-		var dur string
-		switch {
-		case d >= 24*time.Hour:
-			dur = q.ResetAt.Local().Format("01-02")
-		case d >= time.Hour:
-			dur = locales.AgoHours(int(d / time.Hour))
-		default:
-			dur = locales.AgoMinutes(max(1, int(d/time.Minute)))
-		}
-		text += " · " + locales.QuotaResetsIn(dur)
+	if reset := formatQuotaReset(now, q); reset != "" {
+		text += " · " + reset
 	}
 	return text, col
 }

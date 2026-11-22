@@ -441,71 +441,120 @@ func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
 func (a *App) footer(c *ui.Context) {
 	p := a.p
 	cur := a.account()
-	name := locales.NotSignedIn()
 	var q *proto.AccountQuota
 	if cur != nil {
-		name, q = accountName(*cur), cur.Quota
+		q = cur.Quota
 	}
 	left, _ := formatQuota(a.now(), p, q)
 	ui.Column(c).Shrink(0).Padding(6, 8, 10, 8).Children(func() {
-		label := name
+		label := "Stratum"
 		if left != "" {
-			label = locales.AccountQuota(name, left)
+			label = locales.AccountQuota("Stratum", left)
 		}
-		b := ui.ButtonBase(c.Key("profile-card")).Row().Height(32).Padding(0, 8, 0, 10).Gap(6).Radius(8).
+		b := ui.ButtonBase(c.Key("profile-card")).Row().Height(32).Padding(0, 8, 0, 10).Gap(8).Radius(8).
 			AlignItems(ui.Center).Label(label)
 		if left != "" {
 			b.Tooltip(left)
 		}
 		press(b)
 		focusRing(b, p)
-		if b.Hovered() {
+		switch {
+		case a.accountMenuOpen:
+			b.Background(p.Sel)
+		case b.Hovered():
 			b.Background(p.Hover)
 		}
+		if b.Clicked() {
+			a.accountMenuOpen = !a.accountMenuOpen
+		}
 		b.Children(func() {
-			ui.Text(c, name).FontSize(14).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			ui.Row(c).Gap(7).AlignItems(ui.Center).Grow(1).MinWidth(0).Children(func() {
+				brandMark(c, 16, p.Fg)
+				ui.Text(c, "Stratum").FontSize(13.5).FontWeight(600).LetterSpacing(-.18).TextColor(p.Fg).SingleLine().Ellipsis("…")
+			})
 			if q != nil && q.RemainingPct >= 0 {
 				low := q.RemainingPct < 15
 				ink := p.Mute
 				if low {
 					ink = p.Minus
 				}
-				ui.Image(c, ring(p, q.RemainingPct, low)).Size(14, 14).Shrink(0)
-				ui.Text(c, fmt.Sprintf("%d%%", q.RemainingPct)).FontSize(12.5).TextColor(ink).FontFeatures("tnum").SingleLine()
+				ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
+					ui.Image(c, ring(p, q.RemainingPct, low)).Size(14, 14).Shrink(0)
+					ui.Text(c, fmt.Sprintf("%d%%", q.RemainingPct)).FontSize(12.5).TextColor(ink).FontFeatures("tnum").SingleLine()
+				})
 			}
-			sym(c, "selector", 11, p.Mute)
-		}).PopoverMenuButton(func(m *ui.Menu) { a.accountMenu(m, cur) }, a.menuOptions(nil))
+			chevron := "chevron-up"
+			if a.accountMenuOpen {
+				chevron = "chevron-down"
+			}
+			sym(c, chevron, 11, p.Mute)
+		})
+		a.footerPopover(c, b, q)
 	})
 }
 
-// accountMenu is what the footer opens: the accounts, the current one
-// checked, each with what is left of its quota, then adding one, then
-// Settings, as an account menu of macOS does.
-func (a *App) accountMenu(m *ui.Menu, cur *proto.Account) {
-	for _, acc := range a.C.Accounts {
-		id, name := acc.ID, accountName(acc)
-		item := m.Item(name).ID("account:" + id).Checked(cur != nil && cur.ID == id)
-		if sub, _ := formatQuota(a.now(), a.p, acc.Quota); sub != "" {
-			item.Subtitle(sub)
-		} else if acc.Email != "" {
-			item.Subtitle(acc.Email)
-		}
-		if a.C.Current != nil && item.Chosen() {
-			a.do(a.C.Update(proto.SessionUpdate{Account: &id}))
-			a.flash("sparkles", name)
-		}
-	}
-	if len(a.C.Accounts) > 0 {
-		m.Separator()
-	}
-	if m.Item(locales.AddAccount()).ID("account-add").Chosen() {
-		a.openSettings()
-		a.settingsPage, a.addingAccount = "accounts", true
-	}
-	m.Separator()
-	if m.Item(locales.SettingsMenu()).ID("account-settings").Shortcut(ui.Cmd, ui.KeyComma).Chosen() {
-		a.openSettings()
-	}
+// footerPopover shows the Scheme B brand/quota summary card and Settings action
+// above the sidebar footer button.
+func (a *App) footerPopover(c *ui.Context, anchor ui.Element, q *proto.AccountQuota) {
+	p := a.p
+	pop := ui.Popover(c, anchor, &a.accountMenuOpen, func() {
+		ui.Column(c).FillWidth().Gap(4).Children(func() {
+			ui.Column(c).FillWidth().Background(p.Chip).Radius(8).Padding(10, 12).Gap(7).Children(func() {
+				ui.Row(c).AlignItems(ui.Center).Children(func() {
+					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+						brandMark(c, 14, p.Fg)
+						ui.Text(c, "Stratum").FontSize(13).FontWeight(600).LetterSpacing(-.15).TextColor(p.Fg).SingleLine()
+					})
+					ui.Spacer(c)
+					if q != nil && q.RemainingPct >= 0 {
+						pct := max(0, min(100, q.RemainingPct))
+						pctCol := p.Fg
+						if pct < 15 {
+							pctCol = p.Minus
+						}
+						ui.Text(c, locales.QuotaRemaining(pct)).FontSize(12).FontWeight(600).TextColor(pctCol).FontFeatures("tnum").SingleLine()
+					}
+				})
+				if q != nil && q.RemainingPct >= 0 {
+					pct := max(0, min(100, q.RemainingPct))
+					barCol := p.Fg
+					if pct < 15 {
+						barCol = p.Minus
+					} else if pct < 35 {
+						barCol = p.Live
+					}
+					ui.Box(c).FillWidth().Height(4).Radius(2).Background(p.Edge2).Clip().Children(func() {
+						ui.Box(c).WidthPercent(float32(pct)).Height(4).Radius(2).Background(barCol)
+					})
+				}
+				if reset := formatQuotaReset(a.now(), q); reset != "" {
+					ui.Text(c, reset).FontSize(11.5).TextColor(p.Mute).SingleLine()
+				}
+			})
+
+			row := ui.ButtonBase(c.Key("footer-settings")).Row().FillWidth().Height(32).Padding(0, 10).Gap(8).Radius(7).
+				AlignItems(ui.Center).Label(locales.SettingsMenu())
+			press(row)
+			focusRing(row, p)
+			if row.Hovered() {
+				row.Background(p.Hover)
+			}
+			row.Children(func() {
+				sym(c, "settings", 15, p.Fg2)
+				ui.Text(c, locales.SettingsMenu()).FontSize(13.5).TextColor(p.Fg).SingleLine()
+				ui.Spacer(c)
+				ui.Text(c, "⌘,").FontSize(12).TextColor(p.Mute).SingleLine()
+			})
+			if row.Clicked() {
+				a.accountMenuOpen = false
+				a.openSettings()
+			}
+		})
+	})
+	pop.AttachTo(anchor, ui.AnchorTopStart, ui.AnchorBottomStart).Margin(0, 0, 6, 0).
+		Width(248).Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(6).NoShadow()
+	lift(pop, p)
+	rim(pop, p)
 }
 
 // accountName is what an account is called: its name, or its ID.

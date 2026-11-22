@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -115,17 +116,19 @@ func TestNextWaitingAndSeen(t *testing.T) {
 	}
 }
 
-// TestSidebarFooter: the footer is one row, the account and the ring of
-// its quota, with no gear; it opens the accounts, each with its quota, then
-// adding one and Settings.
+// TestSidebarFooter: the footer is one row with the Stratum brand lockup and
+// the quota ring, with no gear; it opens the Scheme B popover with the quota
+// card and Settings.
 func TestSidebarFooter(t *testing.T) {
 	a := task8App()
 	a.C.Accounts = []proto.Account{
-		{ID: "chatgpt", Name: "ChatGPT Pro", Quota: &proto.AccountQuota{RemainingPct: 74}},
-		{ID: "work", Name: "Work", Quota: &proto.AccountQuota{RemainingPct: 9}},
+		{ID: "chatgpt", Name: "ChatGPT Pro", Quota: &proto.AccountQuota{RemainingPct: 74, ResetAt: a.now().Add(3*time.Hour + 20*time.Minute)}},
 	}
 	tt := task8Tester(a, false)
 	snapshot(t, tt, "sidebar-footer")
+	if _, ok := tt.Find("Stratum"); !ok {
+		t.Errorf("the footer does not show Stratum: %q", tt.Texts())
+	}
 	if _, ok := tt.Find("74%"); !ok {
 		t.Errorf("the footer does not show the quota as a percent: %q", tt.Texts())
 	}
@@ -135,23 +138,29 @@ func TestSidebarFooter(t *testing.T) {
 	if _, ok := tt.Find("设置"); ok {
 		t.Error("the footer still has a gear for Settings")
 	}
-	if err := tt.Click("ChatGPT Pro，还剩 74%"); err != nil {
+	left, _ := formatQuota(a.now(), a.p, a.C.Accounts[0].Quota)
+	if err := tt.Click(locales.AccountQuota("Stratum", left)); err != nil {
 		t.Fatal(err)
 	}
-	menu := strings.Join(tt.Menu(), "|")
-	for _, want := range []string{"ChatGPT Pro", "Work", "添加账号…", "设置…"} {
-		if !strings.Contains(menu, want) {
-			t.Errorf("no %q in the menu %q", want, menu)
+	tt.Frame()
+	snapshot(t, tt, "sidebar-footer-menu")
+	texts := strings.Join(tt.Texts(), "|")
+	for _, want := range []string{"还剩 74%", "设置…"} {
+		if !strings.Contains(texts, want) {
+			t.Errorf("no %q in the popover %q", want, texts)
 		}
 	}
-	if strings.Contains(menu, "技能与 MCP") {
-		t.Errorf("the menu repeats the sidebar's own rows: %q", menu)
+	if strings.Contains(texts, "添加账号…") {
+		t.Errorf("unexpected 添加账号… in the popover %q", texts)
 	}
-	if err := tt.ChooseMenuItem("设置…"); err != nil {
+	if err := tt.Click(locales.SettingsMenu()); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
 	if !a.settingsOpen {
 		t.Error("设置… does not open Settings")
+	}
+	if a.accountMenuOpen {
+		t.Error("popover stayed open after choosing Settings")
 	}
 }

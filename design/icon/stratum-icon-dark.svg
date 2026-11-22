@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="180" y1="100" x2="844" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2C3240"/>
+      <stop offset="48%" stop-color="#171A22"/>
+      <stop offset="100%" stop-color="#101218"/>
+    </linearGradient>
+    <radialGradient id="topSheen" cx="320" cy="210" r="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="55%" stop-color="#8AA4D6" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rimGrad" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.24"/>
+      <stop offset="35%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="barTop" x1="274" y1="302" x2="638" y2="392" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E4E9F2"/>
+    </linearGradient>
+    <linearGradient id="barMid" x1="344" y1="467" x2="750" y2="557" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#DCE6F8"/>
+    </linearGradient>
+    <linearGradient id="barBot" x1="274" y1="632" x2="582" y2="722" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8ECF4"/>
+      <stop offset="100%" stop-color="#C6CFE0"/>
+    </linearGradient>
+    <filter id="iconShadow" x="60" y="76" width="904" height="904" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <filter id="barShadow" x="230" y="270" width="564" height="500" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#05070B" flood-opacity="0.42"/>
+    </filter>
+    <clipPath id="squircleClip">
+      <path d="M 286.00 100.00 L 738.00 100.00 C 840.73 100.00 924.00 183.27 924.00 286.00 L 924.00 738.00 C 924.00 840.73 840.73 924.00 738.00 924.00 L 286.00 924.00 C 183.27 924.00 100.00 840.73 100.00 738.00 L 100.00 286.00 C 100.00 183.27 183.27 100.00 286.00 100.00 Z"/>
+    </clipPath>
+  </defs>
+
+  <g filter="url(#iconShadow)">
+    <path d="M 286.00 100.00 L 738.00 100.00 C 840.73 100.00 924.00 183.27 924.00 286.00 L 924.00 738.00 C 924.00 840.73 840.73 924.00 738.00 924.00 L 286.00 924.00 C 183.27 924.00 100.00 840.73 100.00 738.00 L 100.00 286.00 C 100.00 183.27 183.27 100.00 286.00 100.00 Z" fill="url(#bgGrad)"/>
+  </g>
+
+  <g clip-path="url(#squircleClip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#topSheen)"/>
+    <g filter="url(#barShadow)">
+      <rect x="274" y="302" width="364" height="90" rx="45" fill="url(#barTop)"/>
+      <rect x="344" y="467" width="406" height="90" rx="45" fill="url(#barMid)"/>
+      <rect x="274" y="632" width="308" height="90" rx="45" fill="url(#barBot)"/>
+    </g>
+  </g>
+
+  <path d="M 286.00 100.00 L 738.00 100.00 C 840.73 100.00 924.00 183.27 924.00 286.00 L 924.00 738.00 C 924.00 840.73 840.73 924.00 738.00 924.00 L 286.00 924.00 C 183.27 924.00 100.00 840.73 100.00 738.00 L 100.00 286.00 C 100.00 183.27 183.27 100.00 286.00 100.00 Z" stroke="url(#rimGrad)" stroke-width="2.5"/>
+</svg>
