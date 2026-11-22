@@ -234,8 +234,8 @@ body {
 }
 
 .icon-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   color: var(--fg2);
@@ -244,7 +244,11 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  padding: 0;
+}
+
+.icon-btn svg {
+  display: block;
 }
 
 .icon-btn:hover {

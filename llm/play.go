@@ -100,6 +100,10 @@ const longAnswer = "## calc 是怎么组织的\n\n" +
 	"还有什么想了解的？"
 
 func (p Play) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
+	if isSummaryRequest(req) {
+		t := Turn{Text: "演示模式摘要：已梳理项目结构、测试状态与后续修改计划，可继续基于当前上下文推进。"}
+		return (&Script{Turns: []Turn{t}, Delay: p.Delay}).Stream(ctx, req)
+	}
 	steps, n, answer := sub, 0, ""
 	if !strings.Contains(req.System, "You are a sub-agent") {
 		steps = pick(req.Messages).steps
@@ -157,4 +161,23 @@ func spoke(m Message) bool {
 		}
 	}
 	return true
+}
+
+func isSummaryRequest(req Request) bool {
+	if len(req.Tools) > 0 {
+		return false
+	}
+	hasSummaryWord := func(s string) bool {
+		l := strings.ToLower(s)
+		return strings.Contains(l, "summary") || strings.Contains(l, "summarize")
+	}
+	if hasSummaryWord(req.System) {
+		return true
+	}
+	for i := len(req.Messages) - 1; i >= 0; i-- {
+		if req.Messages[i].Role == User {
+			return hasSummaryWord(req.Messages[i].PlainText())
+		}
+	}
+	return false
 }

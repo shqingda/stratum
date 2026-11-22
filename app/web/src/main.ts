@@ -163,11 +163,13 @@ function applyMode(m: ModePayload) {
 }
 
 function renderDiffs(payload: DiffsPayload) {
-  currentDiffStyle = payload.diffStyle === "split" ? "split" : "unified";
-  const nextKeys = new Set<string>();
-  const frag = document.createDocumentFragment();
+  try {
+    currentDiffStyle = payload.diffStyle === "split" ? "split" : "unified";
+    const files = payload.files ?? [];
+    const nextKeys = new Set<string>();
+    const frag = document.createDocumentFragment();
 
-  for (const f of payload.files) {
+    for (const f of files) {
     nextKeys.add(f.key);
     const cached = diffCache.get(f.key);
     if (cached && cached.hash === f.hash && cached.style === currentDiffStyle) {
@@ -242,45 +244,54 @@ function renderDiffs(payload: DiffsPayload) {
     frag.appendChild(card);
   }
 
-  for (const [key, entry] of diffCache.entries()) {
-    if (!nextKeys.has(key)) {
-      entry.instance.cleanUp();
-      diffCache.delete(key);
+    for (const [key, entry] of diffCache.entries()) {
+      if (!nextKeys.has(key)) {
+        entry.instance.cleanUp();
+        diffCache.delete(key);
+      }
     }
-  }
 
-  diffsView.replaceChildren(frag);
+    diffsView.replaceChildren(frag);
+  } catch (err) {
+    diffsView.textContent = `Diff render error: ${String(err)}`;
+  }
 }
 
 function renderTree(payload: TreePayload) {
   treePane.classList.toggle("hidden", payload.hidden);
-  if (!treeInstance || currentTreeCwd !== payload.cwd) {
-    if (treeInstance) {
-      treeInstance.cleanUp();
-      treeInstance = null;
-    }
-    currentTreeCwd = payload.cwd;
-    treeHost.replaceChildren();
-    treeInstance = new FileTree({
-      paths: payload.paths,
-      gitStatus: payload.gitStatus,
-      initialExpansion: "closed",
-      search: true,
-      flattenEmptyDirectories: true,
-      onSelectionChange: (selected) => {
-        if (selected.length > 0) {
-          const path = selected[0];
-          if (!path.endsWith("/")) {
-            void mygo.call("Pierre.SelectFile", path);
+  const paths = payload.paths ?? [];
+  const gitStatus = payload.gitStatus ?? [];
+  try {
+    if (!treeInstance || currentTreeCwd !== payload.cwd) {
+      if (treeInstance) {
+        treeInstance.cleanUp();
+        treeInstance = null;
+      }
+      currentTreeCwd = payload.cwd;
+      treeHost.replaceChildren();
+      treeInstance = new FileTree({
+        paths,
+        gitStatus,
+        initialExpansion: "open",
+        search: true,
+        flattenEmptyDirectories: true,
+        onSelectionChange: (selected) => {
+          if (selected.length > 0) {
+            const path = selected[0];
+            if (!path.endsWith("/")) {
+              void mygo.call("Pierre.SelectFile", path);
+            }
           }
-        }
-      },
-    });
-    treeInstance.render({ containerWrapper: treeHost });
-    return;
+        },
+      });
+      treeInstance.render({ containerWrapper: treeHost });
+      return;
+    }
+    treeInstance.resetPaths(paths);
+    treeInstance.setGitStatus(gitStatus);
+  } catch (err) {
+    treeHost.textContent = `Tree error: ${String(err)}`;
   }
-  treeInstance.resetPaths(payload.paths);
-  treeInstance.setGitStatus(payload.gitStatus);
 }
 
 function renderTabs(tabs: string[], active: string) {
@@ -315,7 +326,7 @@ function renderTabs(tabs: string[], active: string) {
 function renderFile(payload: FilePayload) {
   currentFilePath = payload.path;
   currentMdRaw = payload.raw;
-  renderTabs(payload.tabs, payload.path);
+  renderTabs(payload.tabs ?? [], payload.path);
 
   if (!payload.path) {
     filesCrumb.classList.add("hidden");

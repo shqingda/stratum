@@ -71,20 +71,23 @@ func main() {
 			Vibrancy:       mygo.VibrancyGlass,
 			Content:        ui.View(a.View),
 		})
+		a.SetCloseWindow(win.Close)
+		a.Serve(ctx, k.Server, win.Update)
+		a.UseDesktop()
 		if mygo.WebViewAvailable() {
 			wv, err := win.NewWebView(mygo.WebViewOptions{
-				URL:         "/index.html",
-				Transparent: true,
+				URL:             "/",
+				BackgroundColor: "light-dark(#fbfbfc, #0d0d0e)",
 			})
 			if err != nil {
 				log.Printf("pierre webview unavailable, using native fallback: %v", err)
 			} else {
+				wv.Page().OnDidFailLoad(func(le *mygo.LoadError) {
+					log.Printf("pierre webview load failed: %v", le)
+				})
 				a.SetWebView(wv)
 			}
 		}
-		a.SetCloseWindow(win.Close)
-		a.Serve(ctx, k.Server, win.Update)
-		a.UseDesktop()
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)

@@ -336,7 +336,7 @@ func (a *App) buildPierreDiffs(turns []proto.ChangeTurn) pierreDiffsPayload {
 	if a.C.Current != nil {
 		cwd = a.C.Current.Cwd
 	}
-	var files []pierreDiffFile
+	files := []pierreDiffFile{}
 	for _, t := range turns {
 		for _, f := range t.Files {
 			key := client.DiffKey(t.TurnSeq, f.Path)
@@ -377,7 +377,7 @@ func (a *App) buildPierreDiffs(turns []proto.ChangeTurn) pierreDiffsPayload {
 
 func (a *App) buildPierreTree(cwd string) pierreTreePayload {
 	const maxPierreTreeFiles = 10000
-	var paths []string
+	paths := []string{}
 	_ = filepath.WalkDir(cwd, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -409,7 +409,7 @@ func (a *App) buildPierreTree(cwd string) pierreTreePayload {
 	})
 	sort.Strings(paths)
 
-	var gitStatus []pierreGitStatusEntry
+	gitStatus := []pierreGitStatusEntry{}
 	for _, f := range a.C.Workspace.Files {
 		rel := f.Path
 		if r, err := filepath.Rel(cwd, f.Path); err == nil && !strings.HasPrefix(r, "..") {

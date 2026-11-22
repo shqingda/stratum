@@ -94,10 +94,12 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			ui.Spacer(c)
 		}
 		tip := locales.MaximizePane()
+		icon := "maximize-2"
 		if a.rv.maximized {
 			tip = locales.RestorePane()
+			icon = "minimize-2"
 		}
-		if a.iconButton(c, "rv-maximize", "arrows-exchange", tip).Clicked() {
+		if a.iconButton(c, "rv-maximize", icon, tip).Clicked() {
 			a.rv.maximized = !a.rv.maximized
 		}
 	})
