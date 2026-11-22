@@ -23,13 +23,17 @@ const (
 // sym draws an SF Symbol.
 // iconButton is a 28-point square button holding a symbol.
 func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
+	return a.iconButtonSized(c, key, symbol, tip, 17)
+}
+
+func (a *App) iconButtonSized(c *ui.Context, key, symbol, tip string, size float32) ui.Element {
 	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
 	press(b)
 	focusRing(b, a.p)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
 	}
-	b.Children(func() { sym(c, symbol, 17, a.p.Fg2) })
+	b.Children(func() { sym(c, symbol, size, a.p.Fg2) })
 	return b
 }
 

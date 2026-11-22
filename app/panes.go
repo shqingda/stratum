@@ -36,7 +36,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 		leftPad = 12*a.sideOpen + shut*(1-a.sideOpen)
 	}
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12, 0, leftPad).Gap(6).AlignItems(ui.Center).DragWindow().Children(func() {
-		track := ui.Row(c.Key("rv-tabs")).Height(30).Padding(2, 2, 2, 2).Radius(9).Background(p.Chip).AlignItems(ui.Center)
+		track := ui.Row(c.Key("rv-tabs")).Height(28).Padding(2, 2, 2, 2).Radius(8).Background(p.Chip).AlignItems(ui.Center)
 		if a.rv.maximized {
 			track.Width(400).Shrink(1)
 		} else {
@@ -61,7 +61,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			for _, t := range tabs {
 				on := a.rv.tab == t.id
 				b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).
-					Height(26).Padding(0, 8).Gap(4).Radius(7).AlignItems(ui.Center).Label(t.label).ZIndex(1)
+					Height(24).Padding(0, 8).Gap(4).Radius(6).AlignItems(ui.Center).Label(t.label).ZIndex(1)
 				press(b)
 				focusRing(b, p)
 				fg, weight := p.Fg2, 500
@@ -101,6 +101,10 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 		}
 		if a.iconButton(c, "rv-maximize", icon, tip).Clicked() {
 			a.rv.maximized = !a.rv.maximized
+		}
+		if a.iconButtonSized(c, "rv-close", "x", locales.HideChanges(), 14.5).Clicked() {
+			a.rv.open = false
+			a.rv.maximized = false
 		}
 	})
 }

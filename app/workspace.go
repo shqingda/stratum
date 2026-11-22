@@ -162,7 +162,7 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	if br := a.C.Workspace.Branch; br != "" {
 		label += " · " + br
 	}
-	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(26).Padding(0, 9).Gap(5).Radius(8).AlignItems(ui.Center).
+	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(28).Padding(0, 9).Gap(5).Radius(8).AlignItems(ui.Center).
 		Background(p.Chip).Shrink(1).MinWidth(0).Label(label)
 	rim(b, p)
 	press(b)
