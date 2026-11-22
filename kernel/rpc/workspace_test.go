@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/shqingda/stratum/kernel/session"
 	"github.com/shqingda/stratum/proto"
@@ -188,5 +189,44 @@ func TestPushCreatePRAndChecks(t *testing.T) {
 	w, err = checkout(ctx, proto.Checkout{Cwd: dir, Branch: "main"})
 	if err != nil || w.Branch != "main" {
 		t.Fatalf("checkout main: %+v %v", w, err)
+	}
+}
+
+// TestWorkspaceOverview reads what an empty session shows of its folder:
+// the latest commits and the files changed last, in git and out of it.
+func TestWorkspaceOverview(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	if w, _ := workspace(ctx, dir); len(w.Recent) != 0 || len(w.Commits) != 0 {
+		t.Fatalf("an empty folder: %+v", w)
+	}
+	old := time.Now().Add(-time.Hour)
+	for name, at := range map[string]time.Time{"old.go": old, "new.go": time.Now(), ".env": time.Now().Add(time.Minute)} {
+		p := filepath.Join(dir, name)
+		os.WriteFile(p, []byte("x\n"), 0o644)
+		os.Chtimes(p, at, at)
+	}
+	w, _ := workspace(ctx, dir)
+	if len(w.Recent) != 2 || w.Recent[0].Path != filepath.Join(dir, "new.go") || w.Recent[1].Path != filepath.Join(dir, "old.go") {
+		t.Fatalf("outside git, newest first and no secrets: %+v", w.Recent)
+	}
+	t.Setenv("GIT_AUTHOR_NAME", "t")
+	t.Setenv("GIT_AUTHOR_EMAIL", "t@t")
+	t.Setenv("GIT_COMMITTER_NAME", "t")
+	t.Setenv("GIT_COMMITTER_EMAIL", "t@t")
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"commit", "-q", "--allow-empty", "-m", "first"}, {"commit", "-q", "--allow-empty", "-m", "second"}, {"commit", "-q", "--allow-empty", "-m", "third: with colon"}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v", out, err)
+		}
+	}
+	w, _ = workspace(ctx, dir)
+	if len(w.Commits) != 2 || w.Commits[0].Subject != "third: with colon" || w.Commits[1].Subject != "second" || w.Commits[0].Hash == "" || w.Commits[0].Time == 0 {
+		t.Fatalf("commits: %+v", w.Commits)
+	}
+	if len(w.Recent) != 2 || w.Recent[0].Path != filepath.Join(dir, "new.go") {
+		t.Fatalf("in git: %+v", w.Recent)
 	}
 }

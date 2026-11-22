@@ -34,6 +34,7 @@ func effortLabel(effort string) string {
 // It floats over the foot of the transcript, which fades out above it.
 func (a *App) composer(c *ui.Context) {
 	dock := ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Justify(ui.Center).Padding(0, 28, 10, 28)
+	a.placeHero(c, dock)
 	dock.Children(func() {
 		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() { a.dock(c) })
 	})

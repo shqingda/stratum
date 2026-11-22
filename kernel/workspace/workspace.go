@@ -91,7 +91,7 @@ func located(root, abs string) Path {
 	return Path{Abs: abs, Inside: inside, Rel: rel}
 }
 
-var sensitive = regexp.MustCompile(`(?i)(?:^|/)(?:\.git|\.ssh|\.aws|\.gnupg|\.talos|\.env(?:\.[^/]*)?|\.npmrc|\.netrc|[^/]*(?:secret|credential|token|password)[^/]*|[^/]*\.(?:pem|key|p12))(?:/|$)`)
+var sensitive = regexp.MustCompile(`(?i)(?:^|/)(?:\.git|\.ssh|\.aws|\.gnupg|\.stratum|\.talos|\.env(?:\.[^/]*)?|\.npmrc|\.netrc|[^/]*(?:secret|credential|token|password)[^/]*|[^/]*\.(?:pem|key|p12))(?:/|$)`)
 
 // Sensitive tells whether a path likely holds secrets or version control
 // state, which no mode short of full access touches without asking.

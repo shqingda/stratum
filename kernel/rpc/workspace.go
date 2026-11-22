@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	ws "github.com/shqingda/stratum/kernel/workspace"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -47,6 +48,7 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	var w proto.Workspace
+	w.Recent = recentFiles(ctx, cwd, overviewLen)
 	if b, err := git(ctx, cwd, "symbolic-ref", "--short", "-q", "HEAD"); err == nil {
 		w.Branch = b
 	} else if b, err := git(ctx, cwd, "rev-parse", "--short", "HEAD"); err == nil {
@@ -92,8 +94,49 @@ func workspace(ctx context.Context, cwd string) (proto.Workspace, error) {
 	}
 	w.Branches = localBranches(ctx, cwd)
 	w.Ahead = aheadCount(ctx, cwd, w.Branch, w.Base)
+	w.Commits = recentCommits(ctx, cwd, overviewLen)
 	w.PR = readPR(ctx, cwd, w.Branch, w.Base)
 	return w, nil
+}
+
+// overviewLen is how many commits and files an empty session lists.
+const overviewLen = 2
+
+// recentCommits are HEAD's latest n commits, newest first; none on a
+// branch not yet born.
+func recentCommits(ctx context.Context, cwd string, n int) []proto.CommitSummary {
+	out := gitOut(ctx, cwd, "log", "-n", strconv.Itoa(n), "--format=%h%x00%ct%x00%s%x00", "HEAD")
+	f := strings.Split(out, "\x00")
+	var commits []proto.CommitSummary
+	for i := 0; i+2 < len(f); i += 3 {
+		hash := strings.TrimSpace(f[i])
+		if hash == "" {
+			continue
+		}
+		t, _ := strconv.ParseInt(f[i+1], 10, 64)
+		commits = append(commits, proto.CommitSummary{Hash: hash, Time: t, Subject: f[i+2]})
+	}
+	return commits
+}
+
+// recentFiles are the n files of the folder last changed on disk, newest
+// first: of those git tracks or would track in a repository, else of
+// those outside folders of dependencies and builds. Secrets are left out.
+func recentFiles(ctx context.Context, cwd string, n int) []proto.RecentFile {
+	var recent []proto.RecentFile
+	for _, rel := range ws.Files(ctx, cwd) {
+		if ws.Sensitive(rel) {
+			continue
+		}
+		abs := filepath.Join(cwd, rel)
+		info, err := os.Stat(abs)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		recent = append(recent, proto.RecentFile{Path: abs, Time: info.ModTime().Unix()})
+	}
+	sort.SliceStable(recent, func(i, j int) bool { return recent[i].Time > recent[j].Time })
+	return recent[:min(len(recent), n)]
 }
 
 func localBranches(ctx context.Context, cwd string) []string {

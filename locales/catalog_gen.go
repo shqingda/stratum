@@ -4170,14 +4170,34 @@ func (msgs Messages) StartNewSession() string {
 	return Catalog.Format(msgs.locale, "startNewSession", nil)
 }
 
-// HelloTitle says "在 {folder} 里做点什么"
+// UncommittedCount says "{count} 处未提交"
 // in the language the app shows.
-func HelloTitle(folder string) string { return In(i18n.Locale()).HelloTitle(folder) }
+func UncommittedCount(count int) string { return In(i18n.Locale()).UncommittedCount(count) }
 
-// HelloTitle says "在 {folder} 里做点什么"
+// UncommittedCount says "{count} 处未提交"
 // in the language of msgs.
-func (msgs Messages) HelloTitle(folder string) string {
-	return Catalog.Format(msgs.locale, "helloTitle", map[string]any{"folder": folder})
+func (msgs Messages) UncommittedCount(count int) string {
+	return Catalog.Format(msgs.locale, "uncommittedCount", map[string]any{"count": count})
+}
+
+// RecentCommits says "最近提交"
+// in the language the app shows.
+func RecentCommits() string { return In(i18n.Locale()).RecentCommits() }
+
+// RecentCommits says "最近提交"
+// in the language of msgs.
+func (msgs Messages) RecentCommits() string {
+	return Catalog.Format(msgs.locale, "recentCommits", nil)
+}
+
+// RecentFiles says "最近文件"
+// in the language the app shows.
+func RecentFiles() string { return In(i18n.Locale()).RecentFiles() }
+
+// RecentFiles says "最近文件"
+// in the language of msgs.
+func (msgs Messages) RecentFiles() string {
+	return Catalog.Format(msgs.locale, "recentFiles", nil)
 }
 
 // HelloLead says "Stratum 会先读代码，改动前按你的权限模式询问。"

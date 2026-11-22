@@ -557,14 +557,6 @@ func (a *App) empty(c *ui.Context) {
 	})
 }
 
-// hello is a new session: what it works on in the center while the composer
-// stays anchored at the bottom.
-func (a *App) hello(c *ui.Context) {
-	p := a.p
-	cur := a.C.Current
-	ui.Text(c, locales.HelloTitle(filepath.Base(cur.Cwd))).FontSize(26).FontWeight(600).LetterSpacing(-.42).TextColor(p.Fg).Margin(0, 0, 72, 0)
-}
-
 func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	p := a.p
 	switch e.Role {

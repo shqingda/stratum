@@ -84,6 +84,7 @@ type App struct {
 	sideW               float32 // user-adjusted sidebar width, 0 means default
 	rvW                 float32 // user-adjusted review width, 0 means default
 	dockH               float32 // how tall the composer floating on the transcript was
+	hero                hero    // where the composer of an empty session stands
 	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
 	sys                 ui.Preferences        // the desktop's accessibility preferences, read each frame
 	focusSession        string                // the session the composer last took the focus for
@@ -448,6 +449,7 @@ func (a *App) main(c *ui.Context) {
 		return
 	}
 	sheet := ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
+	a.hero.sheet = sheet.LayoutBounds()
 	if a.sideOpen > 0.001 && !c.Vibrancy() {
 		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
 	}

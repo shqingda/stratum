@@ -74,7 +74,7 @@ func TestViews(t *testing.T) {
 			tt.Frame()
 			wants := []string{"新会话", "calc"}
 			if strings.HasPrefix(tc.name, "empty") {
-				wants = []string{"新会话", "在 calc 里做点什么"} // an empty session shows no status line
+				wants = []string{"新会话"} // an empty session shows no status line
 			}
 			for _, want := range wants {
 				if !tt.HasText(want) {

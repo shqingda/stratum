@@ -576,7 +576,16 @@
   "expandSteps": "展开步骤",
   "thinkingNow": "思考中",
   "startNewSession": "新建一个会话开始",
-  "helloTitle": "在 {folder} 里做点什么",
+  "uncommittedCount": "{count} 处未提交",
+  "@uncommittedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recentCommits": "最近提交",
+  "recentFiles": "最近文件",
   "helloLead": "Stratum 会先读代码，改动前按你的权限模式询问。",
   "recent": "继续",
   "needsApproval": "需要你允许",

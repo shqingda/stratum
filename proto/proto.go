@@ -577,6 +577,24 @@ type Workspace struct {
 	Branches  []string     `json:"branches,omitempty"`
 	Ahead     int          `json:"ahead,omitempty"`
 	PR        *PullRequest `json:"pr,omitempty"`
+	// Commits are HEAD's latest commits, newest first, and Recent the
+	// files of the folder changed on disk last, newest first: what an
+	// empty session shows of the folder. Recent is read outside git too.
+	Commits []CommitSummary `json:"commits,omitempty"`
+	Recent  []RecentFile    `json:"recent,omitempty"`
+}
+
+// CommitSummary is one commit as a list of them shows it.
+type CommitSummary struct {
+	Hash    string `json:"hash"`
+	Subject string `json:"subject"`
+	Time    int64  `json:"time"` // Unix seconds, the committer's
+}
+
+// RecentFile is a file and when it was last changed on disk.
+type RecentFile struct {
+	Path string `json:"path"` // absolute
+	Time int64  `json:"time"` // Unix seconds
 }
 
 type Commit struct {
