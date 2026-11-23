@@ -29,6 +29,14 @@ type QuotaStore struct {
 	mu       sync.RWMutex
 	entries  map[string]proto.AccountQuota
 	inFlight map[string]bool
+
+	// Background work: refreshes and the one cache-file writer. idle is
+	// closed when busy drops to zero; see Flush.
+	bmu     sync.Mutex
+	busy    int
+	idle    chan struct{}
+	dirty   bool // entries changed since the writer took its last snapshot
+	writing bool
 }
 
 // Quotas is the process-wide quota cache.
@@ -85,13 +93,66 @@ func (q *QuotaStore) Set(accountID string, val proto.AccountQuota) {
 	}
 	q.mu.Lock()
 	q.entries[accountID] = val
-	snap := make(map[string]proto.AccountQuota, len(q.entries))
-	for k, v := range q.entries {
-		snap[k] = v
-	}
 	q.mu.Unlock()
 
-	go q.persist(snap)
+	q.bmu.Lock()
+	defer q.bmu.Unlock()
+	q.dirty = true
+	if !q.writing {
+		q.writing = true
+		q.beginLocked()
+		go q.writeLoop()
+	}
+}
+
+// Flush waits until no refresh is running and the cache file holds every
+// quota set before the call.
+func (q *QuotaStore) Flush() {
+	q.bmu.Lock()
+	idle := q.idle
+	q.bmu.Unlock()
+	if idle != nil {
+		<-idle
+	}
+}
+
+func (q *QuotaStore) beginLocked() {
+	if q.busy == 0 {
+		q.idle = make(chan struct{})
+	}
+	q.busy++
+}
+
+func (q *QuotaStore) endLocked() {
+	q.busy--
+	if q.busy == 0 {
+		close(q.idle)
+		q.idle = nil
+	}
+}
+
+// writeLoop is the store's only cache-file writer, so writes never share the
+// .tmp file and an older snapshot never lands after a newer one.
+func (q *QuotaStore) writeLoop() {
+	for {
+		q.bmu.Lock()
+		if !q.dirty {
+			q.writing = false
+			q.endLocked()
+			q.bmu.Unlock()
+			return
+		}
+		q.dirty = false
+		q.bmu.Unlock()
+
+		q.mu.RLock()
+		snap := make(map[string]proto.AccountQuota, len(q.entries))
+		for k, v := range q.entries {
+			snap[k] = v
+		}
+		q.mu.RUnlock()
+		q.persist(snap)
+	}
 }
 
 func (q *QuotaStore) persist(snap map[string]proto.AccountQuota) {
@@ -132,6 +193,9 @@ func (q *QuotaStore) RefreshAsync(ctx context.Context, accounts []string, creds 
 	if len(due) == 0 || creds == nil {
 		return
 	}
+	q.bmu.Lock()
+	q.beginLocked()
+	q.bmu.Unlock()
 	go func() {
 		var wg sync.WaitGroup
 		var changed bool
@@ -162,6 +226,11 @@ func (q *QuotaStore) RefreshAsync(ctx context.Context, accounts []string, creds 
 			}(id)
 		}
 		wg.Wait()
+		// Done before onUpdate, so a callback that calls Flush does not wait
+		// for itself.
+		q.bmu.Lock()
+		q.endLocked()
+		q.bmu.Unlock()
 		if changed && onUpdate != nil {
 			onUpdate()
 		}

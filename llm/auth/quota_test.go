@@ -30,10 +30,17 @@ func TestQuotaHeadersAndFastCache(t *testing.T) {
 	}
 
 	qs := &QuotaStore{Path: filepath.Join(t.TempDir(), "quota.json")}
+	t.Cleanup(qs.Flush) // before TempDir's RemoveAll: cleanups run last-in first-out
 	qs.Set("codex", q)
 	got, ok := qs.Get("codex")
 	if !ok || got.RemainingPct != 74 {
 		t.Fatalf("cache miss: %+v %v", got, ok)
+	}
+
+	qs.Flush()
+	reloaded := &QuotaStore{Path: qs.Path}
+	if got, ok := reloaded.Get("codex"); !ok || got.RemainingPct != 74 {
+		t.Fatalf("cache file after Flush: %+v %v", got, ok)
 	}
 }
 
@@ -56,6 +63,7 @@ func TestQuotaAsyncRefresh(t *testing.T) {
 		Path:    filepath.Join(t.TempDir(), "quota.json"),
 		ChatGPT: srv.URL,
 	}
+	t.Cleanup(qs.Flush)
 	mem := &MemoryStore{items: map[string]Credential{
 		"codex": {Kind: KindOAuth, Method: "codex", Access: "tok", AccountID: "acc-1"},
 	}}
