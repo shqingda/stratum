@@ -137,6 +137,10 @@ type App struct {
 	mcpUI                                     mcpState
 	previewUI                                 previewState
 	term                                      termState
+	web                                       *browser // the panel's browser, made when first used
+	webErr, webAddr                           string
+	webInput                                  ui.Handle
+	newBrowser                                func() (*browser, error)
 	// newTerm starts a shell for the Terminal tab, shellJob tells what runs
 	// in one (foregroundJob); tests put fakes in their place.
 	newTerm         func(terminal.Options) (*terminal.Terminal, error)

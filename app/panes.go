@@ -19,7 +19,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 	tabs := []struct{ id, label string }{
 		{"", locales.Changes()},
 		{"files", locales.Files()},
-		{"preview", locales.Preview()},
+		{"preview", locales.Browser()},
 		{"term", locales.Terminal()},
 		{"plan", locales.Plan()},
 	}

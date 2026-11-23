@@ -70,6 +70,7 @@ var sfNames = map[string]string{
 	"bulb":                         "lightbulb",
 	"check":                        "checkmark",
 	"chevron-down":                 "chevron.down",
+	"chevron-left":                 "chevron.left",
 	"chevron-right":                "chevron.right",
 	"chevron-up":                   "chevron.up",
 	"clock-play":                   "play.circle",

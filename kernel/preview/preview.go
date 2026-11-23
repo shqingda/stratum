@@ -67,6 +67,7 @@ type Manager struct {
 
 	mu     sync.RWMutex
 	latest Snapshot
+	driver Driver // the app's browser, which Open uses when set
 }
 
 // Default is the process-wide preview manager.
@@ -108,6 +109,8 @@ func (m *Manager) Open(ctx context.Context, rawURL string) (Snapshot, error) {
 	var snap Snapshot
 	if m.Runner != nil {
 		snap, err = m.Runner(ctx, target)
+	} else if d := m.currentDriver(); d != nil {
+		snap, err = m.openWithDriver(ctx, d, target)
 	} else if os.Getenv("STRATUM_DEMO") != "" {
 		snap = demoSnapshot(target)
 	} else if bin := m.browserBin(); bin != "" {

@@ -16,6 +16,7 @@ import (
 	"github.com/shqingda/stratum/app/web"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/kernel/boot"
+	"github.com/shqingda/stratum/kernel/preview"
 	"github.com/shqingda/stratum/llm/auth"
 	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
@@ -87,6 +88,21 @@ func main() {
 				})
 				a.SetWebView(wv)
 			}
+			// The panel's browser: someone else's pages, which call no Go,
+			// and which the agent's browser tool drives as the user sees.
+			a.UseBrowser(func() (*mygo.WebView, error) {
+				return win.NewWebView(mygo.WebViewOptions{
+					BackgroundColor: "light-dark(#ffffff, #0d0d0e)",
+					Page: mygo.PageOptions{
+						Untrusted:       true,
+						PreloadScript:   preview.LogScript,
+						SwipeNavigation: true,
+						PinchZoom:       true,
+						UserAgentSuffix: "Version/26.0 Safari/605.1.15",
+					},
+				})
+			})
+			preview.Default.SetDriver(a.BrowserDriver())
 		}
 	})
 	if err := mygo.App.Run(); err != nil {

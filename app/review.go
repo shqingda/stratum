@@ -368,7 +368,7 @@ func (a *App) reviewPanel(c *ui.Context) {
 			a.filesPane(c)
 			return
 		case "preview":
-			a.previewPane(c)
+			a.browserPane(c)
 			return
 		}
 		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {

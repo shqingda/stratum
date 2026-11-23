@@ -87,7 +87,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	if cur != nil {
 		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: a.showTerminal})
 		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
-		add(opt{icon: "world", label: locales.Preview(), run: func() { a.rv.open, a.rv.tab = true, "preview" }})
+		add(opt{icon: "world", label: locales.Browser(), run: a.showBrowser})
 		if !a.C.Busy && (a.C.Workspace.Branch != "" || cur.Worktree) {
 			wt := !cur.Worktree
 			lbl := locales.HandoffToWorktree()

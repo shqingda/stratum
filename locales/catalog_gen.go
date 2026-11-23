@@ -5120,6 +5120,76 @@ func (msgs Messages) OpenInBrowser() string {
 	return Catalog.Format(msgs.locale, "openInBrowser", nil)
 }
 
+// Browser says "浏览器"
+// in the language the app shows.
+func Browser() string { return In(i18n.Locale()).Browser() }
+
+// Browser says "浏览器"
+// in the language of msgs.
+func (msgs Messages) Browser() string {
+	return Catalog.Format(msgs.locale, "browser", nil)
+}
+
+// BrowserAddress says "搜索或输入网站名称"
+// in the language the app shows.
+func BrowserAddress() string { return In(i18n.Locale()).BrowserAddress() }
+
+// BrowserAddress says "搜索或输入网站名称"
+// in the language of msgs.
+func (msgs Messages) BrowserAddress() string {
+	return Catalog.Format(msgs.locale, "browserAddress", nil)
+}
+
+// BrowserEmpty says "输入网址，或让代理打开你的本地应用。"
+// in the language the app shows.
+func BrowserEmpty() string { return In(i18n.Locale()).BrowserEmpty() }
+
+// BrowserEmpty says "输入网址，或让代理打开你的本地应用。"
+// in the language of msgs.
+func (msgs Messages) BrowserEmpty() string {
+	return Catalog.Format(msgs.locale, "browserEmpty", nil)
+}
+
+// Back says "后退"
+// in the language the app shows.
+func Back() string { return In(i18n.Locale()).Back() }
+
+// Back says "后退"
+// in the language of msgs.
+func (msgs Messages) Back() string {
+	return Catalog.Format(msgs.locale, "back", nil)
+}
+
+// Forward says "前进"
+// in the language the app shows.
+func Forward() string { return In(i18n.Locale()).Forward() }
+
+// Forward says "前进"
+// in the language of msgs.
+func (msgs Messages) Forward() string {
+	return Catalog.Format(msgs.locale, "forward", nil)
+}
+
+// Reload says "重新载入此页面"
+// in the language the app shows.
+func Reload() string { return In(i18n.Locale()).Reload() }
+
+// Reload says "重新载入此页面"
+// in the language of msgs.
+func (msgs Messages) Reload() string {
+	return Catalog.Format(msgs.locale, "reload", nil)
+}
+
+// StopLoading says "停止载入此页面"
+// in the language the app shows.
+func StopLoading() string { return In(i18n.Locale()).StopLoading() }
+
+// StopLoading says "停止载入此页面"
+// in the language of msgs.
+func (msgs Messages) StopLoading() string {
+	return Catalog.Format(msgs.locale, "stopLoading", nil)
+}
+
 // Automations says "定时任务"
 // in the language the app shows.
 func Automations() string { return In(i18n.Locale()).Automations() }
