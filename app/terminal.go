@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,71 @@ import (
 
 // startTerminal starts the shells of new apps; the tests start none.
 var startTerminal = terminal.New
+
+// startShell starts the user's shell for a tab. A zsh reports its folder
+// at each prompt, which names the tab (termTitle): it reads zshFolder
+// first, then the user's own startup files as it always does.
+func startShell(o terminal.Options) (*terminal.Terminal, error) {
+	if len(o.Command) > 0 || filepath.Base(loginShell()) != "zsh" {
+		return startTerminal(o)
+	}
+	dir, err := os.MkdirTemp("", "stratum-zsh-")
+	if err == nil {
+		err = os.WriteFile(filepath.Join(dir, ".zshenv"), []byte(zshFolder), 0o600)
+	}
+	if err != nil {
+		// Without it the tab keeps the folder the shell started in.
+		os.RemoveAll(dir)
+		return startTerminal(o)
+	}
+	o.Env = append(slices.Clone(o.Env), "ZDOTDIR="+dir)
+	if z, ok := os.LookupEnv("ZDOTDIR"); ok {
+		o.Env = append(o.Env, "STRATUM_ZDOTDIR="+z)
+	}
+	exit := o.OnExit
+	o.OnExit = func(code int) {
+		os.RemoveAll(dir)
+		if exit != nil {
+			exit(code)
+		}
+	}
+	t, err := startTerminal(o)
+	if err != nil {
+		os.RemoveAll(dir)
+	}
+	return t, err
+}
+
+// loginShell is the shell terminal.New starts without a Command.
+func loginShell() string {
+	if s := os.Getenv("SHELL"); s != "" {
+		return s
+	}
+	if runtime.GOOS == "darwin" {
+		return "/bin/zsh"
+	}
+	return "/bin/sh"
+}
+
+// zshFolder puts ZDOTDIR back and reads the user's .zshenv, then has the
+// shell report its folder (OSC 7) at each prompt, as macOS's own zshrc
+// does for Terminal.app.
+const zshFolder = `if (( ${+STRATUM_ZDOTDIR} )); then
+  export ZDOTDIR=$STRATUM_ZDOTDIR
+  unset STRATUM_ZDOTDIR
+else
+  unset ZDOTDIR
+fi
+[[ ! -r ${ZDOTDIR-$HOME}/.zshenv ]] || source -- "${ZDOTDIR-$HOME}/.zshenv"
+[[ -o interactive ]] || return 0
+
+_stratum_folder() {
+  emulate -L zsh
+  builtin printf '\e]7;file://%s%s\a' "$HOST" "${PWD//\%/%25}"
+}
+typeset -ga precmd_functions
+precmd_functions+=(_stratum_folder)
+`
 
 type termTab struct {
 	id     string
@@ -366,16 +432,32 @@ func (a *App) sweepTerminals() {
 	}
 }
 
-// termTitle is what the shell named its window, else its folder.
+// termTitle names a tab with its shell's folder, as Ghostty does: the
+// folder the shell reported, else the title its program set, else the
+// folder it started in.
 func termTitle(tab *termTab) string {
+	home, _ := os.UserHomeDir()
+	if dir := tab.t.Dir(); dir != "" {
+		return shortDir(dir, home)
+	}
 	if s := strings.TrimSpace(tab.t.Title()); s != "" {
 		return s
 	}
-	dir := tab.t.Dir()
-	if dir == "" {
-		dir = tab.cwd
+	return shortDir(tab.cwd, home)
+}
+
+// shortDir is a folder as Ghostty's zsh integration titles a tab with it
+// (%(4~|…/%3~|%~)): from ~ in the home folder, and of four names or more
+// the last three after "…/".
+func shortDir(dir, home string) string {
+	if home != "" && home != "/" && (dir == home || strings.HasPrefix(dir, home+"/")) {
+		dir = "~" + dir[len(home):]
 	}
-	return filepath.Base(dir)
+	names := strings.Split(strings.TrimPrefix(dir, "/"), "/")
+	if len(names) >= 4 {
+		return "…/" + strings.Join(names[len(names)-3:], "/")
+	}
+	return dir
 }
 
 // terminalPane is the Terminal tab: the session's shells, a tab each.
@@ -428,7 +510,7 @@ func (a *App) terminalPane(c *ui.Context) {
 }
 
 // termTabButton is a shell's tab: its title, and on hover the close
-// button on its left, as Terminal.app and Safari draw theirs.
+// button on its right.
 func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab *termTab) {
 	p := a.p
 	on := i == set.active
@@ -448,6 +530,15 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 		fg = p.Mute
 	}
 	row.Children(func() {
+		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name)
+		press(b)
+		focusRing(b, p)
+		b.Children(func() {
+			ui.Text(c, name).FontSize(12.5).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0)
+		})
+		if b.Clicked() {
+			a.selectTerminal(set, i)
+		}
 		// 22pt to hit, inside the 26pt tab: the mark stays Safari's size.
 		x := ui.ButtonBase(c.Key("term-x:"+tab.id)).Size(22, 22).Radius(5).Center().Shrink(0).Label(locales.CloseTerminal()).Tooltip(locales.CloseTerminal())
 		press(x)
@@ -459,15 +550,6 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 		}
 		if x.Clicked() {
 			a.askCloseTerminal(sid, tab)
-		}
-		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 8, 0, 2).AlignItems(ui.Center).Label(name)
-		press(b)
-		focusRing(b, p)
-		b.Children(func() {
-			ui.Text(c, name).FontSize(12.5).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0)
-		})
-		if b.Clicked() {
-			a.selectTerminal(set, i)
 		}
 	})
 }

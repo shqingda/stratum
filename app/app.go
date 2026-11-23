@@ -167,7 +167,7 @@ func New(c *client.Client) *App {
 	a := &App{C: c, now: time.Now, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
-	a.newTerm, a.shellJob = startTerminal, foregroundJob
+	a.newTerm, a.shellJob = startShell, foregroundJob
 	return a
 }
 
