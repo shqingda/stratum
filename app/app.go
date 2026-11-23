@@ -128,6 +128,8 @@ type App struct {
 	visibleSessions                                                                                               []string
 	menuSession                                                                                                   string
 	modelMenu, effortMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
+	modelQuery                                                                                                    string
+	modelSearch                                                                                                   ui.Handle
 	modelsRequested                                                                                               bool
 	modelsPending, modelsAccount, modelsError                                                                     string
 	modelsLoadedAccount                                                                                           string

@@ -139,6 +139,12 @@ m("noEffortSupport", "这个模型不支持思考强度", "This model doesn’t 
 # Models menu
 m("modelsLoadFailed", "加载失败，请重新打开菜单", "Couldn’t load. Open the menu again.")
 m("noModels", "这个账号没有可用模型", "No models available for this account")
+m("searchModels", "搜索模型…", "Search models…")
+m("favoriteModels", "收藏", "Favorites")
+m("recentModels", "最近使用", "Recent")
+m("allModels", "全部模型", "All Models")
+m("favoriteModel", "收藏模型", "Favorite model")
+m("unfavoriteModel", "取消收藏", "Remove from favorites")
 
 # Connection
 m("phaseStarting", "正在启动", "Starting")

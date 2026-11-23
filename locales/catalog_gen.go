@@ -1236,6 +1236,66 @@ func (msgs Messages) NoModels() string {
 	return Catalog.Format(msgs.locale, "noModels", nil)
 }
 
+// SearchModels says "搜索模型…"
+// in the language the app shows.
+func SearchModels() string { return In(i18n.Locale()).SearchModels() }
+
+// SearchModels says "搜索模型…"
+// in the language of msgs.
+func (msgs Messages) SearchModels() string {
+	return Catalog.Format(msgs.locale, "searchModels", nil)
+}
+
+// FavoriteModels says "收藏"
+// in the language the app shows.
+func FavoriteModels() string { return In(i18n.Locale()).FavoriteModels() }
+
+// FavoriteModels says "收藏"
+// in the language of msgs.
+func (msgs Messages) FavoriteModels() string {
+	return Catalog.Format(msgs.locale, "favoriteModels", nil)
+}
+
+// RecentModels says "最近使用"
+// in the language the app shows.
+func RecentModels() string { return In(i18n.Locale()).RecentModels() }
+
+// RecentModels says "最近使用"
+// in the language of msgs.
+func (msgs Messages) RecentModels() string {
+	return Catalog.Format(msgs.locale, "recentModels", nil)
+}
+
+// AllModels says "全部模型"
+// in the language the app shows.
+func AllModels() string { return In(i18n.Locale()).AllModels() }
+
+// AllModels says "全部模型"
+// in the language of msgs.
+func (msgs Messages) AllModels() string {
+	return Catalog.Format(msgs.locale, "allModels", nil)
+}
+
+// FavoriteModel says "收藏模型"
+// in the language the app shows.
+func FavoriteModel() string { return In(i18n.Locale()).FavoriteModel() }
+
+// FavoriteModel says "收藏模型"
+// in the language of msgs.
+func (msgs Messages) FavoriteModel() string {
+	return Catalog.Format(msgs.locale, "favoriteModel", nil)
+}
+
+// UnfavoriteModel says "取消收藏"
+// in the language the app shows.
+func UnfavoriteModel() string { return In(i18n.Locale()).UnfavoriteModel() }
+
+// UnfavoriteModel says "取消收藏"
+// in the language of msgs.
+func (msgs Messages) UnfavoriteModel() string {
+	return Catalog.Format(msgs.locale, "unfavoriteModel", nil)
+}
+
 // PhaseStarting says "正在启动"
 // in the language the app shows.
 func PhaseStarting() string { return In(i18n.Locale()).PhaseStarting() }

@@ -722,6 +722,10 @@ type Settings struct {
 	BrowserAskDownload bool   `json:"browserAskDownload,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
+	// FavoriteModels and RecentModels keep model keys ("account/id") for
+	// pinning and quick selection in the model picker.
+	FavoriteModels []string `json:"favoriteModels,omitempty"`
+	RecentModels   []string `json:"recentModels,omitempty"`
 }
 
 type ModelRef struct {

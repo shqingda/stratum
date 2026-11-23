@@ -3,12 +3,14 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -116,11 +118,11 @@ func TestTask8Menus(t *testing.T) {
 			if tt.HasText("✓ 默认模型") {
 				t.Errorf("unexpected default model subtitle in %q", tt.Texts())
 			}
-			if selected, ok := tt.AccessByRole(ui.RoleMenuItemCheckBox, "GPT 6 Luna"); !ok || !selected.Checked {
+			if selected, ok := tt.Access("GPT 6 Luna"); !ok || !selected.Checked {
 				t.Errorf("current model is not checked: %+v", selected)
 			}
 			snapshot(t, tt, "t8-model-"+appearance)
-			if err := tt.ChooseMenuItem("GPT 6 Sol"); err != nil {
+			if err := tt.Click("GPT 6 Sol"); err != nil {
 				t.Fatal(err)
 			}
 			var update proto.SessionUpdate
@@ -131,7 +133,7 @@ func TestTask8Menus(t *testing.T) {
 			task8Click(t, tt, "中")
 			task8Command(t, a, proto.MethodModels, nil)
 			snapshot(t, tt, "t8-effort-"+appearance)
-			if err := tt.ChooseMenuItem("推理强度", "极高"); err != nil {
+			if err := tt.Click("极高"); err != nil {
 				t.Fatal(err)
 			}
 			update = proto.SessionUpdate{}
@@ -185,12 +187,18 @@ func TestTask8AllMenuValues(t *testing.T) {
 	} {
 		t.Run(tc.field+"/"+tc.path[len(tc.path)-1], func(t *testing.T) {
 			a := task8App()
+			if tc.field == "effort" && tc.value == "medium" {
+				a.C.Current.Effort = ""
+				tc.pill = "gpt-6-luna"
+			}
 			tt := task8Tester(a, false)
 			task8Click(t, tt, tc.pill)
 			if tc.field == "effort" {
 				task8Command(t, a, proto.MethodModels, nil)
-			}
-			if err := tt.ChooseMenuItem(tc.path...); err != nil {
+				if err := tt.Click(tc.path[len(tc.path)-1]); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := tt.ChooseMenuItem(tc.path...); err != nil {
 				t.Fatal(err)
 			}
 			var params map[string]any
@@ -565,5 +573,55 @@ func TestSlashForkAndExport(t *testing.T) {
 	task8Command(t, a, proto.MethodSessionFork, &ref)
 	if ref.SessionID != a.C.Current.ID {
 		t.Fatalf("forked ref = %+v", ref)
+	}
+}
+
+func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
+	a := task8App()
+	a.C.Settings = &proto.Settings{}
+	tt := task8Tester(a, false)
+
+	task8Click(t, tt, "gpt-6-luna")
+	cmd := task8Command(t, a, proto.MethodModels, nil)
+	task8Models(a, cmd.ID, []proto.Model{
+		{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Context: 128000},
+		{ID: "claude-sonnet-4", Name: "Claude Sonnet 4", Context: 200000},
+		{ID: "o3-mini", Name: "o3 mini", Context: 200000},
+	})
+	tt.Frame()
+
+	// 1. Typing filters visible models.
+	tt.Type("sonnet")
+	tt.Frame()
+	if !tt.HasText("Claude Sonnet 4") || tt.HasText("GPT-6 Luna") {
+		t.Fatalf("expected filtered model list, texts=%q", tt.Texts())
+	}
+
+	// 2. Pinning a model records it in FavoriteModels and displays Favorites section.
+	if err := tt.Click(locales.FavoriteModel()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !slices.Contains(a.C.Settings.FavoriteModels, "chatgpt/claude-sonnet-4") {
+		t.Fatalf("FavoriteModels = %v, want chatgpt/claude-sonnet-4", a.C.Settings.FavoriteModels)
+	}
+
+	// Clear search query and verify Favorites section is shown.
+	a.modelQuery = ""
+	tt.Frame()
+	if !tt.HasText(locales.FavoriteModels()) {
+		t.Fatalf("expected Favorites section header, texts=%q", tt.Texts())
+	}
+
+	// 3. Clicking a model updates session and records in RecentModels.
+	if err := tt.Click("o3 mini"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.modelMenu {
+		t.Fatal("expected model popover to close after picking model")
+	}
+	if !slices.Contains(a.C.Settings.RecentModels, "chatgpt/o3-mini") {
+		t.Fatalf("RecentModels = %v, want chatgpt/o3-mini", a.C.Settings.RecentModels)
 	}
 }

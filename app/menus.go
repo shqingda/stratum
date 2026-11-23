@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/egoist/mygo"
 
@@ -64,6 +66,61 @@ func (a *App) modelAccount() string {
 	return ""
 }
 
+func modelKey(account, id string) string {
+	if account == "" {
+		return id
+	}
+	return account + "/" + id
+}
+
+func (a *App) toggleFavoriteModel(account, id string) {
+	if a.C.Settings == nil {
+		return
+	}
+	k := modelKey(account, id)
+	s := *a.C.Settings
+	favs := slices.Clone(s.FavoriteModels)
+	if idx := slices.Index(favs, k); idx >= 0 {
+		favs = slices.Delete(favs, idx, idx+1)
+	} else {
+		favs = append(favs, k)
+	}
+	s.FavoriteModels = favs
+	a.do(a.C.SaveSettings(s))
+}
+
+func (a *App) recordRecentModel(account, id string) {
+	if a.C.Settings == nil {
+		return
+	}
+	k := modelKey(account, id)
+	s := *a.C.Settings
+	rec := slices.DeleteFunc(slices.Clone(s.RecentModels), func(x string) bool { return x == k })
+	rec = append([]string{k}, rec...)
+	if len(rec) > 5 {
+		rec = rec[:5]
+	}
+	if slices.Equal(s.RecentModels, rec) {
+		return
+	}
+	s.RecentModels = rec
+	a.do(a.C.SaveSettings(s))
+}
+
+func (a *App) filterModels(models []proto.Model, query string) []proto.Model {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return models
+	}
+	var out []proto.Model
+	for _, m := range models {
+		if strings.Contains(strings.ToLower(m.Name), q) || strings.Contains(strings.ToLower(m.ID), q) {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 func (a *App) modelPill(c *ui.Context, label string) {
 	if a.modelsAccount != a.modelAccount() {
 		a.modelsRequested = false
@@ -82,27 +139,198 @@ func (a *App) modelPill(c *ui.Context, label string) {
 		ui.Text(c, effort).FontSize(13).TextColor(p.Mute).SingleLine()
 		sym(c, "selector", 11, p.Mute)
 	})
-	b.PopoverMenuButton(func(m *ui.Menu) {
-		a.modelItems(m, a.modelAccount(), a.C.Current.Model, func(id string) {
-			a.do(a.C.Update(proto.SessionUpdate{Model: &id}))
-		})
-		m.Separator()
-		unsupported := a.reasoningUnsupported()
-		sub := m.Submenu(locales.ReasoningEffort(), func(sm *ui.Menu) {
-			for _, ef := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
-				if sm.Item(effortLabel(ef)).ID("effort:" + ef).Checked(a.C.Current.Effort == ef).Chosen() {
-					e := ef
-					a.do(a.C.Update(proto.SessionUpdate{Effort: &e}))
-				}
-			}
-		}).Trailing(effort)
-		if unsupported {
-			sub.Disabled(true).Tooltip(locales.NoEffortSupport())
+	if b.Clicked() {
+		a.modelMenu = !a.modelMenu
+		if a.modelMenu {
+			a.modelQuery = ""
 		}
-	}, a.menuOptions(&a.modelMenu))
+	}
+	account := a.modelAccount()
+	if a.modelMenu && !a.modelsRequested {
+		a.modelsRequested = true
+		a.modelsAccount, a.modelsError = account, ""
+		cmds, err := a.C.ListModels(account)
+		if err == nil {
+			a.modelsPending = cmds[0].ID
+		} else {
+			a.modelsError = err.Error()
+		}
+		a.do(cmds, err)
+	}
 	if !a.modelMenu {
 		a.modelsRequested = false
+		a.modelQuery = ""
 	}
+	current := a.C.Current.Model
+	set := a.settings()
+	favSet := map[string]bool{}
+	for _, k := range set.FavoriteModels {
+		favSet[k] = true
+	}
+	recSet := map[string]bool{}
+	for _, k := range set.RecentModels {
+		recSet[k] = true
+	}
+	pickModel := func(id string) {
+		a.do(a.C.Update(proto.SessionUpdate{Model: &id}))
+		a.recordRecentModel(account, id)
+		a.modelMenu = false
+	}
+	pop := ui.Popover(c, b, &a.modelMenu, func() {
+		ui.Column(c).Width(300).Gap(4).Children(func() {
+			filtered := a.filterModels(a.C.Models, a.modelQuery)
+			ui.Row(c).Height(32).Padding(0, 8).Gap(6).Radius(8).Background(p.Chip).AlignItems(ui.Center).Children(func() {
+				sym(c, "search", 13, p.Mute)
+				ui.TextInputBase(c.Key("model-search"), &a.modelQuery).Bind(&a.modelSearch).
+					Label(locales.Search()).Placeholder(locales.SearchModels()).PlaceholderColor(p.Mute).
+					FontSize(13).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().
+					OnTextKey(func(k ui.TextKey) bool {
+						switch {
+						case k.Key == ui.KeyEscape && k.Mods == 0:
+							a.modelMenu = false
+							return true
+						case k.Key == ui.KeyEnter && k.Mods == 0 && len(filtered) > 0:
+							pickModel(filtered[0].ID)
+							return true
+						}
+						return false
+					})
+			})
+			switch {
+			case a.modelsPending != "":
+				ui.Text(c, locales.Loading()).FontSize(12.5).TextColor(p.Mute).Padding(6, 8)
+			case a.modelsError != "":
+				ui.Column(c).Padding(6, 8).Gap(2).Children(func() {
+					ui.Text(c, locales.ModelsLoadFailed()).FontSize(12.5).FontWeight(500).TextColor(p.Minus)
+					ui.Text(c, a.modelsError).FontSize(11.5).TextColor(p.Mute)
+				})
+			case len(a.C.Models) == 0:
+				ui.Text(c, locales.NoModels()).FontSize(12.5).TextColor(p.Mute).Padding(6, 8)
+			default:
+				renderModelRow := func(sec string, m proto.Model) {
+					name := m.Name
+					if name == "" {
+						name = m.ID
+					}
+					key := modelKey(account, m.ID)
+					fav := favSet[key]
+					selected := m.ID == current || current == "" && m.Default
+					ui.Row(c.Key("m-row:"+sec+":"+m.ID)).Height(30).Padding(0, 4).Gap(2).AlignItems(ui.Center).Children(func() {
+						btn := ui.ButtonBase(c.Key("m-pick:"+sec+":"+m.ID)).Row().Grow(1).MinWidth(0).Height(28).Padding(0, 6).Gap(6).Radius(6).AlignItems(ui.Center).Label(name).Selected(selected)
+						press(btn)
+						focusRing(btn, p)
+						if selected {
+							btn.Background(p.Sel)
+						} else if btn.Hovered() {
+							btn.Background(p.Hover)
+						}
+						btn.Children(func() {
+							if selected {
+								sym(c, "check", 12, p.Acc)
+							} else {
+								ui.Box(c).Width(12).Shrink(0)
+							}
+							ui.Text(c, name).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+							if ctx := contextSize(m.Context); ctx != "" {
+								ui.Text(c, ctx).FontSize(11).TextColor(p.Mute).SingleLine().Shrink(0)
+							}
+						})
+						if btn.Clicked() {
+							pickModel(m.ID)
+						}
+						pinTip := locales.FavoriteModel()
+						pinCol := p.Faint
+						if fav {
+							pinTip = locales.UnfavoriteModel()
+							pinCol = p.Acc
+						}
+						pinBtn := ui.ButtonBase(c.Key("m-pin:"+sec+":"+m.ID)).Size(24, 24).Radius(6).Center().Shrink(0).Label(pinTip).Tooltip(pinTip)
+						press(pinBtn)
+						if pinBtn.Hovered() {
+							pinBtn.Background(p.Hover)
+						}
+						pinBtn.Children(func() { sym(c, "pin", 12, pinCol) })
+						if pinBtn.Clicked() {
+							a.toggleFavoriteModel(account, m.ID)
+						}
+					})
+				}
+				renderSection := func(sec, title string, list []proto.Model) {
+					if len(list) == 0 {
+						return
+					}
+					if title != "" {
+						ui.Text(c, title).FontSize(11).FontWeight(600).TextColor(p.Mute).Padding(6, 8, 2, 8).SingleLine()
+					}
+					for _, m := range list {
+						renderModelRow(sec, m)
+					}
+				}
+				ui.Scroll(c).MaxHeight(260).Children(func() {
+					if strings.TrimSpace(a.modelQuery) != "" {
+						renderSection("search", "", filtered)
+						return
+					}
+					var favs, recents, rest []proto.Model
+					for _, m := range a.C.Models {
+						k := modelKey(account, m.ID)
+						switch {
+						case favSet[k]:
+							favs = append(favs, m)
+						case recSet[k]:
+							recents = append(recents, m)
+						default:
+							rest = append(rest, m)
+						}
+					}
+					renderSection("fav", locales.FavoriteModels(), favs)
+					renderSection("rec", locales.RecentModels(), recents)
+					allTitle := ""
+					if len(favs) > 0 || len(recents) > 0 {
+						allTitle = locales.AllModels()
+					}
+					renderSection("all", allTitle, rest)
+				})
+			}
+
+			ui.Box(c).FillWidth().Height(.5).Background(p.Edge).Margin(4, 0)
+			unsupported := a.reasoningUnsupported()
+			effRow := ui.Row(c).Padding(4, 6).Gap(4).AlignItems(ui.Center).Label(locales.ReasoningEffort()).Disabled(unsupported)
+			if unsupported {
+				effRow.Tooltip(locales.NoEffortSupport())
+			}
+			effRow.Children(func() {
+				ui.Text(c, locales.ReasoningEffort()).FontSize(12).TextColor(p.Mute).SingleLine()
+				ui.Spacer(c)
+				for _, ef := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
+					on := a.C.Current.Effort == ef
+					eb := ui.ButtonBase(c.Key("eff:"+ef)).Height(22).Padding(0, 6).Radius(5).Center().Label(effortLabel(ef)).Disabled(unsupported)
+					if on {
+						eb.Background(p.Sel)
+					} else if eb.Hovered() && !unsupported {
+						eb.Background(p.Hover)
+					}
+					eb.Children(func() {
+						col := p.Fg2
+						if on {
+							col = p.Fg
+						} else if unsupported {
+							col = p.Faint
+						}
+						ui.Text(c, effortLabel(ef)).FontSize(11.5).TextColor(col).SingleLine()
+					})
+					if eb.Clicked() && !unsupported {
+						e := ef
+						a.do(a.C.Update(proto.SessionUpdate{Effort: &e}))
+					}
+				}
+			})
+		})
+	})
+	pop.AttachTo(b, ui.AnchorTopStart, ui.AnchorBottomStart).Margin(0, 0, 6, 0).
+		Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(8).NoShadow()
+	lift(pop, p)
+	rim(pop, p)
 }
 
 // modelItems lists an account's models in a menu, asking for them once
