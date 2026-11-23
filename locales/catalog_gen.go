@@ -1828,11 +1828,11 @@ func (msgs Messages) Inspect() string {
 	return Catalog.Format(msgs.locale, "inspect", nil)
 }
 
-// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台 浏览器 历史记录 …"
 // in the language the app shows.
 func SettingsGeneralWords() string { return In(i18n.Locale()).SettingsGeneralWords() }
 
-// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台 浏览器 历史记录 …"
 // in the language of msgs.
 func (msgs Messages) SettingsGeneralWords() string {
 	return Catalog.Format(msgs.locale, "settingsGeneralWords", nil)
@@ -5308,6 +5308,36 @@ func HistoryCleared() string { return In(i18n.Locale()).HistoryCleared() }
 // in the language of msgs.
 func (msgs Messages) HistoryCleared() string {
 	return Catalog.Format(msgs.locale, "historyCleared", nil)
+}
+
+// BrowserData says "历史记录与网站数据"
+// in the language the app shows.
+func BrowserData() string { return In(i18n.Locale()).BrowserData() }
+
+// BrowserData says "历史记录与网站数据"
+// in the language of msgs.
+func (msgs Messages) BrowserData() string {
+	return Catalog.Format(msgs.locale, "browserData", nil)
+}
+
+// BrowserDataNote says "Cookie、登录状态、网站存储和缓存，以及前进后退记录。"
+// in the language the app shows.
+func BrowserDataNote() string { return In(i18n.Locale()).BrowserDataNote() }
+
+// BrowserDataNote says "Cookie、登录状态、网站存储和缓存，以及前进后退记录。"
+// in the language of msgs.
+func (msgs Messages) BrowserDataNote() string {
+	return Catalog.Format(msgs.locale, "browserDataNote", nil)
+}
+
+// ClearBrowserData says "清除浏览器历史记录和 Cookie"
+// in the language the app shows.
+func ClearBrowserData() string { return In(i18n.Locale()).ClearBrowserData() }
+
+// ClearBrowserData says "清除浏览器历史记录和 Cookie"
+// in the language of msgs.
+func (msgs Messages) ClearBrowserData() string {
+	return Catalog.Format(msgs.locale, "clearBrowserData", nil)
 }
 
 // ClearWebFailed says "未能清除历史记录：{error}"

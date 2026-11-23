@@ -70,6 +70,9 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	if a.C.Busy {
 		add(opt{icon: "player-stop", label: locales.StopRunning(), kbd: "esc", run: func() { a.do(a.C.Cancel()) }})
 	}
+	if a.clearWebData != nil {
+		add(opt{icon: "trash", label: locales.ClearBrowserData() + "…", sub: locales.Browser(), run: a.askClearWeb})
+	}
 	set := a.settings()
 	for _, d := range []struct {
 		id   string

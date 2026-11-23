@@ -330,6 +330,20 @@ func (a *App) generalPage(c *ui.Context) {
 			}
 		})
 	})
+
+	// The browser's history and cookies, as Safari's Settings manage its
+	// website data: the same Clear History… as the app menu's.
+	if a.clearWebData != nil {
+		section(c, p, locales.Browser(), false)
+		group(c, p, func() {
+			r := rows{p: p}
+			r.row(c, "set-web-data", locales.BrowserData(), locales.BrowserDataNote(), func() {
+				if a.pushButton(c, "set-clear-web", locales.ClearHistory()+"…").Clicked() {
+					a.askClearWeb()
+				}
+			})
+		})
+	}
 }
 
 func (a *App) appearancePage(c *ui.Context) {
