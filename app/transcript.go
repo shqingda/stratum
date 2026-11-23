@@ -133,6 +133,7 @@ func (a *App) bar(c *ui.Context) {
 func (a *App) transcript(c *ui.Context) {
 	p := a.p
 	if len(a.C.Entries) == 0 && len(a.C.Approvals) == 0 {
+		a.listShown = nil
 		a.empty(c)
 		return
 	}
@@ -203,7 +204,11 @@ func (a *App) transcript(c *ui.Context) {
 			{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h},
 			{Color: black, At: max(28, foot-56) / h}, {Color: ui.Transparent, At: foot / h}}})
 	}
-	if len(items) > 0 && !a.transcriptList().AtEnd() {
+	// A list not shown in the last frame (a session just opened) says it
+	// is not at its end, though it starts there: the pill would flash.
+	shown := a.listShown == st
+	a.listShown = st
+	if len(items) > 0 && shown && !st.AtEnd() {
 		a.scrollBottomPill(c)
 	}
 }

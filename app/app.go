@@ -86,6 +86,7 @@ type App struct {
 	rvW                 float32               // user-adjusted review width, 0 means default
 	split               splitDrag             // the seam being dragged
 	dockH               float32               // how tall the composer floating on the transcript was
+	listShown           *ui.ListState         // the transcript's list in the last frame
 	hero                hero                  // where the composer of an empty session stands
 	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
 	sys                 ui.Preferences        // the desktop's accessibility preferences, read each frame
@@ -538,7 +539,10 @@ func (a *App) main(c *ui.Context) {
 		})
 		return
 	}
-	sheet := ui.Column(c).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
+	// Keyed: the sidebar before it comes and goes at the ends of its
+	// slide, and the sheet, by its place, would be built anew, the
+	// composer and the transcript's scroll with it, as a jump.
+	sheet := ui.Column(c.Key("sheet")).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
 	a.hero.sheet = sheet.LayoutBounds()
 	if a.sideOpen > 0.001 && !c.Vibrancy() {
 		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)

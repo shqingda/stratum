@@ -42,7 +42,13 @@ func (a *App) composer(c *ui.Context) {
 	dock.Children(func() {
 		ui.Column(c).Grow(1).MaxWidth(columnWidth).Children(func() { a.dock(c) })
 	})
-	a.dockH = dock.Bounds().H
+	// A dock built anew (a session opened, the sheet rebuilt) has no
+	// bounds before its first layout: the height it had stands for it, or
+	// the transcript's room for it would drop to nothing for a frame and
+	// the list's end jump down and back.
+	if h := dock.Bounds().H; h > 0 {
+		a.dockH = h
+	}
 }
 
 // dock is the composer with the prompts queued above it and the status
