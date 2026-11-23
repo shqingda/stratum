@@ -11,10 +11,12 @@ type fakeDesk struct {
 	active bool
 	badges []int
 	notes  []string
+	awake  []bool
 }
 
 func (d *fakeDesk) Active() bool      { return d.active }
 func (d *fakeDesk) Badge(n int)       { d.badges = append(d.badges, n) }
+func (d *fakeDesk) SetAwake(on bool)  { d.awake = append(d.awake, on) }
 func (d *fakeDesk) Appearance(string) {}
 func (d *fakeDesk) Notify(id, title, body string) {
 	d.notes = append(d.notes, id+" "+body)
@@ -53,5 +55,40 @@ func TestDesktop(t *testing.T) {
 	a.watch()
 	if len(d.notes) != 3 || d.badges[len(d.badges)-1] != 1 {
 		t.Fatalf("active: %v %v", d.notes, d.badges)
+	}
+}
+
+func TestDesktopPreventSleepWhileRunning(t *testing.T) {
+	a := working()
+	d := &fakeDesk{}
+	a.desk = d
+	a.C.Approvals = nil
+	a.C.Busy = true
+	a.C.Marks["1"] = "run"
+	a.C.Marks["2"] = ""
+	a.C.Marks["3"] = ""
+
+	// Disabled by default: running session does not call SetAwake.
+	a.watch()
+	if len(d.awake) != 0 {
+		t.Fatalf("expected no SetAwake when PreventSleep is false, got %v", d.awake)
+	}
+
+	// Enabled: running -> true, waiting for approval -> false, running -> true, done -> false.
+	a.C.Settings = &proto.Settings{PreventSleep: true}
+	a.watch()
+	a.C.Busy = false
+	a.C.Marks["1"] = "wait"
+	a.watch()
+	a.C.Busy = true
+	a.C.Marks["1"] = "run"
+	a.watch()
+	a.C.Busy = false
+	a.C.Marks["1"] = ""
+	a.watch()
+
+	want := []bool{true, false, true, false}
+	if !reflect.DeepEqual(d.awake, want) {
+		t.Fatalf("SetAwake sequence = %v, want %v", d.awake, want)
 	}
 }

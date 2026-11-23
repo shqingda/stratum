@@ -31,6 +31,7 @@ type App struct {
 	desk       Desktop
 	marks      map[string]string // the sessions' states desk last saw
 	badge      int
+	awake      bool
 	p          *Palette
 	now        func() time.Time
 	err        string // the last command that could not be sent

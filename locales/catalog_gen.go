@@ -2268,6 +2268,16 @@ func (msgs Messages) WhileWorking() string {
 	return Catalog.Format(msgs.locale, "whileWorking", nil)
 }
 
+// PreventSleep says "运行时阻止系统休眠"
+// in the language the app shows.
+func PreventSleep() string { return In(i18n.Locale()).PreventSleep() }
+
+// PreventSleep says "运行时阻止系统休眠"
+// in the language of msgs.
+func (msgs Messages) PreventSleep() string {
+	return Catalog.Format(msgs.locale, "preventSleep", nil)
+}
+
 // SearchShortcuts says "搜索快捷键"
 // in the language the app shows.
 func SearchShortcuts() string { return In(i18n.Locale()).SearchShortcuts() }

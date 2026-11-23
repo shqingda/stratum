@@ -292,6 +292,11 @@ func (a *App) generalPage(c *ui.Context) {
 				a.do(a.C.SaveSettings(s))
 			}
 		})
+		r.toggle(c, "set-prevent-sleep", locales.PreventSleep(), set.PreventSleep, false, func(on bool) {
+			s := set
+			s.PreventSleep = on
+			a.do(a.C.SaveSettings(s))
+		})
 	})
 	note(c, p, map[bool]string{false: locales.CmdReturnSteers(), true: locales.CmdReturnQueues()}[set.EnterSteers])
 

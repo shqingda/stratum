@@ -252,6 +252,7 @@ m("commandPalette", "命令面板", "Command palette")
 m("toggleSidebar", "显示或隐藏边栏", "Show or hide the sidebar")
 m("approvals", "审批", "Approvals")
 m("whileWorking", "工作时", "While working")
+m("preventSleep", "运行时阻止系统休眠", "Prevent sleep while running")
 m("searchShortcuts", "搜索快捷键", "Search Shortcuts")
 m("noShortcutMatches", "没有匹配的快捷键。", "No matching shortcuts.")
 

@@ -182,6 +182,9 @@ func (a *App) settingOpts(set proto.Settings, add func(opt)) {
 	add(opt{icon: "keyboard", label: locales.SettingTo(locales.ReturnKey(), enter), run: save(func(s *proto.Settings) {
 		s.EnterSteers = !set.EnterSteers
 	})})
+	add(opt{icon: "clock", label: locales.SettingTo(locales.PreventSleep(), onOff(!set.PreventSleep)), run: save(func(s *proto.Settings) {
+		s.PreventSleep = !set.PreventSleep
+	})})
 	for _, n := range []struct{ kind, label string }{
 		{"wait", locales.NotifyKind(locales.NotifyWaitSetting())}, {"done", locales.NotifyKind(locales.NotifyDoneSetting())},
 		{"fail", locales.NotifyKind(locales.NotifyFailSetting())}, {"badge", locales.DockBadge()},

@@ -679,6 +679,9 @@ type Settings struct {
 	// EnterSteers makes Return, while a turn runs, send into the turn
 	// right away, and ⌘Return queue; by default it is the other way.
 	EnterSteers bool `json:"enterSteers,omitempty"`
+	// PreventSleep keeps the machine awake while a session is actively
+	// running (not while waiting for approval), as in Codex and Zed.
+	PreventSleep bool `json:"preventSleep,omitempty"`
 	// ComputerUse offers the agent the computer tool: the screen, the
 	// mouse and the keyboard, each call asked for but in full access.
 	ComputerUse bool `json:"computerUse,omitempty"`

@@ -223,6 +223,7 @@
   "toggleSidebar": "Show or hide the sidebar",
   "approvals": "Approvals",
   "whileWorking": "While working",
+  "preventSleep": "Prevent sleep while running",
   "searchShortcuts": "Search Shortcuts",
   "noShortcutMatches": "No matching shortcuts.",
   "worked": "Worked",

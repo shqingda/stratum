@@ -272,6 +272,7 @@
   "toggleSidebar": "显示或隐藏边栏",
   "approvals": "审批",
   "whileWorking": "工作时",
+  "preventSleep": "运行时阻止系统休眠",
   "searchShortcuts": "搜索快捷键",
   "noShortcutMatches": "没有匹配的快捷键。",
   "worked": "工作了",

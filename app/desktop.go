@@ -20,6 +20,11 @@ type Desktop interface {
 	Appearance(theme string)
 }
 
+// SleepBlocker prevents idle system sleep while a session is running.
+type SleepBlocker interface {
+	SetAwake(on bool)
+}
+
 // Locale is the language the app shows: the one chosen, or "" to follow
 // the system.
 type Locale interface {
@@ -40,12 +45,15 @@ func (systemLocale) Chosen() string { return mygo.App.ChosenLocale() }
 func (systemLocale) Set(tag string) { mygo.App.SetLocale(tag) }
 
 // system is the Desktop of the running app.
-type system struct{}
+type system struct {
+	awake sleepGuard
+}
 
-func (system) Active() bool { return mygo.App.IsActive() }
-func (system) Badge(n int)  { mygo.App.SetBadgeCount(n) }
+func (*system) Active() bool       { return mygo.App.IsActive() }
+func (*system) Badge(n int)        { mygo.App.SetBadgeCount(n) }
+func (s *system) SetAwake(on bool) { s.awake.Set(on) }
 
-func (system) Appearance(theme string) {
+func (*system) Appearance(theme string) {
 	src := mygo.ThemeSystem
 	switch theme {
 	case "light":
@@ -56,7 +64,7 @@ func (system) Appearance(theme string) {
 	mygo.Theme.SetSource(src)
 }
 
-func (system) Notify(id, title, body string) {
+func (*system) Notify(id, title, body string) {
 	if !mygo.NotificationsSupported() {
 		return
 	}
@@ -68,7 +76,7 @@ const notePrefix = "session:"
 // UseDesktop shows the sessions' states on the Dock and in notifications;
 // clicking a notification opens its session.
 func (a *App) UseDesktop() {
-	a.desk, a.locale = system{}, systemLocale{}
+	a.desk, a.locale = &system{}, systemLocale{}
 	a.version, a.checkUpdates = mygo.App.Version(), updater.CheckForUpdates
 	mygo.App.OnNotificationClick(func(id string) {
 		sid, ok := strings.CutPrefix(id, notePrefix)
@@ -97,11 +105,14 @@ func (a *App) watch() {
 	}
 	quiet := func(kind string) bool { return slices.Contains(set.Quiet, kind) }
 	waiting := 0
+	running := false
 	active := !first && a.desk.Active() && set.NotifyWhen != "always"
 	for _, s := range a.C.Sessions {
 		st := a.state(s)
 		if st == "wait" {
 			waiting++
+		} else if st == "run" {
+			running = true
 		}
 		was, known := a.marks[s.ID]
 		a.marks[s.ID] = st
@@ -138,5 +149,12 @@ func (a *App) watch() {
 	if waiting != a.badge {
 		a.badge = waiting
 		a.desk.Badge(waiting)
+	}
+	wantAwake := set.PreventSleep && running
+	if wantAwake != a.awake {
+		a.awake = wantAwake
+		if sb, ok := a.desk.(SleepBlocker); ok {
+			sb.SetAwake(wantAwake)
+		}
 	}
 }
