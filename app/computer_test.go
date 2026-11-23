@@ -8,7 +8,26 @@ import (
 	"github.com/shqingda/stratum/proto"
 )
 
+func TestComputerUseIsHiddenUntilTurnedOn(t *testing.T) {
+	t.Setenv("STRATUM_COMPUTER_USE", "")
+	a := working()
+	a.C.Busy, a.C.Approvals = false, nil
+	tt := ui.NewTester(a.View, 1120, 800)
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyComma)
+	tt.Frame()
+	a.C.Settings = &proto.Settings{Mode: "auto", ComputerUse: true}
+	tt.Frame()
+	if !tt.HasText("按回车") {
+		t.Fatalf("not on the general page: %q", tt.Texts())
+	}
+	if tt.HasText("电脑操控") || tt.HasText("让代理查看屏幕并使用鼠标和键盘") {
+		t.Error("General shows computer use without STRATUM_COMPUTER_USE")
+	}
+}
+
 func TestComputerUseIsASettingAndAsks(t *testing.T) {
+	t.Setenv("STRATUM_COMPUTER_USE", "1")
 	a := working()
 	a.C.Busy, a.C.Approvals = false, nil
 	a.out = make(chan []proto.Command, 16)

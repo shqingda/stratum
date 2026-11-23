@@ -64,3 +64,14 @@ func TestReadyAsksForWhatIsMissing(t *testing.T) {
 		t.Errorf("a guide closed gave %v", err)
 	}
 }
+
+func TestEnabledOnlyWithTheEnvironment(t *testing.T) {
+	t.Setenv("STRATUM_COMPUTER_USE", "")
+	if Enabled() {
+		t.Error("computer use is offered without STRATUM_COMPUTER_USE")
+	}
+	t.Setenv("STRATUM_COMPUTER_USE", "1")
+	if !Enabled() {
+		t.Error("STRATUM_COMPUTER_USE=1 does not offer computer use")
+	}
+}

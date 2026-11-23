@@ -9,9 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"sync"
 )
+
+// Enabled says whether computer use is offered at all. It is not yet as
+// good as other agents' computer use, so it stays hidden, its setting
+// too, unless STRATUM_COMPUTER_USE is set.
+func Enabled() bool { return os.Getenv("STRATUM_COMPUTER_USE") != "" }
 
 // Desktop is the screen and the input of this machine.
 type Desktop interface {
