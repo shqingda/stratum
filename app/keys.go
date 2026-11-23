@@ -172,6 +172,15 @@ func (a *App) keys(c *ui.Context) {
 			a.openSettings()
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd, ui.KeySemicolon, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
+			if a.btwOpen {
+				a.btwOpen = false
+			} else {
+				a.openSideAsk()
+			}
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBackslash, func() {
 		if !c.ShortcutRepeated() {
 			a.toggleSide()

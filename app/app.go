@@ -47,6 +47,10 @@ type App struct {
 	filesKey   string // the folder and @ query the files were asked for
 	slashAsked string // the folder the / menu last read skills for
 	find       find
+	btwOpen    bool
+	btwFocus   bool
+	btwDraft   string
+	btwInput   ui.Handle
 	editing    string // the approval whose command is being changed
 	cmdDraft   string // the command as changed
 	cmdInput   ui.Handle
@@ -198,7 +202,7 @@ func (a *App) restoreFocus(c *ui.Context) {
 	if a.C.Current != nil {
 		id = a.C.Current.ID
 	}
-	over := a.pal || a.settingsOpen || a.automationsOpen
+	over := a.pal || a.btwOpen || a.settingsOpen || a.automationsOpen
 	if !over && (id != a.focusSession || a.overWas) && id != "" {
 		a.composerInput.Focus(c)
 	}
@@ -397,6 +401,7 @@ func (a *App) View(c *ui.Context) {
 		a.sideToggle(c)
 	})
 	a.palette(c)
+	a.sideAskDialog(c)
 	a.toastHUD(c)
 	a.clearWebDialog(c)
 	a.saveWebTabs()
@@ -698,6 +703,8 @@ func (a *App) closeOrDismiss(c *ui.Context) {
 		}
 	case a.pal:
 		a.pal, a.query = false, ""
+	case a.btwOpen:
+		a.btwOpen = false
 	case a.settingsOpen:
 		a.settingsOpen = false
 	case a.automationsOpen:

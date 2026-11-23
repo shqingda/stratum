@@ -169,6 +169,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Prompt(ctx, p, cmd.ID)
+	case proto.MethodSideAsk:
+		p, err := params[proto.SideAsk](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return m.SideAsk(ctx, p)
 	case proto.MethodShell:
 		p, err := params[proto.ShellRun](cmd)
 		if err != nil {

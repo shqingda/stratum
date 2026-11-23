@@ -110,6 +110,10 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 			a.flash("check", locales.ExportMarkdown())
 		}})
 	}
+	all = append(all, slashItem{"btw", "message", locales.SideAskNote(), func(*ui.Context) {
+		clear()
+		a.openSideAsk()
+	}})
 	if a.C.Busy {
 		all = append(all, slashItem{"stop", "player-stop", locales.Stop(), func(*ui.Context) { clear(); a.do(a.C.Cancel()) }})
 	}

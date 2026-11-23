@@ -173,6 +173,13 @@ type Client struct {
 	Changes   Changes
 	Workspace Workspace
 
+	// Ephemeral /btw side question state (read-only, never persisted).
+	SideSession  string
+	SideQuestion string
+	SideAnswer   string
+	SideErr      string
+	SidePending  bool
+
 	Accounts []proto.Account
 	SignIn   *SignIn
 	Settings *proto.Settings // of new sessions, once read
@@ -450,6 +457,7 @@ func (c *Client) listSessions(bind, autoCreate bool) proto.Command {
 
 func (c *Client) create() proto.Command {
 	c.Phase = Syncing
+	c.ClearSide()
 	c.resetTranscript()
 	p := &pending{mutation: true}
 	p.done = func(r json.RawMessage) []proto.Command {
@@ -476,6 +484,9 @@ func (c *Client) bind(id string) proto.Command {
 	}
 	delete(c.Marks, id)
 	c.Phase = Syncing
+	if c.SideSession != id {
+		c.ClearSide()
+	}
 	c.resetTranscript()
 	c.want = id
 	p := &pending{}
@@ -1045,6 +1056,57 @@ func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Co
 	}
 	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
 	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
+}
+
+// ClearSide resets the ephemeral /btw side-question state.
+func (c *Client) ClearSide() {
+	c.SideSession, c.SideQuestion, c.SideAnswer, c.SideErr, c.SidePending = "", "", "", "", false
+}
+
+// SideAsk asks a one-off read-only side question (/btw) against the current
+// session without interrupting its main turn or saving to its transcript.
+func (c *Client) SideAsk(text string) ([]proto.Command, error) {
+	q := strings.TrimSpace(text)
+	if q == "" {
+		return nil, errors.New(locales.NothingToSend())
+	}
+	sid := sessionID(c.Current)
+	if sid == "" {
+		return nil, ErrNotReady
+	}
+	c.SideSession = sid
+	c.SideQuestion = q
+	c.SideAnswer = ""
+	c.SideErr = ""
+	c.SidePending = true
+	cmds, err := c.mutation(proto.MethodSideAsk, proto.SideAsk{SessionID: sid, Text: q}, func(r json.RawMessage) []proto.Command {
+		var res proto.SideAskResult
+		if err := json.Unmarshal(r, &res); err != nil {
+			if c.SideSession == sid && c.SideQuestion == q {
+				c.SidePending = false
+				c.SideErr = err.Error()
+			}
+			return nil
+		}
+		if c.SideSession == sid && c.SideQuestion == q {
+			c.SidePending = false
+			c.SideAnswer = res.Answer
+		}
+		return nil
+	})
+	if err != nil {
+		c.SidePending = false
+		c.SideErr = err.Error()
+		return nil, err
+	}
+	c.pending[cmds[0].ID].failed = func(e *proto.Error) []proto.Command {
+		if c.SideSession == sid && c.SideQuestion == q {
+			c.SidePending = false
+			c.SideErr = e.Message
+		}
+		return nil
+	}
+	return cmds, nil
 }
 
 // Rewind returns the current session to a prompt. Dropping the

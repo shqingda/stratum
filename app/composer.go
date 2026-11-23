@@ -289,6 +289,17 @@ func (a *App) ready() bool {
 }
 
 func (a *App) submit() {
+	trimmed := strings.TrimSpace(a.draft)
+	if trimmed == "/btw" || strings.HasPrefix(trimmed, "/btw ") {
+		q := strings.TrimSpace(strings.TrimPrefix(trimmed, "/btw"))
+		a.draft = ""
+		if q == "" {
+			a.openSideAsk()
+		} else {
+			a.sendSideAsk(q)
+		}
+		return
+	}
 	if cmd, ok := a.command(); ok {
 		if a.C.Busy {
 			a.err = locales.ShellWhileBusy()

@@ -2278,6 +2278,46 @@ func (msgs Messages) PreventSleep() string {
 	return Catalog.Format(msgs.locale, "preventSleep", nil)
 }
 
+// SideAsk says "旁支对话"
+// in the language the app shows.
+func SideAsk() string { return In(i18n.Locale()).SideAsk() }
+
+// SideAsk says "旁支对话"
+// in the language of msgs.
+func (msgs Messages) SideAsk() string {
+	return Catalog.Format(msgs.locale, "sideAsk", nil)
+}
+
+// SideAskNote says "问一句，不打断当前对话，只读不存盘"
+// in the language the app shows.
+func SideAskNote() string { return In(i18n.Locale()).SideAskNote() }
+
+// SideAskNote says "问一句，不打断当前对话，只读不存盘"
+// in the language of msgs.
+func (msgs Messages) SideAskNote() string {
+	return Catalog.Format(msgs.locale, "sideAskNote", nil)
+}
+
+// SideAskPlaceholder says "问一个不打断主对话的问题…"
+// in the language the app shows.
+func SideAskPlaceholder() string { return In(i18n.Locale()).SideAskPlaceholder() }
+
+// SideAskPlaceholder says "问一个不打断主对话的问题…"
+// in the language of msgs.
+func (msgs Messages) SideAskPlaceholder() string {
+	return Catalog.Format(msgs.locale, "sideAskPlaceholder", nil)
+}
+
+// SideAskBadge says "只读 · 不存盘"
+// in the language the app shows.
+func SideAskBadge() string { return In(i18n.Locale()).SideAskBadge() }
+
+// SideAskBadge says "只读 · 不存盘"
+// in the language of msgs.
+func (msgs Messages) SideAskBadge() string {
+	return Catalog.Format(msgs.locale, "sideAskBadge", nil)
+}
+
 // SearchShortcuts says "搜索快捷键"
 // in the language the app shows.
 func SearchShortcuts() string { return In(i18n.Locale()).SearchShortcuts() }

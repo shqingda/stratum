@@ -78,6 +78,7 @@ const (
 	MethodSessionFlag      = "session.flag"      // SessionFlag → Session
 	MethodSessionFork      = "session.fork"      // SessionRef → Session
 	MethodPrompt           = "prompt"            // Prompt → PromptResult
+	MethodSideAsk          = "side.ask"          // SideAsk → SideAskResult
 	MethodCancel           = "cancel"            // SessionRef → {}
 	MethodEvents           = "events"            // EventsQuery → EventPage
 	MethodApprovalRespond  = "approval.respond"  // ApprovalAnswer → {}
@@ -265,6 +266,17 @@ type Prompt struct {
 type PromptResult struct {
 	Queued bool   `json:"queued"`       // waits in the running turn's queue
 	ID     string `json:"id,omitempty"` // its Queued.ID
+}
+
+// SideAsk asks a quick read-only side question (/btw) against a session
+// without interrupting its main turn or saving to its transcript.
+type SideAsk struct {
+	SessionID string `json:"sessionId"`
+	Text      string `json:"text"`
+}
+
+type SideAskResult struct {
+	Answer string `json:"answer"`
 }
 
 // Queued is a prompt waiting while a turn runs.
