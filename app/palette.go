@@ -85,7 +85,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	}
 	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], kbd: "⌘⌥I", run: func() { a.rv.open = !a.rv.open }})
 	if cur != nil {
-		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: func() { a.rv.open, a.rv.tab = true, "term" }})
+		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: a.showTerminal})
 		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
 		add(opt{icon: "world", label: locales.Preview(), run: func() { a.rv.open, a.rv.tab = true, "preview" }})
 		if !a.C.Busy && (a.C.Workspace.Branch != "" || cur.Worktree) {

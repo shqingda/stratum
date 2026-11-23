@@ -59,21 +59,25 @@ func (a *App) dock(c *ui.Context) {
 		ui.Column(c).Margin(0, 20, -1, 20).Radius(12, 12, 0, 0).Background(p.Card).Border(.5, p.Edge).Clip().
 			Transition(ui.ElementTransition{Size: true, Duration: 180 * time.Millisecond}).Children(func() { a.queue(c) })
 	}
-	// Nothing goes under the card while a turn runs: a line there would
-	// push the card up as the turn starts and drop it as it ends. The stop
-	// button says the turn runs, and its tooltip that Esc stops it.
-	a.box(c)
 	if a.err != "" {
 		// An action's error stays until dismissed or the next action, with
-		// its mark, as an inline error in a Mac form does.
-		ui.Row(c).Gap(6).Margin(6, 0, 0, 0).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
-			sym(c, "alert-circle", 13, p.Minus)
-			ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).MinWidth(0).Selectable()
-			if a.iconPill(c, "dismiss-error", "x", locales.Close()).Size(24, 24).Clicked() {
-				a.err = ""
-			}
-		})
+		// its mark, as an inline error in a Mac form does. It sits over the
+		// card, which the dock holds to the window's foot, so the card stays
+		// where the hand left it as the error comes and goes.
+		ui.Row(c.Key("composer-err")).Gap(6).Margin(0, 0, 6, 0).Justify(ui.Center).AlignItems(ui.Center).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 4, Opacity: 0}, Exit: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
+			Children(func() {
+				sym(c, "alert-circle", 13, p.Minus)
+				ui.Text(c, a.err).FontSize(12.5).TextColor(p.Minus).MinWidth(0).Selectable()
+				if a.iconPill(c, "dismiss-error", "x", locales.Close()).Size(24, 24).Clicked() {
+					a.err = ""
+				}
+			})
 	}
+	// Nothing goes under the card: a line there would push the card up as
+	// it comes and drop it as it goes. The stop button says a turn runs,
+	// and its tooltip that Esc stops it.
+	a.box(c)
 }
 
 // queue lists the prompts waiting while a turn runs.

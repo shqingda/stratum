@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/i18n"
+	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/proto"
@@ -18,6 +20,10 @@ import (
 func TestMain(m *testing.M) {
 	// The tests read Chinese, whatever language this machine is in.
 	i18n.SetLocaleFunc(chinese)
+	// No test starts a shell by chance: those that do say so (termApp).
+	startTerminal = func(terminal.Options) (*terminal.Terminal, error) {
+		return nil, errors.New("no shells in tests")
+	}
 	local := time.Local
 	time.Local = testZone
 	code := m.Run()

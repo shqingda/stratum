@@ -256,3 +256,22 @@ func TestComposerKeepsStillWhileRunning(t *testing.T) {
 		t.Errorf("the composer went from y %v to %v as the turn ended", idle.Y, done.Y)
 	}
 }
+
+func TestComposerKeepsStillWithAnError(t *testing.T) {
+	a := emptySession(proto.Workspace{Branch: "main", Commits: []proto.CommitSummary{{Hash: "a", Subject: "x", Time: now.Unix()}}})
+	a.C.Entries = []*client.Entry{{Key: 1, Role: client.User, Text: "写一个计算器", Done: true}}
+	tt := helloTester(a)
+	tt.Advance(time.Second)
+	tt.Frame()
+	before, _ := tt.Find("手动")
+	a.err = "打不开 Xcode：没有这个应用"
+	tt.Frame()
+	tt.Advance(time.Second)
+	tt.Frame()
+	if !tt.HasText(a.err) {
+		t.Fatalf("the error does not show: %q", tt.Texts())
+	}
+	if after, _ := tt.Find("手动"); after.Y != before.Y {
+		t.Errorf("the error moved the composer from y %v to %v", before.Y, after.Y)
+	}
+}

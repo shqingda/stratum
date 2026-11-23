@@ -679,6 +679,10 @@ type Settings struct {
 	ReduceMotion bool `json:"reduceMotion,omitempty"`
 	// CollapsedProjects lists workspace cwds collapsed in the sidebar.
 	CollapsedProjects []string `json:"collapsedProjects,omitempty"`
+	// SidebarWidth and InspectorWidth are the widths, in points, the user
+	// dragged the sidebar and the review panel to; 0 is the default.
+	SidebarWidth   float32 `json:"sidebarWidth,omitempty"`
+	InspectorWidth float32 `json:"inspectorWidth,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }

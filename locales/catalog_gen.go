@@ -1426,6 +1426,16 @@ func (msgs Messages) Failed() string {
 	return Catalog.Format(msgs.locale, "failed", nil)
 }
 
+// Succeeded says "成功"
+// in the language the app shows.
+func Succeeded() string { return In(i18n.Locale()).Succeeded() }
+
+// Succeeded says "成功"
+// in the language of msgs.
+func (msgs Messages) Succeeded() string {
+	return Catalog.Format(msgs.locale, "succeeded", nil)
+}
+
 // OmittedLines says "… 已省略前 {count} 行"
 // in the language the app shows.
 func OmittedLines(count int) string { return In(i18n.Locale()).OmittedLines(count) }
@@ -3824,14 +3834,94 @@ func (msgs Messages) RedoTurn() string {
 	return Catalog.Format(msgs.locale, "redoTurn", nil)
 }
 
-// NoCommandsYet says "这个会话还没有运行过命令"
+// NewTerminal says "新建终端"
 // in the language the app shows.
-func NoCommandsYet() string { return In(i18n.Locale()).NoCommandsYet() }
+func NewTerminal() string { return In(i18n.Locale()).NewTerminal() }
 
-// NoCommandsYet says "这个会话还没有运行过命令"
+// NewTerminal says "新建终端"
 // in the language of msgs.
-func (msgs Messages) NoCommandsYet() string {
-	return Catalog.Format(msgs.locale, "noCommandsYet", nil)
+func (msgs Messages) NewTerminal() string {
+	return Catalog.Format(msgs.locale, "newTerminal", nil)
+}
+
+// CloseTerminal says "关闭终端"
+// in the language the app shows.
+func CloseTerminal() string { return In(i18n.Locale()).CloseTerminal() }
+
+// CloseTerminal says "关闭终端"
+// in the language of msgs.
+func (msgs Messages) CloseTerminal() string {
+	return Catalog.Format(msgs.locale, "closeTerminal", nil)
+}
+
+// NoTerminal says "没有打开的终端"
+// in the language the app shows.
+func NoTerminal() string { return In(i18n.Locale()).NoTerminal() }
+
+// NoTerminal says "没有打开的终端"
+// in the language of msgs.
+func (msgs Messages) NoTerminal() string {
+	return Catalog.Format(msgs.locale, "noTerminal", nil)
+}
+
+// TerminalFailed says "终端没有启动"
+// in the language the app shows.
+func TerminalFailed() string { return In(i18n.Locale()).TerminalFailed() }
+
+// TerminalFailed says "终端没有启动"
+// in the language of msgs.
+func (msgs Messages) TerminalFailed() string {
+	return Catalog.Format(msgs.locale, "terminalFailed", nil)
+}
+
+// TerminateTitle says "要终止这个终端里的进程吗？"
+// in the language the app shows.
+func TerminateTitle() string { return In(i18n.Locale()).TerminateTitle() }
+
+// TerminateTitle says "要终止这个终端里的进程吗？"
+// in the language of msgs.
+func (msgs Messages) TerminateTitle() string {
+	return Catalog.Format(msgs.locale, "terminateTitle", nil)
+}
+
+// TerminateBody says "关闭这个终端会终止正在运行的进程：{name}。"
+// in the language the app shows.
+func TerminateBody(name string) string { return In(i18n.Locale()).TerminateBody(name) }
+
+// TerminateBody says "关闭这个终端会终止正在运行的进程：{name}。"
+// in the language of msgs.
+func (msgs Messages) TerminateBody(name string) string {
+	return Catalog.Format(msgs.locale, "terminateBody", map[string]any{"name": name})
+}
+
+// TerminateBodyAny says "关闭这个终端会终止其中正在运行的进程。"
+// in the language the app shows.
+func TerminateBodyAny() string { return In(i18n.Locale()).TerminateBodyAny() }
+
+// TerminateBodyAny says "关闭这个终端会终止其中正在运行的进程。"
+// in the language of msgs.
+func (msgs Messages) TerminateBodyAny() string {
+	return Catalog.Format(msgs.locale, "terminateBodyAny", nil)
+}
+
+// Terminate says "终止"
+// in the language the app shows.
+func Terminate() string { return In(i18n.Locale()).Terminate() }
+
+// Terminate says "终止"
+// in the language of msgs.
+func (msgs Messages) Terminate() string {
+	return Catalog.Format(msgs.locale, "terminate", nil)
+}
+
+// FindInTerminal says "在终端中查找"
+// in the language the app shows.
+func FindInTerminal() string { return In(i18n.Locale()).FindInTerminal() }
+
+// FindInTerminal says "在终端中查找"
+// in the language of msgs.
+func (msgs Messages) FindInTerminal() string {
+	return Catalog.Format(msgs.locale, "findInTerminal", nil)
 }
 
 // NoPlanYet says "这个会话还没有计划"

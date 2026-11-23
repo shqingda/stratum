@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 	"github.com/shqingda/stratum/client"
@@ -83,6 +84,7 @@ type App struct {
 	rvOpen              float32               // how far the review inspector is out, 0 to 1
 	sideW               float32               // user-adjusted sidebar width, 0 means default
 	rvW                 float32               // user-adjusted review width, 0 means default
+	split               splitDrag             // the seam being dragged
 	dockH               float32               // how tall the composer floating on the transcript was
 	hero                hero                  // where the composer of an empty session stands
 	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
@@ -134,10 +136,15 @@ type App struct {
 	accountsSeen                              int
 	mcpUI                                     mcpState
 	previewUI                                 previewState
-	automationsOpen                           bool
-	automationsUI                             automationsState
-	locale                                    Locale
-	theme                                     string // the appearance last applied
+	term                                      termState
+	// newTerm starts a shell for the Terminal tab, shellJob tells what runs
+	// in one (foregroundJob); tests put fakes in their place.
+	newTerm         func(terminal.Options) (*terminal.Terminal, error)
+	shellJob        func(live []string, id string) (name string, busy bool)
+	automationsOpen bool
+	automationsUI   automationsState
+	locale          Locale
+	theme           string // the appearance last applied
 
 	attached        []attachment
 	mentionSessions []string
@@ -153,6 +160,7 @@ func New(c *client.Client) *App {
 	a := &App{C: c, now: time.Now, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
+	a.newTerm, a.shellJob = startTerminal, foregroundJob
 	return a
 }
 
@@ -306,6 +314,7 @@ func (a *App) View(c *ui.Context) {
 	a.syncDraft(c)
 	a.markSeen(c)
 	a.syncAnnounce(c)
+	a.sweepTerminals()
 	if a.pierre.focusComposerNext {
 		a.pierre.focusComposerNext = false
 		a.composerInput.Focus(c)
@@ -378,34 +387,100 @@ const (
 	reviewMaxWidth = 680
 )
 
+// The sidebar and the review panel keep the widths the user drags them
+// to, across launches, as Finder's and Mail's do.
 func (a *App) sideWidth() float32 {
-	if a.sideW <= 0 {
+	w := a.sideW
+	if w <= 0 {
+		w = a.settings().SidebarWidth
+	}
+	if w <= 0 {
 		return sidebarWidth
 	}
-	return max(sideMinWidth, min(sideMaxWidth, a.sideW))
+	return max(sideMinWidth, min(sideMaxWidth, w))
 }
 
 func (a *App) reviewWidth() float32 {
-	if a.rvW <= 0 {
+	w := a.rvW
+	if w <= 0 {
+		w = a.settings().InspectorWidth
+	}
+	if w <= 0 {
 		return reviewWidth
 	}
-	return max(reviewMinWidth, min(reviewMaxWidth, a.rvW))
+	return max(reviewMinWidth, min(reviewMaxWidth, w))
+}
+
+// splitDrag is a seam under the pointer: the width it had when pressed,
+// and the width the pointer asks for, which runs past the limits so that
+// the seam meets the pointer again where it left it.
+type splitDrag struct {
+	key        string
+	start, raw float32
+}
+
+func (a *App) dragSplit(key string, width float32, dx float32) *splitDrag {
+	d := &a.split
+	if d.key != key {
+		*d = splitDrag{key: key, start: width, raw: width}
+	}
+	d.raw += dx
+	return d
 }
 
 func (a *App) resizeSide(dx float32) {
-	a.sideW = max(sideMinWidth, min(sideMaxWidth, a.sideWidth()+dx))
+	d := a.dragSplit("split-side", a.sideWidth(), dx)
+	// Dragged well past its narrowest, the sidebar folds away at the width
+	// it had, as Finder's and Mail's do; ⌘\ brings it back.
+	if d.raw < sideMinWidth/2 {
+		a.sideW = d.start
+		a.noSide, a.sideMoved = true, false
+		a.split = splitDrag{}
+		return
+	}
+	a.sideW = max(sideMinWidth, min(sideMaxWidth, d.raw))
 }
 
 func (a *App) resetSideWidth() {
 	a.sideW = sidebarWidth
+	a.saveWidths()
 }
 
 func (a *App) resizeReview(dx float32) {
-	a.rvW = max(reviewMinWidth, min(reviewMaxWidth, a.reviewWidth()-dx))
+	d := a.dragSplit("split-review", a.reviewWidth(), -dx)
+	// Past half its narrowest, the panel closes, as Xcode's inspectors do.
+	if d.raw < reviewMinWidth/2 {
+		a.rvW = d.start
+		a.rv.open = false
+		a.split = splitDrag{}
+		return
+	}
+	a.rvW = max(reviewMinWidth, min(reviewMaxWidth, d.raw))
 }
 
 func (a *App) resetReviewWidth() {
 	a.rvW = reviewWidth
+	a.saveWidths()
+}
+
+// saveWidths keeps the seams' widths in the settings, once a drag ends.
+func (a *App) saveWidths() {
+	if a.C.Settings == nil {
+		return
+	}
+	s := *a.C.Settings
+	side, rv := a.sideWidth(), a.reviewWidth()
+	if side == sidebarWidth {
+		side = 0
+	}
+	if rv == reviewWidth {
+		rv = 0
+	}
+	if s.SidebarWidth == side && s.InspectorWidth == rv {
+		return
+	}
+	s.SidebarWidth, s.InspectorWidth = side, rv
+	a.do(a.C.SaveSettings(s))
 }
 
 // splitHandle draws an 8pt ergonomic resize target centered on a pane seam.
@@ -415,6 +490,9 @@ func (a *App) splitHandle(c *ui.Context, key string, x float32, onDrag func(dx f
 	h := ui.Box(c.Key(key)).Absolute().Top(0).Bottom(0).Left(x - 4).Width(8).Cursor(ui.CursorResizeColumn).Center().ZIndex(12)
 	if dx, _, ok := h.Dragged(); ok && dx != 0 {
 		onDrag(dx)
+	} else if a.split.key == key && !h.Pressed() {
+		a.split = splitDrag{}
+		a.saveWidths()
 	}
 	if h.DoubleClicked() {
 		onReset()
@@ -563,8 +641,11 @@ func (a *App) SetCloseWindow(fn func()) {
 
 // closeOrDismiss handles ⌘W in layers: close active overlay/sheet first
 // (Command Palette, Settings, Automations, Find bar), then close the main window.
-func (a *App) closeOrDismiss() {
+func (a *App) closeOrDismiss(c *ui.Context) {
 	switch {
+	case a.termFocused(c):
+		// ⌘W in a terminal closes its tab, as in Terminal.app.
+		a.closeActiveTerminal()
 	case a.pal:
 		a.pal, a.query = false, ""
 	case a.settingsOpen:

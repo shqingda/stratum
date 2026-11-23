@@ -86,7 +86,11 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 					}
 				})
 				if b.Clicked() {
-					a.rv.tab = t.id
+					if t.id == "term" && a.rv.tab != "term" {
+						a.showTerminal()
+					} else {
+						a.rv.tab = t.id
+					}
 				}
 			}
 		})
@@ -107,52 +111,6 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			a.rv.maximized = false
 		}
 	})
-}
-
-// terminalPane shows the commands the agent ran, output as it came.
-func (a *App) terminalPane(c *ui.Context) {
-	p := a.p
-	var runs []*client.Entry
-	for _, e := range a.C.Entries {
-		if e.Role == client.Tool && e.Text == "shell" {
-			runs = append(runs, e)
-		}
-	}
-	if len(runs) == 0 {
-		a.reviewNote(c, locales.NoCommandsYet())
-		return
-	}
-	prompt := "~/" + filepath.Base(a.C.Current.Cwd) + " $"
-	line := func(s string, col ui.Color) {
-		ui.Text(c, s).Font("monospace").FontSize(13).LineHeight(1.65).TextColor(col).SingleLine()
-	}
-	ui.Scroll(c).Grow(1).Padding(6, 14, 14, 14).Children(func() {
-		for i, e := range runs {
-			top := float32(8)
-			if i == 0 {
-				top = 0
-			}
-			ui.Row(c).Gap(7).Margin(top, 0, 0, 0).Children(func() {
-				line(prompt, p.Mute)
-				line(e.Detail, p.Fg)
-			})
-			for _, l := range strings.Split(strings.TrimRight(e.Output, "\n"), "\n") {
-				line(l, termColor(p, l))
-			}
-		}
-	})
-}
-
-// termColor marks the lines test runners pass and fail on.
-func termColor(p *Palette, l string) ui.Color {
-	t := strings.TrimSpace(l)
-	switch {
-	case strings.HasPrefix(t, "--- PASS") || strings.HasPrefix(t, "ok "):
-		return p.Plus
-	case strings.HasPrefix(t, "--- FAIL") || strings.HasPrefix(t, "FAIL\t") || strings.HasSuffix(t, ": error") || strings.Contains(t, "_test.go:"):
-		return p.Minus
-	}
-	return p.Fg2
 }
 
 type plan struct {

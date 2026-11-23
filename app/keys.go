@@ -11,6 +11,9 @@ import (
 )
 
 func (a *App) keys(c *ui.Context) {
+	// A shell reads esc, ⏎, ⇧⇥ and ⌥ with the arrows itself: while the
+	// keyboard is in the terminal, the window leaves those keys to it.
+	inTerm := a.termFocused(c)
 	c.Root().ObserveInput(func(ev ui.InputEvent) {
 		if ev.Kind == ui.InputKeyDown {
 			a.keyRepeat = ev.Repeat
@@ -37,7 +40,7 @@ func (a *App) keys(c *ui.Context) {
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyW, func() {
 		if !c.ShortcutRepeated() {
-			a.closeOrDismiss()
+			a.closeOrDismiss(c)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyA, func() {
@@ -75,7 +78,7 @@ func (a *App) keys(c *ui.Context) {
 	// ⌘Z takes back an archiving while the focus is not in text, which
 	// keeps ⌘Z for its own typing.
 	c.OnWindowShortcut(ui.Cmd, ui.KeyZ, func() {
-		if !c.ShortcutRepeated() && !c.FocusTakesText() {
+		if !c.ShortcutRepeated() && !c.FocusTakesText() && !inTerm {
 			a.undoArchive()
 		}
 	})
@@ -94,21 +97,33 @@ func (a *App) keys(c *ui.Context) {
 			a.stepSession(1)
 		}
 	})
-	c.OnWindowShortcut(ui.Alt, ui.KeyUp, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
-			a.stepSession(-1)
+	if !inTerm {
+		c.OnWindowShortcut(ui.Alt, ui.KeyUp, func() {
+			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+				a.stepSession(-1)
+			}
+		})
+		c.OnWindowShortcut(ui.Alt, ui.KeyDown, func() {
+			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+				a.stepSession(1)
+			}
+		})
+	}
+	// ⌃` shows and hides the terminal, as in Claude's app and Codex; ⌘T
+	// opens another shell beside it, as in Terminal.app.
+	c.OnWindowShortcut(ui.Ctrl, ui.KeyBackquote, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+			a.toggleTerminal()
 		}
 	})
-	c.OnWindowShortcut(ui.Alt, ui.KeyDown, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
-			a.stepSession(1)
-		}
-	})
-	c.OnWindowShortcut(ui.Cmd, ui.KeyF, func() {
-		if a.C.Current != nil && len(a.C.Entries) > 0 {
-			a.openFind(c)
-		}
-	})
+	if a.termShown() && !a.pal {
+		c.OnWindowShortcut(ui.Cmd, ui.KeyT, func() {
+			if !c.ShortcutRepeated() {
+				a.addTerminal()
+			}
+		})
+	}
+	c.OnWindowShortcut(ui.Cmd, ui.KeyF, func() { a.findCommand(c) })
 	c.OnWindowShortcut(ui.Cmd, ui.KeyJ, func() {
 		if !c.ShortcutRepeated() {
 			a.nextWaiting()
@@ -135,30 +150,36 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyG, func() {
-		if a.find.on {
+		if a.term.find.on && a.termShown() {
+			a.termFindStep(1)
+		} else if a.find.on {
 			a.findStep(1)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyG, func() {
-		if a.find.on {
+		if a.term.find.on && a.termShown() {
+			a.termFindStep(-1)
+		} else if a.find.on {
 			a.findStep(-1)
 		}
 	})
-	c.OnWindowShortcut(ui.Shift, ui.KeyTab, func() {
-		if !c.ShortcutRepeated() && !a.pal && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
-			modes := modeRows()
-			cur := a.C.Current.Mode
-			next := modes[0]
-			for i, m := range modes {
-				if m.id == cur {
-					next = modes[(i+1)%len(modes)]
-					break
+	if !inTerm {
+		c.OnWindowShortcut(ui.Shift, ui.KeyTab, func() {
+			if !c.ShortcutRepeated() && !a.pal && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
+				modes := modeRows()
+				cur := a.C.Current.Mode
+				next := modes[0]
+				for i, m := range modes {
+					if m.id == cur {
+						next = modes[(i+1)%len(modes)]
+						break
+					}
 				}
+				a.do(a.C.Update(proto.SessionUpdate{Mode: &next.id}))
+				a.flash(next.icon, next.label)
 			}
-			a.do(a.C.Update(proto.SessionUpdate{Mode: &next.id}))
-			a.flash(next.icon, next.label)
-		}
-	})
+		})
+	}
 	for i, key := range []ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4, ui.Key5, ui.Key6, ui.Key7, ui.Key8, ui.Key9} {
 		if i < len(a.visibleSessions) {
 			id := a.visibleSessions[i]
@@ -169,6 +190,9 @@ func (a *App) keys(c *ui.Context) {
 		mods ui.Modifiers
 		key  ui.Key
 	}{{0, ui.KeyEnter}, {ui.Cmd, ui.KeyEnter}, {ui.Cmd | ui.Alt, ui.KeyEnter}, {0, ui.KeyEscape}} {
+		if inTerm && key.mods == 0 {
+			continue
+		}
 		c.OnWindowShortcut(key.mods, key.key, func() {
 			if !a.pal && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods&ui.Cmd != 0 && !a.searchInput.Focused(c)) {
 				a.keyRepeat = false
@@ -194,6 +218,15 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 	}
 	if key == ui.KeyEscape && mods == 0 && (a.renaming != "" || a.deleting != "" || len(a.removing) > 0) {
 		a.renaming, a.deleting, a.removing = "", "", nil
+		return true
+	}
+	if key == ui.KeyEscape && mods == 0 && a.term.closing != "" {
+		a.term.closingSession, a.term.closing, a.term.job = "", "", ""
+		a.term.focus = true
+		return true
+	}
+	if key == ui.KeyEscape && mods == 0 && a.term.find.on && a.termShown() {
+		a.closeTermFind()
 		return true
 	}
 	if a.editing != "" {
@@ -460,5 +493,17 @@ func (a *App) stepSession(delta int) {
 	next := ids[(idx+delta+len(ids))%len(ids)]
 	if next != cur {
 		a.do(a.C.Open(next))
+	}
+}
+
+// findCommand is ⌘F: it finds in the terminal while the keyboard is in
+// it, as Find goes to what has the focus in Apple's apps, and in the
+// conversation otherwise.
+func (a *App) findCommand(c *ui.Context) {
+	switch {
+	case a.termFocused(c) || a.term.find.on && a.termShown():
+		a.openTermFind(c)
+	case a.C.Current != nil && len(a.C.Entries) > 0:
+		a.openFind(c)
 	}
 }

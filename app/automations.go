@@ -185,9 +185,9 @@ func (a *App) automationRow(c *ui.Context, it proto.Automation) {
 				ui.Text(c, it.Schedule).Font("monospace").FontSize(11.5).TextColor(p.Fg2).
 					Padding(2, 6).Radius(5).Background(p.Chip)
 				if it.LastStatus == "ok" {
-					ui.Text(c, "OK").FontSize(11).FontWeight(600).TextColor(p.Plus)
+					ui.Text(c, locales.Succeeded()).FontSize(11).FontWeight(600).TextColor(p.Plus)
 				} else if it.LastStatus == "error" {
-					ui.Text(c, "Error").FontSize(11).FontWeight(600).TextColor(p.Minus)
+					ui.Text(c, locales.Failed()).FontSize(11).FontWeight(600).TextColor(p.Minus)
 				}
 			})
 			ui.Text(c, it.Prompt).FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…")

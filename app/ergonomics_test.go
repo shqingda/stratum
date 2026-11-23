@@ -10,6 +10,8 @@ import (
 
 func TestErgonomicsSplitWidths(t *testing.T) {
 	a := task8App()
+	a.C.Settings = &proto.Settings{}
+	letGo := func() { a.split = splitDrag{}; a.saveWidths() }
 	if got := a.sideWidth(); got != sidebarWidth {
 		t.Fatalf("default sideWidth = %v, want %v", got, sidebarWidth)
 	}
@@ -17,17 +19,36 @@ func TestErgonomicsSplitWidths(t *testing.T) {
 	if got := a.sideWidth(); got != sidebarWidth+40 {
 		t.Fatalf("resized sideWidth = %v, want %v", got, sidebarWidth+40)
 	}
-	a.resizeSide(500)
+	letGo()
+	if got := a.C.Settings.SidebarWidth; got != sidebarWidth+40 {
+		t.Fatalf("saved sidebar width = %v, want %v", got, sidebarWidth+40)
+	}
+	// Past the limit the seam stops, and meets the pointer again where it
+	// left it, as an NSSplitView's does.
+	a.resizeSide(200)
 	if got := a.sideWidth(); got != sideMaxWidth {
 		t.Fatalf("clamped max sideWidth = %v, want %v", got, sideMaxWidth)
 	}
-	a.resizeSide(-500)
-	if got := a.sideWidth(); got != sideMinWidth {
-		t.Fatalf("clamped min sideWidth = %v, want %v", got, sideMinWidth)
+	a.resizeSide(-100)
+	if got := a.sideWidth(); got != sideMaxWidth {
+		t.Fatalf("the seam left the limit before the pointer came back: %v", got)
 	}
+	a.resizeSide(-100)
+	if got := a.sideWidth(); got != sidebarWidth+40 {
+		t.Fatalf("the seam lost the pointer: %v, want %v", got, sidebarWidth+40)
+	}
+	letGo()
 	a.resetSideWidth()
-	if got := a.sideWidth(); got != sidebarWidth {
-		t.Fatalf("reset sideWidth = %v, want %v", got, sidebarWidth)
+	if got := a.sideWidth(); got != sidebarWidth || a.C.Settings.SidebarWidth != 0 {
+		t.Fatalf("reset sideWidth = %v (saved %v), want %v", got, a.C.Settings.SidebarWidth, sidebarWidth)
+	}
+	a.resizeSide(-60)
+	if got := a.sideWidth(); got != sideMinWidth || a.noSide {
+		t.Fatalf("the sidebar at its narrowest is %v wide, hidden %v", got, a.noSide)
+	}
+	a.resizeSide(-100)
+	if !a.noSide || a.sideWidth() != sidebarWidth {
+		t.Fatalf("dragged past its narrowest the sidebar stayed (hidden %v, %v wide)", a.noSide, a.sideWidth())
 	}
 
 	if got := a.reviewWidth(); got != reviewWidth {
@@ -42,13 +63,25 @@ func TestErgonomicsSplitWidths(t *testing.T) {
 	if got := a.reviewWidth(); got != reviewMaxWidth {
 		t.Fatalf("clamped max reviewWidth = %v, want %v", got, reviewMaxWidth)
 	}
+	letGo()
+	if got := a.C.Settings.InspectorWidth; got != reviewMaxWidth {
+		t.Fatalf("saved review width = %v, want %v", got, reviewMaxWidth)
+	}
+	a.rv.open = true
 	a.resizeReview(1000)
-	if got := a.reviewWidth(); got != reviewMinWidth {
-		t.Fatalf("clamped min reviewWidth = %v, want %v", got, reviewMinWidth)
+	if a.rv.open || a.reviewWidth() != reviewMaxWidth {
+		t.Fatalf("dragged closed the panel stayed open %v at %v", a.rv.open, a.reviewWidth())
 	}
 	a.resetReviewWidth()
 	if got := a.reviewWidth(); got != reviewWidth {
 		t.Fatalf("reset reviewWidth = %v, want %v", got, reviewWidth)
+	}
+
+	// A new window starts at the saved widths.
+	b := task8App()
+	b.C.Settings = &proto.Settings{SidebarWidth: 300, InspectorWidth: 500}
+	if b.sideWidth() != 300 || b.reviewWidth() != 500 {
+		t.Fatalf("saved widths not used: %v, %v", b.sideWidth(), b.reviewWidth())
 	}
 }
 

@@ -19,11 +19,7 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 		item(locales.NewSession(), "CmdOrCtrl+N", func(*ui.Context) { a.do(a.C.NewSession()) }),
 		item(locales.Search(), "CmdOrCtrl+K", a.openPalette),
 		mygo.Separator(),
-		item(locales.FindInSession(), "CmdOrCtrl+F", func(c *ui.Context) {
-			if a.C.Current != nil && len(a.C.Entries) > 0 {
-				a.openFind(c)
-			}
-		}),
+		item(locales.FindInSession(), "CmdOrCtrl+F", a.findCommand),
 		item(locales.NextWaiting(), "CmdOrCtrl+J", func(*ui.Context) { a.nextWaiting() }),
 		item(locales.PreviousSession(), "CmdOrCtrl+[", func(*ui.Context) { a.stepSession(-1) }),
 		item(locales.NextSession(), "CmdOrCtrl+]", func(*ui.Context) { a.stepSession(1) }),
@@ -39,7 +35,7 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 			}
 		}),
 		mygo.Separator(),
-		item(locales.Close(), "CmdOrCtrl+W", func(*ui.Context) { a.closeOrDismiss() }),
+		item(locales.Close(), "CmdOrCtrl+W", a.closeOrDismiss),
 	}
 	settings = item(locales.Settings()+"…", "CmdOrCtrl+,", func(*ui.Context) {
 		if !a.settingsOpen {
@@ -51,6 +47,11 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 		item(locales.ToggleInspector(), "CmdOrCtrl+Alt+I", func(*ui.Context) {
 			if !a.settingsOpen && !a.automationsOpen {
 				a.rv.open = !a.rv.open
+			}
+		}),
+		item(locales.ShowTerminal(), "Ctrl+`", func(*ui.Context) {
+			if !a.settingsOpen && !a.automationsOpen {
+				a.toggleTerminal()
 			}
 		}),
 		mygo.Separator(),

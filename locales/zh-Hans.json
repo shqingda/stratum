@@ -167,6 +167,7 @@
   "passed": "通过",
   "exitCode": "退出码 {code}",
   "failed": "失败",
+  "succeeded": "成功",
   "omittedLines": "… 已省略前 {count} 行",
   "@omittedLines": {
     "placeholders": {
@@ -489,7 +490,15 @@
   "undone": "已撤销：{note}",
   "undoTurn": "撤销本轮",
   "redoTurn": "重做本轮",
-  "noCommandsYet": "这个会话还没有运行过命令",
+  "newTerminal": "新建终端",
+  "closeTerminal": "关闭终端",
+  "noTerminal": "没有打开的终端",
+  "terminalFailed": "终端没有启动",
+  "terminateTitle": "要终止这个终端里的进程吗？",
+  "terminateBody": "关闭这个终端会终止正在运行的进程：{name}。",
+  "terminateBodyAny": "关闭这个终端会终止其中正在运行的进程。",
+  "terminate": "终止",
+  "findInTerminal": "在终端中查找",
   "noPlanYet": "这个会话还没有计划",
   "planProgress": "{total} 步 · 已完成 {done} 步",
   "@planProgress": {
