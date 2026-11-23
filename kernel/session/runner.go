@@ -106,7 +106,13 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	if blocked, reason := r.m.runPreToolHooks(ctx, r.env.Root, r.sessionID, call.Name, call.Args); blocked {
 		return fail("Blocked by PreToolUse hook: %s", reason)
 	}
-	out, err := tool.Run(ctx, r.env, call.Args)
+	var out string
+	var images []llm.Image
+	if tool.RunImages != nil {
+		out, images, err = tool.RunImages(ctx, r.env, call.Args)
+	} else {
+		out, err = tool.Run(ctx, r.env, call.Args)
+	}
 	if changed != "" {
 		out = fmt.Sprintf("The user changed the command before it ran. It ran:\n%s\n\n%s", changed, out)
 	}
@@ -122,7 +128,7 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	if note := r.m.runPostToolHooks(ctx, r.env.Root, r.sessionID, call.Name, call.Args, out); note != "" {
 		out += "\n\n[PostToolUse hook]\n" + note
 	}
-	return llm.ToolResult{Content: out}, nil
+	return llm.ToolResult{Content: out, Images: images}, nil
 }
 
 // question puts the model's question to the user and returns the reply.
@@ -232,6 +238,10 @@ func reason(req perm.Request, env tools.Env) string {
 		return "It calls a tool of an MCP server, outside the sandbox."
 	case req.Kind == perm.Write:
 		return "It changes files."
+	case req.Kind == perm.Net:
+		return "It reaches a site on the web."
+	case req.Kind == perm.Computer:
+		return "It sees your screen and uses your mouse and keyboard."
 	}
 	return "It touches files that may hold secrets."
 }

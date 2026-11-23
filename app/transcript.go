@@ -57,13 +57,14 @@ var tools = map[string]struct {
 	"lsp":         {"file-search", locales.ToolLsp},
 	"preview":     {"world", locales.ToolPreview},
 	"browser":     {"world", locales.Browser},
+	"computer":    {"device-laptop", locales.ComputerUse},
 	"update_plan": {"list-check", locales.ToolPlan},
 	"ask_user":    {"message", locales.ToolAsk},
 	"task":        {"subtask", locales.ToolTask},
 	"run_tasks":   {"hierarchy-3", locales.ToolTasks},
 }
 
-var kinds = map[string]func() string{"read": locales.KindRead, "write": locales.KindWrite, "exec": locales.KindExec, "mcp": locales.KindMcp, "net": locales.KindNet}
+var kinds = map[string]func() string{"read": locales.KindRead, "write": locales.KindWrite, "exec": locales.KindExec, "mcp": locales.KindMcp, "net": locales.KindNet, "computer": locales.ComputerUse}
 
 // reasons put the kernel's reasons for asking in the app's words.
 var reasons = map[string]func() string{
@@ -74,6 +75,8 @@ var reasons = map[string]func() string{
 	"It changes files.":                                                           locales.ReasonChangesFiles,
 	"It calls a tool of an MCP server, outside the sandbox.":                      locales.ReasonMcp,
 	"It touches files that may hold secrets.":                                     locales.ReasonSecrets,
+	"It reaches a site on the web.":                                               locales.ReasonNet,
+	"It sees your screen and uses your mouse and keyboard.":                       locales.ReasonComputer,
 }
 
 // modeName names a permission mode.

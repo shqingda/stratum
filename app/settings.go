@@ -286,6 +286,17 @@ func (a *App) generalPage(c *ui.Context) {
 	})
 	note(c, p, map[bool]string{false: locales.CmdReturnSteers(), true: locales.CmdReturnQueues()}[set.EnterSteers])
 
+	section(c, p, locales.ComputerUse(), false)
+	group(c, p, func() {
+		r := rows{p: p}
+		r.toggle(c, "set-computer", locales.ComputerUseToggle(), set.ComputerUse, false, func(on bool) {
+			s := set
+			s.ComputerUse = on
+			a.do(a.C.SaveSettings(s))
+		})
+	})
+	note(c, p, locales.ComputerUseNote())
+
 	section(c, p, locales.Notifications(), false)
 	group(c, p, func() {
 		r := rows{p: p}

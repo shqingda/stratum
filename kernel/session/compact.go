@@ -106,6 +106,14 @@ func (m *Manager) compactAt(account, model string) int {
 	return 0
 }
 
+// seesImages reports whether a model takes images, as the catalog says;
+// a model it doesn't know, as the demo's, is taken to.
+func seesImages(account, model string) bool {
+	provider, _, _ := strings.Cut(account, "/")
+	x, ok := llm.FindModel(provider, model)
+	return !ok || x.Images
+}
+
 // tokens guesses the tokens of messages from their size: about three
 // bytes each, between English and CJK text.
 func tokens(msgs []llm.Message) int {

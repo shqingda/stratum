@@ -690,6 +690,10 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	}
 	catalog := m.Skills.Load(x.Cwd)
 	turnTools := append(append(tools.Set(nil), m.Tools...), tools.Skill(catalog))
+	// Computer use is screenshots: only for a model that sees images.
+	if set, err := m.Settings(ctx); err == nil && set.ComputerUse && seesImages(x.Account, x.Model) {
+		turnTools = append(turnTools, tools.Computer)
+	}
 	if m.MCP != nil {
 		turnTools = append(turnTools, m.MCP.Tools(ctx, x.Cwd)...)
 	}

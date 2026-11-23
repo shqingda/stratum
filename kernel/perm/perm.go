@@ -51,6 +51,9 @@ const (
 	// Net reaches the network from the kernel, as web_fetch does: only
 	// Full mode lets it run unasked.
 	Net Kind = "net"
+	// Computer sees the user's screen and uses their mouse and keyboard:
+	// only Full mode lets it run unasked.
+	Computer Kind = "computer"
 )
 
 // Request describes a call for the decision.

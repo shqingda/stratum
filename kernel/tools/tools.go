@@ -35,8 +35,11 @@ type Tool struct {
 	// the arguments are malformed.
 	Access func(env Env, args json.RawMessage) (perm.Request, error)
 	// Run runs an approved call and returns what the model reads.
-	Run     func(ctx context.Context, env Env, args json.RawMessage) (string, error)
-	newCall func() *Tool
+	Run func(ctx context.Context, env Env, args json.RawMessage) (string, error)
+	// RunImages, when set, runs the call in Run's place and gives the
+	// model images too, as computer's screenshots.
+	RunImages func(ctx context.Context, env Env, args json.RawMessage) (string, []llm.Image, error)
+	newCall   func() *Tool
 }
 
 // Spec is the tool as a model sees it.

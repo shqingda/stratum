@@ -5130,6 +5130,56 @@ func (msgs Messages) Browser() string {
 	return Catalog.Format(msgs.locale, "browser", nil)
 }
 
+// ComputerUse says "电脑操控"
+// in the language the app shows.
+func ComputerUse() string { return In(i18n.Locale()).ComputerUse() }
+
+// ComputerUse says "电脑操控"
+// in the language of msgs.
+func (msgs Messages) ComputerUse() string {
+	return Catalog.Format(msgs.locale, "computerUse", nil)
+}
+
+// ReasonNet says "要访问网上的网站"
+// in the language the app shows.
+func ReasonNet() string { return In(i18n.Locale()).ReasonNet() }
+
+// ReasonNet says "要访问网上的网站"
+// in the language of msgs.
+func (msgs Messages) ReasonNet() string {
+	return Catalog.Format(msgs.locale, "reasonNet", nil)
+}
+
+// ReasonComputer says "要查看屏幕，并使用鼠标和键盘"
+// in the language the app shows.
+func ReasonComputer() string { return In(i18n.Locale()).ReasonComputer() }
+
+// ReasonComputer says "要查看屏幕，并使用鼠标和键盘"
+// in the language of msgs.
+func (msgs Messages) ReasonComputer() string {
+	return Catalog.Format(msgs.locale, "reasonComputer", nil)
+}
+
+// ComputerUseToggle says "让代理查看屏幕并使用鼠标和键盘"
+// in the language the app shows.
+func ComputerUseToggle() string { return In(i18n.Locale()).ComputerUseToggle() }
+
+// ComputerUseToggle says "让代理查看屏幕并使用鼠标和键盘"
+// in the language of msgs.
+func (msgs Messages) ComputerUseToggle() string {
+	return Catalog.Format(msgs.locale, "computerUseToggle", nil)
+}
+
+// ComputerUseNote says "…"
+// in the language the app shows.
+func ComputerUseNote() string { return In(i18n.Locale()).ComputerUseNote() }
+
+// ComputerUseNote says "…"
+// in the language of msgs.
+func (msgs Messages) ComputerUseNote() string {
+	return Catalog.Format(msgs.locale, "computerUseNote", nil)
+}
+
 // BrowserAddress says "搜索或输入网站名称"
 // in the language the app shows.
 func BrowserAddress() string { return In(i18n.Locale()).BrowserAddress() }

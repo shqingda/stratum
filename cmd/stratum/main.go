@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/permissionflow"
 	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
@@ -16,6 +17,7 @@ import (
 	"github.com/shqingda/stratum/app/web"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/kernel/boot"
+	"github.com/shqingda/stratum/kernel/computer"
 	"github.com/shqingda/stratum/kernel/preview"
 	"github.com/shqingda/stratum/llm/auth"
 	"github.com/shqingda/stratum/locales"
@@ -104,6 +106,25 @@ func main() {
 			})
 			preview.Default.SetDriver(a.BrowserDriver())
 		}
+		// Computer use asks for the permissions it lacks with the guide to
+		// System Settings: the app to drag into its list.
+		computer.SetPermissions(func() []string {
+			var missing []string
+			for _, p := range []permissionflow.Permission{permissionflow.Accessibility, permissionflow.ScreenRecording} {
+				if !permissionflow.Allowed(p) {
+					missing = append(missing, string(p))
+				}
+			}
+			return missing
+		})
+		computer.SetGuide(func(ctx context.Context, missing []string) error {
+			for _, p := range missing {
+				if _, err := permissionflow.Guide(ctx, permissionflow.Permission(p), permissionflow.GuideOptions{}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)

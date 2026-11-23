@@ -670,6 +670,9 @@ type Settings struct {
 	// EnterSteers makes Return, while a turn runs, send into the turn
 	// right away, and ⌘Return queue; by default it is the other way.
 	EnterSteers bool `json:"enterSteers,omitempty"`
+	// ComputerUse offers the agent the computer tool: the screen, the
+	// mouse and the keyboard, each call asked for but in full access.
+	ComputerUse bool `json:"computerUse,omitempty"`
 	// NotifyWhen is when notifications show: "" while the app is in the
 	// background, "always", or "never".
 	NotifyWhen string `json:"notifyWhen,omitempty"`

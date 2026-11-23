@@ -10,6 +10,7 @@ import (
 
 	"github.com/shqingda/stratum/kernel/perm"
 	"github.com/shqingda/stratum/kernel/preview"
+	"github.com/shqingda/stratum/llm"
 )
 
 type browserArgs struct {
@@ -122,6 +123,24 @@ var Browser = &Tool{
 		}
 		return m.Act(ctx, a.Action)
 	},
+}
+
+// The browser's screenshot goes to the model too, when the model sees
+// images: what the page looks like, not only its bytes.
+func init() {
+	Browser.RunImages = func(ctx context.Context, env Env, args json.RawMessage) (string, []llm.Image, error) {
+		out, err := Browser.Run(ctx, env, args)
+		if err != nil {
+			return "", nil, err
+		}
+		var a browserArgs
+		if decode("browser", args, &a) == nil && a.Do == "screenshot" && preview.Default.Interactive() {
+			if png, err := preview.Default.Capture(ctx); err == nil && len(png) > 0 {
+				return out, []llm.Image{{MediaType: "image/png", Data: png}}, nil
+			}
+		}
+		return out, nil, nil
+	}
 }
 
 func snapshotText(snap preview.Snapshot) string {
