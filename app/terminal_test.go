@@ -97,7 +97,7 @@ func termApp(t *testing.T) (a *App, tt *ui.Tester, pump func(), dir string) {
 	a.update = func(f func()) { mu.Lock(); queue = append(queue, f); mu.Unlock() }
 	a.newTerm = func(o terminal.Options) (*terminal.Terminal, error) {
 		o.Command = []string{"/bin/sh"}
-		o.Env = append(o.Env, "PS1=$ ", "ENV=")
+		o.Env = append(o.Env, "PS1=$ ", "ENV=", "HISTFILE=/dev/null", "HISTFILESIZE=0")
 		return terminal.New(o)
 	}
 	tt = ui.NewTester(a.View, 1440, 880)
