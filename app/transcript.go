@@ -77,6 +77,7 @@ var reasons = map[string]func() string{
 	"It touches files that may hold secrets.":                                     locales.ReasonSecrets,
 	"It reaches a site on the web.":                                               locales.ReasonNet,
 	"It sees your screen and uses your mouse and keyboard.":                       locales.ReasonComputer,
+	"It asks to see and use these apps until Stratum quits.":                      locales.ReasonComputerApps,
 }
 
 // modeName names a permission mode.
@@ -861,51 +862,55 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 				ui.Text(c, w).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
 			}
 		})
-		what := ap.Command
-		if ap.Kind == "mcp" {
-			what += "\n" + compact(ap.Args)
-		}
-		if what == "" && len(ap.Paths) > 0 {
-			var rel []string
-			for _, path := range ap.Paths {
-				dir, base := a.splitPath(path)
-				rel = append(rel, dir+base)
-			}
-			what = strings.Join(rel, "\n")
-		}
-		if what == "" {
-			what = compact(ap.Args)
-		}
 		editing := a.editing == ap.ID
-		chip := ui.Column(c).Padding(9, 12).Gap(4).Radius(9).Background(p.Chip).Margin(10, 0, 8, 0)
-		if editing {
-			chip.InsetShadow(0, 0, 0, 1, p.Live)
-		}
-		chip.Children(func() {
-			if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
-				cwd := home(a.C.Current.Cwd)
-				ui.Text(c, filepath.Base(a.C.Current.Cwd)).Font("monospace").FontSize(11.5).TextColor(p.Mute).
-					SingleLine().TruncateMiddle().Unselectable().Tooltip(cwd)
+		if len(ap.Apps) > 0 {
+			a.appsChip(c, ap)
+		} else {
+			what := ap.Command
+			if ap.Kind == "mcp" {
+				what += "\n" + compact(ap.Args)
 			}
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				if ap.Command != "" && ap.Kind != "mcp" {
-					ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Unselectable()
+			if what == "" && len(ap.Paths) > 0 {
+				var rel []string
+				for _, path := range ap.Paths {
+					dir, base := a.splitPath(path)
+					rel = append(rel, dir+base)
 				}
-				if editing {
-					ui.TextInputBase(c, &a.cmdDraft).Bind(&a.cmdInput).Label(locales.EditCommand()).Font("monospace").FontSize(13.5).TextColor(p.Fg).
-						Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
-						a.cmdDraft = k.Text()
-						if k.Key == ui.KeyEnter && k.Mods == 0 {
-							a.runEdited(ap)
-							return true
-						}
-						return false
-					})
-					return
+				what = strings.Join(rel, "\n")
+			}
+			if what == "" {
+				what = compact(ap.Args)
+			}
+			chip := ui.Column(c).Padding(9, 12).Gap(4).Radius(9).Background(p.Chip).Margin(10, 0, 8, 0)
+			if editing {
+				chip.InsetShadow(0, 0, 0, 1, p.Live)
+			}
+			chip.Children(func() {
+				if ap.Command != "" && ap.Kind != "mcp" && a.C.Current != nil {
+					cwd := home(a.C.Current.Cwd)
+					ui.Text(c, filepath.Base(a.C.Current.Cwd)).Font("monospace").FontSize(11.5).TextColor(p.Mute).
+						SingleLine().TruncateMiddle().Unselectable().Tooltip(cwd)
 				}
-				ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
+				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+					if ap.Command != "" && ap.Kind != "mcp" {
+						ui.Text(c, "$").Font("monospace").FontSize(13.5).TextColor(p.Mute).Shrink(0).Unselectable()
+					}
+					if editing {
+						ui.TextInputBase(c, &a.cmdDraft).Bind(&a.cmdInput).Label(locales.EditCommand()).Font("monospace").FontSize(13.5).TextColor(p.Fg).
+							Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
+							a.cmdDraft = k.Text()
+							if k.Key == ui.KeyEnter && k.Mods == 0 {
+								a.runEdited(ap)
+								return true
+							}
+							return false
+						})
+						return
+					}
+					ui.Text(c, what).Font("monospace").FontSize(13.5).TextColor(p.Fg).Selectable().Grow(1).MinWidth(0)
+				})
 			})
-		})
+		}
 		a.approvalDiff(c, ap)
 		ui.Column(c).Gap(4).Children(func() {
 			why := func(symbol, s string) {
@@ -927,6 +932,9 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			if ap.Rule != nil && !editing {
 				// What allowing it for the session, or always, lets through.
 				why("route", locales.RuleScope(ruleText(*ap.Rule)))
+			}
+			if len(ap.Apps) > 0 {
+				why("keyboard", locales.EscStops())
 			}
 		})
 		if editing {
@@ -964,6 +972,48 @@ func (a *App) ask(c *ui.Context, ap proto.Approval) {
 			}
 		})
 	})
+}
+
+// appsChip lists the apps computer use asks for, each with what the
+// agent may do there, after what the agent wants them for, as Claude's
+// request for access does.
+func (a *App) appsChip(c *ui.Context, ap proto.Approval) {
+	p := a.p
+	var args struct {
+		Reason string `json:"reason"`
+	}
+	json.Unmarshal(ap.Args, &args)
+	why := strings.TrimSpace(args.Reason)
+	ui.Column(c).Padding(3, 12).Radius(9).Background(p.Chip).Margin(10, 0, 8, 0).Children(func() {
+		if why != "" {
+			ui.Text(c, why).FontSize(13.5).TextColor(p.Fg).Selectable().Margin(6, 0, 6, 0)
+		}
+		for i, app := range ap.Apps {
+			label, note := tierText(app.Tier)
+			row := ui.Row(c.Key("app:"+app.Name)).Gap(10).AlignItems(ui.Center).Padding(7, 0)
+			if i > 0 || why != "" {
+				row.BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge)
+			}
+			row.Children(func() {
+				ui.Column(c).Gap(2).Grow(1).MinWidth(0).Children(func() {
+					ui.Text(c, app.Name).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…")
+					ui.Text(c, note).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+				})
+				ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine().Shrink(0)
+			})
+		}
+	})
+}
+
+// tierText names what computer use may do in an app, and says it.
+func tierText(tier string) (label, note string) {
+	switch tier {
+	case "read":
+		return locales.TierRead(), locales.TierReadNote()
+	case "click":
+		return locales.TierClick(), locales.TierClickNote()
+	}
+	return locales.TierFull(), locales.TierFullNote()
 }
 
 // ruleText says what a rule lets run: "以 go test 开头的命令".

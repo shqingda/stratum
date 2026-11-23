@@ -148,6 +148,8 @@ func main() {
 			}
 			return missing
 		})
+		// While a turn uses the computer, a pill says so and esc stops it.
+		computer.SetIndicator(a.ControlIndicator())
 		computer.SetGuide(func(ctx context.Context, missing []string) error {
 			for _, p := range missing {
 				if _, err := permissionflow.Guide(ctx, permissionflow.Permission(p), permissionflow.GuideOptions{}); err != nil {

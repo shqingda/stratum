@@ -51,8 +51,9 @@ const (
 	// Net reaches the network from the kernel, as web_fetch does: only
 	// Full mode lets it run unasked.
 	Net Kind = "net"
-	// Computer sees the user's screen and uses their mouse and keyboard:
-	// only Full mode lets it run unasked.
+	// Computer sees the user's screen and uses their mouse and keyboard.
+	// Granting it apps asks the user in every mode; what it does in the
+	// apps granted runs unasked, as Granted says.
 	Computer Kind = "computer"
 )
 
@@ -68,11 +69,29 @@ type Request struct {
 	Unrestricted bool
 	// InstalledSkill is set only after the skill tool finds an installed snapshot.
 	InstalledSkill bool `json:"-"`
+	// Apps are the apps a Computer call asks to use, with the tier each
+	// would have.
+	Apps []App
+	// Granted is a Computer call inside the apps the user granted, which
+	// the tool itself checks.
+	Granted bool
+}
+
+// App is an app a Computer call asks to use.
+type App struct {
+	Name string
+	Tier string // read, click or full
 }
 
 // Decide returns what happens to req in mode. sandboxed tells whether
 // commands can run in the sandbox here.
 func Decide(mode Mode, req Request, sandboxed bool) Decision {
+	if req.Kind == Computer {
+		if req.Granted {
+			return Allow
+		}
+		return AskUser // the user grants each app, whatever the mode
+	}
 	if mode == Full {
 		return Allow
 	}

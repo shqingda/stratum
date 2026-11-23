@@ -427,6 +427,7 @@ func (m *Manager) Delete(ctx context.Context, id string) error {
 	if x, err := m.Store.GetSession(ctx, id); err == nil {
 		_ = m.disableWorktree(ctx, &x, false)
 	}
+	computer.Forget(id)
 	return m.Store.DeleteSession(ctx, id)
 }
 
@@ -724,7 +725,7 @@ func (m *Manager) runAgent(ctx context.Context, x store.Session, r *run, p proto
 	if p.Compact {
 		return used, nil
 	}
-	env := tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, RecordChange: func(path string, before, after []byte) error {
+	env := tools.Env{Root: x.Cwd, Sandboxed: m.Sandboxed, SessionID: x.ID, Stop: r.cancel, RecordChange: func(path string, before, after []byte) error {
 		return m.changes.Record(context.WithoutCancel(ctx), x.ID, r.turnSeq, path, before, after)
 	}}
 	var subMu sync.Mutex

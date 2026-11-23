@@ -5170,6 +5170,16 @@ func (msgs Messages) ComputerUseToggle() string {
 	return Catalog.Format(msgs.locale, "computerUseToggle", nil)
 }
 
+// ReasonComputerApps says "要在 Stratum 退出前查看和使用这些应用"
+// in the language the app shows.
+func ReasonComputerApps() string { return In(i18n.Locale()).ReasonComputerApps() }
+
+// ReasonComputerApps says "要在 Stratum 退出前查看和使用这些应用"
+// in the language of msgs.
+func (msgs Messages) ReasonComputerApps() string {
+	return Catalog.Format(msgs.locale, "reasonComputerApps", nil)
+}
+
 // ComputerUseNote says "…"
 // in the language the app shows.
 func ComputerUseNote() string { return In(i18n.Locale()).ComputerUseNote() }
@@ -5178,6 +5188,86 @@ func ComputerUseNote() string { return In(i18n.Locale()).ComputerUseNote() }
 // in the language of msgs.
 func (msgs Messages) ComputerUseNote() string {
 	return Catalog.Format(msgs.locale, "computerUseNote", nil)
+}
+
+// TierRead says "只能查看"
+// in the language the app shows.
+func TierRead() string { return In(i18n.Locale()).TierRead() }
+
+// TierRead says "只能查看"
+// in the language of msgs.
+func (msgs Messages) TierRead() string {
+	return Catalog.Format(msgs.locale, "tierRead", nil)
+}
+
+// TierClick says "只能点按"
+// in the language the app shows.
+func TierClick() string { return In(i18n.Locale()).TierClick() }
+
+// TierClick says "只能点按"
+// in the language of msgs.
+func (msgs Messages) TierClick() string {
+	return Catalog.Format(msgs.locale, "tierClick", nil)
+}
+
+// TierFull says "完全控制"
+// in the language the app shows.
+func TierFull() string { return In(i18n.Locale()).TierFull() }
+
+// TierFull says "完全控制"
+// in the language of msgs.
+func (msgs Messages) TierFull() string {
+	return Catalog.Format(msgs.locale, "tierFull", nil)
+}
+
+// TierReadNote says "能在截图中看到，不能点按或输入"
+// in the language the app shows.
+func TierReadNote() string { return In(i18n.Locale()).TierReadNote() }
+
+// TierReadNote says "能在截图中看到，不能点按或输入"
+// in the language of msgs.
+func (msgs Messages) TierReadNote() string {
+	return Catalog.Format(msgs.locale, "tierReadNote", nil)
+}
+
+// TierClickNote says "能点按和滚动，不能输入或按键"
+// in the language the app shows.
+func TierClickNote() string { return In(i18n.Locale()).TierClickNote() }
+
+// TierClickNote says "能点按和滚动，不能输入或按键"
+// in the language of msgs.
+func (msgs Messages) TierClickNote() string {
+	return Catalog.Format(msgs.locale, "tierClickNote", nil)
+}
+
+// TierFullNote says "能点按、输入和按键"
+// in the language the app shows.
+func TierFullNote() string { return In(i18n.Locale()).TierFullNote() }
+
+// TierFullNote says "能点按、输入和按键"
+// in the language of msgs.
+func (msgs Messages) TierFullNote() string {
+	return Catalog.Format(msgs.locale, "tierFullNote", nil)
+}
+
+// EscStops says "代理使用电脑时，按 esc 可以随时停止"
+// in the language the app shows.
+func EscStops() string { return In(i18n.Locale()).EscStops() }
+
+// EscStops says "代理使用电脑时，按 esc 可以随时停止"
+// in the language of msgs.
+func (msgs Messages) EscStops() string {
+	return Catalog.Format(msgs.locale, "escStops", nil)
+}
+
+// AgentUsingComputer says "Stratum 正在使用你的电脑"
+// in the language the app shows.
+func AgentUsingComputer() string { return In(i18n.Locale()).AgentUsingComputer() }
+
+// AgentUsingComputer says "Stratum 正在使用你的电脑"
+// in the language of msgs.
+func (msgs Messages) AgentUsingComputer() string {
+	return Catalog.Format(msgs.locale, "agentUsingComputer", nil)
 }
 
 // BrowserAddress says "搜索或输入网站名称"

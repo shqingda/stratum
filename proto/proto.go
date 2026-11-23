@@ -380,9 +380,18 @@ type Approval struct {
 	// with Options to pick from; the answer's Text replies.
 	Question string   `json:"question,omitempty"`
 	Options  []string `json:"options,omitempty"`
+	// Apps, for Kind "computer", are the apps the agent asks to use.
+	Apps []AppAccess `json:"apps,omitempty"`
 	// Rule is what allowing it for the session, or always, lets run
 	// unasked from then on.
 	Rule *Rule `json:"rule,omitempty"`
+}
+
+// AppAccess is an app computer use asks for, and how much it may do
+// there: "read" shows it, "click" clicks and scrolls, "full" does all.
+type AppAccess struct {
+	Name string `json:"name"`
+	Tier string `json:"tier"`
 }
 
 // Rule lets calls run unasked: those of a tool, and of a command tool

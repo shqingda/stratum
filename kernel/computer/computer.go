@@ -19,15 +19,16 @@ import (
 // too, unless STRATUM_COMPUTER_USE is set.
 func Enabled() bool { return os.Getenv("STRATUM_COMPUTER_USE") != "" }
 
-// Desktop is the screen and the input of this machine.
+// Desktop is the screen and the input of this machine. Points are global:
+// the main display's top left corner is 0, 0.
 type Desktop interface {
-	// Size is the main display's size in points.
-	Size(ctx context.Context) (w, h float64, err error)
+	// Displays lists the displays, the main one first.
+	Displays(ctx context.Context) ([]Display, error)
 	// Missing names the system permissions the app lacks: "accessibility"
 	// for input, "screen-recording" for screenshots.
 	Missing(ctx context.Context) []string
-	// Screenshot is a JPEG of the main display, w by h pixels.
-	Screenshot(ctx context.Context, w, h int) ([]byte, error)
+	// Screenshot is a JPEG of a display, w by h pixels.
+	Screenshot(ctx context.Context, d Display, w, h int) ([]byte, error)
 	// Click presses a mouse button count times at x, y in points.
 	Click(ctx context.Context, x, y float64, button string, count int) error
 	Move(ctx context.Context, x, y float64) error
@@ -38,8 +39,52 @@ type Desktop interface {
 	Key(ctx context.Context, k Key) error
 	// Scroll scrolls at x, y by lines: dy > 0 down, dx > 0 right.
 	Scroll(ctx context.Context, x, y float64, dx, dy int) error
-	// Open opens an app by its name, or brings it to the front.
-	Open(ctx context.Context, app string) error
+	// FindApp finds an installed or running app by its name.
+	FindApp(ctx context.Context, name string) (App, error)
+	// FrontApp is the app in front, which has the keyboard.
+	FrontApp(ctx context.Context) (App, error)
+	// AppAt is the app whose window is at x, y: Finder for the desktop
+	// and the Dock, the app in front for the menu bar.
+	AppAt(ctx context.Context, x, y float64) (Target, error)
+	// Open opens an app, or brings it to the front.
+	Open(ctx context.Context, app App) error
+}
+
+// Display is a display, in points.
+type Display struct {
+	ID         int
+	Name       string
+	X, Y, W, H float64
+	Main       bool
+}
+
+// Contains reports whether the point x, y is on the display.
+func (d Display) Contains(x, y float64) bool {
+	return x >= d.X && y >= d.Y && x < d.X+d.W && y < d.Y+d.H
+}
+
+// App is an app of this Mac.
+type App struct {
+	Name string `json:"name"` // as Finder shows it
+	ID   string `json:"id"`   // its bundle identifier
+	// Self is Stratum, which the agent never uses: it would approve its
+	// own requests.
+	Self bool `json:"self,omitempty"`
+}
+
+// key is how grants know the app.
+func (a App) key() string {
+	if a.ID != "" {
+		return strings.ToLower(a.ID)
+	}
+	return strings.ToLower(a.Name)
+}
+
+// Target is what a point of the screen belongs to.
+type Target struct {
+	App
+	// MenuBar is the menu bar, which belongs to the app in front.
+	MenuBar bool `json:"menuBar,omitempty"`
 }
 
 // Guide asks the user for missing permissions, and returns once they gave
@@ -76,6 +121,16 @@ func desktop() (Desktop, Guide) {
 	mu.Lock()
 	defer mu.Unlock()
 	return current, guide
+}
+
+// Current is the desktop, before any permission check: finding apps
+// needs none.
+func Current() (Desktop, error) {
+	d, _ := desktop()
+	if d == nil {
+		return nil, ErrUnsupported
+	}
+	return d, nil
 }
 
 // Ready returns the desktop once the app may use it, after asking the

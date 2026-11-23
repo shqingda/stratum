@@ -70,6 +70,9 @@ func (r *runner) Run(ctx context.Context, call llm.ToolCall) (llm.ToolResult, er
 	if r.policy != nil {
 		decision = r.policy.Decide(req, decision, r.env.Sandboxed)
 	}
+	if req.Kind == perm.Computer && !req.Granted && decision == perm.Allow {
+		decision = perm.AskUser // no agent's permission grants apps
+	}
 	if decision == perm.AskUser && r.allowed(ctx, req) {
 		decision = perm.Allow
 	}
@@ -155,8 +158,11 @@ func (r *runner) question(ctx context.Context, call llm.ToolCall) (llm.ToolResul
 func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (proto.ApprovalAnswer, error) {
 	rule := ruleFor(req)
 	a := proto.Approval{ID: newID(), Tool: call.Name, Args: call.Args, Kind: string(req.Kind), Command: req.Command, Reason: reason(req, r.env)}
-	if req.Kind != perm.Exec || rule.Prefix != "" {
-		a.Rule = &rule
+	if (req.Kind != perm.Exec || rule.Prefix != "") && req.Kind != perm.Computer {
+		a.Rule = &rule // apps are granted one by one, for the session
+	}
+	for _, app := range req.Apps {
+		a.Apps = append(a.Apps, proto.AppAccess{Name: app.Name, Tier: app.Tier})
 	}
 	for _, p := range req.Paths {
 		a.Paths = append(a.Paths, p.Abs)
@@ -186,6 +192,9 @@ func (r *runner) ask(ctx context.Context, call llm.ToolCall, req perm.Request) (
 // allowed reports whether a rule of the session or of the settings lets
 // req run unasked.
 func (r *runner) allowed(ctx context.Context, req perm.Request) bool {
+	if req.Kind == perm.Computer {
+		return false // a rule kept from before apps were granted
+	}
 	r.m.mu.Lock()
 	rules := slices.Clone(r.m.allowed[r.sessionID])
 	r.m.mu.Unlock()
@@ -241,7 +250,7 @@ func reason(req perm.Request, env tools.Env) string {
 	case req.Kind == perm.Net:
 		return "It reaches a site on the web."
 	case req.Kind == perm.Computer:
-		return "It sees your screen and uses your mouse and keyboard."
+		return "It asks to see and use these apps until Stratum quits."
 	}
 	return "It touches files that may hold secrets."
 }

@@ -24,6 +24,10 @@ type Env struct {
 	// RecordChange records successful file-tool writes; shell changes are not recorded.
 	// A nil slice means a missing file; a non-nil empty slice means an empty file.
 	RecordChange func(path string, before, after []byte) error
+	// SessionID is the session the call runs in.
+	SessionID string
+	// Stop ends the turn, as the user's stop does.
+	Stop func()
 }
 
 // Tool is one tool.

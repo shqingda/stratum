@@ -3,10 +3,12 @@ package computer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -53,6 +55,12 @@ function mouse(type, x, y, button, clicks) {
   if (clicks) $.CGEventSetIntegerValueField(e, 1, clicks);
   post(e);
 }
+function app(r) {
+  if (!r || r.isNil()) return null;
+  var u = r.bundleURL, n = ObjC.unwrap(r.localizedName) || "";
+  if (!u.isNil()) n = ObjC.unwrap($.NSFileManager.defaultManager.displayNameAtPath(u.path)).replace(/\.app$/, "");
+  return {name: n, id: ObjC.unwrap(r.bundleIdentifier) || "", self: r.processIdentifier == A.self};
+}
 function key(code, flags, down) {
   var e = $.CGEventCreateKeyboardEvent(null, code, down);
   $.CGEventSetFlags(e, flags);
@@ -61,18 +69,25 @@ function key(code, flags, down) {
 ` + body, nil
 }
 
-func (m *mac) Size(ctx context.Context) (float64, float64, error) {
-	out, err := m.jxa(ctx, nil, `var b = $.CGDisplayBounds($.CGMainDisplayID()); b.size.width + " " + b.size.height`)
+func (m *mac) Displays(ctx context.Context) ([]Display, error) {
+	out, err := m.jxa(ctx, nil, displaysJS)
 	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
-	f := strings.Fields(out)
-	if len(f) != 2 {
-		return 0, 0, fmt.Errorf("computer: display size %q", out)
+	var ds []Display
+	if err := json.Unmarshal([]byte(out), &ds); err != nil || len(ds) == 0 {
+		return nil, fmt.Errorf("computer: displays %q", out)
 	}
-	w, _ := strconv.ParseFloat(f[0], 64)
-	h, _ := strconv.ParseFloat(f[1], 64)
-	return w, h, nil
+	slices.SortStableFunc(ds, func(a, b Display) int {
+		switch {
+		case a.Main == b.Main:
+			return 0
+		case a.Main:
+			return -1
+		}
+		return 1
+	})
+	return ds, nil
 }
 
 func (m *mac) Missing(ctx context.Context) []string {
@@ -88,14 +103,15 @@ func (m *mac) Missing(ctx context.Context) []string {
 	return nil
 }
 
-func (m *mac) Screenshot(ctx context.Context, w, h int) ([]byte, error) {
+func (m *mac) Screenshot(ctx context.Context, d Display, w, h int) ([]byte, error) {
 	dir, err := os.MkdirTemp("", "stratum-screen-")
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(dir)
 	raw, small := filepath.Join(dir, "screen.png"), filepath.Join(dir, "screen.jpg")
-	if out, err := exec.CommandContext(ctx, "screencapture", "-x", "-m", "-t", "png", raw).CombinedOutput(); err != nil {
+	rect := fmt.Sprintf("-R%g,%g,%g,%g", d.X, d.Y, d.W, d.H)
+	if out, err := exec.CommandContext(ctx, "screencapture", "-x", rect, "-t", "png", raw).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("computer: screencapture: %s", strings.TrimSpace(string(out)))
 	}
 	if out, err := exec.CommandContext(ctx, "sips", "-z", strconv.Itoa(h), strconv.Itoa(w), "-s", "format", "jpeg", "-s", "formatOptions", "80", raw, "--out", small).CombinedOutput(); err != nil {
@@ -151,11 +167,54 @@ func (m *mac) Scroll(ctx context.Context, x, y float64, dx, dy int) error {
 	return err
 }
 
-func (m *mac) Open(ctx context.Context, app string) error {
-	if out, err := exec.CommandContext(ctx, "open", "-a", app).CombinedOutput(); err != nil {
+func (m *mac) Open(ctx context.Context, app App) error {
+	args := []string{"-a", app.Name}
+	if app.ID != "" {
+		args = []string{"-b", app.ID}
+	}
+	if out, err := exec.CommandContext(ctx, "open", args...).CombinedOutput(); err != nil {
 		return fmt.Errorf("computer: %s", strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+func (m *mac) FindApp(ctx context.Context, name string) (App, error) {
+	var a App
+	out, err := m.jxa(ctx, map[string]any{"name": name, "self": os.Getpid()}, findAppJS)
+	if err == nil && out != "null" {
+		err = json.Unmarshal([]byte(out), &a)
+	}
+	if err != nil {
+		return a, err
+	}
+	if out == "null" {
+		return a, fmt.Errorf("computer: there is no app named %q: use its name as Finder shows it, such as \"Google Chrome\"", name)
+	}
+	return a, nil
+}
+
+func (m *mac) FrontApp(ctx context.Context) (App, error) {
+	var a App
+	out, err := m.jxa(ctx, map[string]any{"self": os.Getpid()}, `JSON.stringify(app($.NSWorkspace.sharedWorkspace.frontmostApplication))`)
+	if err == nil {
+		err = json.Unmarshal([]byte(out), &a)
+	}
+	if err == nil && a.Name == "" {
+		err = errors.New("computer: no app is in front")
+	}
+	return a, err
+}
+
+func (m *mac) AppAt(ctx context.Context, x, y float64) (Target, error) {
+	var t Target
+	out, err := m.jxa(ctx, map[string]any{"x": x, "y": y, "self": os.Getpid()}, appAtJS)
+	if err == nil {
+		err = json.Unmarshal([]byte(out), &t)
+	}
+	if err == nil && t.Name == "" {
+		err = fmt.Errorf("computer: no app at %.0f, %.0f", x, y)
+	}
+	return t, err
 }
 
 // The scripts of the actions, after jxaScript's helpers.
@@ -192,6 +251,49 @@ if (saved.length) {
   });
   pb.writeObjects(restore);
 }`
+	displaysJS = `
+var out = [], screens = $.NSScreen.screens;
+for (var i = 0; i < screens.count; i++) {
+  var s = screens.objectAtIndex(i), id = ObjC.unwrap(s.deviceDescription.objectForKey($("NSScreenNumber")));
+  var b = $.CGDisplayBounds(id);
+  out.push({ID: id, Name: ObjC.unwrap(s.localizedName), X: b.origin.x, Y: b.origin.y, W: b.size.width, H: b.size.height, Main: $.CGDisplayIsMain(id) == 1});
+}
+JSON.stringify(out)`
+	// findAppJS looks for an app by name: installed, else running.
+	findAppJS = `
+var ws = $.NSWorkspace.sharedWorkspace, p = ws.fullPathForApplication($(A.name)), found = null;
+if (!p.isNil()) {
+  var b = $.NSBundle.bundleWithPath(p), id = b.isNil() ? "" : (ObjC.unwrap(b.bundleIdentifier) || "");
+  var running = id ? $.NSRunningApplication.runningApplicationsWithBundleIdentifier($(id)) : null;
+  found = {name: ObjC.unwrap($.NSFileManager.defaultManager.displayNameAtPath(p)).replace(/\.app$/, ""), id: id,
+    self: !!(running && running.count > 0 && running.objectAtIndex(0).processIdentifier == A.self)};
+} else {
+  var apps = ws.runningApplications, want = A.name.toLowerCase();
+  for (var i = 0; i < apps.count && !found; i++) {
+    var r = apps.objectAtIndex(i);
+    if ((ObjC.unwrap(r.localizedName) || "").toLowerCase() == want && r.activationPolicy == 0) found = app(r);
+  }
+}
+JSON.stringify(found)`
+	// appAtJS finds the window at a point, front to back: on-screen
+	// windows, without the desktop's.
+	appAtJS = `
+var ws = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1 | 16, 0))) || [], hit = null;
+for (var i = 0; i < ws.length && !hit; i++) {
+  var w = ws[i], b = w.kCGWindowBounds;
+  if (!b || w.kCGWindowAlpha === 0) continue;
+  if (w.kCGWindowOwnerPID == A.self && w.kCGWindowLayer != 0) continue; // the indicator
+  if (A.x >= b.X && A.y >= b.Y && A.x < b.X + b.Width && A.y < b.Y + b.Height) hit = w;
+}
+var front = app($.NSWorkspace.sharedWorkspace.frontmostApplication), out;
+if (hit && (hit.kCGWindowLayer == 24 || hit.kCGWindowLayer == 25) && hit.kCGWindowOwnerName == "Window Server") {
+  out = front; out.menuBar = true;
+} else if (!hit || hit.kCGWindowOwnerName == "Dock") {
+  out = app($.NSRunningApplication.runningApplicationsWithBundleIdentifier($("com.apple.finder")).firstObject) || {name: "Finder", id: "com.apple.finder"};
+} else {
+  out = app($.NSRunningApplication.runningApplicationWithProcessIdentifier(hit.kCGWindowOwnerPID)) || {name: hit.kCGWindowOwnerName, id: ""};
+}
+JSON.stringify(out)`
 	scrollJS = `
 mouse(5, A.x, A.y, 0); delay(0.05);
 post($.CGEventCreateScrollWheelEvent2(null, 1, 2, -A.dy, -A.dx, 0));`
