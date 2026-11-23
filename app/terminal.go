@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,16 +95,65 @@ func (a *App) termFocused(c *ui.Context) bool {
 	return t != nil && a.termShown() && t.h.Focused(c)
 }
 
-// termTheme is the panel's own background and text over the palette of
-// programs that the terminal plugin takes from Visual Studio Code.
+// termTheme is Kero's "paper" theme (theme = paper in Kero, the
+// default), on the panel's own background so the shell shows no box.
 func termTheme(p *Palette) *terminal.Theme {
-	base := terminal.LightTheme()
-	if p.Dark {
-		base = terminal.DarkTheme()
+	th := keroTheme(keroPaper, p.Dark)
+	th.Background, th.CursorText = p.Sheet, p.Sheet
+	return th
+}
+
+// tone and keroTheme are ported from Kero's theme.go
+// (github.com/egoist/kero, MIT): the hue of a theme, how much of it its
+// text takes, how vivid the programs' colors are, which lean to its hue,
+// and the hue of its cursor and selection.
+type tone struct{ hue, tint, vivid, accent float32 }
+
+// keroPaper is Kero's "paper": ink on white paper, a blue cursor.
+var keroPaper = tone{260, 0, 0.9, 262}
+
+func keroTheme(t tone, dark bool) *terminal.Theme {
+	tint := func(l, c float32) ui.Color { return ui.Oklch(l, c*t.tint, t.hue) }
+	// Red, green, yellow, blue, magenta and cyan.
+	hues := [6]float32{28, 145, 85, 255, 325, 195}
+	ls := [6]float32{0.56, 0.56, 0.62, 0.54, 0.54, 0.56}
+	cs := [6]float32{0.15, 0.13, 0.12, 0.13, 0.14, 0.09}
+	bright := float32(0.05)
+	th := &terminal.Theme{}
+	var accent ui.Color
+	if dark {
+		ls = [6]float32{0.70, 0.74, 0.80, 0.70, 0.72, 0.76}
+		cs = [6]float32{0.14, 0.13, 0.12, 0.12, 0.13, 0.10}
+		bright = 0.06
+		th.Background, th.Foreground = tint(0.255, 0.02), tint(0.92, 0.015)
+		th.Palette[0], th.Palette[7], th.Palette[8], th.Palette[15] = tint(0.36, 0.02), tint(0.82, 0.012), tint(0.5, 0.02), tint(0.96, 0.01)
+		th.Selection = ui.Oklch(0.38, 0.06, t.accent)
+		accent = ui.Oklch(0.74, 0.13, t.accent)
+	} else {
+		paper := 0.978 + 0.022*max(0, 1-t.tint/0.5)
+		th.Background, th.Foreground = tint(paper, 0.012), tint(0.28, 0.03)
+		th.Palette[0], th.Palette[7], th.Palette[8], th.Palette[15] = th.Foreground, tint(0.7, 0.02), tint(0.52, 0.02), tint(0.8, 0.015)
+		th.Selection = ui.Oklch(0.9, 0.045, t.accent)
+		accent = ui.Oklch(0.55, 0.13, t.accent)
 	}
-	th := *base
-	th.Foreground, th.Background = p.Fg, p.Sheet
-	return &th
+	for i := range 6 {
+		// Toward the theme's hue, the less the farther it is, and more
+		// vivid the nearer to it.
+		d := float32(math.Remainder(float64(t.hue-hues[i]), 360))
+		h := hues[i] + d*0.35*(1-abs32(d)/180)
+		c := cs[i] * t.vivid * (1 + 0.45*max(0, 1-abs32(d)/60))
+		th.Palette[1+i] = ui.Oklch(ls[i], c, h)
+		th.Palette[9+i] = ui.Oklch(ls[i]+bright, c+0.01, h)
+	}
+	th.Cursor, th.CursorText, th.SelectionText = accent, th.Background, th.Foreground
+	return th
+}
+
+func abs32(x float32) float32 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // addTerminal starts a shell in the session's folder and shows it.
@@ -122,6 +172,8 @@ func (a *App) addTerminal() {
 		Theme:            termTheme(PaletteFor(false)),
 		DarkTheme:        termTheme(PaletteFor(true)),
 		Padding:          terminal.Padding{X: 14, Y: 8},
+		// A blinking bar, as the user's Kero has it (cursor-style = bar).
+		Cursor: terminal.CursorBar,
 		OnExit: func(code int) {
 			if a.update != nil {
 				a.update(func() { a.termExited(sid, id, code) })
