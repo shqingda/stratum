@@ -491,6 +491,7 @@
   "undoTurn": "撤销本轮",
   "redoTurn": "重做本轮",
   "newTerminal": "新建终端",
+  "openInTerminal": "在终端中打开",
   "closeTerminal": "关闭终端",
   "noTerminal": "没有打开的终端",
   "terminalFailed": "终端没有启动",

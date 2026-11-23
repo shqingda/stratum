@@ -176,12 +176,13 @@ type App struct {
 	pick            func() []string                   // the open panel
 	pickDir         func() string                     // the open panel, for a folder
 	update          func(func())                      // runs on the UI thread, as Serve was given
+	haptic          func(hapticPattern)               // trackpad haptic feedback hook
 	menuRuns        []func(c *ui.Context)             // commands from the menu bar, for the next frame
 }
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
+	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, haptic: performHaptic, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
 	a.newTerm, a.shellJob = startShell, foregroundJob
@@ -457,6 +458,12 @@ func (a *App) dragSplit(key string, width float32, dx float32) *splitDrag {
 	return d
 }
 
+func (a *App) fireHaptic(p hapticPattern) {
+	if a.haptic != nil {
+		a.haptic(p)
+	}
+}
+
 func (a *App) resizeSide(dx float32) {
 	d := a.dragSplit("split-side", a.sideWidth(), dx)
 	// Dragged well past its narrowest, the sidebar folds away at the width
@@ -465,6 +472,7 @@ func (a *App) resizeSide(dx float32) {
 		a.sideW = d.start
 		a.noSide, a.sideMoved = true, false
 		a.split = splitDrag{}
+		a.fireHaptic(hapticAlignment)
 		return
 	}
 	a.sideW = max(sideMinWidth, min(sideMaxWidth, d.raw))
@@ -473,6 +481,7 @@ func (a *App) resizeSide(dx float32) {
 func (a *App) resetSideWidth() {
 	a.sideW = sidebarWidth
 	a.saveWidths()
+	a.fireHaptic(hapticAlignment)
 }
 
 func (a *App) resizeReview(dx float32) {
@@ -482,6 +491,7 @@ func (a *App) resizeReview(dx float32) {
 		a.rvW = d.start
 		a.rv.open = false
 		a.split = splitDrag{}
+		a.fireHaptic(hapticAlignment)
 		return
 	}
 	a.rvW = max(reviewMinWidth, min(reviewMaxWidth, d.raw))
@@ -490,6 +500,7 @@ func (a *App) resizeReview(dx float32) {
 func (a *App) resetReviewWidth() {
 	a.rvW = reviewWidth
 	a.saveWidths()
+	a.fireHaptic(hapticAlignment)
 }
 
 // saveWidths keeps the seams' widths in the settings, once a drag ends.
@@ -678,6 +689,12 @@ func (a *App) closeOrDismiss(c *ui.Context) {
 	case a.termFocused(c):
 		// ⌘W in a terminal closes its tab, as in Terminal.app.
 		a.closeActiveTerminal()
+	case a.browserFocused(c):
+		if b := a.activeWeb(); b != nil {
+			a.closeWebTab(b.id)
+		} else {
+			a.rv.open = false
+		}
 	case a.pal:
 		a.pal, a.query = false, ""
 	case a.settingsOpen:

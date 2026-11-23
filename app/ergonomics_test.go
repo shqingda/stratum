@@ -1,10 +1,16 @@
 package app
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -330,5 +336,139 @@ func TestErgonomicsNarrowWindowRules(t *testing.T) {
 	tt.Frame()
 	if a.rvOverlay || a.noSide || a.sideMoved {
 		t.Fatalf("expected overlay off and sidebar restored after closing review, got overlay=%v noSide=%v sideMoved=%v", a.rvOverlay, a.noSide, a.sideMoved)
+	}
+}
+
+func TestCoreTextOpticalTracking(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Core Text optical tracking check is macOS-only")
+	}
+	var w11, w11Spaced, w22 float32
+	tt := ui.NewTester(func(c *ui.Context) {
+		ui.Column(c).AlignItems(ui.Start).Children(func() {
+			e11 := ui.Text(c, "Stratum 1234567890").FontSize(11)
+			e11Spaced := ui.Text(c, "Stratum 1234567890").FontSize(11).LetterSpacing(0.11)
+			e22 := ui.Text(c, "Stratum 1234567890").FontSize(22)
+			w11 = e11.Bounds().W
+			w11Spaced = e11Spaced.Bounds().W
+			w22 = e22.Bounds().W
+		})
+	}, 400, 160)
+	tt.Frame()
+	t.Logf("CoreText widths: 11pt=%.3f, 11pt+0.11=%.3f, 22pt=%.3f, 2*w11=%.3f (ratio=%.4f)",
+		w11, w11Spaced, w22, w11*2, (w11*2)/w22)
+	if w11 <= 0 || w11Spaced <= 0 || w22 <= 0 {
+		t.Fatalf("expected positive text widths, got w11=%v w11Spaced=%v w22=%v", w11, w11Spaced, w22)
+	}
+	if (w11*2)/w22 <= 1.01 {
+		t.Fatalf("expected Core Text to apply automatic positive optical tracking at 11pt vs 22pt, got ratio=%.4f", (w11*2)/w22)
+	}
+}
+
+func TestErgonomicsScrollEdgePanes(t *testing.T) {
+	a := task8App()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Title\n\nBody text\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	a.C.Current.Cwd = dir
+	a.C.Files = []string{"main.go", "README.md"}
+	a.C.Entries = append(a.C.Entries, &client.Entry{
+		Key:  -99,
+		Role: client.Tool,
+		Text: "update_plan",
+		Args: json.RawMessage(`{"title":"Plan","steps":[{"step":"Step 1","status":"done"},{"step":"Step 2","status":"in_progress","note":"working"}]}`),
+	})
+
+	a.rv.open = true
+	a.rv.tab = "files"
+	tt := task8Tester(a, false)
+	if tt.Image() == nil {
+		t.Fatal("expected non-nil image for files tree")
+	}
+
+	// Open markdown preview and code preview inside filesPane.
+	a.openFilePreview(dir, "README.md")
+	tt.Frame()
+	if tt.Image() == nil {
+		t.Fatal("expected non-nil image for markdown preview")
+	}
+	a.openFilePreview(dir, "main.go")
+	tt.Frame()
+	if tt.Image() == nil {
+		t.Fatal("expected non-nil image for code preview")
+	}
+
+	// Switch to planPane.
+	a.rv.tab = "plan"
+	tt.Frame()
+	if tt.Image() == nil {
+		t.Fatal("expected non-nil image for plan pane")
+	}
+
+	// Switch to native Changes view.
+	a.rv.tab = ""
+	tt.Frame()
+	if tt.Image() == nil {
+		t.Fatal("expected non-nil image for native changes pane")
+	}
+}
+
+func TestErgonomicsHapticFeedback(t *testing.T) {
+	a := task8App()
+	a.C.Settings = &proto.Settings{}
+	var got []hapticPattern
+	a.haptic = func(p hapticPattern) {
+		got = append(got, p)
+	}
+
+	// Dragging sidebar past collapse threshold fires alignment haptic.
+	a.resizeSide(-sideMinWidth)
+	if !a.noSide || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
+		t.Fatalf("expected alignment haptic on sidebar collapse, got noSide=%v haptics=%v", a.noSide, got)
+	}
+
+	// Resetting split widths fires alignment haptic.
+	got = nil
+	a.resetSideWidth()
+	a.resetReviewWidth()
+	if !slices.Equal(got, []hapticPattern{hapticAlignment, hapticAlignment}) {
+		t.Fatalf("expected two alignment haptics on width resets, got %v", got)
+	}
+
+	// Dragging review panel past collapse threshold fires alignment haptic.
+	got = nil
+	a.rv.open = true
+	a.resizeReview(reviewMinWidth)
+	if a.rv.open || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
+		t.Fatalf("expected alignment haptic on review collapse, got open=%v haptics=%v", a.rv.open, got)
+	}
+
+	// Switching right-panel tab and Changes scope fires levelChange haptic;
+	// clicking the already-selected tab/scope does not.
+	got = nil
+	a.rv.open = true
+	a.rv.tab = ""
+	tt := task8Tester(a, false)
+	tt.Click(locales.Plan())
+	tt.Frame()
+	tt.Click(locales.Plan())
+	tt.Frame()
+	if !slices.Equal(got, []hapticPattern{hapticLevelChange}) {
+		t.Fatalf("expected one levelChange haptic when switching tab, got %v", got)
+	}
+
+	got = nil
+	a.rv.tab = ""
+	tt.Frame()
+	tt.Click(locales.Uncommitted())
+	tt.Frame()
+	tt.Click(locales.Uncommitted())
+	tt.Frame()
+	if !slices.Equal(got, []hapticPattern{hapticLevelChange}) {
+		t.Fatalf("expected one levelChange haptic when switching scope, got %v", got)
 	}
 }

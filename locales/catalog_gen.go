@@ -3844,6 +3844,16 @@ func (msgs Messages) NewTerminal() string {
 	return Catalog.Format(msgs.locale, "newTerminal", nil)
 }
 
+// OpenInTerminal says "在终端中打开"
+// in the language the app shows.
+func OpenInTerminal() string { return In(i18n.Locale()).OpenInTerminal() }
+
+// OpenInTerminal says "在终端中打开"
+// in the language of msgs.
+func (msgs Messages) OpenInTerminal() string {
+	return Catalog.Format(msgs.locale, "openInTerminal", nil)
+}
+
 // CloseTerminal says "关闭终端"
 // in the language the app shows.
 func CloseTerminal() string { return In(i18n.Locale()).CloseTerminal() }

@@ -2,14 +2,20 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"mime"
+	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/shqingda/stratum/kernel/perm"
 	"github.com/shqingda/stratum/kernel/preview"
+	"github.com/shqingda/stratum/kernel/workspace"
 	"github.com/shqingda/stratum/llm"
 )
 
@@ -26,7 +32,8 @@ var Browser = &Tool{
 		"open loads a URL in the active tab (a localhost dev server or a web page); new_tab opens one, with url or blank. " +
 		"read returns the page's visible text. open, read, click, hover, type, key, scroll, wait, back, forward and reload return the page's console errors, " +
 		"dialogs and failed requests, and its elements, each with a [ref]. click, hover and type act on an element by its ref: type sets the value of a field, " +
-		"a select (by option text or value) or an editable element, and submit presses Enter after it. key presses keys on the focused element " +
+		"a select (by option text or value) or an editable element, and submit presses Enter after it. upload attaches files (paths) to a file input ref. " +
+		"drag drags an element from ref onto to_ref. key presses keys on the focused element " +
 		"(\"Enter\", \"Escape\", \"Tab\", \"shift+Tab\", \"ArrowDown\", \"cmd+a\"). scroll moves by a screen (direction up or down) or to a ref. " +
 		"wait waits for text to show (or for seconds). Dialogs the action opens are dismissed unless accept_dialog is set (dialog_text answers a prompt). " +
 		"screenshot shows you the page (and saves a PNG to save_screenshot); console lists every console message; network lists the page's requests; " +
@@ -35,9 +42,11 @@ var Browser = &Tool{
 	Schema: json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"action": {"type": "string", "enum": ["open", "new_tab", "read", "click", "hover", "type", "key", "scroll", "wait", "back", "forward", "reload", "screenshot", "console", "network", "tabs", "select_tab", "close_tab", "eval"], "description": "What to do (defaults to open)"},
+			"action": {"type": "string", "enum": ["open", "new_tab", "read", "click", "hover", "type", "upload", "drag", "key", "scroll", "wait", "back", "forward", "reload", "screenshot", "console", "network", "tabs", "select_tab", "close_tab", "eval"], "description": "What to do (defaults to open)"},
 			"url": {"type": "string", "description": "For open and new_tab: the URL, e.g. http://localhost:3000"},
-			"ref": {"type": "integer", "description": "For click, hover, type and scroll: the element's ref"},
+			"ref": {"type": "integer", "description": "For click, hover, type, upload, drag and scroll: the element's ref"},
+			"to_ref": {"type": "integer", "description": "For drag: the target element's ref"},
+			"paths": {"type": "array", "items": {"type": "string"}, "description": "For upload: workspace-relative file paths to attach"},
 			"text": {"type": "string", "description": "For type: the text, or the option of a select. For wait: the text to wait for"},
 			"submit": {"type": "boolean", "description": "For type: press Enter after typing"},
 			"keys": {"type": "string", "description": "For key, e.g. Enter or shift+Tab"},
@@ -70,17 +79,30 @@ var Browser = &Tool{
 			}
 			return perm.Request{Tool: "browser", Kind: perm.Read}, nil
 		}
+		var uploadPaths []workspace.Path
+		if a.Do == "upload" {
+			if len(a.Paths) == 0 {
+				return perm.Request{}, errors.New("browser: upload requires paths")
+			}
+			for _, p := range a.Paths {
+				req, err := pathAccess("browser", perm.Read, env, p)
+				if err != nil {
+					return perm.Request{}, err
+				}
+				uploadPaths = append(uploadPaths, req.Paths...)
+			}
+		}
 		// Acting on a site of the web is reaching the network, as opening
 		// it is: only on the user's own local pages does it run unasked.
 		switch a.Do {
-		case "click", "hover", "type", "key", "eval":
+		case "click", "hover", "type", "upload", "drag", "key", "eval":
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			if !preview.IsLocalPage(preview.Default.CurrentURL(ctx)) {
-				return perm.Request{Tool: "browser", Kind: perm.Net}, nil
+				return perm.Request{Tool: "browser", Kind: perm.Net, Paths: uploadPaths}, nil
 			}
 		}
-		return perm.Request{Tool: "browser", Kind: perm.Read}, nil
+		return perm.Request{Tool: "browser", Kind: perm.Read, Paths: uploadPaths}, nil
 	},
 	Run: func(ctx context.Context, env Env, args json.RawMessage) (string, error) {
 		var a browserArgs
@@ -130,9 +152,63 @@ var Browser = &Tool{
 				}
 			}
 			return out, nil
+		case "upload":
+			files, err := loadUploadFiles(env.Root, a.Paths)
+			if err != nil {
+				return "", err
+			}
+			a.Action.Files = files
 		}
 		return m.Act(ctx, a.Action)
 	},
+}
+
+const (
+	maxUploadFileBytes  = 10 << 20 // 10 MiB per file
+	maxUploadTotalBytes = 20 << 20 // 20 MiB total
+)
+
+func loadUploadFiles(root string, paths []string) ([]preview.UploadFile, error) {
+	if len(paths) == 0 {
+		return nil, errors.New("browser: upload requires paths")
+	}
+	var out []preview.UploadFile
+	var total int64
+	for _, rel := range paths {
+		resolved, err := workspace.Resolve(root, rel)
+		if err != nil {
+			return nil, err
+		}
+		abs := resolved.Abs
+		info, err := os.Stat(abs)
+		if err != nil {
+			return nil, err
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("browser: %s is a directory", rel)
+		}
+		if info.Size() > maxUploadFileBytes {
+			return nil, fmt.Errorf("browser: %s exceeds 10 MiB upload limit", rel)
+		}
+		total += info.Size()
+		if total > maxUploadTotalBytes {
+			return nil, errors.New("browser: total upload size exceeds 20 MiB")
+		}
+		data, err := os.ReadFile(abs)
+		if err != nil {
+			return nil, err
+		}
+		mimeType := mime.TypeByExtension(filepath.Ext(abs))
+		if mimeType == "" {
+			mimeType = http.DetectContentType(data)
+		}
+		out = append(out, preview.UploadFile{
+			Name:   filepath.Base(abs),
+			MIME:   mimeType,
+			Base64: base64.StdEncoding.EncodeToString(data),
+		})
+	}
+	return out, nil
 }
 
 // The browser's screenshot goes to the model too, when the model sees

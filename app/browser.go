@@ -44,6 +44,7 @@ type browser struct {
 	back, forward      bool
 	failed             string
 	input              ui.Handle
+	viewHandle         ui.Handle
 	editing            bool // the address field has the focus
 
 	mu    sync.Mutex
@@ -215,6 +216,10 @@ func (a *App) load(b *browser, target string) {
 	b.addr, b.loading, b.failed = target, true, ""
 	if err := b.page.LoadURL(target); err != nil {
 		b.loading, b.failed = false, err.Error()
+		b.mu.Lock()
+		b.err = err.Error()
+		b.loads++
+		b.mu.Unlock()
 	}
 }
 
@@ -258,6 +263,17 @@ func (a *App) showBrowser() {
 
 func (a *App) browserShown() bool {
 	return a.newBrowser != nil && a.rv.open && a.rv.tab == "preview"
+}
+
+func (a *App) browserFocused(c *ui.Context) bool {
+	if !a.browserShown() {
+		return false
+	}
+	if a.webInput.Focused(c) {
+		return true
+	}
+	b := a.activeWeb()
+	return b != nil && (b.input.Focused(c) || b.viewHandle.Focused(c))
 }
 
 // browserPane is the 浏览器 tab: Safari's toolbar, its tab bar from two
@@ -393,9 +409,9 @@ func (a *App) browserPane(c *ui.Context) {
 			ui.Text(c, b.failed).FontSize(12).TextColor(p.Minus).Selectable().Padding(8, 14).Shrink(0)
 		}
 		if b.view != nil {
-			ui.WebView(c.Key(fmt.Sprint("web-page:", b.id)), b.view).Grow(1)
+			ui.WebView(c.Key(fmt.Sprint("web-page:", b.id)), b.view).Bind(&b.viewHandle).Grow(1)
 		} else {
-			ui.Column(c.Key("web-page")).Grow(1).Label(b.shown)
+			ui.Column(c.Key("web-page")).Bind(&b.viewHandle).Grow(1).Label(b.shown)
 		}
 	}
 }

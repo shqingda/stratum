@@ -73,18 +73,28 @@ func (m *Manager) CurrentURL(ctx context.Context) string {
 	return m.State().URL
 }
 
+// UploadFile is a file payload passed to a file input.
+type UploadFile struct {
+	Name   string `json:"name"`
+	MIME   string `json:"mime"`
+	Base64 string `json:"b64"`
+}
+
 // Action is one thing the agent does in the browser.
 type Action struct {
-	Do      string  `json:"action"`
-	URL     string  `json:"url,omitempty"`
-	Ref     int     `json:"ref,omitempty"`
-	Text    string  `json:"text,omitempty"`
-	Submit  bool    `json:"submit,omitempty"`
-	Keys    string  `json:"keys,omitempty"`
-	Dir     string  `json:"direction,omitempty"`
-	Script  string  `json:"script,omitempty"`
-	Tab     int     `json:"tab,omitempty"`
-	Seconds float64 `json:"seconds,omitempty"`
+	Do      string       `json:"action"`
+	URL     string       `json:"url,omitempty"`
+	Ref     int          `json:"ref,omitempty"`
+	ToRef   int          `json:"to_ref,omitempty"`
+	Paths   []string     `json:"paths,omitempty"`
+	Files   []UploadFile `json:"-"`
+	Text    string       `json:"text,omitempty"`
+	Submit  bool         `json:"submit,omitempty"`
+	Keys    string       `json:"keys,omitempty"`
+	Dir     string       `json:"direction,omitempty"`
+	Script  string       `json:"script,omitempty"`
+	Tab     int          `json:"tab,omitempty"`
+	Seconds float64      `json:"seconds,omitempty"`
 	// AcceptDialog answers yes to the dialogs the action opens (confirm,
 	// prompt with DialogText); by default they are dismissed.
 	AcceptDialog bool   `json:"accept_dialog,omitempty"`
@@ -144,6 +154,31 @@ func (m *Manager) Act(ctx context.Context, a Action) (string, error) {
 		if err := do(fmt.Sprintf("scroll(%s, %d)", quote(a.Dir), a.Ref)); err != nil {
 			return "", err
 		}
+		return m.read(ctx, d, false)
+	case "upload":
+		if a.Ref <= 0 {
+			return "", errors.New("upload requires ref")
+		}
+		if len(a.Files) == 0 {
+			return "", errors.New("upload requires files")
+		}
+		b, err := json.Marshal(a.Files)
+		if err != nil {
+			return "", err
+		}
+		if err := do(fmt.Sprintf("upload(%d, %s)", a.Ref, b)); err != nil {
+			return "", err
+		}
+		settle(ctx, d)
+		return m.read(ctx, d, false)
+	case "drag":
+		if a.Ref <= 0 || a.ToRef <= 0 {
+			return "", errors.New("drag requires ref and to_ref")
+		}
+		if err := do(fmt.Sprintf("drag(%d, %d)", a.Ref, a.ToRef)); err != nil {
+			return "", err
+		}
+		settle(ctx, d)
 		return m.read(ctx, d, false)
 	case "wait":
 		if err := wait(ctx, d, a.Text, a.Seconds); err != nil {
@@ -720,6 +755,45 @@ return {
     if (ref) { const el = byRef(ref); el.scrollIntoView({block: 'center'}); flash(el); return true; }
     const h = innerHeight * 0.8;
     scrollBy(0, dir === 'up' ? -h : h);
+    return true;
+  },
+  upload(ref, files) {
+    const el = byRef(ref);
+    if (el.tagName !== 'INPUT' || el.type !== 'file') {
+      throw new Error('ref ' + ref + ' is not a file input');
+    }
+    el.scrollIntoView({block: 'center'});
+    flash(el);
+    const dt = new DataTransfer();
+    for (const f of files) {
+      const bin = atob(f.b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      dt.items.add(new File([bytes], f.name, {type: f.mime || 'application/octet-stream'}));
+    }
+    el.files = dt.files;
+    el.dispatchEvent(new Event('input', {bubbles: true}));
+    el.dispatchEvent(new Event('change', {bubbles: true}));
+    return true;
+  },
+  drag(fromRef, toRef) {
+    const src = byRef(fromRef), dst = byRef(toRef);
+    src.scrollIntoView({block: 'center'});
+    flash(src);
+    flash(dst);
+    const sp = point(src), dp = point(dst);
+    const dt = new DataTransfer();
+    src.dispatchEvent(new PointerEvent('pointerdown', sp));
+    src.dispatchEvent(new MouseEvent('mousedown', sp));
+    src.dispatchEvent(new DragEvent('dragstart', {...sp, dataTransfer: dt}));
+    dst.dispatchEvent(new PointerEvent('pointermove', dp));
+    dst.dispatchEvent(new MouseEvent('mousemove', dp));
+    dst.dispatchEvent(new DragEvent('dragenter', {...dp, dataTransfer: dt}));
+    dst.dispatchEvent(new DragEvent('dragover', {...dp, dataTransfer: dt}));
+    dst.dispatchEvent(new DragEvent('drop', {...dp, dataTransfer: dt}));
+    dst.dispatchEvent(new PointerEvent('pointerup', dp));
+    dst.dispatchEvent(new MouseEvent('mouseup', dp));
+    src.dispatchEvent(new DragEvent('dragend', {...sp, dataTransfer: dt}));
     return true;
   },
   network() {

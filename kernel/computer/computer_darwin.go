@@ -178,6 +178,28 @@ func (m *mac) Open(ctx context.Context, app App) error {
 	return nil
 }
 
+func (m *mac) Windows(ctx context.Context) ([]Window, error) {
+	out, err := m.jxa(ctx, nil, windowsJS)
+	if err != nil {
+		return nil, err
+	}
+	var raw []struct {
+		App App     `json:"app"`
+		X   float64 `json:"x"`
+		Y   float64 `json:"y"`
+		W   float64 `json:"w"`
+		H   float64 `json:"h"`
+	}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return nil, err
+	}
+	wins := make([]Window, 0, len(raw))
+	for _, r := range raw {
+		wins = append(wins, Window{App: r.App, X: r.X, Y: r.Y, W: r.W, H: r.H})
+	}
+	return wins, nil
+}
+
 func (m *mac) FindApp(ctx context.Context, name string) (App, error) {
 	var a App
 	out, err := m.jxa(ctx, map[string]any{"name": name, "self": os.Getpid()}, findAppJS)
@@ -297,4 +319,13 @@ JSON.stringify(out)`
 	scrollJS = `
 mouse(5, A.x, A.y, 0); delay(0.05);
 post($.CGEventCreateScrollWheelEvent2(null, 1, 2, -A.dy, -A.dx, 0));`
+	windowsJS = `
+var ws = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1 | 16, 0))) || [], out = [];
+for (var i = 0; i < ws.length; i++) {
+  var w = ws[i], b = w.kCGWindowBounds;
+  if (!b || w.kCGWindowLayer !== 0 || w.kCGWindowAlpha === 0 || b.Width <= 0 || b.Height <= 0) continue;
+  var a = app($.NSRunningApplication.runningApplicationWithProcessIdentifier(w.kCGWindowOwnerPID)) || {name: w.kCGWindowOwnerName || "", id: ""};
+  out.push({app: a, x: b.X, y: b.Y, w: b.Width, h: b.Height});
+}
+JSON.stringify(out)`
 )

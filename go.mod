@@ -3,6 +3,7 @@ module github.com/shqingda/stratum
 go 1.27.4
 
 require (
+	github.com/ebitengine/purego v0.11.3
 	github.com/egoist/mygo v0.10.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/zalando/go-keyring v0.2.8
@@ -15,7 +16,6 @@ require (
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/godbus/dbus/v5 v5.2.4 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect

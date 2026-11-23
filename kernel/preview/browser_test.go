@@ -276,3 +276,34 @@ func TestIsLocalPage(t *testing.T) {
 		}
 	}
 }
+
+func TestBrowserUploadAndDrag(t *testing.T) {
+	m := &Manager{}
+	ctx := context.Background()
+	d := &fakeDriver{}
+	m.SetDriver(d)
+	if _, err := m.Open(ctx, "localhost:5173"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := m.Act(ctx, Action{Do: "upload", Ref: 3, Files: []UploadFile{{Name: "a.txt", MIME: "text/plain", Base64: "aGVsbG8="}}}); err != nil {
+		t.Fatal(err)
+	}
+	if js := d.evals[len(d.evals)-3]; !strings.Contains(js, `__stratum.upload(3, [{"name":"a.txt","mime":"text/plain","b64":"aGVsbG8="}])`) {
+		t.Errorf("upload js = %q", js[len(js)-120:])
+	}
+
+	if _, err := m.Act(ctx, Action{Do: "drag", Ref: 2, ToRef: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if js := d.evals[len(d.evals)-3]; !strings.Contains(js, `__stratum.drag(2, 5)`) {
+		t.Errorf("drag js = %q", js[len(js)-80:])
+	}
+
+	if _, err := m.Act(ctx, Action{Do: "upload", Ref: 0, Files: []UploadFile{{Name: "a.txt", Base64: "aGVsbG8="}}}); err == nil {
+		t.Error("expected error when upload ref is missing")
+	}
+	if _, err := m.Act(ctx, Action{Do: "drag", Ref: 2, ToRef: 0}); err == nil {
+		t.Error("expected error when drag to_ref is missing")
+	}
+}

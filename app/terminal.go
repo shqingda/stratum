@@ -426,6 +426,18 @@ func (a *App) showTerminal() {
 	a.term.focus = true
 }
 
+// openTerminalIn opens a new terminal tab in dir and shows the Terminal pane.
+func (a *App) openTerminalIn(dir string) {
+	a.rv.open, a.rv.tab = true, "term"
+	if a.C.Current == nil {
+		return
+	}
+	if dir == "" {
+		dir = a.C.Current.Cwd
+	}
+	a.addTerminalAt(dir, nil)
+}
+
 // sweepTerminals hangs up the shells of sessions that are gone.
 func (a *App) sweepTerminals() {
 	if len(a.term.sets) == 0 || !a.C.CanAct() {
@@ -454,11 +466,13 @@ func (a *App) sweepTerminals() {
 // folder it started in.
 func termTitle(tab *termTab) string {
 	home, _ := os.UserHomeDir()
-	if dir := tab.t.Dir(); dir != "" {
-		return shortDir(dir, home)
-	}
-	if s := strings.TrimSpace(tab.t.Title()); s != "" {
-		return s
+	if tab.t != nil {
+		if dir := tab.t.Dir(); dir != "" {
+			return shortDir(dir, home)
+		}
+		if s := strings.TrimSpace(tab.t.Title()); s != "" {
+			return s
+		}
 	}
 	return shortDir(tab.cwd, home)
 }
@@ -526,12 +540,36 @@ func (a *App) terminalPane(c *ui.Context) {
 	a.terminateDialog(c)
 }
 
+// termTabLabel disambiguates duplicate terminal tab titles with (2), (3), etc.
+func termTabLabel(tabs []*termTab, idx int) string {
+	base := termTitle(tabs[idx])
+	occ := 0
+	for j := 0; j < idx; j++ {
+		if termTitle(tabs[j]) == base {
+			occ++
+		}
+	}
+	if occ == 0 {
+		return base
+	}
+	return fmt.Sprintf("%s (%d)", base, occ+1)
+}
+
+func termTabTooltip(tab *termTab) string {
+	if tab.t != nil {
+		if dir := tab.t.Dir(); dir != "" {
+			return dir
+		}
+	}
+	return tab.cwd
+}
+
 // termTabButton is a shell's tab: its title, and on hover the close
 // button on its right.
 func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab *termTab) {
 	p := a.p
 	on := i == set.active
-	name := termTitle(tab)
+	name := termTabLabel(set.tabs, i)
 	row := ui.Row(c.Key("term-tab:"+tab.id)).Height(26).Padding(0, 2).Gap(0).Radius(7).AlignItems(ui.Center).Shrink(1).MinWidth(72).MaxWidth(200)
 	hover := row.Hovered()
 	fg, weight := p.Fg2, 500
@@ -547,7 +585,7 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 		fg = p.Mute
 	}
 	row.Children(func() {
-		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name)
+		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name).Tooltip(termTabTooltip(tab))
 		press(b)
 		focusRing(b, p)
 		b.Children(func() {

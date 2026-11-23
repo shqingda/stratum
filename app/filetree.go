@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/egoist/mygo/ui/markdown"
@@ -197,10 +198,10 @@ func (a *App) fileTreeList(c *ui.Context, cwd string) {
 		a.reviewNote(c, locales.NoFilesFound())
 		return
 	}
-	a.fileTreeListNodes(c, cwd, nodes)
+	a.fileTreeListNodes(c, cwd, nodes, 4)
 }
 
-func (a *App) fileTreeListNodes(c *ui.Context, cwd string, nodes []treeNode) {
+func (a *App) fileTreeListNodes(c *ui.Context, cwd string, nodes []treeNode, topPad float32) {
 	p := a.p
 	status := a.gitStatusMap(cwd)
 	st := &a.rv.treeList
@@ -232,6 +233,9 @@ func (a *App) fileTreeListNodes(c *ui.Context, cwd string, nodes []treeNode) {
 						a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
 					}
 				}
+			}
+			if n.isDir && m.Item(locales.OpenInTerminal()).Chosen() {
+				a.openTerminalIn(abs)
 			}
 			if m.Item(locales.RevealInFinder()).Chosen() {
 				_ = exec.Command("open", "-R", abs).Start()
@@ -269,7 +273,7 @@ func (a *App) fileTreeListNodes(c *ui.Context, cwd string, nodes []treeNode) {
 				a.openFilePreview(cwd, n.rel)
 			}
 		}
-	}).Grow(1).MinHeight(0).Padding(4, 8, 12, 8)
+	}).Grow(1).MinHeight(0).Padding(topPad, 8, 12, 8)
 }
 
 func (a *App) filePreviewView(c *ui.Context, cwd string, split bool) {
@@ -278,100 +282,108 @@ func (a *App) filePreviewView(c *ui.Context, cwd string, split bool) {
 	abs := filepath.Join(cwd, rel)
 	lower := strings.ToLower(rel)
 	isMD := strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".markdown")
-	ui.Row(c).Height(34).Shrink(0).Padding(0, 8).Gap(4).AlignItems(ui.Center).
-		BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
-		if !split {
-			back := ui.ButtonBase(c.Key("fp-back")).Row().Height(24).Padding(0, 6).Gap(4).Radius(6).
-				AlignItems(ui.Center).Label(locales.Close())
-			press(back)
-			focusRing(back, p)
-			if back.Hovered() {
-				back.Background(p.Hover)
-			}
-			back.Children(func() {
-				sym(c, "arrow-back-up", 13, p.Fg2)
-				ui.Text(c, locales.Files()).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+	const headerH = 34
+	ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+		switch {
+		case a.rv.previewLoading:
+			ui.Column(c).Grow(1).MinHeight(0).Padding(headerH, 0, 0, 0).Children(func() {
+				a.reviewNote(c, locales.Reading())
 			})
-			if back.Clicked() {
-				a.rv.previewPath = ""
-				return
-			}
-		}
-		crumb := strings.ReplaceAll(rel, string(filepath.Separator), "  ›  ")
-		ui.Text(c, crumb).Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().TruncateMiddle().Grow(1).MinWidth(0)
-		if isMD {
-			seg := ui.Row(c.Key("fp-md-seg")).Height(24).Padding(2, 2, 2, 2).Radius(7).Background(p.Chip).AlignItems(ui.Center).Shrink(0)
-			seg.Children(func() {
-				for _, opt := range []struct {
-					raw   bool
-					label string
-				}{{false, locales.Preview()}, {true, locales.Raw()}} {
-					on := a.rv.previewRaw == opt.raw
-					btn := ui.ButtonBase(c.Key(fmt.Sprint("fp-md:", opt.raw))).Height(20).Padding(0, 8).Radius(5).Center().Label(opt.label)
-					press(btn)
-					focusRing(btn, p)
-					fg, weight := p.Fg2, 500
-					if on {
-						btn.Background(p.Card)
-						rim(btn, p)
-						fg, weight = p.Fg, 600
-					} else if btn.Hovered() {
-						btn.Background(p.Hover)
-						fg = p.Fg
-					}
-					btn.Children(func() { ui.Text(c, opt.label).FontSize(11.5).FontWeight(weight).TextColor(fg).SingleLine() })
-					if btn.Clicked() {
-						a.rv.previewRaw = opt.raw
-					}
-				}
+		case a.rv.previewErr != "":
+			ui.Column(c).Grow(1).MinHeight(0).Padding(headerH, 0, 0, 0).Children(func() {
+				emptyState(c, p, "file-text", a.rv.previewErr, "", nil)
 			})
-		}
-		if a.iconPill(c, "fp-copy", "copy", locales.CopyPath()).Size(24, 24).Clicked() {
-			c.WriteClipboard(rel)
-			a.flash("check", locales.CopyPath())
-		}
-		if a.iconPill(c, "fp-finder", "folder", locales.RevealInFinder()).Size(24, 24).Clicked() {
-			_ = exec.Command("open", "-R", abs).Start()
-		}
-		if a.openIn != nil && a.iconPill(c, "fp-open", "external-link", locales.OpenInEditor()).Size(24, 24).Clicked() {
-			edLabel, edApp := a.preferredEditor()
-			if err := a.openIn(edApp, abs); err != nil {
-				if edLabel == "" {
-					edLabel = rel
+		case isMD && !a.rv.previewRaw:
+			a.md.Theme = mdTheme(p, c.Theme())
+			a.md.CodeBlock = a.codeBlock
+			ui.Scroll(c).Grow(1).MinHeight(0).Padding(headerH+14, 18, 14, 18).Children(func() {
+				markdown.View(c, strings.Join(a.rv.previewLines, "\n"), &a.md)
+			})
+		default:
+			st := &a.rv.previewList
+			st.Key = func(i int) any { return i }
+			ui.List(c, st, len(a.rv.previewLines), func(i int) {
+				line := a.rv.previewLines[i]
+				var toks []editor.Token
+				if i < len(a.rv.previewTok) {
+					toks = a.rv.previewTok[i]
 				}
-				a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+				ui.Row(c).Height(20).Padding(0, 10, 0, 0).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, strconv.Itoa(i+1)).Width(40).Shrink(0).Padding(0, 8, 0, 4).
+						Font("monospace").FontSize(11.5).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End)
+					ui.RichText(c, a.codeSpans(c, strings.TrimRight(line, "\r\n"), toks)...).
+						SingleLine().PreserveSpaces().Grow(1).MinWidth(0)
+				})
+			}).Grow(1).MinHeight(0).Padding(headerH+6, 0, 12, 0)
+		}
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(headerH + 8).PassThrough().
+			Material(glass.ScrollEdge{Background: p.Sheet})
+		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(headerH).Padding(0, 8).Gap(4).AlignItems(ui.Center).Children(func() {
+			if !split {
+				back := ui.ButtonBase(c.Key("fp-back")).Row().Height(24).Padding(0, 6).Gap(4).Radius(6).
+					AlignItems(ui.Center).Label(locales.Close())
+				press(back)
+				focusRing(back, p)
+				if back.Hovered() {
+					back.Background(p.Hover)
+				}
+				back.Children(func() {
+					sym(c, "arrow-back-up", 13, p.Fg2)
+					ui.Text(c, locales.Files()).FontSize(12.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+				})
+				if back.Clicked() {
+					a.rv.previewPath = ""
+					return
+				}
 			}
-		}
-		if split && a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(24, 24).Clicked() {
-			a.rv.treeHidden = !a.rv.treeHidden
-		}
-	})
-	switch {
-	case a.rv.previewLoading:
-		a.reviewNote(c, locales.Reading())
-	case a.rv.previewErr != "":
-		emptyState(c, p, "file-text", a.rv.previewErr, "", nil)
-	case isMD && !a.rv.previewRaw:
-		a.md.Theme = mdTheme(p, c.Theme())
-		a.md.CodeBlock = a.codeBlock
-		ui.Scroll(c).Grow(1).MinHeight(0).Padding(14, 18).Children(func() {
-			markdown.View(c, strings.Join(a.rv.previewLines, "\n"), &a.md)
+			crumb := strings.ReplaceAll(rel, string(filepath.Separator), "  ›  ")
+			ui.Text(c, crumb).Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().TruncateMiddle().Grow(1).MinWidth(0)
+			if isMD {
+				seg := ui.Row(c.Key("fp-md-seg")).Height(24).Padding(2, 2, 2, 2).Radius(7).Background(p.Chip).AlignItems(ui.Center).Shrink(0)
+				seg.Children(func() {
+					for _, opt := range []struct {
+						raw   bool
+						label string
+					}{{false, locales.Preview()}, {true, locales.Raw()}} {
+						on := a.rv.previewRaw == opt.raw
+						btn := ui.ButtonBase(c.Key(fmt.Sprint("fp-md:", opt.raw))).Height(20).Padding(0, 8).Radius(5).Center().Label(opt.label)
+						press(btn)
+						focusRing(btn, p)
+						fg, weight := p.Fg2, 500
+						if on {
+							btn.Background(p.Card)
+							rim(btn, p)
+							fg, weight = p.Fg, 600
+						} else if btn.Hovered() {
+							btn.Background(p.Hover)
+							fg = p.Fg
+						}
+						btn.Children(func() { ui.Text(c, opt.label).FontSize(11.5).FontWeight(weight).TextColor(fg).SingleLine() })
+						if btn.Clicked() {
+							a.rv.previewRaw = opt.raw
+						}
+					}
+				})
+			}
+			if a.iconPill(c, "fp-copy", "copy", locales.CopyPath()).Size(24, 24).Clicked() {
+				c.WriteClipboard(rel)
+				a.flash("check", locales.CopyPath())
+			}
+			if a.iconPill(c, "fp-finder", "folder", locales.RevealInFinder()).Size(24, 24).Clicked() {
+				_ = exec.Command("open", "-R", abs).Start()
+			}
+			if a.openIn != nil && a.iconPill(c, "fp-open", "external-link", locales.OpenInEditor()).Size(24, 24).Clicked() {
+				edLabel, edApp := a.preferredEditor()
+				if err := a.openIn(edApp, abs); err != nil {
+					if edLabel == "" {
+						edLabel = rel
+					}
+					a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+				}
+			}
+			if split && a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(24, 24).Clicked() {
+				a.rv.treeHidden = !a.rv.treeHidden
+			}
 		})
-	default:
-		st := &a.rv.previewList
-		st.Key = func(i int) any { return i }
-		ui.List(c, st, len(a.rv.previewLines), func(i int) {
-			line := a.rv.previewLines[i]
-			var toks []editor.Token
-			if i < len(a.rv.previewTok) {
-				toks = a.rv.previewTok[i]
-			}
-			ui.Row(c).Height(20).Padding(0, 10, 0, 0).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, strconv.Itoa(i+1)).Width(40).Shrink(0).Padding(0, 8, 0, 4).
-					Font("monospace").FontSize(11.5).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End)
-				ui.RichText(c, a.codeSpans(c, strings.TrimRight(line, "\r\n"), toks)...).
-					SingleLine().PreserveSpaces().Grow(1).MinWidth(0)
-			})
-		}).Grow(1).MinHeight(0).Padding(6, 0, 12, 0)
-	}
+	})
 }

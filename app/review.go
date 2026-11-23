@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/shqingda/stratum/client"
@@ -371,72 +372,90 @@ func (a *App) reviewPanel(c *ui.Context) {
 			a.browserPane(c)
 			return
 		}
-		ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
-			a.scope(c)
-			ui.Spacer(c)
-			if a.pierre.wv != nil {
-				split := a.pierre.diffStyle == "split"
-				label := "Unified"
-				if split {
-					label = "Split"
-				}
-				b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Background(p.Chip).Label(label)
-				press(b)
-				focusRing(b, p)
-				b.Children(func() {
-					ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
-				})
-				if b.Clicked() {
+		const scopeBarH = 40
+		renderScopeBar := func(row ui.Element) {
+			row.Height(scopeBarH).AlignItems(ui.Center).Children(func() {
+				a.scope(c)
+				ui.Spacer(c)
+				if a.pierre.wv != nil {
+					split := a.pierre.diffStyle == "split"
+					label := "Unified"
 					if split {
-						a.pierre.diffStyle = "unified"
-					} else {
-						a.pierre.diffStyle = "split"
+						label = "Split"
 					}
-					a.pierre.lastDiffsSig = ""
+					b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Background(p.Chip).Label(label)
+					press(b)
+					focusRing(b, p)
+					b.Children(func() {
+						ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+					})
+					if b.Clicked() {
+						if split {
+							a.pierre.diffStyle = "unified"
+						} else {
+							a.pierre.diffStyle = "split"
+						}
+						a.pierre.lastDiffsSig = ""
+					}
+				} else if fileCount(turns) > 1 {
+					a.foldAll(c, turns)
 				}
-			} else if fileCount(turns) > 1 {
-				a.foldAll(c, turns)
-			}
-			add, del := a.totals(turns)
-			ui.Row(c).Gap(6).Margin(0, 14, 0, 0).Children(func() {
-				ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus)
-				ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(13).TextColor(p.Minus)
+				add, del := a.totals(turns)
+				ui.Row(c).Gap(6).Margin(0, 14, 0, 0).Children(func() {
+					ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus)
+					ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(13).TextColor(p.Minus)
+				})
 			})
-		})
-		ch := a.C.Changes
-		switch {
-		case a.C.Current == nil:
-			a.reviewNote(c, locales.NoOpenSession())
-		case (a.rv.uncommitted || a.rv.branch) && a.C.Workspace.Branch == "":
-			a.reviewNote(c, locales.NotGitRepo())
-		case a.rv.uncommitted && len(turns) == 0:
-			a.reviewNote(c, locales.NoUncommitted())
-		case a.rv.branch && a.C.Workspace.Base == "":
-			a.reviewNote(c, locales.NoBranchBase())
-		case a.rv.branch && len(turns) == 0:
-			a.reviewNote(c, locales.NoBranchChanges(a.C.Workspace.Base))
-		case a.rv.uncommitted || a.rv.branch:
-			if a.pierre.wv != nil {
-				a.syncPierre("diffs", turns)
-				ui.WebView(c, a.pierre.wv).Grow(1)
-			} else {
-				a.reviewFiles(c, turns)
-				a.reviewDiff(c, turns)
+		}
+		renderChangesBody := func() {
+			ch := a.C.Changes
+			switch {
+			case a.C.Current == nil:
+				a.reviewNote(c, locales.NoOpenSession())
+			case (a.rv.uncommitted || a.rv.branch) && a.C.Workspace.Branch == "":
+				a.reviewNote(c, locales.NotGitRepo())
+			case a.rv.uncommitted && len(turns) == 0:
+				a.reviewNote(c, locales.NoUncommitted())
+			case a.rv.branch && a.C.Workspace.Base == "":
+				a.reviewNote(c, locales.NoBranchBase())
+			case a.rv.branch && len(turns) == 0:
+				a.reviewNote(c, locales.NoBranchChanges(a.C.Workspace.Base))
+			case a.rv.uncommitted || a.rv.branch:
+				if a.pierre.wv != nil {
+					a.syncPierre("diffs", turns)
+					ui.WebView(c, a.pierre.wv).Grow(1)
+				} else {
+					a.reviewFiles(c, turns)
+					a.reviewDiff(c, turns)
+				}
+			case ch.Err != "" && len(ch.Turns) == 0:
+				a.reviewNote(c, locales.ChangesLoadFailed(ch.Err))
+			case len(ch.Turns) == 0 && (ch.Loading || ch.Stale):
+				a.reviewNote(c, locales.Reading())
+			case len(ch.Turns) == 0:
+				a.reviewNote(c, locales.NoChangesYet())
+			default:
+				if a.pierre.wv != nil {
+					a.syncPierre("diffs", turns)
+					ui.WebView(c, a.pierre.wv).Grow(1)
+				} else {
+					a.reviewFiles(c, turns)
+					a.reviewDiff(c, turns)
+				}
 			}
-		case ch.Err != "" && len(ch.Turns) == 0:
-			a.reviewNote(c, locales.ChangesLoadFailed(ch.Err))
-		case len(ch.Turns) == 0 && (ch.Loading || ch.Stale):
-			a.reviewNote(c, locales.Reading())
-		case len(ch.Turns) == 0:
-			a.reviewNote(c, locales.NoChangesYet())
-		default:
-			if a.pierre.wv != nil {
-				a.syncPierre("diffs", turns)
-				ui.WebView(c, a.pierre.wv).Grow(1)
-			} else {
-				a.reviewFiles(c, turns)
-				a.reviewDiff(c, turns)
-			}
+		}
+		if a.pierre.wv != nil {
+			renderScopeBar(ui.Row(c).Shrink(0).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge))
+			renderChangesBody()
+		} else {
+			ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+				ui.Column(c).Grow(1).MinHeight(0).Padding(scopeBarH, 0, 0, 0).Children(func() {
+					renderChangesBody()
+				})
+				ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(scopeBarH + 8).PassThrough().
+					Material(glass.ScrollEdge{Background: p.Sheet})
+				renderScopeBar(ui.Row(c).Absolute().Top(0).Left(0).Right(0))
+			})
 		}
 		if a.C.Current != nil {
 			a.remarksBar(c)
@@ -472,6 +491,7 @@ func (a *App) scope(c *ui.Context) {
 			}
 			b.Children(func() { ui.Text(c, s.label).FontSize(13).FontWeight(weight).TextColor(col) })
 			if b.Clicked() && !on {
+				a.fireHaptic(hapticLevelChange)
 				a.rv.uncommitted, a.rv.branch, a.rv.sel, a.rv.turn = s.uncommitted, s.branch, "", 0
 				if s.uncommitted || s.branch {
 					a.C.Workspace.BranchStale = true // read it as it is now

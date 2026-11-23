@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/locales"
@@ -86,6 +87,9 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 					}
 				})
 				if b.Clicked() {
+					if a.rv.tab != t.id {
+						a.fireHaptic(hapticLevelChange)
+					}
 					if t.id == "term" && a.rv.tab != "term" {
 						a.showTerminal()
 					} else {
@@ -150,34 +154,38 @@ func (a *App) planPane(c *ui.Context) {
 			done++
 		}
 	}
-	ui.Scroll(c).Grow(1).Padding(14, 18).Children(func() {
-		title := pl.Title
-		if title == "" {
-			title = locales.Plan()
-		}
-		ui.Text(c, title).FontSize(14).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
-		ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(13).TextColor(p.Mute).Margin(0, 0, 14, 0)
-		for _, s := range pl.Steps {
-			ui.Row(c).Gap(10).Padding(7, 0).Children(func() {
-				box := ui.Box(c).Size(16, 16).Radius(5).Shrink(0).Margin(2, 0, 0, 0).Center()
-				fg := p.Fg
-				switch s.Status {
-				case "done":
-					fg = p.Mute
-					box.Background(p.Fg2).Children(func() { sym(c, "check", 11, p.Bg) })
-				case "in_progress":
-					box.Border(1.5, p.Live).Children(func() { ui.Box(c).Size(6, 6).Radius(2).Background(p.Live) })
-				default:
-					box.Border(1.2, p.Faint)
-				}
-				ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-					ui.Text(c, s.Step).FontSize(14).LineHeight(1.45).TextColor(fg)
-					if s.Note != "" {
-						ui.Text(c, s.Note).FontSize(13).LineHeight(1.45).TextColor(p.Mute)
+	ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+		ui.Scroll(c).Grow(1).MinHeight(0).Padding(14, 18).Children(func() {
+			title := pl.Title
+			if title == "" {
+				title = locales.Plan()
+			}
+			ui.Text(c, title).FontSize(14).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
+			ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(13).TextColor(p.Mute).Margin(0, 0, 14, 0)
+			for _, s := range pl.Steps {
+				ui.Row(c).Gap(10).Padding(7, 0).Children(func() {
+					box := ui.Box(c).Size(16, 16).Radius(5).Shrink(0).Margin(2, 0, 0, 0).Center()
+					fg := p.Fg
+					switch s.Status {
+					case "done":
+						fg = p.Mute
+						box.Background(p.Fg2).Children(func() { sym(c, "check", 11, p.Bg) })
+					case "in_progress":
+						box.Border(1.5, p.Live).Children(func() { ui.Box(c).Size(6, 6).Radius(2).Background(p.Live) })
+					default:
+						box.Border(1.2, p.Faint)
 					}
+					ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+						ui.Text(c, s.Step).FontSize(14).LineHeight(1.45).TextColor(fg)
+						if s.Note != "" {
+							ui.Text(c, s.Note).FontSize(13).LineHeight(1.45).TextColor(p.Mute)
+						}
+					})
 				})
-			})
-		}
+			}
+		})
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(16).PassThrough().
+			Material(glass.ScrollEdge{Background: p.Sheet})
 	})
 }
 
@@ -204,78 +212,91 @@ func (a *App) filesPane(c *ui.Context) {
 	}
 	renderTree := func() {
 		q := strings.TrimSpace(a.rv.fileQuery)
-		ui.Column(c).Padding(10, 12, 6, 12).Children(func() {
-			ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
-		})
-		if q == "" {
-			if nodes := a.buildTreeNodes(cur.Cwd); len(nodes) > 0 {
-				a.fileTreeListNodes(c, cur.Cwd, nodes)
-				return
-			}
-		}
-		if key := cur.Cwd + "\x00" + q; a.filesKey != key && a.C.Phase == client.Ready {
-			if cmds := a.C.FindFiles(q); cmds != nil {
-				a.filesKey = key
-				a.quiet(cmds, nil)
-			}
-		}
-		if len(a.C.Files) == 0 {
-			a.reviewNote(c, locales.NoFilesFound())
-			return
-		}
-		ui.Scroll(c).Grow(1).Padding(4, 8, 12, 8).Children(func() {
-			for _, f := range a.C.Files {
-				isDir := strings.HasSuffix(f, "/")
-				icon := "file-text"
-				if isDir {
-					icon = "folder"
+		const searchBarH = 44
+		ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+			rendered := false
+			if q == "" {
+				if nodes := a.buildTreeNodes(cur.Cwd); len(nodes) > 0 {
+					a.fileTreeListNodes(c, cur.Cwd, nodes, searchBarH+4)
+					rendered = true
 				}
-				row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
-				press(row)
-				focusRing(row, p)
-				if row.Hovered() {
-					row.Background(p.Hover)
-				}
-				file := f
-				row.ContextMenu(func(m *ui.Menu) {
-					if !isDir && m.Item(locales.Preview()).Chosen() {
-						a.openFilePreview(cur.Cwd, file)
+			}
+			if !rendered {
+				if key := cur.Cwd + "\x00" + q; a.filesKey != key && a.C.Phase == client.Ready {
+					if cmds := a.C.FindFiles(q); cmds != nil {
+						a.filesKey = key
+						a.quiet(cmds, nil)
 					}
-					if !isDir && a.openIn != nil {
-						if m.Item(locales.OpenInEditor()).Chosen() {
-							edLabel, edApp := a.preferredEditor()
-							if err := a.openIn(edApp, filepath.Join(cur.Cwd, file)); err != nil {
-								if edLabel == "" {
-									edLabel = file
+				}
+				if len(a.C.Files) == 0 {
+					ui.Column(c).Grow(1).MinHeight(0).Padding(searchBarH+4, 0, 0, 0).Children(func() {
+						a.reviewNote(c, locales.NoFilesFound())
+					})
+				} else {
+					ui.Scroll(c).Grow(1).MinHeight(0).Padding(searchBarH+4, 8, 12, 8).Children(func() {
+						for _, f := range a.C.Files {
+							isDir := strings.HasSuffix(f, "/")
+							icon := "file-text"
+							if isDir {
+								icon = "folder"
+							}
+							row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
+							press(row)
+							focusRing(row, p)
+							if row.Hovered() {
+								row.Background(p.Hover)
+							}
+							file := f
+							row.ContextMenu(func(m *ui.Menu) {
+								if !isDir && m.Item(locales.Preview()).Chosen() {
+									a.openFilePreview(cur.Cwd, file)
 								}
-								a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+								if isDir && m.Item(locales.OpenInTerminal()).Chosen() {
+									a.openTerminalIn(filepath.Join(cur.Cwd, file))
+								}
+								if !isDir && a.openIn != nil {
+									if m.Item(locales.OpenInEditor()).Chosen() {
+										edLabel, edApp := a.preferredEditor()
+										if err := a.openIn(edApp, filepath.Join(cur.Cwd, file)); err != nil {
+											if edLabel == "" {
+												edLabel = file
+											}
+											a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+										}
+									}
+								}
+								if m.Item(locales.CopyPath()).Chosen() {
+									c.WriteClipboard(file)
+									a.flash("check", locales.CopyPath())
+								}
+							})
+							row.Children(func() {
+								sym(c, icon, 14, p.Mute)
+								ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
+							})
+							if row.Clicked() && !isDir {
+								abs := filepath.Join(cur.Cwd, f)
+								if _, err := os.Stat(abs); err == nil {
+									a.openFilePreview(cur.Cwd, f)
+								} else if a.openIn != nil {
+									edLabel, edApp := a.preferredEditor()
+									if err := a.openIn(edApp, abs); err != nil {
+										if edLabel == "" {
+											edLabel = f
+										}
+										a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
+									}
+								}
 							}
 						}
-					}
-					if m.Item(locales.CopyPath()).Chosen() {
-						c.WriteClipboard(file)
-						a.flash("check", locales.CopyPath())
-					}
-				})
-				row.Children(func() {
-					sym(c, icon, 14, p.Mute)
-					ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
-				})
-				if row.Clicked() && !isDir {
-					abs := filepath.Join(cur.Cwd, f)
-					if _, err := os.Stat(abs); err == nil {
-						a.openFilePreview(cur.Cwd, f)
-					} else if a.openIn != nil {
-						edLabel, edApp := a.preferredEditor()
-						if err := a.openIn(edApp, abs); err != nil {
-							if edLabel == "" {
-								edLabel = f
-							}
-							a.flash("alert-circle", locales.CouldntOpen(edLabel, shortOpenErr(err)))
-						}
-					}
+					})
 				}
 			}
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(searchBarH + 8).PassThrough().
+				Material(glass.ScrollEdge{Background: p.Sheet})
+			ui.Column(c).Absolute().Top(0).Left(0).Right(0).Padding(10, 12, 6, 12).Children(func() {
+				ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
+			})
 		})
 	}
 	if !split {
@@ -287,8 +308,7 @@ func (a *App) filesPane(c *ui.Context) {
 			if a.rv.previewPath != "" {
 				a.filePreviewView(c, cur.Cwd, true)
 			} else {
-				ui.Row(c).Height(34).Shrink(0).Padding(0, 8).AlignItems(ui.Center).
-					BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+				ui.Row(c).Height(34).Shrink(0).Padding(0, 8).AlignItems(ui.Center).Children(func() {
 					ui.Spacer(c)
 					if a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(24, 24).Clicked() {
 						a.rv.treeHidden = !a.rv.treeHidden

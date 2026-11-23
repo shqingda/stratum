@@ -419,6 +419,7 @@ m("redoTurn", "重做本轮", "Redo Turn")
 
 # Panes
 m("newTerminal", "新建终端", "New Terminal")
+m("openInTerminal", "在终端中打开", "Open in Terminal")
 m("closeTerminal", "关闭终端", "Close Terminal")
 m("noTerminal", "没有打开的终端", "No terminal is open")
 m("terminalFailed", "终端没有启动", "The terminal didn’t start")

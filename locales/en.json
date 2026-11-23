@@ -380,6 +380,7 @@
   "undoTurn": "Undo Turn",
   "redoTurn": "Redo Turn",
   "newTerminal": "New Terminal",
+  "openInTerminal": "Open in Terminal",
   "closeTerminal": "Close Terminal",
   "noTerminal": "No terminal is open",
   "terminalFailed": "The terminal didn’t start",

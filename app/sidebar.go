@@ -297,6 +297,9 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 		if cwd != "" && m.Item(locales.RevealInFinder()).Chosen() {
 			_ = exec.Command("open", "-R", cwd).Start()
 		}
+		if cwd != "" && a.C.Current != nil && m.Item(locales.OpenInTerminal()).Chosen() {
+			a.openTerminalIn(cwd)
+		}
 		m.Separator()
 		if m.Item(locales.RemoveProject() + "…").Danger().Chosen() {
 			// It deletes every session in it, for good: ask first, as

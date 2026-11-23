@@ -50,6 +50,18 @@ type Desktop interface {
 	Open(ctx context.Context, app App) error
 }
 
+// Window is an on-screen layer-0 application window in global display points.
+type Window struct {
+	App        App     `json:"app"`
+	X, Y, W, H float64 `json:"-"`
+}
+
+// WindowLister lists visible layer-0 application windows front-to-back
+// so screenshots can hide apps the user has not granted to the session.
+type WindowLister interface {
+	Windows(ctx context.Context) ([]Window, error)
+}
+
 // Display is a display, in points.
 type Display struct {
 	ID         int

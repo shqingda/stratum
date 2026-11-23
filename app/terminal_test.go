@@ -366,3 +366,38 @@ func TestLastLinesStartsALine(t *testing.T) {
 		t.Errorf("lastLines = %q", got)
 	}
 }
+
+func TestTerminalDuplicateTabLabels(t *testing.T) {
+	tabs := []*termTab{
+		{id: "t1", cwd: "/tmp/proj"},
+		{id: "t2", cwd: "/tmp/other"},
+		{id: "t3", cwd: "/tmp/proj"},
+		{id: "t4", cwd: "/tmp/proj"},
+	}
+	want := []string{"/tmp/proj", "/tmp/other", "/tmp/proj (2)", "/tmp/proj (3)"}
+	for i, w := range want {
+		if got := termTabLabel(tabs, i); got != w {
+			t.Errorf("termTabLabel(tabs, %d) = %q, want %q", i, got, w)
+		}
+	}
+}
+
+func TestOpenInTerminalDir(t *testing.T) {
+	a := task8App()
+	subDir := filepath.Join(t.TempDir(), "sub")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	var gotDir string
+	a.newTerm = func(opts terminal.Options) (*terminal.Terminal, error) {
+		gotDir = opts.Dir
+		return nil, errors.New("stubbed")
+	}
+	a.openTerminalIn(subDir)
+	if !a.rv.open || a.rv.tab != "term" {
+		t.Fatalf("expected terminal pane open, got open=%v tab=%q", a.rv.open, a.rv.tab)
+	}
+	if gotDir != subDir {
+		t.Fatalf("expected newTerm Dir=%q, got %q", subDir, gotDir)
+	}
+}

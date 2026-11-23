@@ -350,6 +350,17 @@ func runComputer(ctx context.Context, env Env, args json.RawMessage) (string, []
 	if err != nil {
 		return "", nil, err
 	}
+	if wl, ok := d.(computer.WindowLister); ok {
+		if wins, werr := wl.Windows(ctx); werr == nil && len(wins) > 0 {
+			shot, err = computer.RedactScreenshot(shot, shown, s, wins, func(app computer.App) bool {
+				_, ok := computer.GrantFor(env.SessionID, app)
+				return ok
+			})
+			if err != nil {
+				return "", nil, err
+			}
+		}
+	}
 	did = strings.ReplaceAll(did, "_", " ")
 	out := fmt.Sprintf("%s. Screenshot of %s: %d×%d pixels.", strings.ToUpper(did[:1])+did[1:], shown.Name, iw, ih)
 	if len(displays) > 1 {

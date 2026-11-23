@@ -14,6 +14,7 @@ func (a *App) keys(c *ui.Context) {
 	// A shell reads esc, ⏎, ⇧⇥ and ⌥ with the arrows itself: while the
 	// keyboard is in the terminal, the window leaves those keys to it.
 	inTerm := a.termFocused(c)
+	inWeb := a.browserFocused(c)
 	c.Root().ObserveInput(func(ev ui.InputEvent) {
 		if ev.Kind == ui.InputKeyDown {
 			a.keyRepeat = ev.Repeat
@@ -51,7 +52,11 @@ func (a *App) keys(c *ui.Context) {
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyL, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
-			a.composerInput.Focus(c)
+			if inWeb {
+				a.webFocus = true
+			} else {
+				a.composerInput.Focus(c)
+			}
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeySlash, func() {
@@ -89,12 +94,24 @@ func (a *App) keys(c *ui.Context) {
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketLeft, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
-			a.stepSession(-1)
+			if inWeb {
+				if b := a.activeWeb(); b != nil && b.back {
+					b.page.GoBack()
+				}
+			} else {
+				a.stepSession(-1)
+			}
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketRight, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
-			a.stepSession(1)
+			if inWeb {
+				if b := a.activeWeb(); b != nil && b.forward {
+					b.page.GoForward()
+				}
+			} else {
+				a.stepSession(1)
+			}
 		}
 	})
 	if !inTerm {
@@ -123,6 +140,11 @@ func (a *App) keys(c *ui.Context) {
 		c.OnWindowShortcut(ui.Cmd, ui.KeyT, func() {
 			switch {
 			case c.ShortcutRepeated():
+			case inTerm:
+				a.addTerminal()
+			case inWeb:
+				a.newWebTab("")
+				a.webFocus = true
 			case a.termShown():
 				a.addTerminal()
 			default:

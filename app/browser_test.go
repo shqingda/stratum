@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -13,17 +14,22 @@ import (
 
 // fakePage loads at once: each load counts as its tab's next one.
 type fakePage struct {
-	b       *browser
-	mu      sync.Mutex
-	loaded  []string
-	backs   int
-	reloads int
+	b        *browser
+	mu       sync.Mutex
+	loaded   []string
+	backs    int
+	forwards int
+	reloads  int
+	loadErr  error
 }
 
 // LoadURL runs on the UI thread, as the panel calls it, so it may set
 // what the page shows; the load's end comes from another goroutine, as a
 // web view's does.
 func (f *fakePage) LoadURL(u string) error {
+	if f.loadErr != nil {
+		return f.loadErr
+	}
 	f.mu.Lock()
 	f.loaded = append(f.loaded, u)
 	f.mu.Unlock()
@@ -36,7 +42,7 @@ func (f *fakePage) LoadURL(u string) error {
 	return nil
 }
 func (f *fakePage) GoBack()    { f.backs++ }
-func (f *fakePage) GoForward() {}
+func (f *fakePage) GoForward() { f.forwards++ }
 func (f *fakePage) Reload()    { f.reloads++ }
 func (f *fakePage) Stop()      {}
 func (f *fakePage) EvalContext(context.Context, string) (any, error) {
@@ -337,5 +343,85 @@ func TestBrowserReopensItsTabs(t *testing.T) {
 	tt.Frame()
 	if got := a.C.Settings.BrowserTabs; len(got) != 1 || got[0] != "https://example.com/" || a.C.Settings.BrowserTab != 0 {
 		t.Errorf("after closing a tab the settings keep %q, %d", got, a.C.Settings.BrowserTab)
+	}
+}
+
+func TestBrowserFocusShortcuts(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.showBrowser()
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+
+	// Open two tabs and focus the browser address bar.
+	a.newWebTab("http://localhost:5173")
+	a.newWebTab("http://localhost:3000")
+	a.webTabs[1].back = true
+	a.webTabs[1].forward = true
+	a.webFocus = true
+	tt.Frame()
+
+	// ⌘[ and ⌘] navigate browser history when browser has focus.
+	tt.Key(ui.Cmd, ui.KeyBracketLeft)
+	tt.Frame()
+	if tabs.pages[1].backs != 1 {
+		t.Fatalf("⌘[ in browser: backs=%d, want 1", tabs.pages[1].backs)
+	}
+	tt.Key(ui.Cmd, ui.KeyBracketRight)
+	tt.Frame()
+	if tabs.pages[1].forwards != 1 {
+		t.Fatalf("⌘] in browser: forwards=%d, want 1", tabs.pages[1].forwards)
+	}
+
+	// ⌘W closes active browser tab when browser has focus.
+	tt.Key(ui.Cmd, ui.KeyW)
+	tt.Frame()
+	if len(a.webTabs) != 1 {
+		t.Fatalf("⌘W in browser left %d tabs, want 1", len(a.webTabs))
+	}
+
+	// ⌘L while browser has focus targets address bar instead of composer.
+	a.webFocus = true
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyL)
+	tt.Frame()
+	if !tt.Focused("搜索或输入网站名称") {
+		t.Fatal("⌘L in browser did not keep focus in address bar")
+	}
+
+	// Outside browser focus, ⌘L focuses composer and ⌘[ steps sessions instead of browser.
+	if err := tt.Click("检查"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	a.showBrowser()
+	tt.Frame()
+	prevBack := tabs.pages[0].backs
+	a.webTabs[0].back = true
+	tt.Key(ui.Cmd, ui.KeyBracketLeft)
+	tt.Frame()
+	if tabs.pages[0].backs != prevBack {
+		t.Fatalf("⌘[ outside browser triggered browser GoBack")
+	}
+}
+
+func TestBrowserDriverLoadErrorDoesNotHang(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.update = func(fn func()) { fn() }
+	origNew := a.newBrowser
+	a.newBrowser = func() (*browser, error) {
+		b, err := origNew()
+		if err == nil {
+			tabs.pages[len(tabs.pages)-1].loadErr = errors.New("bad url")
+		}
+		return b, err
+	}
+	drv := &BrowserDriver{a: a}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := drv.OpenTab(ctx, "http://bad"); err == nil || err.Error() != "bad url" {
+		t.Fatalf("OpenTab = %v, want bad url", err)
+	}
+	if err := drv.Navigate(ctx, "http://bad"); err == nil || err.Error() != "bad url" {
+		t.Fatalf("Navigate = %v, want bad url", err)
 	}
 }
