@@ -298,13 +298,57 @@ func (a *App) browserPane(c *ui.Context) {
 			field.InsetShadow(0, 0, 0, 1, p.Live)
 		}
 		field.Children(func() {
+			sugg := a.addressSuggestions(b, *addr, h.Focused(c))
+			if a.webSuggest >= len(sugg) {
+				a.webSuggest = -1
+			}
+			chosen := a.webPick
+			a.webPick = ""
 			inp := ui.TextInputBase(c.Key("web-url"), addr).Bind(h).
 				Placeholder(locales.BrowserAddress()).PlaceholderColor(p.Mute).
-				FontSize(12.5).TextColor(p.Fg).SingleLine().Label(locales.BrowserAddress()).Grow(1).MinWidth(0)
+				FontSize(12.5).TextColor(p.Fg).SingleLine().Label(locales.BrowserAddress()).Grow(1).MinWidth(0).
+				OnTextKey(func(k ui.TextKey) bool {
+					// The history's pages under the field, as Codex's and
+					// Safari's address fields offer them: ↓ and ↑ pick one,
+					// Return opens it.
+					switch {
+					case k.Key == ui.KeyDown && k.Mods == 0 && len(sugg) > 0:
+						a.webSuggest = (a.webSuggest + 1) % len(sugg)
+					case k.Key == ui.KeyUp && k.Mods == 0 && len(sugg) > 0:
+						a.webSuggest = (a.webSuggest + len(sugg)) % (len(sugg) + 1)
+						if a.webSuggest == len(sugg) {
+							a.webSuggest = len(sugg) - 1
+						}
+					case k.Key == ui.KeyEnter && a.webSuggest >= 0 && a.webSuggest < len(sugg):
+						// Keys come between frames: the next one opens it.
+						a.webPick = sugg[a.webSuggest].URL
+					case k.Key == ui.KeyEscape && len(sugg) > 0:
+						a.webSuggestOff = k.Text()
+					default:
+						if k.Key != ui.KeyEnter {
+							a.webSuggest = -1
+						}
+						return false
+					}
+					return true
+				})
 			if b != nil {
 				b.editing = h.Focused(c)
 			}
-			if inp.Submitted() {
+			if pick := a.suggestionList(c, field, *addr, sugg); pick != "" {
+				chosen = pick
+			}
+			switch {
+			case chosen != "":
+				// Put away until the next key typed, as the page loads.
+				*addr = chosen
+				a.webSuggest, a.webSuggestOff = -1, chosen
+				a.browse(chosen)
+				if a.activeWeb() != nil {
+					a.webAddr = ""
+				}
+			case inp.Submitted():
+				a.webSuggest, a.webSuggestOff = -1, *addr
 				a.browse(addressTarget(*addr))
 				if a.activeWeb() != nil {
 					a.webAddr = ""

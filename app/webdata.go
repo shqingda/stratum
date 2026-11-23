@@ -769,3 +769,62 @@ func (a *App) historyRow(c *ui.Context, r *rows, v webVisit) {
 		a.newWebTab(v.URL)
 	}
 }
+
+// addressSuggestions are the pages of the history the address field's
+// text finds while it is being typed in: none for the page's own address.
+func (a *App) addressSuggestions(b *browser, text string, focused bool) []webVisit {
+	q := strings.TrimSpace(text)
+	if a.webSuggestOff != "" && text != a.webSuggestOff {
+		a.webSuggestOff = "" // typed on: they come back
+	}
+	if !focused || q == "" || a.webSuggestOff != "" || b != nil && text == b.shown {
+		return nil
+	}
+	return a.historyMatches(q, 6)
+}
+
+// suggestionList is the list under the address field: each page's title
+// and address, the one ↓ picked marked. It returns the page clicked.
+func (a *App) suggestionList(c *ui.Context, field ui.Element, text string, sugg []webVisit) string {
+	open := len(sugg) > 0
+	if !open {
+		return ""
+	}
+	p := a.p
+	picked := ""
+	pop := ui.Popover(c, field, &open, func() {
+		ui.Column(c).FillWidth().Gap(1).Children(func() {
+			for i, v := range sugg {
+				title := v.Title
+				if title == "" {
+					title = v.URL
+				}
+				row := ui.ButtonBase(c.Key("suggest:"+v.URL)).Row().FillWidth().Height(36).Padding(0, 8).Gap(9).Radius(7).
+					AlignItems(ui.Center).Label(title).KeepFocus()
+				switch {
+				case i == a.webSuggest:
+					row.Background(p.Sel)
+				case row.Hovered():
+					row.Background(p.Hover)
+				}
+				row.Children(func() {
+					sym(c, "history", 14, p.Mute)
+					ui.Column(c).Grow(1).MinWidth(0).Children(func() {
+						ui.Text(c, title).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
+						ui.Text(c, v.URL).FontSize(11.5).TextColor(p.Mute).SingleLine().Ellipsis("…")
+					})
+				})
+				if row.Clicked() {
+					picked = v.URL
+				}
+			}
+		})
+	})
+	pop.AttachTo(field, ui.AnchorBottomStart, ui.AnchorTopStart).Margin(4, 0, 0, 0).
+		Width(max(field.Bounds().W, 260)).Background(p.Card).Border(.5, p.Edge2).Radius(10).Padding(4).NoShadow()
+	lift(pop, p)
+	if !open {
+		a.webSuggestOff = text // Escape or a click away: until the next key
+	}
+	return picked
+}

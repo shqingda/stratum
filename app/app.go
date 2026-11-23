@@ -148,6 +148,9 @@ type App struct {
 	historyFile                               string     // where the history is kept between runs
 	historyDirty                              bool       // the history changed since it was kept
 	historyQuery                              string     // Settings' search of the history
+	webSuggest                                int        // the address field's suggestion picked with ↓, or -1
+	webSuggestOff                             string     // the address text the suggestions were put away at
+	webPick                                   string     // the suggestion Return chose, opened next frame
 	webDownloads                              []*webDownload
 	nextDownload                              int
 	downloadsOpen                             bool // the toolbar's Downloads shows its list
@@ -178,7 +181,7 @@ type App struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	a := &App{C: c, now: time.Now, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
+	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
 	a.newTerm, a.shellJob = startShell, foregroundJob

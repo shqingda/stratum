@@ -356,3 +356,70 @@ func TestSettingsFindBrowser(t *testing.T) {
 		t.Fatalf("a Browser page with no browser: %q", tb.Texts())
 	}
 }
+
+// Typing in the address field lists the history's pages it finds, as
+// Codex's does: ↓ picks one and Return opens it, a click opens one, and
+// Escape puts the list away.
+func TestAddressFieldSuggestsHistory(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.recordVisit("https://go.dev/doc/", "Documentation - The Go Programming Language")
+	a.recordVisit("https://example.com/", "Example Domain")
+	a.recordVisit("https://go.dev/blog/", "The Go Blog")
+	a.showBrowser()
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	if err := tt.Click("搜索或输入网站名称"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Type("go.dev")
+	tt.Frame()
+	for _, want := range []string{"The Go Blog", "Documentation - The Go Programming Language"} {
+		if !tt.HasText(want) {
+			t.Fatalf("suggestions lack %q: %q", want, tt.Texts())
+		}
+	}
+	if tt.HasText("Example Domain") {
+		t.Fatal("a page that does not match is suggested")
+	}
+	blog, _ := tt.Find("The Go Blog")
+	doc, _ := tt.Find("Documentation - The Go Programming Language")
+	if blog.Y >= doc.Y {
+		t.Errorf("not newest first: blog at %v, doc at %v", blog.Y, doc.Y)
+	}
+
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	if tt.HasText("The Go Blog") {
+		t.Fatal("Escape left the list")
+	}
+	tt.Type("/")
+	tt.Frame()
+	if !tt.HasText("The Go Blog") {
+		t.Fatal("typing again did not bring the list back")
+	}
+
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if len(tabs.pages) != 1 {
+		t.Fatalf("tabs made: %d", len(tabs.pages))
+	}
+	if urls := tabs.pages[0].urls(); len(urls) != 1 || urls[0] != "https://go.dev/doc/" {
+		t.Fatalf("↓↓ Return opened %q", urls)
+	}
+	if tt.HasText("The Go Blog") {
+		t.Fatal("the list stays after opening a page")
+	}
+
+	tt.Key(ui.Cmd, ui.KeyA)
+	tt.Type("example")
+	tt.Frame()
+	if err := tt.Click("Example Domain"); err != nil {
+		t.Fatalf("%v: %q", err, tt.Texts())
+	}
+	tt.Frame()
+	if urls := tabs.pages[0].urls(); urls[len(urls)-1] != "https://example.com/" {
+		t.Fatalf("a click opened %q", urls)
+	}
+}
