@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -9,18 +10,23 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-// fakePage loads at once: each load counts as the browser's next one.
+// fakePage loads at once: each load counts as its tab's next one.
 type fakePage struct {
-	b      *browser
-	mu     sync.Mutex
-	loaded []string
-	backs  int
+	b       *browser
+	mu      sync.Mutex
+	loaded  []string
+	backs   int
+	reloads int
 }
 
+// LoadURL runs on the UI thread, as the panel calls it, so it may set
+// what the page shows; the load's end comes from another goroutine, as a
+// web view's does.
 func (f *fakePage) LoadURL(u string) error {
 	f.mu.Lock()
 	f.loaded = append(f.loaded, u)
 	f.mu.Unlock()
+	f.b.shown = u
 	go func() {
 		f.b.mu.Lock()
 		f.b.loads++
@@ -30,7 +36,7 @@ func (f *fakePage) LoadURL(u string) error {
 }
 func (f *fakePage) GoBack()    { f.backs++ }
 func (f *fakePage) GoForward() {}
-func (f *fakePage) Reload()    {}
+func (f *fakePage) Reload()    { f.reloads++ }
 func (f *fakePage) Stop()      {}
 func (f *fakePage) EvalContext(context.Context, string) (any, error) {
 	return "http://localhost:5173/", nil
@@ -42,24 +48,28 @@ func (f *fakePage) urls() []string {
 	return append([]string(nil), f.loaded...)
 }
 
-func browserApp(t *testing.T) (*App, *fakePage) {
+// fakeTabs are the pages of the browser's tabs, in the order made, and
+// how many were destroyed.
+type fakeTabs struct {
+	pages     []*fakePage
+	destroyed int
+}
+
+func browserApp(t *testing.T) (*App, *fakeTabs) {
 	a := screen1()
-	page := &fakePage{}
-	made := 0
+	tabs := &fakeTabs{}
 	a.newBrowser = func() (*browser, error) {
-		made++
-		if made > 1 {
-			t.Error("the panel made a second browser")
-		}
-		b := &browser{page: page, capture: func() ([]byte, error) { return []byte("png"), nil }}
+		page := &fakePage{}
+		b := &browser{page: page, capture: func() ([]byte, error) { return []byte("png"), nil }, destroy: func() { tabs.destroyed++ }}
 		page.b = b
+		tabs.pages = append(tabs.pages, page)
 		return b, nil
 	}
-	return a, page
+	return a, tabs
 }
 
 func TestBrowserLoadsWhatTheAddressSays(t *testing.T) {
-	a, page := browserApp(t)
+	a, tabs := browserApp(t)
 	a.showBrowser()
 	tt := ui.NewTester(a.View, 1440, 880)
 	tt.Frame()
@@ -68,7 +78,7 @@ func TestBrowserLoadsWhatTheAddressSays(t *testing.T) {
 			t.Errorf("the empty browser lacks %q: %q", want, tt.Texts())
 		}
 	}
-	if a.web != nil {
+	if a.activeWeb() != nil {
 		t.Fatal("showing the tab made a browser before anything was asked")
 	}
 	if err := tt.Click("后退"); err != nil {
@@ -80,16 +90,21 @@ func TestBrowserLoadsWhatTheAddressSays(t *testing.T) {
 	tt.Type("localhost:5173")
 	tt.Key(0, ui.KeyEnter)
 	tt.Frame()
+	if len(tabs.pages) != 1 {
+		t.Fatalf("the address made %d tabs", len(tabs.pages))
+	}
+	page := tabs.pages[0]
 	if got := page.urls(); len(got) != 1 || got[0] != "http://localhost:5173" {
 		t.Fatalf("the address loaded %q", got)
 	}
 	if page.backs != 0 {
 		t.Error("back on a first page went back")
 	}
-	a.web.shown, a.web.loading = "http://localhost:5173/", true
+	b := a.activeWeb()
+	b.shown, b.loading = "http://localhost:5173/", true
 	tt.Frame()
 	snapshot(t, tt, "pane-browser")
-	a.web.back = true
+	b.back = true
 	tt.Frame()
 	if err := tt.Click("后退"); err != nil {
 		t.Fatal(err)
@@ -116,42 +131,184 @@ func TestBrowserAddressReadsAsSafariDoes(t *testing.T) {
 	}
 }
 
-func TestBrowserDriverShowsWhatTheAgentOpens(t *testing.T) {
-	a, page := browserApp(t)
+func TestBrowserTabsCloseAsSafarisDo(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.showBrowser()
+	tt := ui.NewTester(a.View, 1440, 880)
+	for i, title := range []string{"Calc", "Docs", "Shop"} {
+		a.newWebTab(fmt.Sprintf("http://localhost:%d/", 5173+i)).title = title
+	}
+	tt.Frame()
+	for _, want := range []string{"Calc", "Docs", "Shop"} {
+		if !tt.HasText(want) {
+			t.Errorf("the tab bar lacks %q: %q", want, tt.Texts())
+		}
+	}
+	snapshot(t, tt, "pane-browser-tabs")
+	if a.activeWeb().title != "Shop" {
+		t.Fatalf("the last tab made is not in front: %q", a.activeWeb().title)
+	}
+	if err := tt.Click("Docs"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.activeWeb().title != "Docs" {
+		t.Fatalf("a click on Docs put %q in front", a.activeWeb().title)
+	}
+	// Closing the tab in front brings the one to its right.
+	if err := tt.Click("关闭标签页"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if got := a.activeWeb().title; got != "Shop" || len(a.webTabs) != 2 || tabs.destroyed != 1 {
+		t.Fatalf("after closing Docs: %q in front of %d tabs, %d destroyed", got, len(a.webTabs), tabs.destroyed)
+	}
+	// The last tab's left neighbour comes to the front.
+	a.closeWebTab(a.activeWeb().id)
+	tt.Frame()
+	if got := a.activeWeb().title; got != "Calc" {
+		t.Fatalf("after closing the last tab %q is in front", got)
+	}
+	if tt.HasText("Calc") {
+		t.Error("one tab still shows the tab bar")
+	}
+	a.closeWebTab(a.activeWeb().id)
+	tt.Frame()
+	if a.activeWeb() != nil || !tt.HasText("输入网址，或让代理打开你的本地应用。") {
+		t.Errorf("closing every tab left %v: %q", a.activeWeb(), tt.Texts())
+	}
+	if err := tt.Click("新建标签页"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if len(a.webTabs) != 1 || a.activeWeb() == nil {
+		t.Errorf("the new tab button made %d tabs", len(a.webTabs))
+	}
+}
+
+// pump runs f off the UI thread, playing what it sends to the UI thread
+// until it returns.
+func pump(t *testing.T, a *App, tt *ui.Tester, f func() error) error {
+	t.Helper()
 	var mu sync.Mutex
 	var queue []func()
-	a.update = func(f func()) { mu.Lock(); queue = append(queue, f); mu.Unlock() }
-	tt := ui.NewTester(a.View, 1440, 880)
-	tt.Frame()
-	d := a.BrowserDriver()
+	a.update = func(g func()) { mu.Lock(); queue = append(queue, g); mu.Unlock() }
+	defer func() { a.update = func(g func()) { g() } }()
 	done := make(chan error, 1)
-	go func() { done <- d.Navigate(context.Background(), "http://localhost:5173") }()
+	go func() { done <- f() }()
 	for end := time.Now().Add(5 * time.Second); ; {
 		mu.Lock()
 		q := queue
 		queue = nil
 		mu.Unlock()
-		for _, f := range q {
-			f()
+		for _, g := range q {
+			g()
 		}
 		tt.Frame()
 		select {
 		case err := <-done:
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !a.rv.open || a.rv.tab != "preview" {
-				t.Errorf("the agent's page is not in front: open=%v tab=%q", a.rv.open, a.rv.tab)
-			}
-			if got := page.urls(); len(got) != 1 || got[0] != "http://localhost:5173" {
-				t.Errorf("the driver loaded %q", got)
-			}
-			return
+			return err
 		default:
 		}
 		if time.Now().After(end) {
-			t.Fatal("Navigate did not return")
+			t.Fatal("the driver did not return")
 		}
 		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestBrowserDriverShowsWhatTheAgentOpens(t *testing.T) {
+	a, tabs := browserApp(t)
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	d := a.BrowserDriver()
+	ctx := context.Background()
+	if err := pump(t, a, tt, func() error { return d.Navigate(ctx, "http://localhost:5173") }); err != nil {
+		t.Fatal(err)
+	}
+	if !a.rv.open || a.rv.tab != "preview" {
+		t.Errorf("the agent's page is not in front: open=%v tab=%q", a.rv.open, a.rv.tab)
+	}
+	if got := tabs.pages[0].urls(); len(got) != 1 || got[0] != "http://localhost:5173" {
+		t.Errorf("the driver loaded %q", got)
+	}
+	if err := pump(t, a, tt, func() error { return d.OpenTab(ctx, "http://localhost:3000") }); err != nil {
+		t.Fatal(err)
+	}
+	list, err := d.Tabs(ctx)
+	if err != nil || len(list) != 2 || list[0].Active || !list[1].Active || list[1].URL != "http://localhost:3000" {
+		t.Fatalf("tabs after OpenTab: %+v, %v", list, err)
+	}
+	if err := pump(t, a, tt, func() error { return d.SelectTab(ctx, list[0].ID) }); err != nil || a.activeWeb().id != list[0].ID {
+		t.Errorf("SelectTab: %v", err)
+	}
+	if err := pump(t, a, tt, func() error { return d.SelectTab(ctx, 99) }); err == nil {
+		t.Error("SelectTab found tab 99")
+	}
+	if err := pump(t, a, tt, func() error { return d.CloseTab(ctx, list[0].ID) }); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := d.Tabs(ctx); len(list) != 1 || !list[0].Active || list[0].URL != "http://localhost:3000" {
+		t.Errorf("tabs after CloseTab: %+v", list)
+	}
+	if err := pump(t, a, tt, func() error { return d.CloseTab(ctx, list[0].ID) }); err == nil {
+		t.Error("closing a closed tab gave no error")
+	}
+	if err := pump(t, a, tt, func() error { return d.OpenTab(ctx, "") }); err != nil || len(a.webTabs) != 2 {
+		t.Errorf("an empty OpenTab: %v, %d tabs", err, len(a.webTabs))
+	}
+}
+
+func TestBrowserShowsTheAgentAtWork(t *testing.T) {
+	a, _ := browserApp(t)
+	now := time.Date(2026, 11, 23, 10, 0, 0, 0, time.UTC)
+	a.now = func() time.Time { return now }
+	a.update = func(f func()) { f() }
+	a.showBrowser()
+	a.newWebTab("http://localhost:5173")
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	if tt.HasText("代理正在使用") {
+		t.Fatal("the toolbar says the agent is at work before it acts")
+	}
+	a.BrowserDriver().Acting()
+	tt.Frame()
+	if !tt.HasText("代理正在使用") {
+		t.Errorf("the toolbar does not show the agent at work: %q", tt.Texts())
+	}
+	snapshot(t, tt, "pane-browser-agent")
+	now = now.Add(agentShows + time.Second)
+	tt.Frame()
+	if tt.HasText("代理正在使用") {
+		t.Error("the toolbar still shows the agent after it stopped")
+	}
+}
+
+func TestBrowserKeysAreSafaris(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.showBrowser()
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyT)
+	tt.Frame()
+	tt.Frame()
+	if len(a.webTabs) != 1 {
+		t.Fatalf("⌘T made %d tabs", len(a.webTabs))
+	}
+	tt.Type("localhost:5173")
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if got := tabs.pages[0].urls(); len(got) != 1 || got[0] != "http://localhost:5173" {
+		t.Fatalf("the new tab's address field did not take the typing: %q", got)
+	}
+	tt.Key(ui.Cmd, ui.KeyR)
+	tt.Frame()
+	if tabs.pages[0].reloads != 1 {
+		t.Errorf("⌘R reloaded %d times", tabs.pages[0].reloads)
+	}
+	tt.Key(ui.Cmd, ui.KeyT)
+	tt.Frame()
+	if len(a.webTabs) != 2 || a.webActive != 1 {
+		t.Errorf("a second ⌘T: %d tabs, %d in front", len(a.webTabs), a.webActive)
 	}
 }

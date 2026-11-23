@@ -925,6 +925,14 @@ type PreviewNetworkEntry struct {
 	Error  string `json:"error,omitempty"`
 }
 
+// BrowserTab is one tab of the panel's browser.
+type BrowserTab struct {
+	ID     int    `json:"id"`
+	URL    string `json:"url"`
+	Title  string `json:"title,omitempty"`
+	Active bool   `json:"active,omitempty"`
+}
+
 // PreviewSnapshot is the state of the built-in browser preview.
 type PreviewSnapshot struct {
 	URL        string                `json:"url"`

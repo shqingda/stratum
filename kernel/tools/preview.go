@@ -22,21 +22,30 @@ type browserArgs struct {
 // can take over: open, read and act on pages, as a person would.
 var Browser = &Tool{
 	Name: "browser",
-	Description: "Use the browser in Stratum's side panel, which the user sees and shares with you. " +
-		"open loads a URL (a localhost dev server or a web page); read returns the page's visible text; " +
-		"open, read, click, type, scroll, back, forward and reload return the page's console errors and its elements, each with a [ref]. " +
-		"click and type act on an element by its ref (type sets the value of a field, select or editable element; submit presses Enter). " +
-		"scroll moves by a screen (direction up or down) or to a ref. screenshot saves a PNG to save_screenshot. eval runs JavaScript in the page (use return for a value). " +
+	Description: "Use the browser in Stratum's side panel, which the user sees and shares with you; it has tabs, as Safari does. " +
+		"open loads a URL in the active tab (a localhost dev server or a web page); new_tab opens one, with url or blank. " +
+		"read returns the page's visible text. open, read, click, hover, type, key, scroll, wait, back, forward and reload return the page's console errors, " +
+		"dialogs and failed requests, and its elements, each with a [ref]. click, hover and type act on an element by its ref: type sets the value of a field, " +
+		"a select (by option text or value) or an editable element, and submit presses Enter after it. key presses keys on the focused element " +
+		"(\"Enter\", \"Escape\", \"Tab\", \"shift+Tab\", \"ArrowDown\", \"cmd+a\"). scroll moves by a screen (direction up or down) or to a ref. " +
+		"wait waits for text to show (or for seconds). Dialogs the action opens are dismissed unless accept_dialog is set (dialog_text answers a prompt). " +
+		"screenshot shows you the page (and saves a PNG to save_screenshot); console lists every console message; network lists the page's requests; " +
+		"tabs lists the tabs, select_tab and close_tab take a tab's id; eval runs JavaScript in the page (use return for a value). " +
 		"Refs come from the latest result: read again after the page changes.",
 	Schema: json.RawMessage(`{
 		"type": "object",
 		"properties": {
-			"action": {"type": "string", "enum": ["open", "read", "click", "type", "scroll", "back", "forward", "reload", "screenshot", "console", "eval"], "description": "What to do (defaults to open)"},
-			"url": {"type": "string", "description": "For open: the URL, e.g. http://localhost:3000"},
-			"ref": {"type": "integer", "description": "For click, type and scroll: the element's ref"},
-			"text": {"type": "string", "description": "For type: the text, or the option of a select"},
+			"action": {"type": "string", "enum": ["open", "new_tab", "read", "click", "hover", "type", "key", "scroll", "wait", "back", "forward", "reload", "screenshot", "console", "network", "tabs", "select_tab", "close_tab", "eval"], "description": "What to do (defaults to open)"},
+			"url": {"type": "string", "description": "For open and new_tab: the URL, e.g. http://localhost:3000"},
+			"ref": {"type": "integer", "description": "For click, hover, type and scroll: the element's ref"},
+			"text": {"type": "string", "description": "For type: the text, or the option of a select. For wait: the text to wait for"},
 			"submit": {"type": "boolean", "description": "For type: press Enter after typing"},
+			"keys": {"type": "string", "description": "For key, e.g. Enter or shift+Tab"},
 			"direction": {"type": "string", "enum": ["up", "down"], "description": "For scroll without a ref"},
+			"seconds": {"type": "number", "description": "For wait: at most this long (default 10 with text, 1 without; at most 30)"},
+			"tab": {"type": "integer", "description": "For select_tab and close_tab: the tab's id from tabs"},
+			"accept_dialog": {"type": "boolean", "description": "Accept the confirm or prompt dialogs this action opens"},
+			"dialog_text": {"type": "string", "description": "With accept_dialog: the answer to a prompt dialog"},
 			"script": {"type": "string", "description": "For eval: JavaScript run as the body of an async function"},
 			"save_screenshot": {"type": "string", "description": "For screenshot: workspace-relative path of the PNG"}
 		}
@@ -51,7 +60,7 @@ var Browser = &Tool{
 				return perm.Request{}, err
 			}
 		}
-		if a.Do == "" || a.Do == "open" {
+		if a.Do == "" || a.Do == "open" || a.Do == "new_tab" && strings.TrimSpace(a.URL) != "" {
 			target, err := preview.NormalizeURL(a.URL)
 			if err != nil {
 				return perm.Request{}, err
@@ -63,7 +72,8 @@ var Browser = &Tool{
 		}
 		// Acting on a site of the web is reaching the network, as opening
 		// it is: only on the user's own local pages does it run unasked.
-		if a.Do != "screenshot" && a.Do != "console" && a.Do != "read" {
+		switch a.Do {
+		case "click", "hover", "type", "key", "eval":
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			if !preview.IsLocalPage(preview.Default.CurrentURL(ctx)) {
@@ -98,7 +108,7 @@ var Browser = &Tool{
 		case "screenshot", "console":
 			var snap preview.Snapshot
 			if m.Interactive() && a.Do == "console" {
-				return m.Summary(ctx)
+				return m.Act(ctx, a.Action)
 			}
 			if m.Interactive() {
 				png, err := m.Capture(ctx)

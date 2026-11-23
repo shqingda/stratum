@@ -5240,6 +5240,36 @@ func (msgs Messages) StopLoading() string {
 	return Catalog.Format(msgs.locale, "stopLoading", nil)
 }
 
+// NewTab says "新建标签页"
+// in the language the app shows.
+func NewTab() string { return In(i18n.Locale()).NewTab() }
+
+// NewTab says "新建标签页"
+// in the language of msgs.
+func (msgs Messages) NewTab() string {
+	return Catalog.Format(msgs.locale, "newTab", nil)
+}
+
+// CloseTab says "关闭标签页"
+// in the language the app shows.
+func CloseTab() string { return In(i18n.Locale()).CloseTab() }
+
+// CloseTab says "关闭标签页"
+// in the language of msgs.
+func (msgs Messages) CloseTab() string {
+	return Catalog.Format(msgs.locale, "closeTab", nil)
+}
+
+// AgentBrowsing says "代理正在使用"
+// in the language the app shows.
+func AgentBrowsing() string { return In(i18n.Locale()).AgentBrowsing() }
+
+// AgentBrowsing says "代理正在使用"
+// in the language of msgs.
+func (msgs Messages) AgentBrowsing() string {
+	return Catalog.Format(msgs.locale, "agentBrowsing", nil)
+}
+
 // Automations says "定时任务"
 // in the language the app shows.
 func Automations() string { return In(i18n.Locale()).Automations() }

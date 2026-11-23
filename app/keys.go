@@ -116,10 +116,26 @@ func (a *App) keys(c *ui.Context) {
 			a.toggleTerminal()
 		}
 	})
-	if a.termShown() && !a.pal {
+	// While the browser shows without the terminal, ⌘T opens a tab in it,
+	// as in Safari; ⌘R reloads its page.
+	web := a.browserShown() && !a.settingsOpen && !a.automationsOpen && !a.pal
+	if (a.termShown() || web) && !a.pal {
 		c.OnWindowShortcut(ui.Cmd, ui.KeyT, func() {
-			if !c.ShortcutRepeated() {
+			switch {
+			case c.ShortcutRepeated():
+			case a.termShown():
 				a.addTerminal()
+			default:
+				a.newWebTab("")
+				a.webFocus = true
+			}
+		})
+	}
+	if b := a.activeWeb(); web && !inTerm && b != nil && b.shown != "" {
+		c.OnWindowShortcut(ui.Cmd, ui.KeyR, func() {
+			if !c.ShortcutRepeated() {
+				b.loading, b.failed = true, ""
+				b.page.Reload()
 			}
 		})
 	}

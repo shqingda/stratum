@@ -137,7 +137,10 @@ type App struct {
 	mcpUI                                     mcpState
 	previewUI                                 previewState
 	term                                      termState
-	web                                       *browser // the panel's browser, made when first used
+	webTabs                                   []*browser // the panel's browser's tabs, the first made when first used
+	webActive, webSeq                         int        // the tab in front; the last tab's id
+	webAgent                                  time.Time  // the agent's last action in the browser
+	webFocus                                  bool       // the address field takes the focus next frame
 	webErr, webAddr                           string
 	webInput                                  ui.Handle
 	newBrowser                                func() (*browser, error)
