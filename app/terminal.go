@@ -120,6 +120,10 @@ type termState struct {
 	// runs in it.
 	closingSession, closing, job string
 	find                         termFind
+	// file keeps the tabs across a quit; kept are those it kept for the
+	// sessions whose terminal has not shown since.
+	file string
+	kept map[string][]keptTab
 }
 
 // termSet is the session's shells, made on first asking.
@@ -224,6 +228,13 @@ func abs32(x float32) float32 {
 
 // addTerminal starts a shell in the session's folder and shows it.
 func (a *App) addTerminal() {
+	if cur := a.C.Current; cur != nil {
+		a.addTerminalAt(cur.Cwd, nil)
+	}
+}
+
+// addTerminalAt starts a shell in dir, under what an earlier one showed.
+func (a *App) addTerminalAt(dir string, history []byte) {
 	cur := a.C.Current
 	if cur == nil || a.newTerm == nil {
 		return
@@ -233,7 +244,7 @@ func (a *App) addTerminal() {
 	id := fmt.Sprintf("t%d", a.term.seq)
 	sid := cur.ID
 	t, err := a.newTerm(terminal.Options{
-		Dir:              cur.Cwd,
+		Dir:              dir,
 		ShellIntegration: true,
 		Theme:            termTheme(PaletteFor(false)),
 		DarkTheme:        termTheme(PaletteFor(true)),
@@ -254,8 +265,12 @@ func (a *App) addTerminal() {
 		set.err = err.Error()
 		return
 	}
+	if len(history) > 0 {
+		t.Feed(history)
+		t.Feed([]byte("\x1b[0m\r\n\x1b[2m" + locales.RestoredSession() + "\x1b[0m\r\n"))
+	}
 	set.err = ""
-	set.tabs = append(set.tabs, &termTab{id: id, seq: a.term.seq, t: t, cwd: cur.Cwd})
+	set.tabs = append(set.tabs, &termTab{id: id, seq: a.term.seq, t: t, cwd: dir})
 	a.selectTerminal(set, len(set.tabs)-1)
 }
 
@@ -403,7 +418,9 @@ func (a *App) showTerminal() {
 	}
 	if set := a.termSet(a.C.Current.ID); len(set.tabs) == 0 {
 		set.err = ""
-		a.addTerminal()
+		if !a.reopenTerminals(a.C.Current.ID) {
+			a.addTerminal()
+		}
 		return
 	}
 	a.term.focus = true

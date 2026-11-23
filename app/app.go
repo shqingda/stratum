@@ -143,6 +143,7 @@ type App struct {
 	webAgent                                  time.Time  // the agent's last action in the browser
 	webFocus                                  bool       // the address field takes the focus next frame
 	webClearing                               bool       // the dialog that clears the browser's history shows
+	webRestored                               bool       // the tabs the settings keep were opened
 	clearWebData                              func() error
 	webErr, webAddr                           string
 	webInput                                  ui.Handle
@@ -383,6 +384,7 @@ func (a *App) View(c *ui.Context) {
 	a.palette(c)
 	a.toastHUD(c)
 	a.clearWebDialog(c)
+	a.saveWebTabs()
 	a.keys(c)
 	a.restoreFocus(c)
 }

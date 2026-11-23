@@ -5320,6 +5320,36 @@ func (msgs Messages) ClearWebFailed(error string) string {
 	return Catalog.Format(msgs.locale, "clearWebFailed", map[string]any{"error": error})
 }
 
+// Downloaded says "已下载到“下载”：{name}"
+// in the language the app shows.
+func Downloaded(name string) string { return In(i18n.Locale()).Downloaded(name) }
+
+// Downloaded says "已下载到“下载”：{name}"
+// in the language of msgs.
+func (msgs Messages) Downloaded(name string) string {
+	return Catalog.Format(msgs.locale, "downloaded", map[string]any{"name": name})
+}
+
+// DownloadFailed says "下载失败：{error}"
+// in the language the app shows.
+func DownloadFailed(error string) string { return In(i18n.Locale()).DownloadFailed(error) }
+
+// DownloadFailed says "下载失败：{error}"
+// in the language of msgs.
+func (msgs Messages) DownloadFailed(error string) string {
+	return Catalog.Format(msgs.locale, "downloadFailed", map[string]any{"error": error})
+}
+
+// RestoredSession says "已恢复之前的内容"
+// in the language the app shows.
+func RestoredSession() string { return In(i18n.Locale()).RestoredSession() }
+
+// RestoredSession says "已恢复之前的内容"
+// in the language of msgs.
+func (msgs Messages) RestoredSession() string {
+	return Catalog.Format(msgs.locale, "restoredSession", nil)
+}
+
 // Automations says "定时任务"
 // in the language the app shows.
 func Automations() string { return In(i18n.Locale()).Automations() }

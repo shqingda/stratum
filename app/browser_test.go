@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/stratum/proto"
 )
 
 // fakePage loads at once: each load counts as its tab's next one.
@@ -376,5 +377,31 @@ func TestClearHistoryEmptiesTheBrowser(t *testing.T) {
 	tt.Frame()
 	if !tt.HasText("未能清除历史记录：WebKit said no") || tabs.destroyed != 2 {
 		t.Errorf("a failure: %q, destroyed %d", tt.Texts(), tabs.destroyed)
+	}
+}
+
+// TestBrowserReopensItsTabs: the tabs' pages stay in the settings, and the
+// browser opens them again the first time it shows, as Safari reopens
+// its windows.
+func TestBrowserReopensItsTabs(t *testing.T) {
+	a, tabs := browserApp(t)
+	a.C.Settings = &proto.Settings{BrowserTabs: []string{"http://localhost:5173/", "https://example.com/"}, BrowserTab: 1}
+	tt := ui.NewTester(a.View, 1440, 880)
+	tt.Frame()
+	if len(a.webTabs) != 0 {
+		t.Fatal("the tabs opened before the browser showed")
+	}
+	a.showBrowser()
+	tt.Frame()
+	if len(a.webTabs) != 2 || a.webActive != 1 {
+		t.Fatalf("reopened %d tabs, %d in front", len(a.webTabs), a.webActive)
+	}
+	if got := tabs.pages[0].urls(); len(got) != 1 || got[0] != "http://localhost:5173/" {
+		t.Errorf("the first tab loaded %q", got)
+	}
+	a.closeWebTab(a.webTabs[0].id)
+	tt.Frame()
+	if got := a.C.Settings.BrowserTabs; len(got) != 1 || got[0] != "https://example.com/" || a.C.Settings.BrowserTab != 0 {
+		t.Errorf("after closing a tab the settings keep %q, %d", got, a.C.Settings.BrowserTab)
 	}
 }

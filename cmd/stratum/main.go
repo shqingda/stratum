@@ -75,6 +75,16 @@ func main() {
 			Content:        ui.View(a.View),
 		})
 		a.SetCloseWindow(win.Close)
+		// The terminal's tabs and what they showed outlast a quit, as
+		// Terminal.app restores its windows.
+		if dir, err := mygo.App.Path(mygo.PathUserData); err == nil {
+			a.KeepTerminals(filepath.Join(dir, "terminals.json"))
+		}
+		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
+			if err := a.SaveTerminals(); err != nil {
+				log.Printf("terminals not kept: %v", err)
+			}
+		})
 		a.Serve(ctx, k.Server, win.Update)
 		a.UseDesktop()
 		if mygo.WebViewAvailable() {
@@ -101,6 +111,7 @@ func main() {
 					Page: mygo.PageOptions{
 						Session:         browsing,
 						Untrusted:       true,
+						DevTools:        mygo.DevToolsEnabled, // Inspect Element, as Kero's
 						PreloadScript:   preview.LogScript,
 						SwipeNavigation: true,
 						PinchZoom:       true,

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -115,6 +117,19 @@ func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func() erro
 			b.mu.Unlock()
 			edit(func() { b.loading, b.failed = false, le.Description })
 		})
+		// Downloads go to the Downloads folder, as Safari's do; an
+		// untrusted page's would be canceled without a listener.
+		pg.OnWillDownload(func(*mygo.DownloadEvent) {})
+		pg.OnDownloadDone(func(d *mygo.Download) {
+			name, err := filepath.Base(d.Path), d.Err
+			edit(func() {
+				if err != nil {
+					a.flash("alert-circle", locales.DownloadFailed(err.Error()))
+					return
+				}
+				a.flash("download", locales.Downloaded(name))
+			})
+		})
 		// A link to a new window opens in a new tab, as Safari opens it.
 		pg.SetWindowOpenHandler(func(req mygo.WindowOpenRequest) *mygo.WindowOptions {
 			if req.UserInitiated && webScheme(req.URL) {
@@ -170,6 +185,7 @@ func (a *App) activeWeb() *browser {
 
 // newWebTab opens a tab in front, loading target unless it is empty.
 func (a *App) newWebTab(target string) *browser {
+	a.restoreWebTabs()
 	if a.newBrowser == nil {
 		return nil
 	}
@@ -190,6 +206,7 @@ func (a *App) newWebTab(target string) *browser {
 
 // openBrowser is the tab in front, made the first time it is needed.
 func (a *App) openBrowser() *browser {
+	a.restoreWebTabs()
 	if b := a.activeWeb(); b != nil {
 		return b
 	}
@@ -254,6 +271,7 @@ func (a *App) browserPane(c *ui.Context) {
 		return
 	}
 	p := a.p
+	a.restoreWebTabs()
 	b := a.activeWeb()
 	if b == nil && a.webAddr == "" && a.C.Preview != nil {
 		a.webAddr = a.C.Preview.URL
@@ -560,6 +578,7 @@ func (d *BrowserDriver) Capture(ctx context.Context) ([]byte, error) {
 func (d *BrowserDriver) Tabs(ctx context.Context) ([]proto.BrowserTab, error) {
 	var tabs []proto.BrowserTab
 	err := d.onUI(ctx, func() {
+		d.a.restoreWebTabs()
 		for i, b := range d.a.webTabs {
 			tabs = append(tabs, proto.BrowserTab{ID: b.id, URL: b.shown, Title: b.title, Active: i == d.a.webActive})
 		}
@@ -706,4 +725,50 @@ func (a *App) clearWeb() {
 		err := wipe()
 		update(func() { done(err) })
 	}()
+}
+
+// restoreWebTabs opens the tabs the settings keep, once, the first time
+// the browser shows or the agent uses it.
+func (a *App) restoreWebTabs() {
+	if a.webRestored || a.newBrowser == nil || a.C.Settings == nil {
+		return
+	}
+	a.webRestored = true
+	if len(a.webTabs) > 0 {
+		return
+	}
+	set := a.C.Settings
+	for _, u := range set.BrowserTabs {
+		if a.newWebTab(u) == nil {
+			break
+		}
+	}
+	if set.BrowserTab >= 0 && set.BrowserTab < len(a.webTabs) {
+		a.webActive = set.BrowserTab
+	}
+}
+
+// saveWebTabs keeps the tabs' pages in the settings when they changed,
+// once those the settings kept were opened.
+func (a *App) saveWebTabs() {
+	if !a.webRestored || a.C.Settings == nil {
+		return
+	}
+	var urls []string
+	active := 0
+	for i, b := range a.webTabs {
+		if b.shown == "" || b.shown == "about:blank" {
+			continue
+		}
+		if i == a.webActive {
+			active = len(urls)
+		}
+		urls = append(urls, b.shown)
+	}
+	s := *a.C.Settings
+	if slices.Equal(s.BrowserTabs, urls) && s.BrowserTab == active {
+		return
+	}
+	s.BrowserTabs, s.BrowserTab = urls, active
+	a.do(a.C.SaveSettings(s))
 }

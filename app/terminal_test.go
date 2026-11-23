@@ -322,3 +322,47 @@ func TestShortDirAsGhosttyTitlesTabs(t *testing.T) {
 		}
 	}
 }
+
+// TestTerminalOutlastsAQuit: the tabs and what they showed are kept when
+// the app quits, and the session's terminal opens them again, in their
+// folder, as Terminal.app restores its windows.
+func TestTerminalOutlastsAQuit(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "terminals.json")
+	a, tt, pump, _ := termApp(t)
+	a.KeepTerminals(file)
+	a.showTerminal()
+	waitFor(t, pump, "a shell", func() bool { return a.activeTerm() != nil })
+	term := a.activeTerm().t
+	waitFor(t, pump, "the prompt", func() bool { return strings.Contains(term.Text(), "$") })
+	tt.Type("echo kept-$((40+2))")
+	tt.Key(0, ui.KeyEnter)
+	waitFor(t, pump, "the output", func() bool { return strings.Contains(term.Text(), "kept-42") })
+	if err := a.SaveTerminals(); err != nil {
+		t.Fatal(err)
+	}
+
+	b, _, pump2, _ := termApp(t)
+	b.KeepTerminals(file)
+	b.C.Current.Cwd = a.C.Current.Cwd
+	b.showTerminal()
+	waitFor(t, pump2, "the tab again", func() bool { return b.activeTerm() != nil })
+	again := b.activeTerm()
+	waitFor(t, pump2, "what it showed", func() bool {
+		return strings.Contains(again.t.Text(), "kept-42") && strings.Contains(again.t.Text(), "已恢复之前的内容")
+	})
+	if again.cwd != a.activeTerm().cwd {
+		t.Errorf("the tab opened in %q, not %q", again.cwd, a.activeTerm().cwd)
+	}
+	if len(b.term.kept) != 0 {
+		t.Error("the kept tabs were not taken")
+	}
+}
+
+func TestLastLinesStartsALine(t *testing.T) {
+	if got := string(lastLines([]byte("aaa\nbbb\nccc"), 6)); got != "ccc" {
+		t.Errorf("lastLines = %q", got)
+	}
+	if got := string(lastLines([]byte("short"), 10)); got != "short" {
+		t.Errorf("lastLines = %q", got)
+	}
+}

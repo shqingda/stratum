@@ -686,6 +686,11 @@ type Settings struct {
 	// dragged the sidebar and the review panel to; 0 is the default.
 	SidebarWidth   float32 `json:"sidebarWidth,omitempty"`
 	InspectorWidth float32 `json:"inspectorWidth,omitempty"`
+	// BrowserTabs are the pages the panel's browser showed in its tabs,
+	// and BrowserTab the one in front, which it opens again, as Safari
+	// reopens its windows.
+	BrowserTabs []string `json:"browserTabs,omitempty"`
+	BrowserTab  int      `json:"browserTab,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }
