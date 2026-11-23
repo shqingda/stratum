@@ -1828,11 +1828,11 @@ func (msgs Messages) Inspect() string {
 	return Catalog.Format(msgs.locale, "inspect", nil)
 }
 
-// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台 浏览器 历史记录 …"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
 // in the language the app shows.
 func SettingsGeneralWords() string { return In(i18n.Locale()).SettingsGeneralWords() }
 
-// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台 浏览器 历史记录 …"
+// SettingsGeneralWords says "语言 回车 队列 立即发送 通知 确认 完成 出错 程序坞 数字 后台"
 // in the language of msgs.
 func (msgs Messages) SettingsGeneralWords() string {
 	return Catalog.Format(msgs.locale, "settingsGeneralWords", nil)
@@ -5280,11 +5280,11 @@ func (msgs Messages) ClearHistory() string {
 	return Catalog.Format(msgs.locale, "clearHistory", nil)
 }
 
-// ClearWebTitle says "清除浏览器的历史记录？"
+// ClearWebTitle says "清除浏览数据"
 // in the language the app shows.
 func ClearWebTitle() string { return In(i18n.Locale()).ClearWebTitle() }
 
-// ClearWebTitle says "清除浏览器的历史记录？"
+// ClearWebTitle says "清除浏览数据"
 // in the language of msgs.
 func (msgs Messages) ClearWebTitle() string {
 	return Catalog.Format(msgs.locale, "clearWebTitle", nil)
@@ -5310,26 +5310,6 @@ func (msgs Messages) HistoryCleared() string {
 	return Catalog.Format(msgs.locale, "historyCleared", nil)
 }
 
-// BrowserData says "历史记录与网站数据"
-// in the language the app shows.
-func BrowserData() string { return In(i18n.Locale()).BrowserData() }
-
-// BrowserData says "历史记录与网站数据"
-// in the language of msgs.
-func (msgs Messages) BrowserData() string {
-	return Catalog.Format(msgs.locale, "browserData", nil)
-}
-
-// BrowserDataNote says "Cookie、登录状态、网站存储和缓存，以及前进后退记录。"
-// in the language the app shows.
-func BrowserDataNote() string { return In(i18n.Locale()).BrowserDataNote() }
-
-// BrowserDataNote says "Cookie、登录状态、网站存储和缓存，以及前进后退记录。"
-// in the language of msgs.
-func (msgs Messages) BrowserDataNote() string {
-	return Catalog.Format(msgs.locale, "browserDataNote", nil)
-}
-
 // ClearBrowserData says "清除浏览器历史记录和 Cookie"
 // in the language the app shows.
 func ClearBrowserData() string { return In(i18n.Locale()).ClearBrowserData() }
@@ -5338,6 +5318,366 @@ func ClearBrowserData() string { return In(i18n.Locale()).ClearBrowserData() }
 // in the language of msgs.
 func (msgs Messages) ClearBrowserData() string {
 	return Catalog.Format(msgs.locale, "clearBrowserData", nil)
+}
+
+// WebHistoryKind says "浏览历史记录"
+// in the language the app shows.
+func WebHistoryKind() string { return In(i18n.Locale()).WebHistoryKind() }
+
+// WebHistoryKind says "浏览历史记录"
+// in the language of msgs.
+func (msgs Messages) WebHistoryKind() string {
+	return Catalog.Format(msgs.locale, "webHistoryKind", nil)
+}
+
+// WebHistoryKindNote says "访问过的网页，以及各标签页的前进和后退记录。"
+// in the language the app shows.
+func WebHistoryKindNote() string { return In(i18n.Locale()).WebHistoryKindNote() }
+
+// WebHistoryKindNote says "访问过的网页，以及各标签页的前进和后退记录。"
+// in the language of msgs.
+func (msgs Messages) WebHistoryKindNote() string {
+	return Catalog.Format(msgs.locale, "webHistoryKindNote", nil)
+}
+
+// WebCookiesKind says "Cookie 和网站数据"
+// in the language the app shows.
+func WebCookiesKind() string { return In(i18n.Locale()).WebCookiesKind() }
+
+// WebCookiesKind says "Cookie 和网站数据"
+// in the language of msgs.
+func (msgs Messages) WebCookiesKind() string {
+	return Catalog.Format(msgs.locale, "webCookiesKind", nil)
+}
+
+// WebCookiesKindNote says "网站存储的数据。会退出大多数网站的登录。"
+// in the language the app shows.
+func WebCookiesKindNote() string { return In(i18n.Locale()).WebCookiesKindNote() }
+
+// WebCookiesKindNote says "网站存储的数据。会退出大多数网站的登录。"
+// in the language of msgs.
+func (msgs Messages) WebCookiesKindNote() string {
+	return Catalog.Format(msgs.locale, "webCookiesKindNote", nil)
+}
+
+// WebCacheKind says "缓存的图片和文件"
+// in the language the app shows.
+func WebCacheKind() string { return In(i18n.Locale()).WebCacheKind() }
+
+// WebCacheKind says "缓存的图片和文件"
+// in the language of msgs.
+func (msgs Messages) WebCacheKind() string {
+	return Catalog.Format(msgs.locale, "webCacheKind", nil)
+}
+
+// WebCacheKindNote says "让网页加载更快的副本。网站下次打开时会重新下载。"
+// in the language the app shows.
+func WebCacheKindNote() string { return In(i18n.Locale()).WebCacheKindNote() }
+
+// WebCacheKindNote says "让网页加载更快的副本。网站下次打开时会重新下载。"
+// in the language of msgs.
+func (msgs Messages) WebCacheKindNote() string {
+	return Catalog.Format(msgs.locale, "webCacheKindNote", nil)
+}
+
+// CantUndo says "此操作无法撤销。"
+// in the language the app shows.
+func CantUndo() string { return In(i18n.Locale()).CantUndo() }
+
+// CantUndo says "此操作无法撤销。"
+// in the language of msgs.
+func (msgs Messages) CantUndo() string {
+	return Catalog.Format(msgs.locale, "cantUndo", nil)
+}
+
+// ClearWebOK says "清除"
+// in the language the app shows.
+func ClearWebOK() string { return In(i18n.Locale()).ClearWebOK() }
+
+// ClearWebOK says "清除"
+// in the language of msgs.
+func (msgs Messages) ClearWebOK() string {
+	return Catalog.Format(msgs.locale, "clearWebOK", nil)
+}
+
+// CookiesCleared says "已清除 Cookie"
+// in the language the app shows.
+func CookiesCleared() string { return In(i18n.Locale()).CookiesCleared() }
+
+// CookiesCleared says "已清除 Cookie"
+// in the language of msgs.
+func (msgs Messages) CookiesCleared() string {
+	return Catalog.Format(msgs.locale, "cookiesCleared", nil)
+}
+
+// CacheCleared says "已清除缓存"
+// in the language the app shows.
+func CacheCleared() string { return In(i18n.Locale()).CacheCleared() }
+
+// CacheCleared says "已清除缓存"
+// in the language of msgs.
+func (msgs Messages) CacheCleared() string {
+	return Catalog.Format(msgs.locale, "cacheCleared", nil)
+}
+
+// WebDataCleared says "已清除浏览数据"
+// in the language the app shows.
+func WebDataCleared() string { return In(i18n.Locale()).WebDataCleared() }
+
+// WebDataCleared says "已清除浏览数据"
+// in the language of msgs.
+func (msgs Messages) WebDataCleared() string {
+	return Catalog.Format(msgs.locale, "webDataCleared", nil)
+}
+
+// MoreBrowser says "更多"
+// in the language the app shows.
+func MoreBrowser() string { return In(i18n.Locale()).MoreBrowser() }
+
+// MoreBrowser says "更多"
+// in the language of msgs.
+func (msgs Messages) MoreBrowser() string {
+	return Catalog.Format(msgs.locale, "moreBrowser", nil)
+}
+
+// ClearCookies says "清除 Cookie"
+// in the language the app shows.
+func ClearCookies() string { return In(i18n.Locale()).ClearCookies() }
+
+// ClearCookies says "清除 Cookie"
+// in the language of msgs.
+func (msgs Messages) ClearCookies() string {
+	return Catalog.Format(msgs.locale, "clearCookies", nil)
+}
+
+// ClearCache says "清除缓存"
+// in the language the app shows.
+func ClearCache() string { return In(i18n.Locale()).ClearCache() }
+
+// ClearCache says "清除缓存"
+// in the language of msgs.
+func (msgs Messages) ClearCache() string {
+	return Catalog.Format(msgs.locale, "clearCache", nil)
+}
+
+// ClearWebData says "清除浏览数据"
+// in the language the app shows.
+func ClearWebData() string { return In(i18n.Locale()).ClearWebData() }
+
+// ClearWebData says "清除浏览数据"
+// in the language of msgs.
+func (msgs Messages) ClearWebData() string {
+	return Catalog.Format(msgs.locale, "clearWebData", nil)
+}
+
+// Downloads says "下载"
+// in the language the app shows.
+func Downloads() string { return In(i18n.Locale()).Downloads() }
+
+// Downloads says "下载"
+// in the language of msgs.
+func (msgs Messages) Downloads() string {
+	return Catalog.Format(msgs.locale, "downloads", nil)
+}
+
+// BrowserSettings says "浏览器设置"
+// in the language the app shows.
+func BrowserSettings() string { return In(i18n.Locale()).BrowserSettings() }
+
+// BrowserSettings says "浏览器设置"
+// in the language of msgs.
+func (msgs Messages) BrowserSettings() string {
+	return Catalog.Format(msgs.locale, "browserSettings", nil)
+}
+
+// ClearList says "清除"
+// in the language the app shows.
+func ClearList() string { return In(i18n.Locale()).ClearList() }
+
+// ClearList says "清除"
+// in the language of msgs.
+func (msgs Messages) ClearList() string {
+	return Catalog.Format(msgs.locale, "clearList", nil)
+}
+
+// NoDownloads says "没有下载"
+// in the language the app shows.
+func NoDownloads() string { return In(i18n.Locale()).NoDownloads() }
+
+// NoDownloads says "没有下载"
+// in the language of msgs.
+func (msgs Messages) NoDownloads() string {
+	return Catalog.Format(msgs.locale, "noDownloads", nil)
+}
+
+// Downloading says "正在下载…"
+// in the language the app shows.
+func Downloading() string { return In(i18n.Locale()).Downloading() }
+
+// Downloading says "正在下载…"
+// in the language of msgs.
+func (msgs Messages) Downloading() string {
+	return Catalog.Format(msgs.locale, "downloading", nil)
+}
+
+// DownloadCanceled says "已取消"
+// in the language the app shows.
+func DownloadCanceled() string { return In(i18n.Locale()).DownloadCanceled() }
+
+// DownloadCanceled says "已取消"
+// in the language of msgs.
+func (msgs Messages) DownloadCanceled() string {
+	return Catalog.Format(msgs.locale, "downloadCanceled", nil)
+}
+
+// ChoosingWhere says "正在选择存放位置…"
+// in the language the app shows.
+func ChoosingWhere() string { return In(i18n.Locale()).ChoosingWhere() }
+
+// ChoosingWhere says "正在选择存放位置…"
+// in the language of msgs.
+func (msgs Messages) ChoosingWhere() string {
+	return Catalog.Format(msgs.locale, "choosingWhere", nil)
+}
+
+// SizeBytes says "{n} 字节"
+// in the language the app shows.
+func SizeBytes(n int) string { return In(i18n.Locale()).SizeBytes(n) }
+
+// SizeBytes says "{n} 字节"
+// in the language of msgs.
+func (msgs Messages) SizeBytes(n int) string {
+	return Catalog.Format(msgs.locale, "sizeBytes", map[string]any{"n": n})
+}
+
+// SettingsBrowser says "浏览器"
+// in the language the app shows.
+func SettingsBrowser() string { return In(i18n.Locale()).SettingsBrowser() }
+
+// SettingsBrowser says "浏览器"
+// in the language of msgs.
+func (msgs Messages) SettingsBrowser() string {
+	return Catalog.Format(msgs.locale, "settingsBrowser", nil)
+}
+
+// SettingsBrowserWords says "历史记录 网站数据 Cookie 缓存 清除 下载 位置 询问"
+// in the language the app shows.
+func SettingsBrowserWords() string { return In(i18n.Locale()).SettingsBrowserWords() }
+
+// SettingsBrowserWords says "历史记录 网站数据 Cookie 缓存 清除 下载 位置 询问"
+// in the language of msgs.
+func (msgs Messages) SettingsBrowserWords() string {
+	return Catalog.Format(msgs.locale, "settingsBrowserWords", nil)
+}
+
+// SettingsBrowserLede says "内置浏览器访问过的网页、存储的数据和下载的文件。"
+// in the language the app shows.
+func SettingsBrowserLede() string { return In(i18n.Locale()).SettingsBrowserLede() }
+
+// SettingsBrowserLede says "内置浏览器访问过的网页、存储的数据和下载的文件。"
+// in the language of msgs.
+func (msgs Messages) SettingsBrowserLede() string {
+	return Catalog.Format(msgs.locale, "settingsBrowserLede", nil)
+}
+
+// BrowsingHistory says "历史记录"
+// in the language the app shows.
+func BrowsingHistory() string { return In(i18n.Locale()).BrowsingHistory() }
+
+// BrowsingHistory says "历史记录"
+// in the language of msgs.
+func (msgs Messages) BrowsingHistory() string {
+	return Catalog.Format(msgs.locale, "browsingHistory", nil)
+}
+
+// SearchHistory says "搜索历史记录"
+// in the language the app shows.
+func SearchHistory() string { return In(i18n.Locale()).SearchHistory() }
+
+// SearchHistory says "搜索历史记录"
+// in the language of msgs.
+func (msgs Messages) SearchHistory() string {
+	return Catalog.Format(msgs.locale, "searchHistory", nil)
+}
+
+// NoHistory says "没有历史记录"
+// in the language the app shows.
+func NoHistory() string { return In(i18n.Locale()).NoHistory() }
+
+// NoHistory says "没有历史记录"
+// in the language of msgs.
+func (msgs Messages) NoHistory() string {
+	return Catalog.Format(msgs.locale, "noHistory", nil)
+}
+
+// NoHistoryFound says "没有找到"
+// in the language the app shows.
+func NoHistoryFound() string { return In(i18n.Locale()).NoHistoryFound() }
+
+// NoHistoryFound says "没有找到"
+// in the language of msgs.
+func (msgs Messages) NoHistoryFound() string {
+	return Catalog.Format(msgs.locale, "noHistoryFound", nil)
+}
+
+// RemoveFromHistory says "从历史记录中移除"
+// in the language the app shows.
+func RemoveFromHistory() string { return In(i18n.Locale()).RemoveFromHistory() }
+
+// RemoveFromHistory says "从历史记录中移除"
+// in the language of msgs.
+func (msgs Messages) RemoveFromHistory() string {
+	return Catalog.Format(msgs.locale, "removeFromHistory", nil)
+}
+
+// ClearWebDataNote says "可以选择清除历史记录、Cookie 和网站数据，或缓存。"
+// in the language the app shows.
+func ClearWebDataNote() string { return In(i18n.Locale()).ClearWebDataNote() }
+
+// ClearWebDataNote says "可以选择清除历史记录、Cookie 和网站数据，或缓存。"
+// in the language of msgs.
+func (msgs Messages) ClearWebDataNote() string {
+	return Catalog.Format(msgs.locale, "clearWebDataNote", nil)
+}
+
+// DownloadLocation says "下载位置"
+// in the language the app shows.
+func DownloadLocation() string { return In(i18n.Locale()).DownloadLocation() }
+
+// DownloadLocation says "下载位置"
+// in the language of msgs.
+func (msgs Messages) DownloadLocation() string {
+	return Catalog.Format(msgs.locale, "downloadLocation", nil)
+}
+
+// ChangeFolder says "更改…"
+// in the language the app shows.
+func ChangeFolder() string { return In(i18n.Locale()).ChangeFolder() }
+
+// ChangeFolder says "更改…"
+// in the language of msgs.
+func (msgs Messages) ChangeFolder() string {
+	return Catalog.Format(msgs.locale, "changeFolder", nil)
+}
+
+// UseDownloadsFolder says "恢复默认"
+// in the language the app shows.
+func UseDownloadsFolder() string { return In(i18n.Locale()).UseDownloadsFolder() }
+
+// UseDownloadsFolder says "恢复默认"
+// in the language of msgs.
+func (msgs Messages) UseDownloadsFolder() string {
+	return Catalog.Format(msgs.locale, "useDownloadsFolder", nil)
+}
+
+// AskWhereToSave says "下载前询问存放位置"
+// in the language the app shows.
+func AskWhereToSave() string { return In(i18n.Locale()).AskWhereToSave() }
+
+// AskWhereToSave says "下载前询问存放位置"
+// in the language of msgs.
+func (msgs Messages) AskWhereToSave() string {
+	return Catalog.Format(msgs.locale, "askWhereToSave", nil)
 }
 
 // ClearWebFailed says "未能清除历史记录：{error}"

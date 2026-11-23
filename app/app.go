@@ -142,9 +142,19 @@ type App struct {
 	webActive, webSeq                         int        // the tab in front; the last tab's id
 	webAgent                                  time.Time  // the agent's last action in the browser
 	webFocus                                  bool       // the address field takes the focus next frame
-	webClearing                               bool       // the dialog that clears the browser's history shows
-	webRestored                               bool       // the tabs the settings keep were opened
-	clearWebData                              func() error
+	webClearing                               bool       // the dialog that clears the browser's data shows
+	clearKinds                                WebData    // what that dialog clears
+	webHistory                                []webVisit // the pages the browser showed, oldest first
+	historyFile                               string     // where the history is kept between runs
+	historyDirty                              bool       // the history changed since it was kept
+	historyQuery                              string     // Settings' search of the history
+	webDownloads                              []*webDownload
+	nextDownload                              int
+	downloadsOpen                             bool // the toolbar's Downloads shows its list
+	dlPrefs                                   downloadPrefs
+	askSavePath                               func(name, dir string) (string, error)
+	webRestored                               bool // the tabs the settings keep were opened
+	clearWebData                              func(WebData) error
 	webErr, webAddr                           string
 	webInput                                  ui.Handle
 	newBrowser                                func() (*browser, error)
@@ -385,6 +395,7 @@ func (a *App) View(c *ui.Context) {
 	a.toastHUD(c)
 	a.clearWebDialog(c)
 	a.saveWebTabs()
+	a.syncDownloadPrefs()
 	a.keys(c)
 	a.restoreFocus(c)
 }

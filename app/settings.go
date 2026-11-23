@@ -25,6 +25,7 @@ var settingsPages = []struct {
 	{"accounts", "sparkles", locales.Messages.SettingsAccountsAndModels, locales.Messages.SettingsAccountsAndModelsWords, locales.Messages.SettingsAccountsAndModelsLede},
 	{"permissions", "shield-half", locales.Messages.SettingsPermissions, locales.Messages.SettingsPermissionsWords, locales.Messages.SettingsPermissionsLede},
 	{"appearance", "palette", locales.Messages.Appearance, locales.Messages.SettingsAppearanceWords, locales.Messages.SettingsAppearanceLede},
+	{"browser", "world", locales.Messages.SettingsBrowser, locales.Messages.SettingsBrowserWords, locales.Messages.SettingsBrowserLede},
 	{"shortcuts", "keyboard", locales.Messages.SettingsShortcuts, locales.Messages.SettingsShortcutsWords, locales.Messages.SettingsShortcutsLede},
 	{"mcp", "puzzle", locales.Messages.SettingsMcp, locales.Messages.SettingsMcpWords, locales.Messages.SettingsMcpLede},
 }
@@ -109,7 +110,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 							lede = pg.lede(locales.In(i18n.Locale()))
 						}
 					}
-					if q != "" && !finds(pg.label, pg.words, q) {
+					if q != "" && !finds(pg.label, pg.words, q) || pg.id == "browser" && a.newBrowser == nil {
 						continue
 					}
 					active := pg.id == curPage
@@ -158,6 +159,8 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 						a.shortcutsPage(c)
 					case "mcp":
 						a.mcpPage(c)
+					case "browser":
+						a.browserSettingsPage(c)
 					default:
 						a.generalPage(c)
 					}
@@ -330,20 +333,6 @@ func (a *App) generalPage(c *ui.Context) {
 			}
 		})
 	})
-
-	// The browser's history and cookies, as Safari's Settings manage its
-	// website data: the same Clear History… as the app menu's.
-	if a.clearWebData != nil {
-		section(c, p, locales.Browser(), false)
-		group(c, p, func() {
-			r := rows{p: p}
-			r.row(c, "set-web-data", locales.BrowserData(), locales.BrowserDataNote(), func() {
-				if a.pushButton(c, "set-clear-web", locales.ClearHistory()+"…").Clicked() {
-					a.askClearWeb()
-				}
-			})
-		})
-	}
 }
 
 func (a *App) appearancePage(c *ui.Context) {

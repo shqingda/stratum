@@ -79,10 +79,14 @@ func main() {
 		// Terminal.app restores its windows.
 		if dir, err := mygo.App.Path(mygo.PathUserData); err == nil {
 			a.KeepTerminals(filepath.Join(dir, "terminals.json"))
+			a.KeepBrowserHistory(filepath.Join(dir, "browser-history.json"))
 		}
 		mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 			if err := a.SaveTerminals(); err != nil {
 				log.Printf("terminals not kept: %v", err)
+			}
+			if err := a.SaveBrowserHistory(); err != nil {
+				log.Printf("browser history not kept: %v", err)
 			}
 		})
 		a.Serve(ctx, k.Server, win.Update)
@@ -118,7 +122,19 @@ func main() {
 						UserAgentSuffix: "Version/26.0 Safari/605.1.15",
 					},
 				})
-			}, func() error { return browsing.ClearData(mygo.SiteDataAll) })
+			}, func(kinds app.WebData) error {
+				var types mygo.SiteData
+				if kinds&app.WebCookies != 0 {
+					types |= mygo.SiteDataCookies | mygo.SiteDataLocalStorage | mygo.SiteDataIndexedDB | mygo.SiteDataServiceWorkers
+				}
+				if kinds&app.WebCache != 0 {
+					types |= mygo.SiteDataCaches
+				}
+				if kinds&(app.WebCookies|app.WebCache) == app.WebCookies|app.WebCache {
+					types = mygo.SiteDataAll // and what else WebKit keeps for sites
+				}
+				return browsing.ClearData(types)
+			})
 			preview.Default.SetDriver(a.BrowserDriver())
 		}
 		// Computer use asks for the permissions it lacks with the guide to

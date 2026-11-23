@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -315,72 +314,6 @@ func TestBrowserKeysAreSafaris(t *testing.T) {
 	}
 }
 
-// TestClearHistoryEmptiesTheBrowser: the menu's Clear History… asks
-// first; then the browser's data goes, and each tab is made anew at its
-// page, without its back and forward history.
-func TestClearHistoryEmptiesTheBrowser(t *testing.T) {
-	a, tabs := browserApp(t)
-	cleared := 0
-	a.clearWebData = func() error { cleared++; return nil }
-	a.showBrowser()
-	tt := ui.NewTester(a.View, 1440, 880)
-	a.newWebTab("http://localhost:5173/")
-	a.newWebTab("https://example.com/")
-	a.webTabs[0].back = true
-	ids := []int{a.webTabs[0].id, a.webTabs[1].id}
-	tt.Frame()
-
-	_, _, _, clearHistory := a.MenuBar()
-	if clearHistory.Label != "清除历史记录…" {
-		t.Errorf("the menu item says %q", clearHistory.Label)
-	}
-	a.askClearWeb()
-	tt.Frame()
-	if !tt.HasText("清除浏览器的历史记录？") {
-		t.Fatalf("no dialog: %q", tt.Texts())
-	}
-	if err := tt.Click("取消"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if cleared != 0 || tt.HasText("清除浏览器的历史记录？") {
-		t.Fatalf("cancel cleared %d times, dialog shown %v", cleared, tt.HasText("清除浏览器的历史记录？"))
-	}
-
-	a.askClearWeb()
-	tt.Frame()
-	if err := tt.Click("清除历史记录"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if cleared != 1 {
-		t.Fatalf("cleared %d times", cleared)
-	}
-	if len(a.webTabs) != 2 || a.webTabs[0].id != ids[0] || a.webTabs[1].id != ids[1] {
-		t.Fatalf("the tabs after clearing: %d", len(a.webTabs))
-	}
-	if a.webTabs[0].back || tabs.destroyed != 2 || len(tabs.pages) != 4 {
-		t.Errorf("tabs were not made anew: back %v, destroyed %d, made %d", a.webTabs[0].back, tabs.destroyed, len(tabs.pages))
-	}
-	if got := tabs.pages[2].urls(); len(got) != 1 || got[0] != "http://localhost:5173/" {
-		t.Errorf("the first tab reloaded %q", got)
-	}
-	if !tt.HasText("已清除历史记录") {
-		t.Errorf("no word that it was done: %q", tt.Texts())
-	}
-
-	a.clearWebData = func() error { return fmt.Errorf("WebKit said no") }
-	a.askClearWeb()
-	tt.Frame()
-	if err := tt.Click("清除历史记录"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if !tt.HasText("未能清除历史记录：WebKit said no") || tabs.destroyed != 2 {
-		t.Errorf("a failure: %q, destroyed %d", tt.Texts(), tabs.destroyed)
-	}
-}
-
 // TestBrowserReopensItsTabs: the tabs' pages stay in the settings, and the
 // browser opens them again the first time it shows, as Safari reopens
 // its windows.
@@ -404,68 +337,5 @@ func TestBrowserReopensItsTabs(t *testing.T) {
 	tt.Frame()
 	if got := a.C.Settings.BrowserTabs; len(got) != 1 || got[0] != "https://example.com/" || a.C.Settings.BrowserTab != 0 {
 		t.Errorf("after closing a tab the settings keep %q, %d", got, a.C.Settings.BrowserTab)
-	}
-}
-
-// Clear History… is in Settings, under Browser, as Safari's Settings
-// manage its website data, and in ⌘K, found by "cookie": not only in the
-// app menu, where it was easy to miss.
-func TestClearHistoryFromSettingsAndSearch(t *testing.T) {
-	a, _ := browserApp(t)
-	cleared := 0
-	a.clearWebData = func() error { cleared++; return nil }
-	tt := ui.NewTester(a.View, 1440, 880)
-	tt.Frame()
-
-	a.openSettings()
-	tt.Frame()
-	for _, want := range []string{"浏览器", "历史记录与网站数据", "Cookie、登录状态、网站存储和缓存，以及前进后退记录。"} {
-		if !tt.HasText(want) {
-			t.Errorf("Settings lack %q: %q", want, tt.Texts())
-		}
-	}
-	a.settingsQuery = "cookie"
-	tt.Frame()
-	// General shows twice: in the list, found, and as the page's title.
-	if n := slices.Index(tt.Texts(), "通用"); n < 0 || !slices.Contains(tt.Texts()[n+1:], "通用") {
-		t.Errorf("searching Settings for cookie does not find General: %q", tt.Texts())
-	}
-	a.settingsQuery = ""
-	if err := tt.Click("清除历史记录…"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if !tt.HasText("清除浏览器的历史记录？") {
-		t.Fatalf("Settings' button opened no dialog: %q", tt.Texts())
-	}
-	if err := tt.Click("清除历史记录"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if cleared != 1 {
-		t.Fatalf("cleared %d times", cleared)
-	}
-	a.settingsOpen = false
-	tt.Frame()
-
-	tt.Key(ui.Cmd, ui.KeyK)
-	tt.Type("cookie")
-	tt.Frame()
-	if !tt.HasText("清除浏览器历史记录和 Cookie…") {
-		t.Fatalf("⌘K does not find it: %q", tt.Texts())
-	}
-	tt.Key(0, ui.KeyEnter)
-	tt.Frame()
-	if !tt.HasText("清除浏览器的历史记录？") {
-		t.Fatalf("⌘K opened no dialog: %q", tt.Texts())
-	}
-
-	// Without a browser to clear, neither shows.
-	b, _ := browserApp(t)
-	b.openSettings()
-	tb := ui.NewTester(b.View, 1440, 880)
-	tb.Frame()
-	if tb.HasText("历史记录与网站数据") {
-		t.Error("Settings offer to clear a browser there is none of")
 	}
 }

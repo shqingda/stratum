@@ -691,6 +691,11 @@ type Settings struct {
 	// reopens its windows.
 	BrowserTabs []string `json:"browserTabs,omitempty"`
 	BrowserTab  int      `json:"browserTab,omitempty"`
+	// BrowserDownloads is the folder the browser saves downloads to, or
+	// "" for Downloads; BrowserAskDownload asks where to save each one, as
+	// Safari's "Ask for each download" does.
+	BrowserDownloads   string `json:"browserDownloads,omitempty"`
+	BrowserAskDownload bool   `json:"browserAskDownload,omitempty"`
 	// Rules are the calls allowed unasked in every session.
 	Rules []Rule `json:"rules,omitempty"`
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -58,8 +57,9 @@ const agentShows = 3 * time.Second
 
 // UseBrowser gives the panel's browser a way to make the web view of a
 // tab: the window's, an untrusted page that only navigates and runs no Go;
-// and wipe, which deletes what the browser's pages stored.
-func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func() error) {
+// and wipe, which deletes what the browser's pages stored of the kinds
+// asked (WebCookies, WebCache: the history is the app's own).
+func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func(WebData) error) {
 	a.clearWebData = wipe
 	a.newBrowser = func() (*browser, error) {
 		wv, err := newView()
@@ -80,7 +80,10 @@ func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func() erro
 		pg.OnPageTitleUpdated(func(e *mygo.TitleEvent) {
 			e.PreventDefault() // the window keeps its own title
 			t := e.Title
-			edit(func() { b.title = t })
+			edit(func() {
+				b.title = t
+				a.titleVisit(b.shown, t)
+			})
 		})
 		pg.OnWillNavigate(func(e *mygo.NavigateEvent) {
 			if !webScheme(e.URL) {
@@ -107,7 +110,10 @@ func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func() erro
 			b.mu.Lock()
 			b.loads++
 			b.mu.Unlock()
-			edit(func() { b.loading = false })
+			edit(func() {
+				b.loading = false
+				a.recordVisit(b.shown, b.title)
+			})
 			go history()
 		})
 		pg.OnDidFailLoad(func(le *mygo.LoadError) {
@@ -117,19 +123,11 @@ func (a *App) UseBrowser(newView func() (*mygo.WebView, error), wipe func() erro
 			b.mu.Unlock()
 			edit(func() { b.loading, b.failed = false, le.Description })
 		})
-		// Downloads go to the Downloads folder, as Safari's do; an
-		// untrusted page's would be canceled without a listener.
-		pg.OnWillDownload(func(*mygo.DownloadEvent) {})
-		pg.OnDownloadDone(func(d *mygo.Download) {
-			name, err := filepath.Base(d.Path), d.Err
-			edit(func() {
-				if err != nil {
-					a.flash("alert-circle", locales.DownloadFailed(err.Error()))
-					return
-				}
-				a.flash("download", locales.Downloaded(name))
-			})
-		})
+		// Downloads go to the Downloads folder or the one Settings name,
+		// and show in the toolbar's Downloads, as Safari's do; an untrusted
+		// page's would be canceled without a listener.
+		pg.OnWillDownload(func(e *mygo.DownloadEvent) { a.willDownload(e) })
+		pg.OnDownloadDone(func(d *mygo.Download) { a.downloadDone(d.URL, d.Path, d.Err) })
 		// A link to a new window opens in a new tab, as Safari opens it.
 		pg.SetWindowOpenHandler(func(req mygo.WindowOpenRequest) *mygo.WindowOptions {
 			if req.UserInitiated && webScheme(req.URL) {
@@ -332,6 +330,8 @@ func (a *App) browserPane(c *ui.Context) {
 		if a.webButton(c, "web-ext", "external-link", locales.OpenInBrowser(), b != nil && b.shown != "" && a.openURL != nil) {
 			_ = a.openURL(b.shown)
 		}
+		a.downloadsButton(c)
+		a.webMoreMenu(c)
 	})
 	if len(a.webTabs) > 1 {
 		a.webTabBar(c)
@@ -642,89 +642,6 @@ func (d *BrowserDriver) Acting() {
 	}
 	d.a.update(func() { d.a.webAgent = d.a.now() })
 	time.AfterFunc(agentShows+50*time.Millisecond, func() { d.a.update(func() {}) })
-}
-
-// askClearWeb is the menu's Clear History…, which asks first, as Safari's
-// does.
-func (a *App) askClearWeb() {
-	if a.clearWebData != nil {
-		a.webClearing = true
-	}
-}
-
-// clearWebDialog asks before the browser's history and website data go:
-// Safari's Clear History, without its time range, which WebKit does not
-// take for a store's data.
-func (a *App) clearWebDialog(c *ui.Context) {
-	if !a.webClearing {
-		return
-	}
-	open := true
-	p := a.p
-	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 12, 14, .18)
-		if p.Dark {
-			scrim = ui.RGBA(0, 0, 0, .42)
-		}
-		backdrop.Background(scrim)
-		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.ClearWebTitle())
-		lift(panel, p).Children(func() {
-			ui.Text(c, locales.ClearWebTitle()).FontSize(15).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.ClearWebBody()).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
-			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-				if a.button(c, "clear-web-cancel", locales.Cancel(), "esc", false).Clicked() {
-					open = false
-				}
-				if a.button(c, "clear-web-ok", locales.ClearHistory(), "", true).Background(p.Minus).Clicked() {
-					a.clearWeb()
-					open = false
-				}
-			})
-		})
-	})
-	if !open {
-		a.webClearing = false
-	}
-}
-
-// clearWeb deletes the browser's cookies, storage and caches, then makes
-// each tab anew at its page: its back and forward history goes, and the
-// page drops what it held in memory.
-func (a *App) clearWeb() {
-	wipe, update := a.clearWebData, a.update
-	if wipe == nil {
-		return
-	}
-	done := func(err error) {
-		if err != nil {
-			a.flash("alert-circle", locales.ClearWebFailed(err.Error()))
-			return
-		}
-		for i, b := range a.webTabs {
-			nb, err := a.newBrowser()
-			if err != nil {
-				continue
-			}
-			nb.id = b.id
-			a.webTabs[i] = nb
-			if b.destroy != nil {
-				b.destroy()
-			}
-			if b.shown != "" {
-				a.load(nb, b.shown)
-			}
-		}
-		a.flash("check", locales.HistoryCleared())
-	}
-	if update == nil {
-		done(wipe())
-		return
-	}
-	// WebKit clears on the main thread: wait for it off the UI's.
-	go func() {
-		err := wipe()
-		update(func() { done(err) })
-	}()
 }
 
 // restoreWebTabs opens the tabs the settings keep, once, the first time
