@@ -583,6 +583,9 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 				}
 			}
 			if a.rewindable(e) {
+				if e.Text != "" && m.Item(locales.EditAndResend()).Chosen() {
+					a.editAndResend(c, a.C.Turns[e.Turn].Seq, e.Text)
+				}
 				if m.Item(locales.RewindTo()).Chosen() {
 					seq := a.C.Turns[e.Turn].Seq
 					text := e.Text
@@ -624,6 +627,9 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 						a.copyButton(c, e.Text, msg.Hovered())
 					}
 					if a.rewindable(e) {
+						if e.Text != "" {
+							a.editResendButton(c, e, msg.Hovered())
+						}
 						a.rewindButton(c, e, msg.Hovered())
 					}
 				})

@@ -50,6 +50,11 @@ func (a *App) keys(c *ui.Context) {
 			a.archive(s, !s.Archived)
 		}
 	})
+	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyU, func() {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !a.btwOpen && a.C.Current != nil {
+			a.markUnread(a.C.Current.ID)
+		}
+	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyL, func() {
 		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
 			if inWeb {

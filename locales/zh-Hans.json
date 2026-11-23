@@ -27,6 +27,7 @@
   "rewindSummarize": "从这里起做摘要",
   "rewindSummarizeBefore": "摘要到这里",
   "rewindTo": "回退到这里",
+  "editAndResend": "编辑并重发",
   "rewindShell": "终端命令造成的改动回不去",
   "rewindEmpty": "还没有可以回退的消息",
   "rewindConflict": "这些文件和记录对不上，对话留在原地：{paths}",

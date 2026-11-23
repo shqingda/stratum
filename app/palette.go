@@ -125,7 +125,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 			on := !s.Pinned
 			a.do(a.C.Flag(proto.SessionFlag{SessionID: s.ID, Pinned: &on}))
 		}})
-		add(opt{icon: "eye", label: locales.MarkUnread(), sub: title(s), run: func() { a.markUnread(s.ID) }})
+		add(opt{icon: "eye", label: locales.MarkUnread(), sub: title(s), kbd: "⇧⌘U", run: func() { a.markUnread(s.ID) }})
 		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), kbd: "⇧⌘A", run: func() { a.archive(s, !s.Archived) }})
 		add(opt{icon: "trash", label: locales.DeleteSession(), sub: title(s), run: func() { a.deleting = s.ID }})
 	}

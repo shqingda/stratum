@@ -27,6 +27,7 @@
   "rewindSummarize": "Summarize from here",
   "rewindSummarizeBefore": "Summarize up to here",
   "rewindTo": "Rewind to here",
+  "editAndResend": "Edit & Resend",
   "rewindShell": "What a shell command changed stays",
   "rewindEmpty": "No message to rewind to",
   "rewindConflict": "These files no longer match the record, so the conversation stays: {paths}",

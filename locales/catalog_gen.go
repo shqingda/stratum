@@ -304,6 +304,16 @@ func (msgs Messages) RewindTo() string {
 	return Catalog.Format(msgs.locale, "rewindTo", nil)
 }
 
+// EditAndResend says "编辑并重发"
+// in the language the app shows.
+func EditAndResend() string { return In(i18n.Locale()).EditAndResend() }
+
+// EditAndResend says "编辑并重发"
+// in the language of msgs.
+func (msgs Messages) EditAndResend() string {
+	return Catalog.Format(msgs.locale, "editAndResend", nil)
+}
+
 // RewindShell says "终端命令造成的改动回不去"
 // in the language the app shows.
 func RewindShell() string { return In(i18n.Locale()).RewindShell() }

@@ -147,6 +147,38 @@ func (a *App) openRewindAt(seq int64, prompt string) {
 	a.rewind.step, a.rewind.seq, a.rewind.prompt, a.rewind.bubble = "actions", seq, prompt, true
 }
 
+func (a *App) editAndResend(c *ui.Context, seq int64, text string) {
+	a.draft, a.toEnd = text, true
+	a.drafts.kept, a.drafts.last = a.draft, a.draft
+	a.drafts.since = time.Now()
+	if a.now != nil {
+		a.drafts.since = a.now()
+	}
+	a.rewind = rewind{}
+	a.do(a.C.Rewind(seq, "conversation"))
+	a.composerInput.Focus(c)
+}
+
+func (a *App) editResendButton(c *ui.Context, e *client.Entry, shown bool) {
+	p := a.p
+	seq := a.C.Turns[e.Turn].Seq
+	b := ui.ButtonBase(c.Key("edit-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.EditAndResend()).Tooltip(locales.EditAndResend())
+	press(b)
+	focusRing(b, p)
+	target := float32(0)
+	if shown || b.Focused() {
+		target = 1
+	}
+	b.Opacity(b.AnimateTo("shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
+	if b.Hovered() {
+		b.Background(p.Hover)
+	}
+	b.Children(func() { sym(c, "pencil", 14, p.Mute) })
+	if b.Clicked() {
+		a.editAndResend(c, seq, e.Text)
+	}
+}
+
 func (a *App) rewindCount() int {
 	if !a.rewind.open {
 		return 0
@@ -227,7 +259,10 @@ func (a *App) rewindMenu(c *ui.Context) {
 					row.Background(p.Hover)
 				}
 				row.Children(func() {
-					ui.Text(c, pr.text).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+					ui.Text(c, pr.text).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+					if i < 9 {
+						ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(p.Faint).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
+					}
 				})
 				if row.Clicked() {
 					a.rewind.step, a.rewind.seq, a.rewind.prompt, a.rewind.sel = "actions", pr.seq, pr.text, 0
@@ -261,7 +296,10 @@ func (a *App) rewindActionRows(c *ui.Context) {
 			row.Background(p.Hover)
 		}
 		row.Children(func() {
-			ui.Text(c, act.label).FontSize(13).TextColor(p.Fg).SingleLine()
+			ui.Text(c, act.label).FontSize(13).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0)
+			if i < 9 {
+				ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(p.Faint).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
+			}
 		})
 		if row.Clicked() {
 			a.rewindDo(act.action)
@@ -296,6 +334,13 @@ func (a *App) rewindKey(k ui.TextKey) bool {
 			a.rewind.step, a.rewind.sel = "prompts", 0
 		} else {
 			a.rewind = rewind{}
+		}
+	default:
+		if k.Key >= ui.Key1 && k.Key <= ui.Key9 {
+			if idx := int(k.Key - ui.Key1); idx < n {
+				a.rewind.sel = idx
+				a.rewindPick()
+			}
 		}
 	}
 	return true

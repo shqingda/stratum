@@ -472,3 +472,56 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 		t.Fatalf("expected one levelChange haptic when switching scope, got %v", got)
 	}
 }
+
+func TestErgonomicsUnreadShortcutEditResendAndRewindDigits(t *testing.T) {
+	a := task8App()
+	a.C.Turns = []client.Turn{{Seq: 1, Done: true}, {Seq: 2, Done: true}}
+	a.C.Entries = []*client.Entry{
+		{Key: 1, Role: client.User, Text: "first prompt", Turn: 0},
+		{Key: 2, Role: client.Assistant, Text: "first answer", Done: true, Turn: 0},
+		{Key: 3, Role: client.User, Text: "second prompt", Turn: 1},
+		{Key: 4, Role: client.Assistant, Text: "second answer", Done: true, Turn: 1},
+	}
+	tt := task8Tester(a, false)
+
+	// 1. ⌘⇧U marks current session unread.
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyU)
+	tt.Frame()
+	if a.C.Marks[a.C.Current.ID] != "unread" {
+		t.Fatalf("⌘⇧U mark = %q, want unread", a.C.Marks[a.C.Current.ID])
+	}
+	for len(a.out) > 0 {
+		<-a.out
+	}
+
+	// 2. Rewind menu supports 1-9 direct selection.
+	a.openRewind()
+	tt.Frame()
+	if !a.rewind.open || a.rewind.step != "prompts" {
+		t.Fatalf("expected rewind prompts open, got open=%v step=%q", a.rewind.open, a.rewind.step)
+	}
+	if !a.rewindKey(ui.TextKey{Key: ui.Key2}) {
+		t.Fatal("expected rewindKey to consume Key2")
+	}
+	if a.rewind.step != "actions" || a.rewind.prompt != "second prompt" {
+		t.Fatalf("Key2 picked step=%q prompt=%q, want actions / second prompt", a.rewind.step, a.rewind.prompt)
+	}
+	a.rewind = rewind{}
+
+	// 3. editAndResend puts prompt back in draft and sends MethodRewind(conversation).
+	a.editAndResend(nil, 2, "second prompt")
+	if a.draft != "second prompt" {
+		t.Fatalf("editAndResend draft = %q, want second prompt", a.draft)
+	}
+	cmds, ok := next(a)
+	if !ok || len(cmds) != 1 || cmds[0].Method != proto.MethodRewind {
+		t.Fatalf("expected MethodRewind command, got ok=%v cmds=%+v", ok, cmds)
+	}
+	var rw proto.Rewind
+	if err := json.Unmarshal(cmds[0].Params, &rw); err != nil {
+		t.Fatal(err)
+	}
+	if rw.TurnSeq != 2 || rw.Action != "conversation" {
+		t.Fatalf("unexpected Rewind params: %+v", rw)
+	}
+}
