@@ -11,7 +11,7 @@ import (
 // MenuBar is the app's own commands for the menu bar, each with the
 // shortcut the window already answers to: a Session menu, Settings,
 // and the sidebar / inspector toggles for the View menu.
-func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view []*mygo.MenuItem) {
+func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view []*mygo.MenuItem, clearHistory *mygo.MenuItem) {
 	item := func(label, acc string, run func(c *ui.Context)) *mygo.MenuItem {
 		return &mygo.MenuItem{Label: label, Accelerator: acc, Click: func(*mygo.MenuItem, *mygo.Window) { a.fromMenu(run) }}
 	}
@@ -42,6 +42,8 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 			a.openSettings()
 		}
 	})
+	// Safari's app menu clears its history under Settings.
+	clearHistory = item(locales.ClearHistory()+"…", "", func(*ui.Context) { a.askClearWeb() })
 	view = []*mygo.MenuItem{
 		item(locales.ToggleSidebarMenu(), "CmdOrCtrl+\\", func(*ui.Context) { a.toggleSide() }),
 		item(locales.ToggleInspector(), "CmdOrCtrl+Alt+I", func(*ui.Context) {

@@ -5270,6 +5270,56 @@ func (msgs Messages) AgentBrowsing() string {
 	return Catalog.Format(msgs.locale, "agentBrowsing", nil)
 }
 
+// ClearHistory says "清除历史记录"
+// in the language the app shows.
+func ClearHistory() string { return In(i18n.Locale()).ClearHistory() }
+
+// ClearHistory says "清除历史记录"
+// in the language of msgs.
+func (msgs Messages) ClearHistory() string {
+	return Catalog.Format(msgs.locale, "clearHistory", nil)
+}
+
+// ClearWebTitle says "清除浏览器的历史记录？"
+// in the language the app shows.
+func ClearWebTitle() string { return In(i18n.Locale()).ClearWebTitle() }
+
+// ClearWebTitle says "清除浏览器的历史记录？"
+// in the language of msgs.
+func (msgs Messages) ClearWebTitle() string {
+	return Catalog.Format(msgs.locale, "clearWebTitle", nil)
+}
+
+// ClearWebBody says "清除历史记录会移除浏览器的 Cookie …"
+// in the language the app shows.
+func ClearWebBody() string { return In(i18n.Locale()).ClearWebBody() }
+
+// ClearWebBody says "清除历史记录会移除浏览器的 Cookie …"
+// in the language of msgs.
+func (msgs Messages) ClearWebBody() string {
+	return Catalog.Format(msgs.locale, "clearWebBody", nil)
+}
+
+// HistoryCleared says "已清除历史记录"
+// in the language the app shows.
+func HistoryCleared() string { return In(i18n.Locale()).HistoryCleared() }
+
+// HistoryCleared says "已清除历史记录"
+// in the language of msgs.
+func (msgs Messages) HistoryCleared() string {
+	return Catalog.Format(msgs.locale, "historyCleared", nil)
+}
+
+// ClearWebFailed says "未能清除历史记录：{error}"
+// in the language the app shows.
+func ClearWebFailed(error string) string { return In(i18n.Locale()).ClearWebFailed(error) }
+
+// ClearWebFailed says "未能清除历史记录：{error}"
+// in the language of msgs.
+func (msgs Messages) ClearWebFailed(error string) string {
+	return Catalog.Format(msgs.locale, "clearWebFailed", map[string]any{"error": error})
+}
+
 // Automations says "定时任务"
 // in the language the app shows.
 func Automations() string { return In(i18n.Locale()).Automations() }

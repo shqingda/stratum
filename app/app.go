@@ -141,6 +141,8 @@ type App struct {
 	webActive, webSeq                         int        // the tab in front; the last tab's id
 	webAgent                                  time.Time  // the agent's last action in the browser
 	webFocus                                  bool       // the address field takes the focus next frame
+	webClearing                               bool       // the dialog that clears the browser's history shows
+	clearWebData                              func() error
 	webErr, webAddr                           string
 	webInput                                  ui.Handle
 	newBrowser                                func() (*browser, error)
@@ -314,6 +316,7 @@ func (a *App) View(c *ui.Context) {
 	}
 	if a.needsLogin() {
 		a.onboarding(c)
+		a.clearWebDialog(c)
 		a.keys(c)
 		return
 	}
@@ -330,6 +333,7 @@ func (a *App) View(c *ui.Context) {
 		ui.Box(c.Key("view-settings")).Fill().
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
 			Children(func() { a.settingsView(c, vibrant) })
+		a.clearWebDialog(c)
 		a.keys(c)
 		return
 	}
@@ -337,6 +341,7 @@ func (a *App) View(c *ui.Context) {
 		ui.Box(c.Key("view-automations")).Fill().
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
 			Children(func() { a.automationsView(c, vibrant) })
+		a.clearWebDialog(c)
 		a.keys(c)
 		return
 	}
@@ -351,7 +356,9 @@ func (a *App) View(c *ui.Context) {
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
-	// not squeezed, so its rows hold still while it slides.
+	// not squeezed, so its rows hold still while it slides. It does not
+	// fade, as Finder's does not: faded, its wash over the window's glass
+	// let the dark glass through, a flash of gray at each toggle.
 	target := float32(1)
 	if a.noSide {
 		target = 0
@@ -361,11 +368,8 @@ func (a *App) View(c *ui.Context) {
 	shell.Children(func() {
 		if a.sideOpen > 0.001 {
 			sideW := float32(math.Round(float64(a.sideOpen * sw)))
-			sideWrap := ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip()
-			if a.sideOpen < 0.999 {
-				sideWrap.Opacity(min(1, a.sideOpen*1.25))
-			}
-			sideWrap.Children(func() { a.sidebar(c, vibrant) })
+			ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip().
+				Children(func() { a.sidebar(c, vibrant) })
 		} else {
 			a.visibleSessions = a.sessionOrder()
 		}
@@ -377,6 +381,7 @@ func (a *App) View(c *ui.Context) {
 	})
 	a.palette(c)
 	a.toastHUD(c)
+	a.clearWebDialog(c)
 	a.keys(c)
 	a.restoreFocus(c)
 }

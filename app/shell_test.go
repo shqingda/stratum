@@ -73,3 +73,36 @@ func TestCopyMessages(t *testing.T) {
 		}
 	}
 }
+
+// TestSidebarSlidesWithoutFading: while the sidebar slides, its wash over
+// the window's glass stays as it is, so the sidebar does not flash gray.
+func TestSidebarSlidesWithoutFading(t *testing.T) {
+	a := working()
+	tt := ui.NewTester(a.View, 1200, 800)
+	tt.SetVibrancy(true)
+	tt.Frame()
+	r, ok := tt.Find("技能与 MCP")
+	if !ok {
+		t.Fatal("no sidebar")
+	}
+	img := tt.Image()
+	scale := float32(img.Bounds().Dx()) / 1200
+	x, y := int(4*scale), int((r.Y+r.H+40)*scale)
+	open := img.RGBAAt(x, y)
+	a.toggleSide()
+	checked := 0
+	for i := 0; i < 60 && a.sideOpen > 0.05; i++ {
+		tt.Advance(16 * time.Millisecond)
+		tt.Frame()
+		if a.sideOpen <= 0.05 || a.sideOpen >= 0.95 {
+			continue
+		}
+		checked++
+		if got := tt.Image().RGBAAt(x, y); got != open {
+			t.Fatalf("at %.2f open the sidebar is %v, not %v as when open", a.sideOpen, got, open)
+		}
+	}
+	if checked < 3 {
+		t.Fatalf("only %d frames of the slide", checked)
+	}
+}

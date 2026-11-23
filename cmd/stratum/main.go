@@ -92,10 +92,14 @@ func main() {
 			}
 			// The panel's browser: someone else's pages, which call no Go,
 			// and which the agent's browser tool drives as the user sees.
+			// Their cookies and storage are a session of their own, apart
+			// from the app's page, which Clear History… empties.
+			browsing := mygo.NewSession("browser")
 			a.UseBrowser(func() (*mygo.WebView, error) {
 				return win.NewWebView(mygo.WebViewOptions{
 					BackgroundColor: "light-dark(#ffffff, #0d0d0e)",
 					Page: mygo.PageOptions{
+						Session:         browsing,
 						Untrusted:       true,
 						PreloadScript:   preview.LogScript,
 						SwipeNavigation: true,
@@ -103,7 +107,7 @@ func main() {
 						UserAgentSuffix: "Version/26.0 Safari/605.1.15",
 					},
 				})
-			})
+			}, func() error { return browsing.ClearData(mygo.SiteDataAll) })
 			preview.Default.SetDriver(a.BrowserDriver())
 		}
 		// Computer use asks for the permissions it lacks with the guide to
@@ -134,13 +138,14 @@ func main() {
 // menu is the default menu bar with "Check for Updates…" after About and
 // the app's own commands: Settings, a Session menu and the sidebar in View.
 func menu(a *app.App) *mygo.Menu {
-	session, settings, view := a.MenuBar()
+	session, settings, view, clearHistory := a.MenuBar()
 	return mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Stratum", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleAbout},
 			updater.MenuItem(),
 			mygo.Separator(),
 			settings,
+			clearHistory,
 			mygo.Separator(),
 			{Role: mygo.RoleServices},
 			mygo.Separator(),
