@@ -153,7 +153,7 @@ func (a *App) transcript(c *ui.Context) {
 		return "running"
 	}
 	st.FollowEnd = true
-	st.FollowAnimation = &ui.Smooth
+	st.FollowAnimation = nil
 	a.md.Theme = mdTheme(p, c.Theme())
 	a.md.CodeBlock = a.codeBlock
 	n := len(items)

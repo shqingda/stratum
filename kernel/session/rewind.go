@@ -21,7 +21,11 @@ func (m *Manager) Rewind(ctx context.Context, q proto.Rewind) (proto.RewindResul
 	if q.TurnSeq <= 0 || (q.Action != "both" && q.Action != "conversation" && q.Action != "code" && q.Action != "summarize" && q.Action != "summarize_before") {
 		return out, proto.Errorf("bad_request", "rewind needs a prompt and an action")
 	}
-	if !m.lockIdle(ctx) {
+	idleScope := q.SessionID
+	if q.Action == "both" || q.Action == "code" {
+		idleScope = ""
+	}
+	if !m.lockIdle(ctx, idleScope) {
 		return out, proto.Errorf("busy", "wait for running turns before rewinding")
 	}
 	unlocked := false
@@ -164,7 +168,7 @@ func (m *Manager) rewindSummarize(ctx context.Context, x store.Session, turnSeq 
 		return out, errEmptySummary
 	}
 
-	if !m.lockIdle(ctx) {
+	if !m.lockIdle(ctx, x.ID) {
 		return out, proto.Errorf("busy", "wait for running turns before rewinding")
 	}
 	evs, err := m.Store.Events(ctx, x.ID, turnSeq-1, 1)
@@ -237,7 +241,7 @@ func (m *Manager) rewindSummarizeBefore(ctx context.Context, x store.Session, tu
 		return out, errEmptySummary
 	}
 
-	if !m.lockIdle(ctx) {
+	if !m.lockIdle(ctx, x.ID) {
 		return out, proto.Errorf("busy", "wait for running turns before rewinding")
 	}
 	evs, err := m.Store.Events(ctx, x.ID, turnSeq-1, 1)

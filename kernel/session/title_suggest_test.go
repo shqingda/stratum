@@ -84,3 +84,57 @@ func TestPromptSuggestionOnTurnEnd(t *testing.T) {
 	}
 	m.wg.Wait()
 }
+
+func TestRewindConversationAllowedWhileOtherSessionRuns(t *testing.T) {
+	script := &llm.Script{Turns: []llm.Turn{{Text: "first answer"}}}
+	m, s1 := changesManager(t, script)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ended := make(chan struct{}, 1)
+	defer m.Subscribe(func(e proto.Event) {
+		if e.Type == proto.EventTurnEnd && e.SessionID == s1.ID {
+			ended <- struct{}{}
+		}
+	})()
+
+	if _, err := m.Prompt(ctx, proto.Prompt{SessionID: s1.ID, Text: "first question"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+	case <-ctx.Done():
+		t.Fatal("s1 turn did not end")
+	}
+
+	// Simulate another session (e.g., notes waiting for approval) with an active run.
+	m.mu.Lock()
+	if m.runs == nil {
+		m.runs = map[string]*run{}
+	}
+	m.runs["other-session"] = &run{}
+	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		delete(m.runs, "other-session")
+		m.mu.Unlock()
+	}()
+
+	evs, err := m.Store.Events(ctx, s1.ID, 0, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var turnSeq int64
+	for _, ev := range evs {
+		if ev.Type == proto.EventTurnStart {
+			turnSeq = ev.Seq
+			break
+		}
+	}
+	if turnSeq == 0 {
+		t.Fatal("missing EventTurnStart")
+	}
+	if _, err := m.Rewind(ctx, proto.Rewind{SessionID: s1.ID, TurnSeq: turnSeq, Action: "conversation"}); err != nil {
+		t.Fatalf("conversation rewind blocked by another session: %v", err)
+	}
+}

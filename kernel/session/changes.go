@@ -46,7 +46,7 @@ func (m *Manager) ChangesApply(ctx context.Context, q proto.ChangeQuery, redo bo
 	if q.TurnSeq <= 0 {
 		return proto.ChangeResult{}, proto.Errorf("bad_request", "turnSeq must be positive")
 	}
-	if !m.lockIdle(ctx) {
+	if !m.lockIdle(ctx, "") {
 		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
 	}
 	x, err := m.session(ctx, q.SessionID)
@@ -89,7 +89,7 @@ func (m *Manager) ChangesRevertHunk(ctx context.Context, q proto.HunkQuery) (pro
 	if q.TurnSeq <= 0 || q.Path == "" {
 		return proto.ChangeResult{}, proto.Errorf("bad_request", "turnSeq and path are required")
 	}
-	if !m.lockIdle(ctx) {
+	if !m.lockIdle(ctx, "") {
 		return proto.ChangeResult{}, proto.Errorf("busy", "wait for running turns before restoring files")
 	}
 	unlocked := false
@@ -132,13 +132,18 @@ func changeError(err error) error {
 	return err
 }
 
-// lockIdle takes m.mu once no turn runs, and says whether it did. A turn
-// tells the client it is over a moment before it lets go of the session,
-// so an undo pressed at once waits that moment out rather than failing.
-func (m *Manager) lockIdle(ctx context.Context) bool {
+// lockIdle takes m.mu once no turn runs in sessionID (or any session if
+// sessionID is empty), and says whether it did. A turn tells the client it
+// is over a moment before it lets go of the session, so an undo or rewind
+// pressed at once waits that moment out rather than failing.
+func (m *Manager) lockIdle(ctx context.Context, sessionID string) bool {
 	for wait := 0; ; wait++ {
 		m.mu.Lock()
-		if len(m.runs) == 0 {
+		idle := len(m.runs) == 0
+		if sessionID != "" {
+			idle = m.runs[sessionID] == nil
+		}
+		if idle {
 			return true
 		}
 		m.mu.Unlock()
