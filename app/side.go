@@ -55,7 +55,7 @@ func (a *App) sideAskCard(c *ui.Context) {
 			}
 		})
 
-		ui.Row(c).Padding(8, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+		ui.Row(c).Padding(8, 12).Gap(8).AlignItems(ui.Center).Children(func() {
 			inp := ui.TextInputBase(c.Key("side-input"), &a.btwDraft).Bind(&a.btwInput).
 				Label(locales.SideAsk()).Placeholder(locales.SideAskPlaceholder()).PlaceholderColor(p.Mute).
 				FontSize(13.5).TextColor(p.Fg).Grow(1).MinWidth(0).SingleLine().
@@ -95,6 +95,7 @@ func (a *App) sideAskCard(c *ui.Context) {
 			curID = a.C.Current.ID
 		}
 		if a.C.SideQuestion != "" && a.C.SideSession == curID {
+			ui.Box(c).FillWidth().Height(.5).Background(p.Edge)
 			ui.Scroll(c).MaxHeight(280).Padding(10, 14, 12, 14).Children(func() {
 				ui.Text(c, a.C.SideQuestion).FontSize(13).FontWeight(600).TextColor(p.Fg2).Margin(0, 0, 8, 0)
 				switch {
@@ -116,10 +117,6 @@ func (a *App) sideAskCard(c *ui.Context) {
 						}
 					})
 				}
-			})
-		} else {
-			ui.Row(c).Padding(10, 14, 12, 14).Children(func() {
-				ui.Text(c, locales.SideAskNote()).FontSize(12.5).TextColor(p.Mute)
 			})
 		}
 	})

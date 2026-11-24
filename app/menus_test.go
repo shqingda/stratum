@@ -584,9 +584,11 @@ func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
 	task8Click(t, tt, "gpt-6-luna")
 	cmd := task8Command(t, a, proto.MethodModels, nil)
 	task8Models(a, cmd.ID, []proto.Model{
-		{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Context: 128000},
-		{ID: "claude-sonnet-4", Name: "Claude Sonnet 4", Context: 200000},
-		{ID: "o3-mini", Name: "o3 mini", Context: 200000},
+		{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Context: 128000, Reasoning: true},
+		{ID: "claude-sonnet-4", Name: "Claude Sonnet 4", Context: 200000, Reasoning: true},
+		{ID: "o3-mini", Name: "o3 mini", Context: 200000, Reasoning: true},
+		{ID: "claude-opus-4", Name: "Claude Opus 4", Context: 200000, Reasoning: true},
+		{ID: "gemini-pro", Name: "Gemini Pro", Context: 1000000, Reasoning: true},
 	})
 	tt.Frame()
 
@@ -597,7 +599,13 @@ func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
 		t.Fatalf("expected filtered model list, texts=%q", tt.Texts())
 	}
 
-	// 2. Pinning a model records it in FavoriteModels and displays Favorites section.
+	// 2. Hovering and pinning a model records it in FavoriteModels and displays Favorites section.
+	acc, ok := tt.Access("Claude Sonnet 4")
+	if !ok {
+		t.Fatal("missing Claude Sonnet 4 accessibility element")
+	}
+	tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
+	tt.Frame()
 	if err := tt.Click(locales.FavoriteModel()); err != nil {
 		t.Fatal(err)
 	}

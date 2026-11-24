@@ -305,7 +305,7 @@ func (a *App) composerPlaceholder() string {
 	case a.C.Busy:
 		return locales.ComposerQueuePlaceholder()
 	case a.activeSuggestion() != "":
-		return a.activeSuggestion() + "  ⇥"
+		return a.activeSuggestion()
 	default:
 		return locales.ComposerPlaceholder()
 	}

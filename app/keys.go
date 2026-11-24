@@ -257,7 +257,7 @@ func (a *App) keys(c *ui.Context) {
 // The oldest approval keeps its keys until answered; a repeated key never
 // advances to another approval while its response is still in flight.
 func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
-	if a.modelMenu || a.effortMenu || a.modeMenu {
+	if a.modelMenu || a.modeMenu {
 		return false
 	}
 	if key == ui.KeyEscape && mods == 0 && a.automationsOpen {

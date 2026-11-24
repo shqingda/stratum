@@ -120,19 +120,19 @@ type App struct {
 	commitMsg   string
 	commitInput ui.Handle
 
-	searchInput                                                                                                   ui.Handle
-	composerInput                                                                                                 ui.Handle
-	closeWindow                                                                                                   func()
-	reconnect                                                                                                     func()
-	keyRepeat                                                                                                     bool
-	visibleSessions                                                                                               []string
-	menuSession                                                                                                   string
-	modelMenu, effortMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
-	modelQuery                                                                                                    string
-	modelSearch                                                                                                   ui.Handle
-	modelsRequested                                                                                               bool
-	modelsPending, modelsAccount, modelsError                                                                     string
-	modelsLoadedAccount                                                                                           string
+	searchInput                                                                                       ui.Handle
+	composerInput                                                                                     ui.Handle
+	closeWindow                                                                                       func()
+	reconnect                                                                                         func()
+	keyRepeat                                                                                         bool
+	visibleSessions                                                                                   []string
+	menuSession                                                                                       string
+	modelMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
+	modelQuery                                                                                        string
+	modelSearch                                                                                       ui.Handle
+	modelsRequested                                                                                   bool
+	modelsPending, modelsAccount, modelsError                                                         string
+	modelsLoadedAccount                                                                               string
 
 	keyOpen, keyMenu bool
 	keyProvider, key string

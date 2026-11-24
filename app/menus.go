@@ -26,7 +26,7 @@ func (a *App) syncMenus() {
 		a.modelsPending = ""
 	}
 	if id != a.menuSession || !a.C.CanAct() {
-		a.modelMenu, a.effortMenu, a.modeMenu, a.detailMenu, a.worktreeMenu, a.branchMenu = false, false, false, false, false, false
+		a.modelMenu, a.modeMenu, a.detailMenu, a.worktreeMenu, a.branchMenu = false, false, false, false, false
 		a.modelsRequested = false
 		a.menuSession = id
 	}
@@ -177,25 +177,27 @@ func (a *App) modelPill(c *ui.Context, label string) {
 		a.modelMenu = false
 	}
 	pop := ui.Popover(c, b, &a.modelMenu, func() {
-		ui.Column(c).Width(300).Gap(4).Children(func() {
+		ui.Column(c).Width(308).Gap(4).Children(func() {
 			filtered := a.filterModels(a.C.Models, a.modelQuery)
-			ui.Row(c).Height(32).Padding(0, 8).Gap(6).Radius(8).Background(p.Chip).AlignItems(ui.Center).Children(func() {
-				sym(c, "search", 13, p.Mute)
-				ui.TextInputBase(c.Key("model-search"), &a.modelQuery).Bind(&a.modelSearch).
-					Label(locales.Search()).Placeholder(locales.SearchModels()).PlaceholderColor(p.Mute).
-					FontSize(13).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().
-					OnTextKey(func(k ui.TextKey) bool {
-						switch {
-						case k.Key == ui.KeyEscape && k.Mods == 0:
-							a.modelMenu = false
-							return true
-						case k.Key == ui.KeyEnter && k.Mods == 0 && len(filtered) > 0:
-							pickModel(filtered[0].ID)
-							return true
-						}
-						return false
-					})
-			})
+			if len(a.C.Models) > 4 || a.modelQuery != "" {
+				ui.Row(c).Height(30).Padding(0, 8).Gap(6).Radius(7).Background(p.Chip).AlignItems(ui.Center).Children(func() {
+					sym(c, "search", 13, p.Mute)
+					ui.TextInputBase(c.Key("model-search"), &a.modelQuery).Bind(&a.modelSearch).
+						Label(locales.Search()).Placeholder(locales.SearchModels()).PlaceholderColor(p.Mute).
+						FontSize(13).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().
+						OnTextKey(func(k ui.TextKey) bool {
+							switch {
+							case k.Key == ui.KeyEscape && k.Mods == 0:
+								a.modelMenu = false
+								return true
+							case k.Key == ui.KeyEnter && k.Mods == 0 && len(filtered) > 0:
+								pickModel(filtered[0].ID)
+								return true
+							}
+							return false
+						})
+				})
+			}
 			switch {
 			case a.modelsPending != "":
 				ui.Text(c, locales.Loading()).FontSize(12.5).TextColor(p.Mute).Padding(6, 8)
@@ -207,6 +209,7 @@ func (a *App) modelPill(c *ui.Context, label string) {
 			case len(a.C.Models) == 0:
 				ui.Text(c, locales.NoModels()).FontSize(12.5).TextColor(p.Mute).Padding(6, 8)
 			default:
+				canPin := len(a.C.Models) > 1
 				renderModelRow := func(sec string, m proto.Model) {
 					name := m.Name
 					if name == "" {
@@ -215,22 +218,21 @@ func (a *App) modelPill(c *ui.Context, label string) {
 					key := modelKey(account, m.ID)
 					fav := favSet[key]
 					selected := m.ID == current || current == "" && m.Default
-					ui.Row(c.Key("m-row:"+sec+":"+m.ID)).Height(30).Padding(0, 4).Gap(2).AlignItems(ui.Center).Children(func() {
-						btn := ui.ButtonBase(c.Key("m-pick:"+sec+":"+m.ID)).Row().Grow(1).MinWidth(0).Height(28).Padding(0, 6).Gap(6).Radius(6).AlignItems(ui.Center).Label(name).Selected(selected)
-						press(btn)
+					row := ui.Row(c.Key("m-row:"+sec+":"+m.ID)).Height(30).Padding(0, 4, 0, 8).Gap(4).Radius(7).AlignItems(ui.Center)
+					if selected {
+						row.Background(p.Sel)
+					} else if row.Hovered() {
+						row.Background(p.Hover)
+					}
+					row.Children(func() {
+						btn := ui.ButtonBase(c.Key("m-pick:" + sec + ":" + m.ID)).Row().Grow(1).MinWidth(0).Height(30).Gap(6).AlignItems(ui.Center).Label(name).Selected(selected)
 						focusRing(btn, p)
-						if selected {
-							btn.Background(p.Sel)
-						} else if btn.Hovered() {
-							btn.Background(p.Hover)
-						}
 						btn.Children(func() {
+							weight := 400
 							if selected {
-								sym(c, "check", 12, p.Acc)
-							} else {
-								ui.Box(c).Width(12).Shrink(0)
+								weight = 500
 							}
-							ui.Text(c, name).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+							ui.Text(c, name).FontSize(13).FontWeight(weight).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 							if ctx := contextSize(m.Context); ctx != "" {
 								ui.Text(c, ctx).FontSize(11).TextColor(p.Mute).SingleLine().Shrink(0)
 							}
@@ -238,20 +240,21 @@ func (a *App) modelPill(c *ui.Context, label string) {
 						if btn.Clicked() {
 							pickModel(m.ID)
 						}
-						pinTip := locales.FavoriteModel()
-						pinCol := p.Faint
-						if fav {
-							pinTip = locales.UnfavoriteModel()
-							pinCol = p.Acc
-						}
-						pinBtn := ui.ButtonBase(c.Key("m-pin:"+sec+":"+m.ID)).Size(24, 24).Radius(6).Center().Shrink(0).Label(pinTip).Tooltip(pinTip)
-						press(pinBtn)
-						if pinBtn.Hovered() {
-							pinBtn.Background(p.Hover)
-						}
-						pinBtn.Children(func() { sym(c, "pin", 12, pinCol) })
-						if pinBtn.Clicked() {
-							a.toggleFavoriteModel(account, m.ID)
+						if canPin && (fav || row.Hovered()) {
+							pinTip := locales.FavoriteModel()
+							pinCol := p.Mute
+							if fav {
+								pinTip = locales.UnfavoriteModel()
+								pinCol = p.Acc
+							}
+							pinBtn := ui.ButtonBase(c.Key("m-pin:"+sec+":"+m.ID)).Size(22, 22).Radius(5).Center().Shrink(0).Label(pinTip).Tooltip(pinTip)
+							if pinBtn.Hovered() {
+								pinBtn.Background(p.Hover)
+							}
+							pinBtn.Children(func() { sym(c, "pin", 12, pinCol) })
+							if pinBtn.Clicked() {
+								a.toggleFavoriteModel(account, m.ID)
+							}
 						}
 					})
 				}
@@ -283,52 +286,60 @@ func (a *App) modelPill(c *ui.Context, label string) {
 							rest = append(rest, m)
 						}
 					}
+					sections := 0
+					for _, n := range []int{len(favs), len(recents), len(rest)} {
+						if n > 0 {
+							sections++
+						}
+					}
+					if sections <= 1 {
+						renderSection("fav", "", favs)
+						renderSection("rec", "", recents)
+						renderSection("all", "", rest)
+						return
+					}
 					renderSection("fav", locales.FavoriteModels(), favs)
 					renderSection("rec", locales.RecentModels(), recents)
-					allTitle := ""
-					if len(favs) > 0 || len(recents) > 0 {
-						allTitle = locales.AllModels()
-					}
-					renderSection("all", allTitle, rest)
+					renderSection("all", locales.AllModels(), rest)
 				})
 			}
 
-			ui.Box(c).FillWidth().Height(.5).Background(p.Edge).Margin(4, 0)
 			unsupported := a.reasoningUnsupported()
-			effRow := ui.Row(c).Padding(4, 6).Gap(4).AlignItems(ui.Center).Label(locales.ReasoningEffort()).Disabled(unsupported)
+			ui.Box(c).FillWidth().Height(.5).Background(p.Edge).Margin(2, 2)
+			effRow := ui.Row(c).Padding(2, 4, 2, 6).Gap(6).AlignItems(ui.Center).Label(locales.ReasoningEffort()).Disabled(unsupported)
 			if unsupported {
 				effRow.Tooltip(locales.NoEffortSupport())
 			}
 			effRow.Children(func() {
 				ui.Text(c, locales.ReasoningEffort()).FontSize(12).TextColor(p.Mute).SingleLine()
 				ui.Spacer(c)
-				for _, ef := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
-					on := a.C.Current.Effort == ef
-					eb := ui.ButtonBase(c.Key("eff:"+ef)).Height(22).Padding(0, 6).Radius(5).Center().Label(effortLabel(ef)).Disabled(unsupported)
-					if on {
-						eb.Background(p.Sel)
-					} else if eb.Hovered() && !unsupported {
-						eb.Background(p.Hover)
-					}
-					eb.Children(func() {
-						col := p.Fg2
-						if on {
-							col = p.Fg
-						} else if unsupported {
+				ui.Row(c).Background(p.Chip).Radius(7).Padding(2).Gap(1).AlignItems(ui.Center).Children(func() {
+					for _, ef := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
+						on := a.C.Current.Effort == ef
+						eb := ui.ButtonBase(c.Key("eff:"+ef)).Height(22).Padding(0, 6).Radius(5).Center().Label(effortLabel(ef)).Selected(on).Disabled(unsupported)
+						col, weight := p.Fg2, 400
+						if unsupported {
 							col = p.Faint
+						} else if on {
+							eb.Background(p.Card).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08))
+							col, weight = p.Fg, 500
+						} else if eb.Hovered() {
+							eb.Background(p.Hover)
 						}
-						ui.Text(c, effortLabel(ef)).FontSize(11.5).TextColor(col).SingleLine()
-					})
-					if eb.Clicked() && !unsupported {
-						e := ef
-						a.do(a.C.Update(proto.SessionUpdate{Effort: &e}))
+						eb.Children(func() {
+							ui.Text(c, effortLabel(ef)).FontSize(11.5).FontWeight(weight).TextColor(col).SingleLine()
+						})
+						if eb.Clicked() && !unsupported {
+							e := ef
+							a.do(a.C.Update(proto.SessionUpdate{Effort: &e}))
+						}
 					}
-				}
+				})
 			})
 		})
 	})
 	pop.AttachTo(b, ui.AnchorTopStart, ui.AnchorBottomStart).Margin(0, 0, 6, 0).
-		Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(8).NoShadow()
+		Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(6).NoShadow()
 	lift(pop, p)
 	rim(pop, p)
 }
@@ -392,28 +403,6 @@ func (a *App) reasoningUnsupported() bool {
 		}
 	}
 	return false
-}
-
-func (a *App) effortPill(c *ui.Context, label string) {
-	unsupported := a.reasoningUnsupported()
-	container := ui.Box(c)
-	if unsupported {
-		// Disabled controls do not show tooltips in mygo; their container can.
-		container.Tooltip(locales.NoEffortSupport())
-	}
-	container.Children(func() {
-		b := a.pill(c, "effort", "", label, false).Disabled(!a.C.CanAct() || unsupported)
-		if unsupported {
-			b.Description(locales.NoEffortSupport())
-		}
-		b.PopoverMenuButton(func(m *ui.Menu) {
-			for _, effort := range []string{"", "minimal", "low", "medium", "high", "xhigh"} {
-				if m.Item(effortLabel(effort)).ID("effort:" + effort).Checked(a.C.Current.Effort == effort).Chosen() {
-					a.do(a.C.Update(proto.SessionUpdate{Effort: &effort}))
-				}
-			}
-		}, a.menuOptions(&a.effortMenu))
-	})
 }
 
 func (a *App) modePill(c *ui.Context, label string) {
