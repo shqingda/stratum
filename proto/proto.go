@@ -77,6 +77,7 @@ const (
 	MethodSessionDelete    = "session.delete"    // SessionRef → {}
 	MethodSessionFlag      = "session.flag"      // SessionFlag → Session
 	MethodSessionFork      = "session.fork"      // SessionRef → Session
+	MethodSessionRetitle   = "session.retitle"   // SessionRef → Session
 	MethodPrompt           = "prompt"            // Prompt → PromptResult
 	MethodSideAsk          = "side.ask"          // SideAsk → SideAskResult
 	MethodCancel           = "cancel"            // SessionRef → {}
@@ -338,6 +339,7 @@ const (
 	EventSession          = "session.updated"   // durable; Session
 	EventTurnStart        = "turn.start"        // durable; TurnStart
 	EventTurnEnd          = "turn.end"          // durable; TurnEnd
+	EventSuggestion       = "turn.suggestion"   // live; Suggestion
 	EventMessage          = "message"           // durable; llm.Message
 	EventApprovalRequest  = "approval.request"  // durable; Approval
 	EventApprovalResolved = "approval.resolved" // durable; ApprovalAnswer
@@ -351,6 +353,11 @@ const (
 
 // TurnStart begins a turn.
 type TurnStart struct {
+	Text string `json:"text"`
+}
+
+// Suggestion is a short follow-up prompt offered after a turn ends.
+type Suggestion struct {
 	Text string `json:"text"`
 }
 
@@ -694,6 +701,8 @@ type Settings struct {
 	// PreventSleep keeps the machine awake while a session is actively
 	// running (not while waiting for approval), as in Codex and Zed.
 	PreventSleep bool `json:"preventSleep,omitempty"`
+	// NoSuggestions disables post-reply ghost prompt suggestions.
+	NoSuggestions bool `json:"noSuggestions,omitempty"`
 	// ComputerUse offers the agent the computer tool: the screen, the
 	// mouse and the keyboard, each call asked for but in full access.
 	ComputerUse bool `json:"computerUse,omitempty"`

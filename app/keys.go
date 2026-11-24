@@ -51,7 +51,7 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyU, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !a.btwOpen && a.C.Current != nil {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
 			a.markUnread(a.C.Current.ID)
 		}
 	})
@@ -299,6 +299,10 @@ func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
 		a.closeFind()
 		return true
 	}
+	if a.btwOpen && key == ui.KeyEscape && mods == 0 {
+		a.btwOpen = false
+		return true
+	}
 	if key == ui.KeyEscape && mods == 0 && a.rewind.open {
 		a.escAt = time.Time{}
 		if a.rewind.step == "actions" && !a.rewind.bubble {
@@ -435,6 +439,17 @@ func (a *App) composerKey(k ui.TextKey) bool {
 	}
 	if a.mentionKey(k) || a.slashKey(k) {
 		return true
+	}
+	if sug := a.activeSuggestion(); sug != "" && k.Mods == 0 {
+		if k.Key == ui.KeyTab {
+			a.recall = sug
+			a.C.Suggestion = ""
+			return true
+		}
+		if k.Key == ui.KeyEscape {
+			a.C.Suggestion = ""
+			return true
+		}
 	}
 	// Tab moves the session to the next primary agent, as in OpenCode;
 	// ⇧Tab stays the permission mode's, as in Claude Code.

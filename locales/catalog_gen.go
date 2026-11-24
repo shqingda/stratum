@@ -2348,6 +2348,46 @@ func (msgs Messages) PreventSleep() string {
 	return Catalog.Format(msgs.locale, "preventSleep", nil)
 }
 
+// PromptSuggestions says "回复后建议下一步提问"
+// in the language the app shows.
+func PromptSuggestions() string { return In(i18n.Locale()).PromptSuggestions() }
+
+// PromptSuggestions says "回复后建议下一步提问"
+// in the language of msgs.
+func (msgs Messages) PromptSuggestions() string {
+	return Catalog.Format(msgs.locale, "promptSuggestions", nil)
+}
+
+// AcceptSuggestion says "按 Tab 接受建议"
+// in the language the app shows.
+func AcceptSuggestion() string { return In(i18n.Locale()).AcceptSuggestion() }
+
+// AcceptSuggestion says "按 Tab 接受建议"
+// in the language of msgs.
+func (msgs Messages) AcceptSuggestion() string {
+	return Catalog.Format(msgs.locale, "acceptSuggestion", nil)
+}
+
+// RegenerateTitle says "重新生成标题"
+// in the language the app shows.
+func RegenerateTitle() string { return In(i18n.Locale()).RegenerateTitle() }
+
+// RegenerateTitle says "重新生成标题"
+// in the language of msgs.
+func (msgs Messages) RegenerateTitle() string {
+	return Catalog.Format(msgs.locale, "regenerateTitle", nil)
+}
+
+// RegenerateTitleNote says "根据对话内容重新生成会话标题"
+// in the language the app shows.
+func RegenerateTitleNote() string { return In(i18n.Locale()).RegenerateTitleNote() }
+
+// RegenerateTitleNote says "根据对话内容重新生成会话标题"
+// in the language of msgs.
+func (msgs Messages) RegenerateTitleNote() string {
+	return Catalog.Format(msgs.locale, "regenerateTitleNote", nil)
+}
+
 // SideAsk says "旁支对话"
 // in the language the app shows.
 func SideAsk() string { return In(i18n.Locale()).SideAsk() }

@@ -51,8 +51,9 @@ type Manager struct {
 	MCP         *mcp.Hub // nil without MCP
 	WorktreeDir string   // directory holding session git worktrees; TempDir when empty
 	// Sandboxed tells whether commands run in the sandbox.
-	Sandboxed bool
-	Clock     agent.Clock // real time when nil
+	Sandboxed      bool
+	SuggestInTests bool        // enables post-turn suggestions with *llm.Script in tests
+	Clock          agent.Clock // real time when nil
 
 	mu   sync.Mutex
 	runs map[string]*run
@@ -633,7 +634,7 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 		m.Store.UpdateSession(context.WithoutCancel(ctx), x)
 		x, _ = m.Store.GetSession(context.WithoutCancel(ctx), x.ID)
 		m.record(ctx, x.ID, proto.EventSession, m.sessionProto(ctx, x))
-		m.retitle(x.ID, x.Title, text)
+		m.retitle(x, x.Title, text)
 	}
 	usage, err := m.runAgent(ctx, x, r, p)
 	end := proto.TurnEnd{Usage: usage}
@@ -655,6 +656,14 @@ func (m *Manager) turn(ctx context.Context, x store.Session, r *run, p proto.Pro
 			mark = "fail"
 		}
 		m.Flag(context.WithoutCancel(ctx), proto.SessionFlag{SessionID: x.ID, Mark: &mark})
+	}
+	if err == nil && !end.Stopped && !end.Limit {
+		m.mu.Lock()
+		hasQueued := len(r.queued) > 0
+		m.mu.Unlock()
+		if !hasQueued {
+			m.suggestNext(x.ID)
+		}
 	}
 	return err
 }

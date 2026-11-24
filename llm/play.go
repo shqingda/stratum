@@ -104,6 +104,23 @@ func (p Play) Stream(ctx context.Context, req Request) iter.Seq2[Event, error] {
 		t := Turn{Text: "演示模式摘要：已梳理项目结构、测试状态与后续修改计划，可继续基于当前上下文推进。"}
 		return (&Script{Turns: []Turn{t}, Delay: p.Delay}).Stream(ctx, req)
 	}
+	if len(req.Tools) == 0 {
+		lastUser := ""
+		for i := len(req.Messages) - 1; i >= 0; i-- {
+			if req.Messages[i].Role == User {
+				lastUser = strings.ToLower(req.Messages[i].PlainText())
+				break
+			}
+		}
+		switch {
+		case strings.Contains(lastUser, "write a title") || strings.Contains(lastUser, "write a concise title"):
+			return (&Script{Turns: []Turn{{Text: "修复 calc 的 Add 测试"}}, Delay: p.Delay}).Stream(ctx, req)
+		case strings.Contains(lastUser, "suggest the next"):
+			return (&Script{Turns: []Turn{{Text: "为 Add 补充负数与零值边界测试"}}, Delay: p.Delay}).Stream(ctx, req)
+		case strings.Contains(req.System, "/btw"):
+			return (&Script{Turns: []Turn{{Text: "演示旁支回答：Add 在 add.go 里写成了 a - b，改为 a + b 即可。"}}, Delay: p.Delay}).Stream(ctx, req)
+		}
+	}
 	steps, n, answer := sub, 0, ""
 	if !strings.Contains(req.System, "You are a sub-agent") {
 		steps = pick(req.Messages).steps

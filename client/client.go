@@ -179,6 +179,8 @@ type Client struct {
 	SideAnswer   string
 	SideErr      string
 	SidePending  bool
+	// Suggestion is the post-reply follow-up prompt offered in the composer.
+	Suggestion string
 
 	Accounts []proto.Account
 	SignIn   *SignIn
@@ -525,6 +527,7 @@ func (c *Client) resetTranscript() {
 	c.Current, c.Entries, c.streaming, c.Turns = nil, nil, nil, nil
 	c.thinking, c.thought, c.LastInput = nil, nil, 0
 	c.Busy, c.Queued, c.Approvals, c.Usage = false, nil, nil, llm.Usage{}
+	c.Suggestion = ""
 	clear(c.Answering)
 	c.buffer, c.overflow = nil, false
 	c.cursor = 0
@@ -667,6 +670,23 @@ func (c *Client) Rename(id, title string) ([]proto.Command, error) {
 	})}, nil
 }
 
+// Retitle asks the kernel to summarize the session into a new title.
+func (c *Client) Retitle(id string) ([]proto.Command, error) {
+	if c.Phase != Ready {
+		return nil, ErrNotReady
+	}
+	if id == "" && c.Current != nil {
+		id = c.Current.ID
+	}
+	if id == "" {
+		return nil, ErrNotReady
+	}
+	return c.mutation(proto.MethodSessionRetitle, proto.SessionRef{SessionID: id}, func(r json.RawMessage) []proto.Command {
+		c.sessionUpdated(proto.Event{Data: r})
+		return nil
+	})
+}
+
 // Seen clears the mark of a session whose ended turn the user has now
 // seen.
 func (c *Client) Seen(id string) []proto.Command {
@@ -712,6 +732,7 @@ func (c *Client) event(e proto.Event) []proto.Command {
 	switch e.Type {
 	case proto.EventTurnStart:
 		c.Busy = true
+		c.Suggestion = ""
 		c.Turns = append(c.Turns, Turn{Seq: e.Seq, Start: e.At})
 	case proto.EventThinkingDelta:
 		var d proto.Delta
@@ -858,6 +879,11 @@ func (c *Client) event(e proto.Event) []proto.Command {
 			c.notice("limit", "%s", locales.StepLimit())
 		case t.Error != "":
 			c.notice("fail", "%s", locales.TurnFailed(t.Error))
+		}
+	case proto.EventSuggestion:
+		var s proto.Suggestion
+		if !c.Busy && json.Unmarshal(e.Data, &s) == nil {
+			c.Suggestion = strings.TrimSpace(s.Text)
 		}
 	}
 	return nil
@@ -1054,6 +1080,7 @@ func (c *Client) prompt(steer bool, text string, images []llm.Image) ([]proto.Co
 	if strings.TrimSpace(text) == "" && len(images) == 0 {
 		return nil, errors.New(locales.NothingToSend())
 	}
+	c.Suggestion = ""
 	p := proto.Prompt{SessionID: sessionID(c.Current), Text: text, Images: images, Steer: steer}
 	return c.mutation(proto.MethodPrompt, p, nil) // the queue streams what became of it
 }

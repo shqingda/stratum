@@ -297,6 +297,11 @@ func (a *App) generalPage(c *ui.Context) {
 			s.PreventSleep = on
 			a.do(a.C.SaveSettings(s))
 		})
+		r.toggle(c, "set-suggestions", locales.PromptSuggestions(), !set.NoSuggestions, false, func(on bool) {
+			s := set
+			s.NoSuggestions = !on
+			a.do(a.C.SaveSettings(s))
+		})
 	})
 	note(c, p, map[bool]string{false: locales.CmdReturnSteers(), true: locales.CmdReturnQueues()}[set.EnterSteers])
 

@@ -138,19 +138,13 @@ func lift(e ui.Element, p *Palette) ui.Element {
 
 var (
 	springDefault  = ui.SpringOptions{Stiffness: 300, Damping: 34.6} // critically damped (ζ ≈ 1.0)
-	springSnappy   = ui.SpringOptions{Stiffness: 650, Damping: 51}   // critically damped (ζ ≈ 1.0)
 	springMomentum = ui.SpringOptions{Stiffness: 480, Damping: 36}   // ζ ≈ 0.82, for rotation / momentum
 )
 
-// press shrinks a control a little while it is held, using a critically
-// damped spring so the feedback is interruptible on rapid taps.
+// press is a no-op on macOS desktop: pointer controls indicate interaction
+// through instant surface highlight rather than iOS touch-scale bounce.
 func press(e ui.Element) ui.Element {
-	target := float32(1)
-	if e.Pressed() {
-		target = .965
-	}
-	s := e.Spring("press", target, springSnappy)
-	return e.Scale(s, s)
+	return e
 }
 
 // focusRing gives keyboard-navigated controls a restrained Apple focus ring

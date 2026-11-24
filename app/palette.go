@@ -89,6 +89,9 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 	add(opt{icon: "layout-sidebar-right", label: map[bool]string{true: locales.HideChanges(), false: locales.ShowChanges()}[a.rv.open], kbd: "⌘⌥I", run: func() { a.rv.open = !a.rv.open }})
 	if cur != nil {
 		add(opt{icon: "message", label: locales.SideAsk(), kbd: "⌘;", run: a.openSideAsk})
+		if len(a.C.Entries) > 0 {
+			add(opt{icon: "sparkles", label: locales.RegenerateTitle(), run: func() { a.do(a.C.Retitle(cur.ID)) }})
+		}
 		add(opt{icon: "terminal-2", label: locales.ShowTerminal(), run: a.showTerminal})
 		add(opt{icon: "list-check", label: locales.ShowPlan(), run: func() { a.rv.open, a.rv.tab = true, "plan" }})
 		add(opt{icon: "world", label: locales.Browser(), run: a.showBrowser})
@@ -185,6 +188,9 @@ func (a *App) settingOpts(set proto.Settings, add func(opt)) {
 	})})
 	add(opt{icon: "clock", label: locales.SettingTo(locales.PreventSleep(), onOff(!set.PreventSleep)), run: save(func(s *proto.Settings) {
 		s.PreventSleep = !set.PreventSleep
+	})})
+	add(opt{icon: "sparkles", label: locales.SettingTo(locales.PromptSuggestions(), onOff(set.NoSuggestions)), run: save(func(s *proto.Settings) {
+		s.NoSuggestions = !set.NoSuggestions
 	})})
 	for _, n := range []struct{ kind, label string }{
 		{"wait", locales.NotifyKind(locales.NotifyWaitSetting())}, {"done", locales.NotifyKind(locales.NotifyDoneSetting())},

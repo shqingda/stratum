@@ -491,7 +491,6 @@ func (a *App) scope(c *ui.Context) {
 			}
 			b.Children(func() { ui.Text(c, s.label).FontSize(13).FontWeight(weight).TextColor(col) })
 			if b.Clicked() && !on {
-				a.fireHaptic(hapticLevelChange)
 				a.rv.uncommitted, a.rv.branch, a.rv.sel, a.rv.turn = s.uncommitted, s.branch, "", 0
 				if s.uncommitted || s.branch {
 					a.C.Workspace.BranchStale = true // read it as it is now

@@ -262,12 +262,38 @@ func (a *App) words(c *ui.Context, dragOver bool, svc ui.Services) {
 			a.modelPill(c, cur.Model)
 		}
 		ui.Spacer(c)
+		if sug := a.activeSuggestion(); sug != "" {
+			sb := ui.ButtonBase(c.Key("accept-sug")).Height(22).Padding(0, 7).Radius(6).Background(p.Chip).Center().
+				Label(locales.AcceptSuggestion()).Tooltip(locales.AcceptSuggestion())
+			press(sb)
+			focusRing(sb, p)
+			if sb.Hovered() {
+				sb.Background(p.Hover)
+			}
+			sb.Children(func() {
+				ui.Text(c, "⇥ Tab").FontSize(11).FontWeight(500).TextColor(p.Mute).SingleLine()
+			})
+			if sb.Clicked() {
+				a.draft, a.toEnd, a.C.Suggestion = sug, true, ""
+				a.composerInput.Focus(c)
+			}
+		}
 		if cur != nil {
 			a.modePill(c, modeName(cur.Mode))
 			a.contextRing(c)
 		}
 		a.goButton(c)
 	})
+}
+
+func (a *App) activeSuggestion() string {
+	if a.settings().NoSuggestions || a.C.Current == nil || a.C.Busy || len(a.C.Approvals) > 0 {
+		return ""
+	}
+	if strings.TrimSpace(a.draft) != "" || len(a.attached) > 0 || len(a.mentionSessions) > 0 {
+		return ""
+	}
+	return strings.TrimSpace(a.C.Suggestion)
 }
 
 func (a *App) composerPlaceholder() string {
@@ -278,6 +304,8 @@ func (a *App) composerPlaceholder() string {
 		return locales.ComposerDenyPlaceholder()
 	case a.C.Busy:
 		return locales.ComposerQueuePlaceholder()
+	case a.activeSuggestion() != "":
+		return a.activeSuggestion() + "  ⇥"
 	default:
 		return locales.ComposerPlaceholder()
 	}

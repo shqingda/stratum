@@ -157,6 +157,12 @@ func (s *Server) handle(ctx context.Context, cmd proto.Command) (any, error) {
 			return nil, err
 		}
 		return m.Fork(ctx, p)
+	case proto.MethodSessionRetitle:
+		p, err := params[proto.SessionRef](cmd)
+		if err != nil {
+			return nil, err
+		}
+		return m.Retitle(ctx, p.SessionID)
 	case proto.MethodSessionDelete:
 		p, err := params[proto.SessionRef](cmd)
 		if err != nil {

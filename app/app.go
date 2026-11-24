@@ -204,7 +204,7 @@ func (a *App) restoreFocus(c *ui.Context) {
 	if a.C.Current != nil {
 		id = a.C.Current.ID
 	}
-	over := a.pal || a.btwOpen || a.settingsOpen || a.automationsOpen
+	over := a.pal || a.settingsOpen || a.automationsOpen
 	if !over && (id != a.focusSession || a.overWas) && id != "" {
 		a.composerInput.Focus(c)
 	}
@@ -403,7 +403,6 @@ func (a *App) View(c *ui.Context) {
 		a.sideToggle(c)
 	})
 	a.palette(c)
-	a.sideAskDialog(c)
 	a.toastHUD(c)
 	a.clearWebDialog(c)
 	a.saveWebTabs()
@@ -489,7 +488,6 @@ func (a *App) resizeSide(dx float32) {
 func (a *App) resetSideWidth() {
 	a.sideW = sidebarWidth
 	a.saveWidths()
-	a.fireHaptic(hapticAlignment)
 }
 
 func (a *App) resizeReview(dx float32) {
@@ -508,7 +506,6 @@ func (a *App) resizeReview(dx float32) {
 func (a *App) resetReviewWidth() {
 	a.rvW = reviewWidth
 	a.saveWidths()
-	a.fireHaptic(hapticAlignment)
 }
 
 // saveWidths keeps the seams' widths in the settings, once a drag ends.
@@ -589,6 +586,7 @@ func (a *App) main(c *ui.Context) {
 			a.composer(c)
 		}
 		a.findBar(c)
+		a.sideAskCard(c)
 	})
 	if a.rvOpen > 0.001 {
 		rw := a.reviewWidth()

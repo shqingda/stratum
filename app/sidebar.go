@@ -398,8 +398,8 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		}
 		ui.Text(c, title(s)).FontSize(14).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		switch {
-		case c.Modifiers() == ui.Cmd && n <= 9:
-			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(12.5).TextColor(p.Mute).SingleLine()
+		case c.Modifiers()&(ui.Cmd|ui.Shift|ui.Alt|ui.Ctrl) == ui.Cmd && n <= 9:
+			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).FontWeight(500).FontFeatures("tnum").TextColor(p.Fg2).Background(p.Chip).Padding(1, 6).Radius(5).SingleLine()
 		case st == "wait":
 			badge := locales.BadgeApproval()
 			if on && a.questionFirst() {

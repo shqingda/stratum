@@ -19,6 +19,9 @@ func (a *App) sessionMenu(m *ui.Menu, s proto.Session) {
 	if m.Item(locales.Rename()).Chosen() {
 		a.rename(s, "side")
 	}
+	if m.Item(locales.RegenerateTitle()).Chosen() {
+		a.do(a.C.Retitle(s.ID))
+	}
 	if a.state(s) == "unread" || a.state(s) == "fail" {
 		if m.Item(locales.MarkRead()).Chosen() {
 			a.send(a.C.Seen(s.ID))

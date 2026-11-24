@@ -87,9 +87,6 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 					}
 				})
 				if b.Clicked() {
-					if a.rv.tab != t.id {
-						a.fireHaptic(hapticLevelChange)
-					}
 					if t.id == "term" && a.rv.tab != "term" {
 						a.showTerminal()
 					} else {

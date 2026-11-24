@@ -50,15 +50,39 @@ func TestSideAskShortcutAndSubmit(t *testing.T) {
 		t.Fatal("expected ⌘W to close side question dialog")
 	}
 
-	// Typing "/btw <question>" in composer opens side dialog and sends MethodSideAsk.
+	// Typing "/btw <question>" in composer opens side card and sends MethodSideAsk.
 	a.draft = "/btw explain this"
 	a.submit()
 	tt.Frame()
 	if !a.btwOpen || a.draft != "" {
-		t.Fatalf("expected /btw submit to open dialog and clear draft, got open=%v draft=%q", a.btwOpen, a.draft)
+		t.Fatalf("expected /btw submit to open card and clear draft, got open=%v draft=%q", a.btwOpen, a.draft)
 	}
 	cmds, ok = next(a)
 	if !ok || len(cmds) != 1 || cmds[0].Method != proto.MethodSideAsk {
 		t.Fatalf("expected MethodSideAsk from /btw, got ok=%v cmds=%+v", ok, cmds)
+	}
+
+	// Non-modal: while /btw is open, the user can still interact with the main window
+	// (e.g. toggling the inspector panel or submitting a main composer prompt).
+	wasRV := a.rv.open
+	tt.Key(ui.Cmd|ui.Alt, ui.KeyI)
+	tt.Frame()
+	if a.rv.open == wasRV {
+		t.Fatal("expected main window shortcut ⌘⌥I to work while /btw card is open")
+	}
+	for {
+		if _, ok := next(a); !ok {
+			break
+		}
+	}
+	if !a.btwOpen {
+		t.Fatal("expected /btw card to stay open during main window interaction")
+	}
+	a.draft = "main task"
+	a.submit()
+	tt.Frame()
+	cmds, ok = next(a)
+	if !ok || len(cmds) != 1 || cmds[0].Method != proto.MethodPrompt {
+		t.Fatalf("expected main composer Prompt while /btw is open, got ok=%v cmds=%+v", ok, cmds)
 	}
 }

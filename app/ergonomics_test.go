@@ -431,12 +431,12 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 		t.Fatalf("expected alignment haptic on sidebar collapse, got noSide=%v haptics=%v", a.noSide, got)
 	}
 
-	// Resetting split widths fires alignment haptic.
+	// Resetting split widths and clicking tabs/scopes do not fire haptics.
 	got = nil
 	a.resetSideWidth()
 	a.resetReviewWidth()
-	if !slices.Equal(got, []hapticPattern{hapticAlignment, hapticAlignment}) {
-		t.Fatalf("expected two alignment haptics on width resets, got %v", got)
+	if len(got) != 0 {
+		t.Fatalf("expected no haptics on width resets, got %v", got)
 	}
 
 	// Dragging review panel past collapse threshold fires alignment haptic.
@@ -447,18 +447,15 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 		t.Fatalf("expected alignment haptic on review collapse, got open=%v haptics=%v", a.rv.open, got)
 	}
 
-	// Switching right-panel tab and Changes scope fires levelChange haptic;
-	// clicking the already-selected tab/scope does not.
+	// Switching right-panel tab and Changes scope does not fire haptics.
 	got = nil
 	a.rv.open = true
 	a.rv.tab = ""
 	tt := task8Tester(a, false)
 	tt.Click(locales.Plan())
 	tt.Frame()
-	tt.Click(locales.Plan())
-	tt.Frame()
-	if !slices.Equal(got, []hapticPattern{hapticLevelChange}) {
-		t.Fatalf("expected one levelChange haptic when switching tab, got %v", got)
+	if len(got) != 0 {
+		t.Fatalf("expected no haptics when switching tab, got %v", got)
 	}
 
 	got = nil
@@ -466,10 +463,8 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 	tt.Frame()
 	tt.Click(locales.Uncommitted())
 	tt.Frame()
-	tt.Click(locales.Uncommitted())
-	tt.Frame()
-	if !slices.Equal(got, []hapticPattern{hapticLevelChange}) {
-		t.Fatalf("expected one levelChange haptic when switching scope, got %v", got)
+	if len(got) != 0 {
+		t.Fatalf("expected no haptics when switching scope, got %v", got)
 	}
 }
 
@@ -523,5 +518,70 @@ func TestErgonomicsUnreadShortcutEditResendAndRewindDigits(t *testing.T) {
 	}
 	if rw.TurnSeq != 2 || rw.Action != "conversation" {
 		t.Fatalf("unexpected Rewind params: %+v", rw)
+	}
+}
+
+func TestRetitleSuggestionAndCmdHoldBadges(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+
+	// 1. Retitle emits MethodSessionRetitle and updates session title on response.
+	cmds, err := a.C.Retitle(a.C.Current.ID)
+	if err != nil || len(cmds) != 1 || cmds[0].Method != proto.MethodSessionRetitle {
+		t.Fatalf("Retitle cmds = %+v, err=%v", cmds, err)
+	}
+	a.C.Receive(proto.Frame{
+		Type:   proto.FrameResponse,
+		ID:     cmds[0].ID,
+		Result: json.RawMessage(`{"id":"1","title":"Refactored Title","cwd":"/w"}`),
+	})
+	if a.C.Current.Title != "Refactored Title" {
+		t.Fatalf("Current.Title = %q, want Refactored Title", a.C.Current.Title)
+	}
+
+	// 2. Post-reply suggestion: Escape dismisses, Tab accepts into composer draft.
+	b, _ := json.Marshal(proto.Suggestion{Text: "add edge case tests"})
+	a.C.Receive(proto.Frame{
+		Type: proto.FrameEvent,
+		Event: &proto.Event{
+			SessionID: a.C.Current.ID,
+			Type:      proto.EventSuggestion,
+			Data:      b,
+		},
+	})
+	tt.Frame()
+	if a.activeSuggestion() != "add edge case tests" {
+		t.Fatalf("activeSuggestion = %q", a.activeSuggestion())
+	}
+	if !tt.HasText("⇥ Tab") {
+		t.Fatalf("expected ⇥ Tab pill when suggestion is active")
+	}
+	if err := tt.Click(locales.AcceptSuggestion()); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.draft != "add edge case tests" || a.C.Suggestion != "" {
+		t.Fatalf("expected clicking suggestion pill to accept: draft=%q suggestion=%q", a.draft, a.C.Suggestion)
+	}
+
+	a.draft = ""
+	a.C.Suggestion = "run go test"
+	tt.Frame()
+	tt.Key(0, ui.KeyTab)
+	tt.Frame()
+	if a.draft != "run go test" || a.C.Suggestion != "" {
+		t.Fatalf("expected Tab to accept suggestion: draft=%q suggestion=%q", a.draft, a.C.Suggestion)
+	}
+
+	// 3. Holding Cmd shows ⌘1 badge in sidebar; releasing hides it.
+	tt.HoldModifiers(ui.Cmd)
+	tt.Frame()
+	if !tt.HasText("⌘1") {
+		t.Fatalf("expected ⌘1 badge when Cmd held, texts=%q", tt.Texts())
+	}
+	tt.HoldModifiers(0)
+	tt.Frame()
+	if tt.HasText("⌘1") {
+		t.Fatalf("expected ⌘1 badge hidden after releasing Cmd")
 	}
 }

@@ -104,11 +104,17 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 		)
 	}
 	if len(a.C.Entries) > 0 {
-		all = append(all, slashItem{"export", "copy", locales.ExportNote(), func(c *ui.Context) {
-			clear()
-			c.WriteClipboard(a.sessionMarkdown())
-			a.flash("check", locales.ExportMarkdown())
-		}})
+		all = append(all,
+			slashItem{"retitle", "sparkles", locales.RegenerateTitleNote(), func(*ui.Context) {
+				clear()
+				a.do(a.C.Retitle(a.C.Current.ID))
+			}},
+			slashItem{"export", "copy", locales.ExportNote(), func(c *ui.Context) {
+				clear()
+				c.WriteClipboard(a.sessionMarkdown())
+				a.flash("check", locales.ExportMarkdown())
+			}},
+		)
 	}
 	all = append(all, slashItem{"btw", "message", locales.SideAskNote(), func(*ui.Context) {
 		clear()

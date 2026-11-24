@@ -12,8 +12,7 @@ import (
 type hapticPattern int
 
 const (
-	hapticAlignment   hapticPattern = 1 // NSHapticFeedbackPatternAlignment
-	hapticLevelChange hapticPattern = 2 // NSHapticFeedbackPatternLevelChange
+	hapticAlignment hapticPattern = 1 // NSHapticFeedbackPatternAlignment
 )
 
 const hapticTimeNow = 1 // NSHapticFeedbackPerformanceTimeNow
