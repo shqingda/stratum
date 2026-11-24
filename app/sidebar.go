@@ -330,13 +330,19 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 		if toggle.Clicked() {
 			a.toggleProjectCollapsed(cwd)
 		}
-		if row.Hovered() {
+		menuOpen := a.menu.projectMenu == cwd
+		if row.Hovered() || menuOpen {
 			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(label)
-			if more.Hovered() {
+			if menuOpen || more.Hovered() {
 				more.Background(p.Sel)
 			}
 			more.Children(func() { sym(c, "dots", 14, p.Fg2) })
-			more.PopoverMenuButton(fillMenu, a.menuOptions(nil))
+			more.PopoverMenuButton(fillMenu, a.menuOptions(&menuOpen))
+			if menuOpen {
+				a.menu.projectMenu = cwd
+			} else if a.menu.projectMenu == cwd {
+				a.menu.projectMenu = ""
+			}
 
 			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(locales.NewSession()).Tooltip(locales.NewSession())
 			if add.Hovered() {

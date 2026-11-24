@@ -777,3 +777,37 @@ func TestModelPickerHoverCascadeEffort(t *testing.T) {
 		}
 	})
 }
+
+func TestProjectRowMenuStaysOpenOnPointerLeave(t *testing.T) {
+	a := task8App()
+	tt := task8Tester(a, false)
+
+	siteAcc, ok := tt.Access("site")
+	if !ok {
+		t.Fatal("missing site project row")
+	}
+	// Hover the project row so the "..." action button appears.
+	tt.Move(siteAcc.Bounds.X+siteAcc.Bounds.W/2, siteAcc.Bounds.Y+siteAcc.Bounds.H/2)
+	tt.Frame()
+
+	// Click the "..." button near the right end of the hovered project row (left of "+").
+	moreX := siteAcc.Bounds.X + siteAcc.Bounds.W - 36
+	moreY := siteAcc.Bounds.Y + siteAcc.Bounds.H/2
+	tt.Move(moreX, moreY)
+	tt.ClickAt(moreX, moreY)
+	tt.Frame()
+	if !tt.HasText("在访达中显示") {
+		t.Fatalf("expected project menu open, texts=%q", tt.Texts())
+	}
+
+	// Move pointer down onto the menu item (leaving the project row): menu must stay open.
+	finderAcc, ok := tt.Access("在访达中显示")
+	if !ok {
+		t.Fatal("missing 在访达中显示 menu item")
+	}
+	tt.Move(finderAcc.Bounds.X+finderAcc.Bounds.W/2, finderAcc.Bounds.Y+finderAcc.Bounds.H/2)
+	tt.Frame()
+	if !tt.HasText("在访达中显示") || a.menu.projectMenu == "" {
+		t.Fatalf("project menu closed when moving pointer onto menu (projectMenu=%q), texts=%q", a.menu.projectMenu, tt.Texts())
+	}
+}

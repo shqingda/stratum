@@ -207,6 +207,7 @@ type menuState struct {
 	modelsPending, modelsAccount, modelsError                                                         string
 	modelsLoadedAccount                                                                               string
 	hoverSub                                                                                          string
+	projectMenu                                                                                       string
 }
 
 // New returns an app over c, not connected yet.

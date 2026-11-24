@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -54,7 +55,8 @@ const historyMax = 5000
 type webDownload struct {
 	id              int
 	url, name, path string
-	staged          string // where it downloads to while asking where it goes
+	staged          string // where it downloads to while asking or before moving
+	ask, retried    bool
 	done, canceled  bool
 	err             string
 	at              time.Time
@@ -384,14 +386,20 @@ func (a *App) willDownload(e *mygo.DownloadEvent) {
 	dir, ask := a.dlPrefs.get()
 	staged := ""
 	switch {
-	case ask:
+	case ask || dir == "":
+		// Stage in TMPDIR when asking or using default ~/Downloads so macOS
+		// WebKit's networking XPC process does not fail with "Cannot create file"
+		// under TCC/sandbox before our Go process moves it into ~/Downloads.
 		tmp, err := os.MkdirTemp("", "stratum-download-")
 		if err != nil {
-			e.PreventDefault()
-			return
+			if ask {
+				e.PreventDefault()
+				return
+			}
+		} else {
+			staged = filepath.Join(tmp, e.SuggestedName)
+			e.Path = staged
 		}
-		staged = filepath.Join(tmp, e.SuggestedName)
-		e.Path = staged
 	case dir != "":
 		if err := os.MkdirAll(dir, 0o755); err == nil {
 			e.Path = uniquePath(filepath.Join(dir, e.SuggestedName))
@@ -400,7 +408,7 @@ func (a *App) willDownload(e *mygo.DownloadEvent) {
 	u, name, path := e.URL, e.SuggestedName, e.Path
 	a.edit(func() {
 		a.nextDownload++
-		a.webDownloads = append(a.webDownloads, &webDownload{id: a.nextDownload, url: u, name: filepath.Base(name), path: path, staged: staged, at: a.now()})
+		a.webDownloads = append(a.webDownloads, &webDownload{id: a.nextDownload, url: u, name: filepath.Base(name), path: path, staged: staged, ask: ask, at: a.now()})
 		if path != "" && staged == "" {
 			a.webDownloads[len(a.webDownloads)-1].name = filepath.Base(path)
 		}
@@ -424,18 +432,169 @@ func (a *App) downloadDone(u, path string, err error) {
 			d.id = a.nextDownload
 			a.webDownloads = append(a.webDownloads, d)
 		}
-		d.done = true
 		if err != nil {
+			if !d.retried && (strings.HasPrefix(d.url, "http://") || strings.HasPrefix(d.url, "https://")) &&
+				strings.Contains(err.Error(), "Cannot create file") {
+				if d.staged != "" {
+					_ = os.RemoveAll(filepath.Dir(d.staged))
+					d.staged = ""
+				}
+				d.retried = true
+				a.fallbackDownload(d)
+				return
+			}
+			d.done = true
 			d.err = err.Error()
 			a.flash("alert-circle", locales.DownloadFailed(d.err))
 			return
 		}
+		d.done = true
 		if d.staged != "" {
-			a.placeDownload(d)
+			if d.ask {
+				a.placeDownload(d)
+				return
+			}
+			a.finishStagedDownload(d)
 			return
 		}
 		a.flash("download", locales.Downloaded(d.name))
 	})
+}
+
+func (a *App) defaultDownloadDir() string {
+	dir, _ := a.dlPrefs.get()
+	if dir == "" {
+		if d, err := mygo.App.Path(mygo.PathDownloads); err == nil {
+			dir = d
+		}
+	}
+	return dir
+}
+
+// finishStagedDownload moves an auto-staged download to the configured folder
+// or system Downloads directory without prompting.
+func (a *App) finishStagedDownload(d *webDownload) {
+	staged, name := d.staged, d.name
+	dir := a.defaultDownloadDir()
+	d.staged = ""
+	if dir == "" {
+		_ = os.RemoveAll(filepath.Dir(staged))
+		d.err = "downloads directory unavailable"
+		a.flash("alert-circle", locales.DownloadFailed(d.err))
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		_ = os.RemoveAll(filepath.Dir(staged))
+		d.err = err.Error()
+		a.flash("alert-circle", locales.DownloadFailed(d.err))
+		return
+	}
+	to := uniquePath(filepath.Join(dir, name))
+	err := moveFile(staged, to)
+	_ = os.RemoveAll(filepath.Dir(staged))
+	if err != nil {
+		d.err = err.Error()
+		a.flash("alert-circle", locales.DownloadFailed(d.err))
+		return
+	}
+	d.path, d.name = to, filepath.Base(to)
+	a.flash("download", locales.Downloaded(d.name))
+}
+
+// fallbackDownload fetches u directly over HTTP when WebKit's WKDownload fails
+// with "Cannot create file" (e.g. XPC sandbox restrictions on destination).
+func (a *App) fallbackDownload(d *webDownload) {
+	u, name, destPath, ask := d.url, d.name, d.path, d.ask
+	dir := a.defaultDownloadDir()
+	run := func() {
+		var tmpStaged string
+		var finalPath string
+		var dlErr error
+		client := &http.Client{Timeout: 60 * time.Second}
+		resp, err := client.Get(u)
+		if err != nil {
+			dlErr = err
+		} else {
+			defer resp.Body.Close()
+			if resp.StatusCode >= 400 {
+				dlErr = fmt.Errorf("%d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+			} else if ask {
+				if tmp, err := os.MkdirTemp("", "stratum-download-"); err != nil {
+					dlErr = err
+				} else {
+					tmpStaged = filepath.Join(tmp, name)
+					f, err := os.Create(tmpStaged)
+					if err != nil {
+						dlErr = err
+						_ = os.RemoveAll(tmp)
+						tmpStaged = ""
+					} else {
+						_, dlErr = io.Copy(f, resp.Body)
+						if cerr := f.Close(); dlErr == nil {
+							dlErr = cerr
+						}
+						if dlErr != nil {
+							_ = os.RemoveAll(tmp)
+							tmpStaged = ""
+						}
+					}
+				}
+			} else {
+				target := destPath
+				if target == "" || strings.Contains(target, string(filepath.Separator)+"stratum-download-") {
+					if dir == "" {
+						dlErr = errors.New("downloads directory unavailable")
+					} else if err := os.MkdirAll(dir, 0o755); err != nil {
+						dlErr = err
+					} else {
+						target = uniquePath(filepath.Join(dir, name))
+					}
+				} else {
+					if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+						dlErr = err
+					} else {
+						target = uniquePath(target)
+					}
+				}
+				if dlErr == nil {
+					f, err := os.Create(target)
+					if err != nil {
+						dlErr = err
+					} else {
+						_, dlErr = io.Copy(f, resp.Body)
+						if cerr := f.Close(); dlErr == nil {
+							dlErr = cerr
+						}
+						if dlErr == nil {
+							finalPath = target
+						} else {
+							_ = os.Remove(target)
+						}
+					}
+				}
+			}
+		}
+		a.edit(func() {
+			d.done = true
+			if dlErr != nil {
+				d.err = dlErr.Error()
+				a.flash("alert-circle", locales.DownloadFailed(d.err))
+				return
+			}
+			if tmpStaged != "" {
+				d.staged = tmpStaged
+				a.placeDownload(d)
+				return
+			}
+			d.path, d.name = finalPath, filepath.Base(finalPath)
+			a.flash("download", locales.Downloaded(d.name))
+		})
+	}
+	if a.update == nil {
+		run()
+		return
+	}
+	go run()
 }
 
 // placeDownload asks where a download that waited goes, then moves it

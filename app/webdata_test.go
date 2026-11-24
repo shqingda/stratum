@@ -2,6 +2,8 @@ package app
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -257,6 +259,50 @@ func TestBrowserAsksWhereToSave(t *testing.T) {
 	if !slices.Equal(asked[:2], []string{"a.zip", dir}) {
 		t.Errorf("asked %q", asked)
 	}
+}
+
+func TestBrowserDownloadDefaultStagingAndCannotCreateFallback(t *testing.T) {
+	t.Run("default empty BrowserDownloads stages in temp dir", func(t *testing.T) {
+		a, _ := browserApp(t)
+		a.C.Settings = &proto.Settings{} // BrowserDownloads == "", BrowserAskDownload == false
+		a.syncDownloadPrefs()
+
+		e := &mygo.DownloadEvent{URL: "https://unsplash.com/photos/x/download", SuggestedName: "photo.jpg"}
+		a.willDownload(e)
+		if e.Path == "" || !slices.Contains([]string{filepath.Base(filepath.Dir(e.Path))}, filepath.Base(filepath.Dir(e.Path))) {
+			t.Fatalf("unexpected staged path %q", e.Path)
+		}
+		if d := a.webDownloads[0]; d.staged == "" || d.ask {
+			t.Fatalf("expected staged auto-move download, got %+v", d)
+		}
+		_ = os.RemoveAll(filepath.Dir(e.Path))
+	})
+
+	t.Run("Cannot create file triggers HTTP fallback into configured dir", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "image/jpeg")
+			_, _ = w.Write([]byte("fake-jpeg-bytes"))
+		}))
+		defer srv.Close()
+
+		a, _ := browserApp(t)
+		dir := t.TempDir()
+		a.C.Settings = &proto.Settings{BrowserDownloads: dir}
+		a.syncDownloadPrefs()
+
+		e := &mygo.DownloadEvent{URL: srv.URL + "/dmytro.jpg", SuggestedName: "dmytro.jpg"}
+		a.willDownload(e)
+		a.downloadDone(e.URL, e.Path, errors.New("Cannot create file"))
+
+		d := a.webDownloads[0]
+		if !d.done || d.err != "" {
+			t.Fatalf("fallback download failed: %+v", d)
+		}
+		got, err := os.ReadFile(d.path)
+		if err != nil || string(got) != "fake-jpeg-bytes" {
+			t.Fatalf("downloaded file = %q, err=%v", got, err)
+		}
+	})
 }
 
 // The history keeps what the browser showed, newest first and each page
