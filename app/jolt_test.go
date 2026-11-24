@@ -116,3 +116,82 @@ func TestOpeningASessionHoldsStill(t *testing.T) {
 		prev = cur
 	}
 }
+
+func TestRegenerateStreamingDoesNotOverlapOrTremble(t *testing.T) {
+	const answer = "## calc 是怎么组织的\n\n" +
+		"这个仓库很小，只有一个包。\n\n" +
+		"| 文件 | 内容 |\n|---|---|\n| add.go | Add 函数 |\n| add_test.go | Add 的表驱动测试 |\n| go.mod | 模块 calc |\n\n" +
+		"### Add\n\n" +
+		"```go\nfunc Add(a, b int) int {\n    return a - b\n}\n```\n\n" +
+		"这里有个错误：应该是 `a + b`。测试用三组输入检查它：\n\n" +
+		"1. `Add(2, 3)` 应为 5\n" +
+		"2. `Add(-1, 1)` 应为 0\n" +
+		"3. `Add(0, 0)` 应为 0\n\n" +
+		"第 2、3 组碰巧能过，第 1 组会失败。\n\n" +
+		"### 怎么验证\n\n" +
+		"运行 `go test ./...`。修好后应该看到 `ok calc`。\n\n" +
+		"> 表驱动测试加一组新输入只要加一行，比每组写一个函数省事。\n\n" +
+		"还有什么想了解的？"
+
+	a := working()
+	a.C.Busy, a.C.Approvals, a.C.Queued = false, nil, nil
+	a.C.Turns = []client.Turn{{Seq: 1, Done: true}}
+	a.C.Entries = []*client.Entry{
+		{Key: 1, Role: client.User, Text: "详细解释一下这个仓库", Done: true, Turn: 0},
+		{Key: 2, Role: client.Thinking, Text: "先看仓库结构", Done: true, Took: time.Second, Turn: 0},
+		{Key: 3, Role: client.Assistant, Text: answer, Done: true, Turn: 0},
+	}
+	var ctx *ui.Context
+	tt := ui.NewTester(func(c *ui.Context) { ctx = c; a.View(c) }, 1200, 772)
+	tt.SetScale(2)
+	tt.Advance(time.Second)
+
+	// Simulate Retry: entries clear for a frame, then turn 1 starts.
+	a.C.Entries, a.C.Turns, a.C.Busy = nil, nil, false
+	ctx.Invalidate()
+	tt.Advance(16 * time.Millisecond)
+
+	userE := &client.Entry{Key: 10, Role: client.User, Text: "详细解释一下这个仓库", Done: true, Turn: 0}
+	thinkE := &client.Entry{Key: 11, Role: client.Thinking, Text: "先看仓库结构", Done: false, Turn: 0}
+	a.C.Turns = []client.Turn{{Seq: 1, Done: false}}
+	a.C.Entries = []*client.Entry{userE, thinkE}
+	a.C.Busy = true
+	ctx.Invalidate()
+	tt.Advance(16 * time.Millisecond)
+
+	// Thinking finishes and Assistant starts streaming.
+	thinkE.Done = true
+	thinkE.Took = time.Second
+	asstE := &client.Entry{Key: 12, Role: client.Assistant, Text: "", Done: false, Turn: 0}
+	a.C.Entries = append(a.C.Entries, asstE)
+
+	runes := []rune(answer)
+	var prevThoughtBottom, prevHeadTop float32
+	for pos := 0; pos < len(runes); {
+		end := min(pos+10, len(runes))
+		asstE.Text += string(runes[pos:end])
+		pos = end
+		ctx.Invalidate()
+		for step := 0; step < 2; step++ {
+			tt.Advance(16 * time.Millisecond)
+			thAcc, thOk := tt.Access("思考了 1 秒")
+			hdAcc, hdOk := tt.Access("calc 是怎么组织的")
+			if thOk && hdOk {
+				thBottom := thAcc.Bounds.Y + thAcc.Bounds.H
+				hdTop := hdAcc.Bounds.Y
+				if hdTop < thBottom-1 {
+					t.Fatalf("overlap at pos=%d step=%d: thought=[%.1f..%.1f] heading=[%.1f..%.1f]",
+						pos, step, thAcc.Bounds.Y, thBottom, hdTop, hdTop+hdAcc.Bounds.H)
+				}
+				if prevHeadTop > 0 && prevThoughtBottom > 0 {
+					// If thought hasn't scrolled off/moved, heading shouldn't jump independently.
+					if thBottom == prevThoughtBottom && (hdTop-prevHeadTop > 5 || prevHeadTop-hdTop > 5) {
+						t.Fatalf("heading jumped at pos=%d step=%d while thought stayed at %.1f: heading %.1f -> %.1f",
+							pos, step, thBottom, prevHeadTop, hdTop)
+					}
+				}
+				prevThoughtBottom, prevHeadTop = thBottom, hdTop
+			}
+		}
+	}
+}

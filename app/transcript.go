@@ -135,6 +135,9 @@ func (a *App) transcript(c *ui.Context) {
 	p := a.p
 	if len(a.C.Entries) == 0 && len(a.C.Approvals) == 0 {
 		a.listShown = nil
+		if a.C.Current != nil {
+			delete(a.lists, a.C.Current.ID)
+		}
 		a.empty(c)
 		return
 	}
@@ -162,11 +165,6 @@ func (a *App) transcript(c *ui.Context) {
 	}
 	list := ui.List(c, st, n, func(i int) {
 		row := ui.Row(c).Justify(ui.Center).Padding(0, 28)
-		// What the running turn adds rises into place; rows already there
-		// when a session opens just show.
-		if i >= len(items) || items[i].live || i == len(items)-1 && items[i].e != nil && items[i].e.Role == client.User {
-			row.Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Duration: 220 * time.Millisecond})
-		}
 		row.Children(func() {
 			col := ui.Column(c).Grow(1).MaxWidth(columnWidth)
 			if i == hit {
