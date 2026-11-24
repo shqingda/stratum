@@ -138,7 +138,6 @@ func (a *App) barButton(c *ui.Context, key, symbol, label string, children func(
 	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
 		Label(label).Background(p.Card).Border(.5, p.Edge2)
 	rim(b, p)
-	press(b)
 	if b.Hovered() {
 		b.Background(p.Card.Mix(p.Fg, .04))
 	}
@@ -165,7 +164,7 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(28).Padding(0, 9).Gap(5).Radius(8).AlignItems(ui.Center).
 		Background(p.Chip).Shrink(1).MinWidth(0).Label(label)
 	rim(b, p)
-	press(b)
+	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Sel)
 	}
@@ -240,7 +239,7 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 				}
 			}
 		}
-	}, a.menuOptions(&a.openMenu))
+	}, a.menuOptions(&a.menu.openMenu))
 }
 
 // commitField is the commit message; left empty, the session's title.

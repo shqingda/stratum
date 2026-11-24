@@ -435,7 +435,6 @@ func (a *App) webTabBar(c *ui.Context) {
 			}
 			tab := ui.ButtonBase(c.Key(fmt.Sprint("web-tab:", b.id))).Height(24).Grow(1).MinWidth(0).Radius(6).Padding(0, 4, 0, 8).
 				Label(title).Tooltip(b.shown)
-			press(tab)
 			if active {
 				tab.Background(p.Chip)
 			} else if tab.Hovered() {
@@ -477,7 +476,6 @@ func (a *App) webButton(c *ui.Context, key, symbol, tip string, enabled bool) bo
 	bt := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip).Disabled(!enabled)
 	col := a.p.Faint
 	if enabled {
-		press(bt)
 		focusRing(bt, a.p)
 		if bt.Hovered() {
 			bt.Background(a.p.Hover)

@@ -17,7 +17,7 @@ import (
 func TestErgonomicsSplitWidths(t *testing.T) {
 	a := task8App()
 	a.C.Settings = &proto.Settings{}
-	letGo := func() { a.split = splitDrag{}; a.saveWidths() }
+	letGo := func() { a.side.split = splitDrag{}; a.saveWidths() }
 	if got := a.sideWidth(); got != sidebarWidth {
 		t.Fatalf("default sideWidth = %v, want %v", got, sidebarWidth)
 	}
@@ -49,12 +49,12 @@ func TestErgonomicsSplitWidths(t *testing.T) {
 		t.Fatalf("reset sideWidth = %v (saved %v), want %v", got, a.C.Settings.SidebarWidth, sidebarWidth)
 	}
 	a.resizeSide(-60)
-	if got := a.sideWidth(); got != sideMinWidth || a.noSide {
-		t.Fatalf("the sidebar at its narrowest is %v wide, hidden %v", got, a.noSide)
+	if got := a.sideWidth(); got != sideMinWidth || a.side.noSide {
+		t.Fatalf("the sidebar at its narrowest is %v wide, hidden %v", got, a.side.noSide)
 	}
 	a.resizeSide(-100)
-	if !a.noSide || a.sideWidth() != sidebarWidth {
-		t.Fatalf("dragged past its narrowest the sidebar stayed (hidden %v, %v wide)", a.noSide, a.sideWidth())
+	if !a.side.noSide || a.sideWidth() != sidebarWidth {
+		t.Fatalf("dragged past its narrowest the sidebar stayed (hidden %v, %v wide)", a.side.noSide, a.sideWidth())
 	}
 
 	if got := a.reviewWidth(); got != reviewWidth {
@@ -137,16 +137,16 @@ func TestErgonomicsPaletteWrapAndAutomationsEsc(t *testing.T) {
 
 	// Palette Up from index 0 wraps to the last item.
 	tt.Key(ui.Cmd, ui.KeyK)
-	if !a.pal || a.palSel != 0 {
-		t.Fatalf("palette open=%v sel=%d", a.pal, a.palSel)
+	if !a.pal.open || a.pal.sel != 0 {
+		t.Fatalf("palette open=%v sel=%d", a.pal.open, a.pal.sel)
 	}
 	tt.Key(0, ui.KeyUp)
-	if a.palSel == 0 {
+	if a.pal.sel == 0 {
 		t.Fatal("Up at index 0 did not wrap around to last item")
 	}
 	tt.Key(0, ui.KeyDown)
-	if a.palSel != 0 {
-		t.Fatalf("Down from last item did not wrap to 0, got %d", a.palSel)
+	if a.pal.sel != 0 {
+		t.Fatalf("Down from last item did not wrap to 0, got %d", a.pal.sel)
 	}
 	tt.Key(0, ui.KeyEscape)
 
@@ -207,21 +207,21 @@ func TestErgonomicsCmdWLayeredCloseAndAgentShortcuts(t *testing.T) {
 
 	// 4. Cmd+/ toggles model menu.
 	tt.Key(ui.Cmd, ui.KeySlash)
-	if !a.modelMenu {
+	if !a.menu.modelMenu {
 		t.Fatal("Cmd+/ did not open model menu")
 	}
 	tt.Key(ui.Cmd, ui.KeySlash)
-	if a.modelMenu {
+	if a.menu.modelMenu {
 		t.Fatal("second Cmd+/ did not close model menu")
 	}
 
 	// 5. Cmd+Shift+P opens command palette.
 	tt.Key(ui.Cmd|ui.Shift, ui.KeyP)
-	if !a.pal {
+	if !a.pal.open {
 		t.Fatal("Cmd+Shift+P did not open palette")
 	}
 	tt.Key(ui.Cmd, ui.KeyW)
-	if a.pal {
+	if a.pal.open {
 		t.Fatal("Cmd+W did not close palette")
 	}
 
@@ -305,28 +305,28 @@ func TestErgonomicsNarrowWindowRules(t *testing.T) {
 	// Open review inspector at 1200pt: 264 + 452 + 600 = 1316 > 1200, so sidebar collapses, no overlay.
 	a.rv.open = true
 	tt.Frame()
-	if !a.noSide || !a.sideMoved {
-		t.Fatalf("expected sidebar collapsed at 1200pt with review open, got noSide=%v sideMoved=%v", a.noSide, a.sideMoved)
+	if !a.side.noSide || !a.side.sideMoved {
+		t.Fatalf("expected sidebar collapsed at 1200pt with review open, got noSide=%v sideMoved=%v", a.side.noSide, a.side.sideMoved)
 	}
-	if a.rvOverlay {
+	if a.side.rvOverlay {
 		t.Fatal("expected rvOverlay=false at 1200pt")
 	}
 
 	// Narrow to 760pt (< 452 + 600 = 1052): review panel becomes overlay.
 	tt.SetSize(760, 480)
 	tt.Frame()
-	if !a.rvOverlay {
+	if !a.side.rvOverlay {
 		t.Fatal("expected rvOverlay=true at 760pt")
 	}
 
 	// Widen to 1400pt: sidebar is restored and overlay turns off.
 	tt.SetSize(1400, 780)
 	tt.Frame()
-	if a.rvOverlay {
+	if a.side.rvOverlay {
 		t.Fatal("expected rvOverlay=false at 1400pt")
 	}
-	if a.noSide || a.sideMoved {
-		t.Fatalf("expected sidebar restored at 1400pt, got noSide=%v sideMoved=%v", a.noSide, a.sideMoved)
+	if a.side.noSide || a.side.sideMoved {
+		t.Fatalf("expected sidebar restored at 1400pt, got noSide=%v sideMoved=%v", a.side.noSide, a.side.sideMoved)
 	}
 
 	// Narrow to 760pt again and close review panel: sidebar restores and overlay turns off.
@@ -334,8 +334,8 @@ func TestErgonomicsNarrowWindowRules(t *testing.T) {
 	tt.Frame()
 	a.rv.open = false
 	tt.Frame()
-	if a.rvOverlay || a.noSide || a.sideMoved {
-		t.Fatalf("expected overlay off and sidebar restored after closing review, got overlay=%v noSide=%v sideMoved=%v", a.rvOverlay, a.noSide, a.sideMoved)
+	if a.side.rvOverlay || a.side.noSide || a.side.sideMoved {
+		t.Fatalf("expected overlay off and sidebar restored after closing review, got overlay=%v noSide=%v sideMoved=%v", a.side.rvOverlay, a.side.noSide, a.side.sideMoved)
 	}
 }
 
@@ -427,8 +427,8 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 
 	// Dragging sidebar past collapse threshold fires alignment haptic.
 	a.resizeSide(-sideMinWidth)
-	if !a.noSide || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
-		t.Fatalf("expected alignment haptic on sidebar collapse, got noSide=%v haptics=%v", a.noSide, got)
+	if !a.side.noSide || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
+		t.Fatalf("expected alignment haptic on sidebar collapse, got noSide=%v haptics=%v", a.side.noSide, got)
 	}
 
 	// Resetting split widths and clicking tabs/scopes do not fire haptics.
@@ -452,7 +452,7 @@ func TestErgonomicsHapticFeedback(t *testing.T) {
 	a.rv.open = true
 	a.rv.tab = ""
 	tt := task8Tester(a, false)
-	tt.Click(locales.Plan())
+	tt.Click(locales.Files())
 	tt.Frame()
 	if len(got) != 0 {
 		t.Fatalf("expected no haptics when switching tab, got %v", got)

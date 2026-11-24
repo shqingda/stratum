@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -39,7 +40,7 @@ func TestOpenAndCommit(t *testing.T) {
 	if !tt.HasText("+9") || !tt.HasText("−3") {
 		t.Fatal("the inspect button does not count the lines")
 	}
-	if err := tt.Click("检查"); err != nil {
+	if err := tt.Click(locales.ShowChanges()); err != nil {
 		t.Fatal(err)
 	}
 	tt.Advance(time.Second)

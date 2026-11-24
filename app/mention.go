@@ -70,7 +70,7 @@ func (a *App) mentionMenu(c *ui.Context) {
 		m.shut = 0
 	}
 	m.at, m.query, m.open = at, q, false
-	if at < 0 || m.shut == at+1 || a.C.Current == nil || a.pal {
+	if at < 0 || m.shut == at+1 || a.C.Current == nil || a.pal.open {
 		return
 	}
 	// Asked once for each folder and query; an empty query too.
@@ -102,7 +102,6 @@ func (a *App) mentionMenu(c *ui.Context) {
 					i, item := n, it
 					n++
 					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name).KeepFocus()
-					press(row)
 					focusRing(row, p)
 					switch {
 					case i == m.sel:

@@ -343,7 +343,6 @@ func (a *App) webMoreMenu(c *ui.Context) {
 	}
 	p := a.p
 	bt := ui.ButtonBase(c.Key("web-more")).Size(28, 28).Radius(7).Center().Label(locales.MoreBrowser()).Tooltip(locales.MoreBrowser())
-	press(bt)
 	focusRing(bt, p)
 	if bt.Hovered() {
 		bt.Background(p.Hover)
@@ -543,7 +542,6 @@ func (a *App) downloadsButton(c *ui.Context) {
 		busy = busy || !d.done || d.staged != ""
 	}
 	bt := ui.ButtonBase(c.Key("web-downloads")).Size(28, 28).Radius(7).Center().Label(locales.Downloads()).Tooltip(locales.Downloads())
-	press(bt)
 	focusRing(bt, p)
 	if bt.Hovered() || a.downloadsOpen {
 		bt.Background(p.Hover)
@@ -603,7 +601,6 @@ func (a *App) downloadRow(c *ui.Context, d *webDownload) {
 		Label(d.name).Disabled(!found)
 	if found {
 		row.Tooltip(locales.RevealInFinder())
-		press(row)
 		if row.Hovered() {
 			row.Background(p.Hover)
 		}
@@ -736,7 +733,6 @@ func (a *App) historyRow(c *ui.Context, r *rows, v webVisit) {
 	}
 	row := ui.ButtonBase(c.Key("visit:"+v.URL)).Row().FillWidth().MinHeight(46).Padding(7, 8, 7, 12).Gap(10).AlignItems(ui.Center).
 		Label(title).Tooltip(v.URL)
-	press(row)
 	if row.Hovered() {
 		row.Background(p.Hover)
 	}

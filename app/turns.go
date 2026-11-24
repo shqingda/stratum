@@ -60,20 +60,22 @@ func (a *App) work(c *ui.Context, steps []*client.Entry, t int) {
 	a.inWork = true
 	defer func() { a.inWork = false }()
 	ui.Column(c.Key("work-body:"+key)).Margin(2, 0, 8, 0).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 120 * time.Millisecond}).
 		Children(func() {
 			for i := 0; i < len(steps); {
-				var run []item
-				run, i = a.row(steps, i, -1, nil)
-				for _, it := range run {
-					ui.Column(c.Key(it.key())).Children(func() {
-						if it.fold != nil {
-							a.fold(c, it.fold)
-						} else {
-							a.body(c, it.e)
-						}
-					})
+				var it item
+				var ok bool
+				it, ok, i = a.row(steps, i, -1, nil)
+				if !ok {
+					continue
 				}
+				ui.Column(c.Key(it.key())).Children(func() {
+					if it.fold != nil {
+						a.fold(c, it.fold)
+					} else {
+						a.body(c, it.e)
+					}
+				})
 			}
 		})
 }
@@ -124,7 +126,7 @@ func (a *App) summary(c *ui.Context, t int) {
 	if ch != nil && len(ch.Files) > 0 {
 		add, del := a.totals([]proto.ChangeTurn{*ch})
 		reverted := a.C.Changes.Reverted[ch.TurnSeq]
-		ui.Row(c).Height(40).Padding(0, 8, 0, 12).Gap(10).Radius(10).InsetShadow(0, 0, 0, .5, p.Edge2).Margin(12, 0, 6, 0).AlignItems(ui.Center).Children(func() {
+		ui.Row(c).Height(34).Padding(0, 6, 0, 10).Gap(8).Radius(8).Background(p.Chip).Margin(8, 0, 4, 0).AlignItems(ui.Center).Children(func() {
 			sym(c, "files", 15, p.Fg2)
 			what := locales.ChangedFiles(len(ch.Files))
 			if reverted {
@@ -285,7 +287,7 @@ func (a *App) thought(c *ui.Context, e *client.Entry) {
 	})
 	if open {
 		ui.Column(c.Key("thought-body:" + key)).
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 120 * time.Millisecond}).
 			Children(func() {
 				ui.Text(c, strings.TrimSpace(e.Text)).FontSize(13.5).LineHeight(1.55).TextColor(p.Mute).Padding(2, 0, 8, 20).Selectable()
 			})

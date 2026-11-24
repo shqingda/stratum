@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
@@ -138,4 +139,140 @@ func (c *Client) DiffBase(path string) ([]proto.Command, error) {
 		}
 		return nil
 	})}, nil
+}
+
+func (c *Client) listAccounts() proto.Command {
+	return c.read(proto.MethodAccounts, nil, func(r json.RawMessage) []proto.Command {
+		_ = json.Unmarshal(r, &c.Accounts)
+		return nil
+	})
+}
+
+// listSessions reads the session list. With bind it then shows a session:
+// the one shown before a reconnect, else the workspace's newest, else a new
+// one.
+func (c *Client) listSessions(bind, autoCreate bool) proto.Command {
+	return c.read(proto.MethodSessionList, nil, func(r json.RawMessage) []proto.Command {
+		var list []proto.Session
+		if err := json.Unmarshal(r, &list); err == nil {
+			c.Sessions = list
+			clear(c.Marks)
+			for _, s := range list {
+				switch {
+				case s.State != "":
+					c.Marks[s.ID] = s.State
+				case s.Mark != "":
+					c.Marks[s.ID] = s.Mark
+				}
+			}
+		}
+		if !bind {
+			return nil
+		}
+		if c.want != "" {
+			return []proto.Command{c.bind(c.want)}
+		}
+		for _, s := range c.Sessions {
+			if s.Cwd == c.Cwd {
+				return []proto.Command{c.bind(s.ID)}
+			}
+		}
+		if autoCreate {
+			return []proto.Command{c.create()}
+		}
+		if len(c.Sessions) > 0 {
+			return []proto.Command{c.bind(c.Sessions[0].ID)}
+		}
+		c.Phase = Ready
+		return nil
+	})
+}
+
+// mark follows a session that is not shown.
+func (c *Client) mark(e proto.Event) {
+	if e.SessionID == c.want {
+		return // being opened
+	}
+	switch e.Type {
+	case proto.EventTurnStart, proto.EventApprovalResolved:
+		c.Marks[e.SessionID] = "run"
+	case proto.EventApprovalRequest:
+		c.Marks[e.SessionID] = "wait"
+	case proto.EventTurnEnd:
+		var end proto.TurnEnd
+		json.Unmarshal(e.Data, &end)
+		c.Marks[e.SessionID] = "unread"
+		if end.Error != "" {
+			c.Marks[e.SessionID] = "fail"
+		}
+	}
+}
+
+func (c *Client) upsertSession(s proto.Session) {
+	for i := range c.Sessions {
+		if c.Sessions[i].ID == s.ID {
+			c.Sessions[i] = s
+			return
+		}
+	}
+	c.Sessions = append([]proto.Session{s}, c.Sessions...)
+}
+
+func (c *Client) sessionUpdated(e proto.Event) {
+	var s proto.Session
+	if json.Unmarshal(e.Data, &s) != nil || s.ID == "" {
+		return
+	}
+	c.upsertSession(s)
+	if c.Current != nil && c.Current.ID == s.ID {
+		if c.Current.Cwd != s.Cwd {
+			c.Workspace.BranchStale = true
+		}
+		*c.Current = s
+	}
+	if m := c.Marks[s.ID]; m != "run" && m != "wait" {
+		if s.Mark != "" {
+			c.Marks[s.ID] = s.Mark
+		} else {
+			delete(c.Marks, s.ID)
+		}
+	}
+}
+
+// returned keeps the prompts a session's stopped turns gave back.
+func (c *Client) returned(e proto.Event) {
+	var q proto.Queue
+	if json.Unmarshal(e.Data, &q) != nil || len(q.Returned) == 0 {
+		return
+	}
+	if c.Returned == nil {
+		c.Returned = map[string][]string{}
+	}
+	for _, it := range q.Returned {
+		if it.Text != "" {
+			c.Returned[e.SessionID] = append(c.Returned[e.SessionID], it.Text)
+		}
+	}
+}
+
+func sessionID(s *proto.Session) string {
+	if s == nil {
+		return ""
+	}
+	return s.ID
+}
+
+// modelName shows "account/model" as the account's name and the model.
+func (c *Client) modelName(ref string) string {
+	i := strings.LastIndex(ref, "/")
+	if i < 0 {
+		return ref
+	}
+	account, model := ref[:i], ref[i+1:]
+	for _, a := range c.Accounts {
+		if a.ID == account && a.Name != "" {
+			account = a.Name
+		}
+	}
+	return account + " · " + model
 }

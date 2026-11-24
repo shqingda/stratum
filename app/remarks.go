@@ -30,9 +30,13 @@ func lineRemark(path string, d *fileDiff, e edit) remark {
 
 // remarksAt shows the remarks on a line, and the field one is written in.
 func (a *App) remarksAt(c *ui.Context, at remark) {
+	if len(a.rv.remarks) == 0 && a.rv.writing == "" {
+		return
+	}
+	atKey := at.at()
 	p := a.p
 	for i, r := range a.rv.remarks {
-		if r.at() != at.at() {
+		if r.at() != atKey {
 			continue
 		}
 		ui.Row(c.Key(fmt.Sprintf("remark:%d", i))).Margin(4, 12, 4, 92).Padding(6, 6, 6, 10).Gap(8).Radius(8).
@@ -44,7 +48,7 @@ func (a *App) remarksAt(c *ui.Context, at remark) {
 			}
 		})
 	}
-	if a.rv.writing != at.at() {
+	if a.rv.writing != atKey {
 		return
 	}
 	ui.Row(c.Key("remark-new")).Margin(4, 12, 4, 92).Padding(4, 4, 4, 10).Gap(6).Radius(8).

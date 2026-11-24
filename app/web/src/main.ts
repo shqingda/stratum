@@ -7,6 +7,24 @@ declare const mygo: {
   on<T>(event: string, fn: (payload: T) => void): () => void;
 };
 
+interface StringsPayload {
+  preview: string;
+  raw: string;
+  openExternal: string;
+  toggleTree: string;
+  selectFile: string;
+  findPlaceholder: string;
+  findPrev: string;
+  findNext: string;
+  close: string;
+  comment: string;
+  revert: string;
+  addRemark: string;
+  remarkPlaceholder: string;
+  cancel: string;
+  add: string;
+}
+
 interface ThemePayload {
   dark: boolean;
   bg: string;
@@ -23,6 +41,7 @@ interface ThemePayload {
   live: string;
   plus: string;
   minus: string;
+  strings?: StringsPayload;
 }
 
 interface ModePayload {
@@ -87,11 +106,29 @@ const findPrev = document.getElementById("find-prev")!;
 const findNext = document.getElementById("find-next")!;
 const findClose = document.getElementById("find-close")!;
 
-const remarkModal = document.getElementById("remark-modal")!;
+const remarkModal = document.getElementById("remark-modal") as HTMLDialogElement;
 const remarkTitle = document.getElementById("remark-title")!;
 const remarkText = document.getElementById("remark-text") as HTMLTextAreaElement;
 const remarkCancel = document.getElementById("remark-cancel")!;
 const remarkSubmit = document.getElementById("remark-submit")!;
+
+let uiStrings: StringsPayload = {
+  preview: "Preview",
+  raw: "Raw",
+  openExternal: "Open externally",
+  toggleTree: "Toggle Workspace Tree",
+  selectFile: "Select a file to preview",
+  findPlaceholder: "Find in view...",
+  findPrev: "Previous",
+  findNext: "Next",
+  close: "Close",
+  comment: "Comment",
+  revert: "Revert",
+  addRemark: "Add line comment",
+  remarkPlaceholder: "Comment for the agent...",
+  cancel: "Cancel",
+  add: "Add",
+};
 
 let isDark = false;
 let currentMode: "diffs" | "files" = "diffs";
@@ -144,6 +181,35 @@ function applyTheme(t: ThemePayload) {
   r.setProperty("--plus", t.plus);
   r.setProperty("--minus", t.minus);
   document.documentElement.dataset.theme = isDark ? "dark" : "light";
+
+  if (t.strings) {
+    uiStrings = t.strings;
+    mdPreviewBtn.textContent = uiStrings.preview;
+    mdRawBtn.textContent = uiStrings.raw;
+    openExtBtn.title = uiStrings.openExternal;
+    openExtBtn.setAttribute("aria-label", uiStrings.openExternal);
+    treeToggleBtn.title = uiStrings.toggleTree;
+    treeToggleBtn.setAttribute("aria-label", uiStrings.toggleTree);
+    if (!currentFilePath) {
+      filesEmpty.textContent = uiStrings.selectFile;
+    }
+    findInput.placeholder = uiStrings.findPlaceholder;
+    findPrev.title = uiStrings.findPrev;
+    findPrev.setAttribute("aria-label", uiStrings.findPrev);
+    findNext.title = uiStrings.findNext;
+    findNext.setAttribute("aria-label", uiStrings.findNext);
+    findClose.title = uiStrings.close;
+    findClose.setAttribute("aria-label", uiStrings.close);
+    remarkText.placeholder = uiStrings.remarkPlaceholder;
+    remarkCancel.textContent = uiStrings.cancel;
+    remarkSubmit.textContent = uiStrings.add;
+    for (const entry of diffCache.values()) {
+      const cbtn = entry.card.querySelector<HTMLButtonElement>(".diff-comment-btn");
+      if (cbtn) cbtn.textContent = uiStrings.comment;
+      const rbtn = entry.card.querySelector<HTMLButtonElement>(".diff-revert-btn");
+      if (rbtn) rbtn.textContent = uiStrings.revert;
+    }
+  }
 
   const mode = isDark ? "dark" : "light";
   for (const entry of diffCache.values()) {
@@ -200,16 +266,16 @@ function renderDiffs(payload: DiffsPayload) {
 
     const commentBtn = document.createElement("button");
     commentBtn.type = "button";
-    commentBtn.className = "diff-btn";
-    commentBtn.textContent = "Comment";
+    commentBtn.className = "diff-btn diff-comment-btn";
+    commentBtn.textContent = uiStrings.comment;
     commentBtn.onclick = () => openRemarkModal(f.relPath || f.path, 1, "new");
     head.appendChild(commentBtn);
 
     if (!f.reverted && f.turnSeq > 0) {
       const revertBtn = document.createElement("button");
       revertBtn.type = "button";
-      revertBtn.className = "diff-btn";
-      revertBtn.textContent = "Revert";
+      revertBtn.className = "diff-btn diff-revert-btn";
+      revertBtn.textContent = uiStrings.revert;
       revertBtn.onclick = () => {
         void mygo.call("Pierre.RevertFile", f.turnSeq, f.path);
       };
@@ -228,6 +294,7 @@ function renderDiffs(payload: DiffsPayload) {
       diffStyle: currentDiffStyle,
       disableFileHeader: true,
       overflow: "scroll",
+      preferredHighlighter: "highlights",
     });
     inst.render({
       oldFile: { name: f.relPath || f.path, contents: f.before ?? "" },
@@ -370,6 +437,7 @@ function renderFile(payload: FilePayload) {
       themeType: isDark ? "dark" : "light",
       disableFileHeader: true,
       overflow: "scroll",
+      preferredHighlighter: "highlights",
     });
   } else {
     fileInstance.setThemeType(isDark ? "dark" : "light");
@@ -382,16 +450,26 @@ function renderFile(payload: FilePayload) {
 
 function openRemarkModal(path: string, line: number, side: string) {
   remarkTarget = { path, line, side };
-  remarkTitle.textContent = `Comment on ${path}:${line}`;
+  remarkTitle.textContent = `${uiStrings.addRemark} · ${path}:${line}`;
   remarkText.value = "";
-  remarkModal.classList.remove("hidden");
+  if (!remarkModal.open) {
+    remarkModal.showModal();
+  }
   remarkText.focus();
 }
 
 function closeRemarkModal() {
   remarkTarget = null;
-  remarkModal.classList.add("hidden");
+  if (remarkModal.open) {
+    remarkModal.close();
+  }
 }
+
+remarkModal.addEventListener("click", (e) => {
+  if (e.target === remarkModal) {
+    closeRemarkModal();
+  }
+});
 
 function openFindBar() {
   findBar.classList.remove("hidden");
@@ -468,7 +546,7 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Escape") {
-    if (!remarkModal.classList.contains("hidden")) {
+    if (remarkModal.open) {
       e.preventDefault();
       closeRemarkModal();
       return;

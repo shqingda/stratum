@@ -119,7 +119,7 @@ func screen3() *App {
 	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "1", Title: "修复 Add 测试", Cwd: "/Users/me/Projects/calc", Updated: now.Add(-10 * time.Second)})
 	a.C.Current = &a.C.Sessions[0]
 	a.draft = ""
-	a.noSide = true
+	a.side.noSide = true
 	return a
 }
 
@@ -128,7 +128,7 @@ func screen4() *App {
 	a := screen2()
 	a.draft = ""
 	a.C.Sessions = append(a.C.Sessions, proto.Session{ID: "11", Title: "测试里跑 go test 要进沙箱", Cwd: "/Users/me/Projects/stratum", Updated: now.Add(-8 * 24 * time.Hour)})
-	a.pal, a.query = true, "沙箱"
+	a.pal.open, a.search.query = true, "沙箱"
 	return a
 }
 

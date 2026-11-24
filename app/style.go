@@ -59,7 +59,6 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 		key := h.Sum64()
 		done := c.Now().Sub(copied[key]) < 2*time.Second
 		btn := ui.ButtonBase(c).Size(26, 26).Radius(7).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
-		press(btn)
 		focusRing(btn, p)
 		if btn.Hovered() {
 			btn.Background(p.Hover)

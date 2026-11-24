@@ -586,7 +586,6 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 	}
 	row.Children(func() {
 		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name).Tooltip(termTabTooltip(tab))
-		press(b)
 		focusRing(b, p)
 		b.Children(func() {
 			ui.Text(c, name).FontSize(12.5).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0)
@@ -596,7 +595,6 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 		}
 		// 22pt to hit, inside the 26pt tab: the mark stays Safari's size.
 		x := ui.ButtonBase(c.Key("term-x:"+tab.id)).Size(22, 22).Radius(5).Center().Shrink(0).Label(locales.CloseTerminal()).Tooltip(locales.CloseTerminal())
-		press(x)
 		if x.Hovered() {
 			x.Background(p.Hover)
 		}

@@ -1296,6 +1296,56 @@ func (msgs Messages) UnfavoriteModel() string {
 	return Catalog.Format(msgs.locale, "unfavoriteModel", nil)
 }
 
+// UsageView says "查看用量"
+// in the language the app shows.
+func UsageView() string { return In(i18n.Locale()).UsageView() }
+
+// UsageView says "查看用量"
+// in the language of msgs.
+func (msgs Messages) UsageView() string {
+	return Catalog.Format(msgs.locale, "usageView", nil)
+}
+
+// UsageTitle says "用量"
+// in the language the app shows.
+func UsageTitle() string { return In(i18n.Locale()).UsageTitle() }
+
+// UsageTitle says "用量"
+// in the language of msgs.
+func (msgs Messages) UsageTitle() string {
+	return Catalog.Format(msgs.locale, "usageTitle", nil)
+}
+
+// UsageQuota says "账号额度"
+// in the language the app shows.
+func UsageQuota() string { return In(i18n.Locale()).UsageQuota() }
+
+// UsageQuota says "账号额度"
+// in the language of msgs.
+func (msgs Messages) UsageQuota() string {
+	return Catalog.Format(msgs.locale, "usageQuota", nil)
+}
+
+// UsageSession says "当前会话上下文"
+// in the language the app shows.
+func UsageSession() string { return In(i18n.Locale()).UsageSession() }
+
+// UsageSession says "当前会话上下文"
+// in the language of msgs.
+func (msgs Messages) UsageSession() string {
+	return Catalog.Format(msgs.locale, "usageSession", nil)
+}
+
+// UsageNoData says "暂无用量数据"
+// in the language the app shows.
+func UsageNoData() string { return In(i18n.Locale()).UsageNoData() }
+
+// UsageNoData says "暂无用量数据"
+// in the language of msgs.
+func (msgs Messages) UsageNoData() string {
+	return Catalog.Format(msgs.locale, "usageNoData", nil)
+}
+
 // PhaseStarting says "正在启动"
 // in the language the app shows.
 func PhaseStarting() string { return In(i18n.Locale()).PhaseStarting() }
@@ -2408,11 +2458,11 @@ func (msgs Messages) SideAskNote() string {
 	return Catalog.Format(msgs.locale, "sideAskNote", nil)
 }
 
-// SideAskPlaceholder says "问一个不打断主对话的问题…"
+// SideAskPlaceholder says "问一句（只读，不写入主对话）…"
 // in the language the app shows.
 func SideAskPlaceholder() string { return In(i18n.Locale()).SideAskPlaceholder() }
 
-// SideAskPlaceholder says "问一个不打断主对话的问题…"
+// SideAskPlaceholder says "问一句（只读，不写入主对话）…"
 // in the language of msgs.
 func (msgs Messages) SideAskPlaceholder() string {
 	return Catalog.Format(msgs.locale, "sideAskPlaceholder", nil)
@@ -6598,4 +6648,34 @@ func FormattersNote() string { return In(i18n.Locale()).FormattersNote() }
 // in the language of msgs.
 func (msgs Messages) FormattersNote() string {
 	return Catalog.Format(msgs.locale, "formattersNote", nil)
+}
+
+// OpenExternally says "在外部应用打开"
+// in the language the app shows.
+func OpenExternally() string { return In(i18n.Locale()).OpenExternally() }
+
+// OpenExternally says "在外部应用打开"
+// in the language of msgs.
+func (msgs Messages) OpenExternally() string {
+	return Catalog.Format(msgs.locale, "openExternally", nil)
+}
+
+// FindInView says "在当前视图中查找…"
+// in the language the app shows.
+func FindInView() string { return In(i18n.Locale()).FindInView() }
+
+// FindInView says "在当前视图中查找…"
+// in the language of msgs.
+func (msgs Messages) FindInView() string {
+	return Catalog.Format(msgs.locale, "findInView", nil)
+}
+
+// CommentShort says "批注"
+// in the language the app shows.
+func CommentShort() string { return In(i18n.Locale()).CommentShort() }
+
+// CommentShort says "批注"
+// in the language of msgs.
+func (msgs Messages) CommentShort() string {
+	return Catalog.Format(msgs.locale, "commentShort", nil)
 }

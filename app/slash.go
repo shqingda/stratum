@@ -55,8 +55,8 @@ func (a *App) slashItems(c *ui.Context) []slashItem {
 	}
 	// The composer's own menus, opened from here.
 	all = append(all,
-		slashItem{"model", "sparkles", locales.DefaultModel(), func(*ui.Context) { clear(); a.modelMenu = true }},
-		slashItem{"effort", "brain", locales.ReasoningEffort(), func(*ui.Context) { clear(); a.modelMenu = true }},
+		slashItem{"model", "sparkles", locales.DefaultModel(), func(*ui.Context) { clear(); a.menu.modelMenu = true }},
+		slashItem{"effort", "brain", locales.ReasoningEffort(), func(*ui.Context) { clear(); a.menu.modelMenu = true }},
 	)
 	// /undo puts back the last turn's changes not yet undone.
 	if turns := a.C.Changes.Turns; !a.C.Busy {
@@ -201,7 +201,6 @@ func (a *App) slashMenu(c *ui.Context) {
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			for i, it := range items {
 				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name).KeepFocus()
-				press(row)
 				focusRing(row, p)
 				switch {
 				case i == s.sel:

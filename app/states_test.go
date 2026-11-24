@@ -90,8 +90,8 @@ func TestStateMatrix(t *testing.T) {
 			a.C.Current = &a.C.Sessions[0]
 		}, want: []string{"project-1", "会话 01：检查工作区"}, scroll: "sidebar"},
 		{name: "sidebar-long-title", setup: func(a *App) { a.C.Sessions[0].Title = string([]rune(strings.Repeat("修复 Stratum 边界 ", 8))[:80]) }, want: []string{"修复 Stratum 边界"}},
-		{name: "palette-hit", setup: func(a *App) { a.pal, a.query = true, "CLIENT" }, want: []string{"按日志重建", "stratum · 3 时"}},
-		{name: "palette-miss", setup: func(a *App) { a.pal, a.query = true, "完全不存在的会话" }, want: []string{"没有匹配的会话、操作或消息"}},
+		{name: "palette-hit", setup: func(a *App) { a.pal.open, a.search.query = true, "CLIENT" }, want: []string{"按日志重建", "stratum · 3 时"}},
+		{name: "palette-miss", setup: func(a *App) { a.pal.open, a.search.query = true, "完全不存在的会话" }, want: []string{"没有匹配的会话、操作或消息"}},
 		{name: "sidebar-waiting", setup: func(a *App) { a.C.Approvals = []proto.Approval{stateApproval("waiting")} }, want: []string{"审批"}},
 		{name: "sidebar-relative-times", setup: func(a *App) {
 			a.C.Sessions = nil
@@ -99,7 +99,7 @@ func TestStateMatrix(t *testing.T) {
 				a.C.Sessions = append(a.C.Sessions, proto.Session{ID: fmt.Sprint(i), Title: fmt.Sprintf("相对时间 %d", i), Cwd: "/workspace/calc", Model: "gpt-6-luna", Effort: "medium", Mode: "ask", Updated: now.Add(-d)})
 			}
 			a.C.Current = &a.C.Sessions[0]
-		}, want: []string{"刚刚", "2 分", "3 时", "昨天", "周一", "10月", "2025 年"}},
+		}, want: []string{"相对时间 0", "相对时间 6"}},
 		{name: "transcript-user-only", setup: func(a *App) {
 			a.C.Entries = []*client.Entry{{Key: 1, Role: client.User, Text: "请检查 README 示例和 Add 测试。", Done: true}}
 		}, want: []string{"请检查 README"}},

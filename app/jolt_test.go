@@ -79,7 +79,7 @@ func TestTranscriptHoldsStillAsTheSidebarSlides(t *testing.T) {
 			tt.Advance(8 * time.Millisecond)
 			cur := darkRows(tt.Image(), 1200)
 			if d := vshift(prev, cur); d != 0 {
-				t.Fatalf("sliding %s, at %.3f open the transcript moved %d px", way, a.sideOpen, d)
+				t.Fatalf("sliding %s, at %.3f open the transcript moved %d px", way, a.side.sideOpen, d)
 			}
 			prev = cur
 		}

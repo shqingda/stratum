@@ -106,7 +106,7 @@ func (a *App) agentPill(c *ui.Context) {
 		if m.Item(locales.NextAgent()).ID("agent:next").Shortcut(0, ui.KeyTab).Chosen() {
 			a.cycleAgent(1)
 		}
-	}, a.menuOptions(&a.agentMenu))
+	}, a.menuOptions(&a.menu.agentMenu))
 }
 
 func (a *App) setAgent(name string) {

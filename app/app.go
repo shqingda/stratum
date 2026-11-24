@@ -73,66 +73,43 @@ type App struct {
 	keptUnread        string // marked unread while shown
 	showArchived      bool
 	drafts            drafts                   // keeps each session's draft in the kernel
-	query             string                   // the sidebar's search
 	lists             map[string]*ui.ListState // per-session transcript scroll state
 	md                markdown.Options
 	opened            map[string]bool // tool calls whose output shows
 	inWork            bool            // building a finished turn's folded work
-	noSide            bool            // the sidebar is hidden
-	// panelWas is whether the review panel was open last frame; sideMoved
-	// that opening it in a narrow window put the sidebar away, so that
-	// closing it brings the sidebar back.
-	panelWas, sideMoved bool
-	rvOverlay           bool                  // review panel floats over main when window is very narrow
-	lastW               float32               // last window width seen by fitPanel
-	sideOpen            float32               // how far the sidebar is out, 0 to 1, on its way
-	rvOpen              float32               // how far the review inspector is out, 0 to 1
-	sideW               float32               // user-adjusted sidebar width, 0 means default
-	rvW                 float32               // user-adjusted review width, 0 means default
-	split               splitDrag             // the seam being dragged
-	dockH               float32               // how tall the composer floating on the transcript was
-	listShown           *ui.ListState         // the transcript's list in the last frame
-	hero                hero                  // where the composer of an empty session stands
-	apDiffs             map[string][]diffLine // the approvals' diffs, by ID
-	sys                 ui.Preferences        // the desktop's accessibility preferences, read each frame
-	focusSession        string                // the session the composer last took the focus for
-	overWas             bool                  // the palette, settings or automations showed last frame
-	removing            []string              // the sessions of the project the user asked to remove, waiting on Remove
-	removingName        string
-	pal                 bool   // the ⌘K palette shows
-	jump                int64  // a message to scroll to, from a search
-	jumpIn              string // the session it is in
-	palSel              int    // its row chosen by the arrow keys
-	palScroll           bool   // scroll palette selection into view once after ↑/↓
-	stats               map[string][2]int
-	rv                  review
-	pierre              pierreState
-	seen                map[string]time.Time // when approvals first showed
-	openIn              func(app, dir string) error
-	openURL             func(url string) error
-	hasApp              func(appName string) bool
+	side              sideState
+	listShown         *ui.ListState         // the transcript's list in the last frame
+	hero              hero                  // where the composer of an empty session stands
+	apDiffs           map[string][]diffLine // the approvals' diffs, by ID
+	sys               ui.Preferences        // the desktop's accessibility preferences, read each frame
+	focusSession      string                // the session the composer last took the focus for
+	overWas           bool                  // the palette, settings or automations showed last frame
+	removing          []string              // the sessions of the project the user asked to remove, waiting on Remove
+	removingName      string
+	pal               palState
+	search            searchState
+	stats             map[string][2]int
+	rv                review
+	pierre            pierreState
+	itemsBuf          []item
+	sideGroups        sessionGroups
+	openIn            func(app, dir string) error
+	openURL           func(url string) error
+	hasApp            func(appName string) bool
 	// version is the app's, as packaged; checkUpdates asks the updater,
 	// nil where there is none.
 	version      string
 	checkUpdates func()
 
-	openMenu    bool
 	commitMsg   string
 	commitInput ui.Handle
 
-	searchInput                                                                                       ui.Handle
-	composerInput                                                                                     ui.Handle
-	closeWindow                                                                                       func()
-	reconnect                                                                                         func()
-	keyRepeat                                                                                         bool
-	visibleSessions                                                                                   []string
-	menuSession                                                                                       string
-	modelMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
-	modelQuery                                                                                        string
-	modelSearch                                                                                       ui.Handle
-	modelsRequested                                                                                   bool
-	modelsPending, modelsAccount, modelsError                                                         string
-	modelsLoadedAccount                                                                               string
+	composerInput   ui.Handle
+	closeWindow     func()
+	reconnect       func()
+	keyRepeat       bool
+	visibleSessions []string
+	menu            menuState
 
 	keyOpen, keyMenu bool
 	keyProvider, key string
@@ -187,6 +164,51 @@ type App struct {
 	menuRuns        []func(c *ui.Context)             // commands from the menu bar, for the next frame
 }
 
+// sideState groups sidebar and review-panel layout, animation, and drag state.
+type sideState struct {
+	noSide bool // the sidebar is hidden
+	// panelWas is whether the review panel was open last frame; sideMoved
+	// that opening it in a narrow window put the sidebar away, so that
+	// closing it brings the sidebar back.
+	panelWas, sideMoved bool
+	rvOverlay           bool      // review panel floats over main when window is very narrow
+	lastW               float32   // last window width seen by fitPanel
+	sideOpen            float32   // how far the sidebar is out, 0 to 1, on its way
+	rvOpen              float32   // how far the review inspector is out, 0 to 1
+	sideW               float32   // user-adjusted sidebar width, 0 means default
+	rvW                 float32   // user-adjusted review width, 0 means default
+	split               splitDrag // the seam being dragged
+	dockH               float32   // how tall the composer floating on the transcript was
+}
+
+// palState holds the ⌘K command palette's visibility and selection state.
+type palState struct {
+	open   bool // the ⌘K palette shows
+	sel    int  // its row chosen by the arrow keys
+	scroll bool // scroll palette selection into view once after ↑/↓
+}
+
+// searchState holds palette search query and message-jump state.
+type searchState struct {
+	query       string // the palette search query
+	jump        int64  // a message to scroll to, from a search
+	jumpIn      string // the session it is in
+	searchInput ui.Handle
+}
+
+// menuState holds composer/header/account popover menu and model-loading state.
+type menuState struct {
+	session                                                                                           string
+	modelMenu, modeMenu, agentMenu, detailMenu, folderMenu, worktreeMenu, branchMenu, accountMenuOpen bool
+	openMenu                                                                                          bool
+	modelQuery                                                                                        string
+	modelSearch                                                                                       ui.Handle
+	modelsRequested                                                                                   bool
+	modelsPending, modelsAccount, modelsError                                                         string
+	modelsLoadedAccount                                                                               string
+	hoverSub                                                                                          string
+}
+
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
 	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, haptic: performHaptic, opened: map[string]bool{}, locale: &memLocale{},
@@ -204,7 +226,7 @@ func (a *App) restoreFocus(c *ui.Context) {
 	if a.C.Current != nil {
 		id = a.C.Current.ID
 	}
-	over := a.pal || a.settingsOpen || a.automationsOpen
+	over := a.pal.open || a.settingsOpen || a.automationsOpen
 	if !over && (id != a.focusSession || a.overWas) && id != "" {
 		a.composerInput.Focus(c)
 	}
@@ -285,7 +307,7 @@ func (a *App) Serve(ctx context.Context, srv *rpc.Server, update func(func())) {
 		if err == nil {
 			err = io.EOF
 		}
-		update(func() { a.C.Disconnected(err); a.modelsPending = "" })
+		update(func() { a.C.Disconnected(err); a.menu.modelsPending = "" })
 	}()
 }
 
@@ -375,7 +397,7 @@ func (a *App) View(c *ui.Context) {
 	}
 	// Keep the review drawer spring on the root so collapsing the sidebar
 	// never shifts child indices and replays the opening animation.
-	a.rvOpen = c.Root().Spring("review", rvTarget, springDefault)
+	a.side.rvOpen = c.Root().Spring("review", rvTarget, springDefault)
 	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
 	// One spring moves the sidebar and the title bar beside it, as versta
 	// does: it can be turned around halfway, and the sidebar is clipped,
@@ -383,21 +405,21 @@ func (a *App) View(c *ui.Context) {
 	// fade, as Finder's does not: faded, its wash over the window's glass
 	// let the dark glass through, a flash of gray at each toggle.
 	target := float32(1)
-	if a.noSide {
+	if a.side.noSide {
 		target = 0
 	}
-	a.sideOpen = shell.Spring("side", target, springDefault)
+	a.side.sideOpen = shell.Spring("side", target, springDefault)
 	sw := a.sideWidth()
 	shell.Children(func() {
-		if a.sideOpen > 0.001 {
-			sideW := float32(math.Round(float64(a.sideOpen * sw)))
+		if a.side.sideOpen > 0.001 {
+			sideW := float32(math.Round(float64(a.side.sideOpen * sw)))
 			ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip().
 				Children(func() { a.sidebar(c, vibrant) })
 		} else {
 			a.visibleSessions = a.sessionOrder()
 		}
 		a.main(c)
-		if a.sideOpen > 0.99 {
+		if a.side.sideOpen > 0.99 {
 			a.splitHandle(c, "split-side", sw, func(dx float32) { a.resizeSide(dx) }, a.resetSideWidth)
 		}
 		a.sideToggle(c)
@@ -427,7 +449,7 @@ const (
 // The sidebar and the review panel keep the widths the user drags them
 // to, across launches, as Finder's and Mail's do.
 func (a *App) sideWidth() float32 {
-	w := a.sideW
+	w := a.side.sideW
 	if w <= 0 {
 		w = a.settings().SidebarWidth
 	}
@@ -438,7 +460,7 @@ func (a *App) sideWidth() float32 {
 }
 
 func (a *App) reviewWidth() float32 {
-	w := a.rvW
+	w := a.side.rvW
 	if w <= 0 {
 		w = a.settings().InspectorWidth
 	}
@@ -457,7 +479,7 @@ type splitDrag struct {
 }
 
 func (a *App) dragSplit(key string, width float32, dx float32) *splitDrag {
-	d := &a.split
+	d := &a.side.split
 	if d.key != key {
 		*d = splitDrag{key: key, start: width, raw: width}
 	}
@@ -476,17 +498,17 @@ func (a *App) resizeSide(dx float32) {
 	// Dragged well past its narrowest, the sidebar folds away at the width
 	// it had, as Finder's and Mail's do; ⌘\ brings it back.
 	if d.raw < sideMinWidth/2 {
-		a.sideW = d.start
-		a.noSide, a.sideMoved = true, false
-		a.split = splitDrag{}
+		a.side.sideW = d.start
+		a.side.noSide, a.side.sideMoved = true, false
+		a.side.split = splitDrag{}
 		a.fireHaptic(hapticAlignment)
 		return
 	}
-	a.sideW = max(sideMinWidth, min(sideMaxWidth, d.raw))
+	a.side.sideW = max(sideMinWidth, min(sideMaxWidth, d.raw))
 }
 
 func (a *App) resetSideWidth() {
-	a.sideW = sidebarWidth
+	a.side.sideW = sidebarWidth
 	a.saveWidths()
 }
 
@@ -494,17 +516,17 @@ func (a *App) resizeReview(dx float32) {
 	d := a.dragSplit("split-review", a.reviewWidth(), -dx)
 	// Past half its narrowest, the panel closes, as Xcode's inspectors do.
 	if d.raw < reviewMinWidth/2 {
-		a.rvW = d.start
+		a.side.rvW = d.start
 		a.rv.open = false
-		a.split = splitDrag{}
+		a.side.split = splitDrag{}
 		a.fireHaptic(hapticAlignment)
 		return
 	}
-	a.rvW = max(reviewMinWidth, min(reviewMaxWidth, d.raw))
+	a.side.rvW = max(reviewMinWidth, min(reviewMaxWidth, d.raw))
 }
 
 func (a *App) resetReviewWidth() {
-	a.rvW = reviewWidth
+	a.side.rvW = reviewWidth
 	a.saveWidths()
 }
 
@@ -535,8 +557,8 @@ func (a *App) splitHandle(c *ui.Context, key string, x float32, onDrag func(dx f
 	h := ui.Box(c.Key(key)).Absolute().Top(0).Bottom(0).Left(x - 4).Width(8).Cursor(ui.CursorResizeColumn).Center().ZIndex(12)
 	if dx, _, ok := h.Dragged(); ok && dx != 0 {
 		onDrag(dx)
-	} else if a.split.key == key && !h.Pressed() {
-		a.split = splitDrag{}
+	} else if a.side.split.key == key && !h.Pressed() {
+		a.side.split = splitDrag{}
 		a.saveWidths()
 	}
 	if h.DoubleClicked() {
@@ -576,7 +598,7 @@ func (a *App) main(c *ui.Context) {
 	// composer and the transcript's scroll with it, as a jump.
 	sheet := ui.Column(c.Key("sheet")).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
 	a.hero.sheet = sheet.LayoutBounds()
-	if a.sideOpen > 0.001 && !c.Vibrancy() {
+	if a.side.sideOpen > 0.001 && !c.Vibrancy() {
 		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
 	}
 	sheet.Children(func() {
@@ -588,29 +610,29 @@ func (a *App) main(c *ui.Context) {
 		a.findBar(c)
 		a.sideAskCard(c)
 	})
-	if a.rvOpen > 0.001 {
+	if a.side.rvOpen > 0.001 {
 		rw := a.reviewWidth()
-		if a.rvOverlay {
+		if a.side.rvOverlay {
 			w, _ := c.Size()
 			if w > 0 {
 				rw = min(rw, w*0.85)
 			}
 			rvWrap := ui.Row(c).Absolute().Top(0).Bottom(0).Right(0).Width(rw).ZIndex(20).AlignItems(ui.Stretch).Clip()
 			lift(rvWrap, p)
-			if a.rvOpen < 0.999 {
-				rvWrap.Translate((1-a.rvOpen)*20, 0).Opacity(min(1, a.rvOpen*1.35))
+			if a.side.rvOpen < 0.999 {
+				rvWrap.Translate((1-a.side.rvOpen)*20, 0).Opacity(min(1, a.side.rvOpen*1.35))
 			}
 			rvWrap.Children(func() {
 				a.reviewPanel(c)
 			})
 		} else {
-			rvWrap := ui.Row(c).Width(a.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
-			if a.rvOpen < 0.999 {
-				rvWrap.Translate((1-a.rvOpen)*10, 0).Opacity(min(1, a.rvOpen*1.35))
+			rvWrap := ui.Row(c).Width(a.side.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
+			if a.side.rvOpen < 0.999 {
+				rvWrap.Translate((1-a.side.rvOpen)*10, 0).Opacity(min(1, a.side.rvOpen*1.35))
 			}
 			rvWrap.Children(func() {
 				a.reviewPanel(c)
-				if a.rvOpen > 0.99 {
+				if a.side.rvOpen > 0.99 {
 					a.splitHandle(c, "split-review", 0, func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
 				}
 			})
@@ -639,25 +661,25 @@ const minMain = 600
 // the window widens or the panel closes.
 func (a *App) fitPanel(c *ui.Context) {
 	w, _ := c.Size()
-	if a.rv.open == a.panelWas && w == a.lastW {
+	if a.rv.open == a.side.panelWas && w == a.side.lastW {
 		return
 	}
-	a.panelWas = a.rv.open
-	a.lastW = w
+	a.side.panelWas = a.rv.open
+	a.side.lastW = w
 	if !a.rv.open {
-		a.rvOverlay = false
-		if a.sideMoved {
-			a.noSide, a.sideMoved = false, false
+		a.side.rvOverlay = false
+		if a.side.sideMoved {
+			a.side.noSide, a.side.sideMoved = false, false
 		}
 		return
 	}
 	needAll := a.sideWidth() + a.reviewWidth() + minMain
-	if !a.noSide && w < needAll {
-		a.noSide, a.sideMoved = true, true
-	} else if a.sideMoved && w >= needAll {
-		a.noSide, a.sideMoved = false, false
+	if !a.side.noSide && w < needAll {
+		a.side.noSide, a.side.sideMoved = true, true
+	} else if a.side.sideMoved && w >= needAll {
+		a.side.noSide, a.side.sideMoved = false, false
 	}
-	a.rvOverlay = w < a.reviewWidth()+minMain
+	a.side.rvOverlay = w < a.reviewWidth()+minMain
 }
 
 // transcriptList returns the scroll state for the active session.
@@ -701,8 +723,8 @@ func (a *App) closeOrDismiss(c *ui.Context) {
 		} else {
 			a.rv.open = false
 		}
-	case a.pal:
-		a.pal, a.query = false, ""
+	case a.pal.open:
+		a.pal.open, a.search.query = false, ""
 	case a.btwOpen:
 		a.btwOpen = false
 	case a.settingsOpen:
@@ -723,7 +745,7 @@ func (a *App) closeOrDismiss(c *ui.Context) {
 // toggleSide shows or hides the sidebar as the user asks, which the panel
 // then leaves alone.
 func (a *App) toggleSide() {
-	a.noSide, a.sideMoved = !a.noSide, false
+	a.side.noSide, a.side.sideMoved = !a.side.noSide, false
 }
 
 // syncAnnounce informs VoiceOver when a new approval arrives or a turn ends.

@@ -19,8 +19,8 @@ func TestSideAskShortcutAndSubmit(t *testing.T) {
 	if !a.btwOpen {
 		t.Fatal("expected ⌘; to open side question dialog")
 	}
-	if !tt.HasText(locales.SideAskBadge()) {
-		t.Fatalf("expected side question badge %q in dialog", locales.SideAskBadge())
+	if !tt.HasText(locales.SideAsk()) {
+		t.Fatalf("expected side question header %q in card", locales.SideAsk())
 	}
 
 	// Typing and pressing Enter sends MethodSideAsk without touching main Prompt.

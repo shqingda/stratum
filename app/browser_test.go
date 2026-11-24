@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -389,7 +390,7 @@ func TestBrowserFocusShortcuts(t *testing.T) {
 	}
 
 	// Outside browser focus, ⌘L focuses composer and ⌘[ steps sessions instead of browser.
-	if err := tt.Click("检查"); err != nil {
+	if err := tt.Click(locales.HideChanges()); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()

@@ -210,7 +210,6 @@ func (a *App) fileTreeListNodes(c *ui.Context, cwd string, nodes []treeNode, top
 		n := nodes[i]
 		row := ui.ButtonBase(c.Key("ft:"+n.rel)).Row().Height(26).Padding(0, 8, 0, float32(8+n.depth*14)).
 			Gap(6).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(n.name)
-		press(row)
 		focusRing(row, p)
 		if row.Hovered() {
 			row.Background(p.Hover)
@@ -322,7 +321,6 @@ func (a *App) filePreviewView(c *ui.Context, cwd string, split bool) {
 			if !split {
 				back := ui.ButtonBase(c.Key("fp-back")).Row().Height(24).Padding(0, 6).Gap(4).Radius(6).
 					AlignItems(ui.Center).Label(locales.Close())
-				press(back)
 				focusRing(back, p)
 				if back.Hovered() {
 					back.Background(p.Hover)
@@ -347,7 +345,6 @@ func (a *App) filePreviewView(c *ui.Context, cwd string, split bool) {
 					}{{false, locales.Preview()}, {true, locales.Raw()}} {
 						on := a.rv.previewRaw == opt.raw
 						btn := ui.ButtonBase(c.Key(fmt.Sprint("fp-md:", opt.raw))).Height(20).Padding(0, 8).Radius(5).Center().Label(opt.label)
-						press(btn)
 						focusRing(btn, p)
 						fg, weight := p.Fg2, 500
 						if on {

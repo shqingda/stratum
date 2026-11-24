@@ -113,7 +113,6 @@ func (a *App) automationsView(c *ui.Context, vibrant bool) {
 				}
 				done := ui.ButtonBase(c.Key("auto-close")).Row().Shrink(0).Size(28, 28).Margin(0, 0, 0, 8).Radius(8).Center().
 					Label(locales.Close()).Tooltip(locales.Close()).KeyShortcuts(0, ui.KeyEscape)
-				press(done)
 				focusRing(done, p)
 				if done.Hovered() {
 					done.Background(p.Hover)

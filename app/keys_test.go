@@ -23,12 +23,12 @@ func TestTask8NewAndSearchShortcuts(t *testing.T) {
 		t.Fatal("Cmd+K did not focus search")
 	}
 	tt.Type("client")
-	if a.query != "client" || a.draft != "保留草稿" {
-		t.Fatalf("query %q, draft %q", a.query, a.draft)
+	if a.search.query != "client" || a.draft != "保留草稿" {
+		t.Fatalf("query %q, draft %q", a.search.query, a.draft)
 	}
 	tt.Key(0, ui.KeyEscape)
-	if a.pal || a.query != "" {
-		t.Fatalf("Escape left the palette open: %v %q", a.pal, a.query)
+	if a.pal.open || a.search.query != "" {
+		t.Fatalf("Escape left the palette open: %v %q", a.pal.open, a.search.query)
 	}
 	task8NoCommand(t, a)
 	tt.Key(ui.Cmd, ui.KeyN)
@@ -79,8 +79,8 @@ func TestPaletteOpensSession(t *testing.T) {
 	tt.Key(0, ui.KeyEnter)
 	var ref proto.SessionRef
 	task8Command(t, a, proto.MethodSessionGet, &ref)
-	if ref.SessionID != "3" || a.pal {
-		t.Fatalf("opened %q, palette open %v", ref.SessionID, a.pal)
+	if ref.SessionID != "3" || a.pal.open {
+		t.Fatalf("opened %q, palette open %v", ref.SessionID, a.pal.open)
 	}
 }
 
@@ -459,8 +459,8 @@ func TestPaletteActions(t *testing.T) {
 	tt.Type("查找")
 	tt.Key(0, ui.KeyEnter)
 	tt.Frame()
-	if a.pal || !a.find.on {
-		t.Fatalf("palette open %v, find on %v", a.pal, a.find.on)
+	if a.pal.open || !a.find.on {
+		t.Fatalf("palette open %v, find on %v", a.pal.open, a.find.on)
 	}
 	a.closeFind()
 	tt.Key(ui.Cmd, ui.KeyK)

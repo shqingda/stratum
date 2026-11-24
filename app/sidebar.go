@@ -16,7 +16,7 @@ import (
 
 const (
 	barHeight    = 52
-	sheetBar     = 48 // the title bar on a sheet, under the gap above it
+	sheetBar     = 52 // matches barHeight so all three panes share one top bar baseline
 	sidebarWidth = 264
 )
 
@@ -28,7 +28,6 @@ func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
 
 func (a *App) iconButtonSized(c *ui.Context, key, symbol, tip string, size float32) ui.Element {
 	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
-	press(b)
 	focusRing(b, a.p)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
@@ -79,13 +78,13 @@ func (a *App) sidebar(c *ui.Context, vibrant bool) {
 func (a *App) sideToggle(c *ui.Context) {
 	p := a.p
 	tip := locales.HideSidebar()
-	if a.noSide {
+	if a.side.noSide {
 		tip = locales.ShowSidebar()
 	}
 	const pillW, pillH = float32(74), float32(32)
 	leftClosed := toggleLeft(c)
 	leftOpen := a.sideWidth() - 14 - pillW
-	left := leftClosed + a.sideOpen*(leftOpen-leftClosed)
+	left := leftClosed + a.side.sideOpen*(leftOpen-leftClosed)
 	bg := ui.RGBA(255, 255, 255, .94)
 	shadow := ui.RGBA(0, 0, 0, .08)
 	if p.Dark {
@@ -98,7 +97,6 @@ func (a *App) sideToggle(c *ui.Context) {
 	pill.Children(func() {
 		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(30, 26).Radius(13).Center().
 			Label(locales.NewSession()).Tooltip(locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN)
-		press(newBtn)
 		focusRing(newBtn, p)
 		newCol := p.Fg
 		if newBtn.Hovered() {
@@ -111,7 +109,6 @@ func (a *App) sideToggle(c *ui.Context) {
 
 		togBtn := ui.ButtonBase(c.Key("side")).Size(30, 26).Radius(13).Center().
 			Label(tip).Tooltip(tip)
-		press(togBtn)
 		focusRing(togBtn, p)
 		togCol := p.Fg
 		if togBtn.Hovered() {
@@ -129,14 +126,13 @@ func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+10, 14) }
 
 func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
 	p := a.p
-	it := ui.ButtonBase(c.Key(key)).Row().Height(36).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
-	press(it)
+	it := ui.ButtonBase(c.Key(key)).Row().Height(32).Padding(0, 9).Gap(9).Radius(7).AlignItems(ui.Center).Label(label)
 	focusRing(it, p)
 	if it.Hovered() {
 		it.Background(p.Hover)
 	}
 	it.Children(func() {
-		ui.Box(c).Width(17).Center().Children(func() { sym(c, symbol, 17, p.Fg2) })
+		ui.Box(c).Width(17).Center().Children(func() { sym(c, symbol, 16, p.Fg2) })
 		ui.Text(c, label).FontSize(14).TextColor(p.Fg).SingleLine()
 		ui.Spacer(c)
 		if kbd != "" {
@@ -154,8 +150,20 @@ type sessionGroups struct {
 	cwdByFolder      map[string]string
 }
 
-func (a *App) groupSessions() sessionGroups {
-	g := sessionGroups{byFolder: map[string][]proto.Session{}, cwdByFolder: map[string]string{}}
+func (a *App) groupSessions() *sessionGroups {
+	g := &a.sideGroups
+	g.pinned = g.pinned[:0]
+	g.archived = g.archived[:0]
+	g.folders = g.folders[:0]
+	if g.byFolder == nil {
+		g.byFolder = map[string][]proto.Session{}
+		g.cwdByFolder = map[string]string{}
+	} else {
+		for k, s := range g.byFolder {
+			g.byFolder[k] = s[:0]
+		}
+		clear(g.cwdByFolder)
+	}
 	for _, s := range a.C.Sessions {
 		switch {
 		case s.Archived:
@@ -166,7 +174,7 @@ func (a *App) groupSessions() sessionGroups {
 			continue
 		}
 		f := filepath.Base(s.Cwd)
-		if _, ok := g.byFolder[f]; !ok {
+		if _, ok := g.cwdByFolder[f]; !ok {
 			g.folders = append(g.folders, f)
 			g.cwdByFolder[f] = s.Cwd
 		}
@@ -246,7 +254,6 @@ func (a *App) sessions(c *ui.Context) {
 		p := a.p
 		b := ui.ButtonBase(c.Key("archived")).Row().Height(26).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).Radius(6).AlignItems(ui.Center).
 			Label(locales.Archived()).Expanded(a.showArchived)
-		press(b)
 		focusRing(b, p)
 		if b.Hovered() {
 			b.Background(p.Hover)
@@ -286,7 +293,7 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Session) {
 	p := a.p
 	collapsed := a.projectCollapsed(cwd)
-	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(14, 0, 4, 0).Padding(0, 4, 0, 8).Gap(4).Radius(7).AlignItems(ui.Center)
+	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(13, 0, 3, 0).Padding(0, 4, 0, 8).Gap(4).Radius(7).AlignItems(ui.Center)
 	if row.Hovered() {
 		row.Background(p.Hover)
 	}
@@ -366,15 +373,14 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)
 	n := len(a.visibleSessions) // its ⌘ number
-	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(32).Padding(0, 10).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
-	row.Transition(ui.ElementTransition{Position: true, Duration: 180 * time.Millisecond})
+	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(32).Padding(0, 9).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
+	if row.Hovered() && !s.Updated.IsZero() {
+		row.Tooltip(ago(a.now(), s.Updated))
+	}
 	focusRing(row, p)
 	switch {
-	case on && p.Dark:
-		row.Background(p.Sel)
 	case on:
-		// The open session is a pill of paper raised off the sidebar.
-		row.Background(p.Card).Shadow(0, 0, 0, .5, p.Edge).Shadow(0, 1, 2, 0, ink.Alpha(.06))
+		row.Background(p.Sel)
 	case row.Hovered():
 		row.Background(p.Hover)
 	}
@@ -382,32 +388,33 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 		a.do(a.C.Open(s.ID))
 	}
 	row.ContextMenu(func(m *ui.Menu) { a.sessionMenu(m, s) })
-	press(row)
+	leftSt := st
+	if leftSt == "wait" {
+		leftSt = ""
+	}
 	if a.renaming == s.ID && a.renameIn == "side" {
 		row.Children(func() {
-			slot(c, p, st)
+			slot(c, p, leftSt)
 			a.renameInput(c, s).FontSize(14)
 		})
 		return
 	}
 	row.Children(func() {
-		slot(c, p, st)
-		fg := p.Fg2
+		slot(c, p, leftSt)
+		fg, weight := p.Fg2, 400
 		if on {
-			fg = p.Fg
+			fg, weight = p.Fg, 500
 		}
-		ui.Text(c, title(s)).FontSize(14).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		ui.Text(c, title(s)).FontSize(14).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		switch {
 		case c.Modifiers()&(ui.Cmd|ui.Shift|ui.Alt|ui.Ctrl) == ui.Cmd && n <= 9:
-			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).FontWeight(500).FontFeatures("tnum").TextColor(p.Fg2).Background(p.Chip).Padding(1, 6).Radius(5).SingleLine()
+			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).FontWeight(500).FontFeatures("tnum").TextColor(p.Fg2).Background(p.Chip).Padding(1, 5).Radius(4).SingleLine()
 		case st == "wait":
 			badge := locales.BadgeApproval()
 			if on && a.questionFirst() {
 				badge = locales.BadgeQuestion()
 			}
-			ui.Text(c, badge).FontSize(12).FontWeight(600).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
-		default:
-			ui.Text(c, ago(a.now(), s.Updated)).FontSize(12.5).TextColor(p.Mute).SingleLine()
+			ui.Text(c, badge).FontSize(11.5).FontWeight(500).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
 		}
 	})
 }
@@ -459,16 +466,15 @@ func (a *App) footer(c *ui.Context) {
 		if left != "" {
 			b.Tooltip(left)
 		}
-		press(b)
 		focusRing(b, p)
 		switch {
-		case a.accountMenuOpen:
+		case a.menu.accountMenuOpen:
 			b.Background(p.Sel)
 		case b.Hovered():
 			b.Background(p.Hover)
 		}
 		if b.Clicked() {
-			a.accountMenuOpen = !a.accountMenuOpen
+			a.menu.accountMenuOpen = !a.menu.accountMenuOpen
 		}
 		b.Children(func() {
 			ui.Row(c).Gap(7).AlignItems(ui.Center).Grow(1).MinWidth(0).Children(func() {
@@ -487,7 +493,7 @@ func (a *App) footer(c *ui.Context) {
 				})
 			}
 			chevron := "chevron-up"
-			if a.accountMenuOpen {
+			if a.menu.accountMenuOpen {
 				chevron = "chevron-down"
 			}
 			sym(c, chevron, 11, p.Mute)
@@ -500,7 +506,7 @@ func (a *App) footer(c *ui.Context) {
 // above the sidebar footer button.
 func (a *App) footerPopover(c *ui.Context, anchor ui.Element, q *proto.AccountQuota) {
 	p := a.p
-	pop := ui.Popover(c, anchor, &a.accountMenuOpen, func() {
+	pop := ui.Popover(c, anchor, &a.menu.accountMenuOpen, func() {
 		ui.Column(c).FillWidth().Gap(4).Children(func() {
 			ui.Column(c).FillWidth().Background(p.Chip).Radius(8).Padding(10, 12).Gap(7).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Children(func() {
@@ -537,7 +543,6 @@ func (a *App) footerPopover(c *ui.Context, anchor ui.Element, q *proto.AccountQu
 
 			row := ui.ButtonBase(c.Key("footer-settings")).Row().FillWidth().Height(32).Padding(0, 10).Gap(8).Radius(7).
 				AlignItems(ui.Center).Label(locales.SettingsMenu())
-			press(row)
 			focusRing(row, p)
 			if row.Hovered() {
 				row.Background(p.Hover)
@@ -549,7 +554,7 @@ func (a *App) footerPopover(c *ui.Context, anchor ui.Element, q *proto.AccountQu
 				ui.Text(c, "⌘,").FontSize(12).TextColor(p.Mute).SingleLine()
 			})
 			if row.Clicked() {
-				a.accountMenuOpen = false
+				a.menu.accountMenuOpen = false
 				a.openSettings()
 			}
 		})

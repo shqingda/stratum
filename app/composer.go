@@ -47,7 +47,7 @@ func (a *App) composer(c *ui.Context) {
 	// the transcript's room for it would drop to nothing for a frame and
 	// the list's end jump down and back.
 	if h := dock.Bounds().H; h > 0 {
-		a.dockH = h
+		a.side.dockH = h
 	}
 }
 
@@ -135,14 +135,10 @@ func (a *App) queue(c *ui.Context) {
 
 func (a *App) box(c *ui.Context) {
 	p := a.p
-	box := ui.Column(c).Radius(20).Border(.5, p.Edge2).
+	box := ui.Column(c).Radius(16).Border(.5, p.Edge2).
 		Transition(ui.ElementTransition{Colors: true, Shadows: true, Duration: 160 * time.Millisecond})
 	a.glass(box, composerGlass(p))
-	if a.helloShown() {
-		raise(box, p)
-	} else {
-		lift(box, p)
-	}
+	raise(box, p)
 	rim(box, p)
 	if files := box.DroppedFiles(); len(files) > 0 {
 		a.attachPaths(files)
@@ -152,7 +148,7 @@ func (a *App) box(c *ui.Context) {
 	case dragOver:
 		box.Border(1.5, p.Live).Background(p.Card.Mix(p.Live, .06))
 	case box.FocusWithin():
-		box.Border(.5, p.Live.Alpha(.45)).Shadow(0, 0, 0, 2.5, p.Live.Alpha(.14))
+		box.Border(.5, p.Live.Alpha(.65)).InsetShadow(0, 0, 0, .5, p.Live.Alpha(.45))
 	}
 	svc := c.Services()
 	box.Children(func() {
@@ -201,7 +197,6 @@ func (a *App) token(c *ui.Context, key, icon string, thumb ui.ImageSource, label
 		}
 		ui.Text(c, label).FontSize(12.5).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 		rm = ui.ButtonBase(c.Key(key+":x")).Size(20, 20).Radius(5).Center().KeepFocus().Label(locales.AttachRemove(label))
-		press(rm)
 		if rm.Hovered() {
 			rm.Background(fg.Alpha(.10))
 		}
@@ -222,26 +217,44 @@ func (a *App) words(c *ui.Context, dragOver bool, svc ui.Services) {
 	if a.recall != "" {
 		a.draft, a.recall, a.toEnd = a.recall, "", true
 	}
-	area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
-	a.hero.words = area.LayoutBounds()
-	if a.toEnd {
-		// A draft put in whole is written on from its end.
-		n := len([]rune(a.draft))
-		area.SetTextSelection(n, n)
-		a.toEnd = false
-	}
-	if pl := a.mention.place; pl > 0 {
-		area.SetTextSelection(pl-1, pl-1)
-		a.mention.place = 0
-	}
-	if _, caret := area.TextSelection(); caret != a.mention.caret {
-		// The @ word is found before the composer is built.
-		a.mention.caret = caret
-		c.Invalidate()
-	}
-	area.Lines(1, 10).Grow(1).MinWidth(0).Padding(2, 2, 8, 2).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
-		FontSize(14).LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) }).
-		TextRanges(a.draftMarks()...)
+	sug := a.activeSuggestion()
+	ui.Row(c).AlignItems(ui.Start).Gap(6).Children(func() {
+		area := ui.TextAreaBase(c, &a.draft).Bind(&a.composerInput)
+		a.hero.words = area.LayoutBounds()
+		if a.toEnd {
+			// A draft put in whole is written on from its end.
+			n := len([]rune(a.draft))
+			area.SetTextSelection(n, n)
+			a.toEnd = false
+		}
+		if pl := a.mention.place; pl > 0 {
+			area.SetTextSelection(pl-1, pl-1)
+			a.mention.place = 0
+		}
+		if _, caret := area.TextSelection(); caret != a.mention.caret {
+			// The @ word is found before the composer is built.
+			a.mention.caret = caret
+			c.Invalidate()
+		}
+		area.Lines(1, 10).Grow(1).MinWidth(0).Padding(2, 2, 8, 2).Placeholder(a.composerPlaceholder()).PlaceholderColor(p.Mute).TextColor(p.Fg).
+			FontSize(14).LineHeight(1.45).AutoFocus().OnTextKey(a.composerKey).OnPaste(func(text string) bool { return a.paste(svc) }).
+			TextRanges(a.draftMarks()...)
+		if sug != "" {
+			sb := ui.ButtonBase(c.Key("accept-sug")).Height(22).Padding(0, 6).Margin(2, 0, 0, 0).Radius(5).Background(p.Chip).Center().Shrink(0).
+				Label(locales.AcceptSuggestion()).Tooltip(locales.AcceptSuggestion())
+			focusRing(sb, p)
+			if sb.Hovered() {
+				sb.Background(p.Hover)
+			}
+			sb.Children(func() {
+				ui.Text(c, "⇥ Tab").FontSize(11).FontWeight(500).TextColor(p.Mute).SingleLine()
+			})
+			if sb.Clicked() {
+				a.draft, a.toEnd, a.C.Suggestion = sug, true, ""
+				a.composerInput.Focus(c)
+			}
+		}
+	})
 	if _, ok := a.command(); ok {
 		// A draft that starts with ! runs in the terminal.
 		ui.Row(c).Height(26).Gap(5).AlignItems(ui.Center).Padding(0, 2).Shrink(0).Children(func() {
@@ -262,22 +275,6 @@ func (a *App) words(c *ui.Context, dragOver bool, svc ui.Services) {
 			a.modelPill(c, cur.Model)
 		}
 		ui.Spacer(c)
-		if sug := a.activeSuggestion(); sug != "" {
-			sb := ui.ButtonBase(c.Key("accept-sug")).Height(22).Padding(0, 7).Radius(6).Background(p.Chip).Center().
-				Label(locales.AcceptSuggestion()).Tooltip(locales.AcceptSuggestion())
-			press(sb)
-			focusRing(sb, p)
-			if sb.Hovered() {
-				sb.Background(p.Hover)
-			}
-			sb.Children(func() {
-				ui.Text(c, "⇥ Tab").FontSize(11).FontWeight(500).TextColor(p.Mute).SingleLine()
-			})
-			if sb.Clicked() {
-				a.draft, a.toEnd, a.C.Suggestion = sug, true, ""
-				a.composerInput.Focus(c)
-			}
-		}
 		if cur != nil {
 			a.modePill(c, modeName(cur.Mode))
 			a.contextRing(c)
@@ -386,7 +383,6 @@ func (a *App) putBack(text string) {
 // iconPill is a composer control that is only a symbol.
 func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
 	b := ui.ButtonBase(c.Key("pill:"+key)).Size(28, 28).Radius(14).Center().Label(tip).Tooltip(tip).KeepFocus()
-	press(b)
 	focusRing(b, a.p)
 	if b.Hovered() {
 		b.Background(a.p.Hover)
@@ -398,7 +394,6 @@ func (a *App) iconPill(c *ui.Context, key, symbol, tip string) ui.Element {
 func (a *App) pill(c *ui.Context, key, symbol, label string, chevron bool) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key("pill:"+key)).Row().Height(28).Padding(0, 9).Gap(5).Radius(14).AlignItems(ui.Center).Label(label)
-	press(b)
 	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Hover)
@@ -425,7 +420,6 @@ func (a *App) goButton(c *ui.Context) {
 	p := a.p
 	b := ui.ButtonBase(c.Key("go")).Size(28, 28).Radius(14).Center().Margin(0, 0, 0, 2).
 		Transition(ui.ElementTransition{Colors: true, Duration: 160 * time.Millisecond}).KeepFocus()
-	press(b)
 	focusRing(b, p)
 	// The arrow and the stop square cross-fade where they are, so the
 	// button turns into the other rather than being swapped.
@@ -468,7 +462,6 @@ func (a *App) goButton(c *ui.Context) {
 func (a *App) textButton(c *ui.Context, key, label string) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key(key)).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Label(label).Shrink(0)
-	press(b)
 	focusRing(b, p)
 	if b.Hovered() {
 		b.Background(p.Hover)

@@ -142,26 +142,23 @@ func (a *App) hello(c *ui.Context) {
 	p := a.p
 	cur := a.C.Current
 	w := a.C.Workspace
-	ui.Column(c.Key("overview")).Width(360).MaxWidthPercent(100).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 180 * time.Millisecond}).
+	ui.Column(c.Key("overview")).Width(480).MaxWidthPercent(100).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
 		Children(func() {
 			// The folder and its branch, and whether anything waits to be
 			// committed: Finder's path bar and status line in one.
-			ui.Row(c).Height(26).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+			ui.Row(c).Height(32).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 				where := filepath.Base(cur.Cwd)
 				if w.Branch != "" {
 					where += " · " + w.Branch
 				}
-				ui.Text(c, where).FontSize(12).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
+				ui.Text(c, where).FontSize(14).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 				ui.Spacer(c)
 				switch {
 				case len(w.Files) > 0:
-					ui.Text(c, locales.UncommittedCount(len(w.Files))).FontSize(12).TextColor(p.Fg2).SingleLine().FontFeatures("tnum")
+					ui.Text(c, locales.UncommittedCount(len(w.Files))).FontSize(13).TextColor(p.Fg2).SingleLine().FontFeatures("tnum")
 				case w.Branch != "":
-					ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-						sym(c, "check", 12, p.Mute)
-						ui.Text(c, locales.NoUncommitted()).FontSize(12).TextColor(p.Mute).SingleLine()
-					})
+					ui.Text(c, locales.NoUncommitted()).FontSize(13).TextColor(p.Mute).SingleLine()
 				}
 			})
 			for i, f := range w.Files {
@@ -214,7 +211,7 @@ func (a *App) recentNotListed() []proto.RecentFile {
 }
 
 func (a *App) overviewSection(c *ui.Context, label string) {
-	ui.Text(c, label).FontSize(11).LetterSpacing(.11).TextColor(a.p.Mute).Margin(12, 0, 2, 0).SingleLine()
+	ui.Text(c, label).FontSize(12.5).LetterSpacing(.08).TextColor(a.p.Mute).Margin(14, 0, 4, 0).SingleLine()
 }
 
 // overviewRow is one line of the overview; one that opens something
@@ -232,12 +229,12 @@ func (a *App) overviewRow(c *ui.Context, key, icon, text, meta string, opens boo
 	} else {
 		row = ui.Row(c.Key(key))
 	}
-	row.Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center)
+	row.Height(32).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center)
 	row.Children(func() {
-		sym(c, icon, 13, p.Mute)
-		ui.Text(c, text).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
+		sym(c, icon, 15, p.Mute)
+		ui.Text(c, text).FontSize(14.5).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 		ui.Spacer(c)
-		ui.Text(c, meta).FontSize(11.5).LetterSpacing(.12).TextColor(p.Mute).SingleLine().Shrink(0).FontFeatures("tnum")
+		ui.Text(c, meta).FontSize(12.5).LetterSpacing(.08).TextColor(p.Mute).SingleLine().Shrink(0).FontFeatures("tnum")
 	})
 	return row
 }

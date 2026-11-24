@@ -33,7 +33,7 @@ func TestSearchHits(t *testing.T) {
 		}
 	}
 	user.Seq = 42
-	a.pal, a.query = true, "README"
+	a.pal.open, a.search.query = true, "README"
 	a.C.Hits, a.C.HitsFor = []proto.SearchHit{{SessionID: a.C.Current.ID, Seq: 42, Snippet: "顺便看看 [README] 里的示例对不对"}}, "README"
 	tt := ui.NewTester(a.View, 1200, 780)
 	tt.Frame()
@@ -45,8 +45,8 @@ func TestSearchHits(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if a.jumpIn != a.C.Current.ID || a.jump != 0 || a.pal {
-		t.Fatalf("jump %d in %q, pal %v", a.jump, a.jumpIn, a.pal)
+	if a.search.jumpIn != a.C.Current.ID || a.search.jump != 0 || a.pal.open {
+		t.Fatalf("jump %d in %q, pal %v", a.search.jump, a.search.jumpIn, a.pal.open)
 	}
 }
 

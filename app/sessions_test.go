@@ -160,7 +160,7 @@ func TestSidebarFooter(t *testing.T) {
 	if !a.settingsOpen {
 		t.Error("设置… does not open Settings")
 	}
-	if a.accountMenuOpen {
+	if a.menu.accountMenuOpen {
 		t.Error("popover stayed open after choosing Settings")
 	}
 }

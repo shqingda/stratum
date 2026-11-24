@@ -84,7 +84,7 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 			curPage = "general"
 		}
 	}
-	title, lede := "", ""
+	title := ""
 	stageBg := p.Sheet
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		side := ui.Column(c).Width(sidebarWidth).Shrink(0)
@@ -106,9 +106,6 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 					label := pg.label(locales.In(i18n.Locale()))
 					if pg.id == curPage {
 						title = label
-						if pg.lede != nil {
-							lede = pg.lede(locales.In(i18n.Locale()))
-						}
 					}
 					if q != "" && !finds(pg.label, pg.words, q) || pg.id == "browser" && a.newBrowser == nil {
 						continue
@@ -116,7 +113,6 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 					active := pg.id == curPage
 					it := ui.ButtonBase(c.Key("settings-"+pg.id)).Row().AlignSelf(ui.Stretch).Justify(ui.Start).
 						Height(32).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(label)
-					press(it)
 					focusRing(it, p)
 					switch {
 					case active:
@@ -145,9 +141,6 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 		ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).Background(stageBg).Clip().Children(func() {
 			ui.Scroll(c).Grow(1).MinHeight(0).Children(func() {
 				ui.Column(c).Width(596).MaxWidthPercent(100).AlignSelf(ui.Center).Padding(barHeight+12, 28, 52, 28).Children(func() {
-					if lede != "" {
-						ui.Text(c, lede).FontSize(13.5).LineHeight(1.5).TextColor(p.Mute).Margin(0, 0, 18, 0)
-					}
 					switch curPage {
 					case "accounts":
 						a.accountsAndModelsPage(c)
@@ -173,7 +166,6 @@ func (a *App) settingsView(c *ui.Context, vibrant bool) {
 				ui.Spacer(c)
 				done := ui.ButtonBase(c.Key("settings-close")).Row().Shrink(0).Size(28, 28).Radius(8).Center().
 					Label(locales.CloseSettings()).Tooltip(locales.CloseSettings()).KeyShortcuts(0, ui.KeyEscape)
-				press(done)
 				focusRing(done, p)
 				if done.Hovered() {
 					done.Background(p.Hover)
@@ -587,8 +579,8 @@ func (a *App) defaultModel(c *ui.Context, set proto.Settings) {
 			}
 		}
 	}
-	if a.modelsAccount != account && a.setModelMenu {
-		a.modelsRequested = false
+	if a.menu.modelsAccount != account && a.setModelMenu {
+		a.menu.modelsRequested = false
 	}
 	a.picker(c, "set-model", name, model).PopoverMenuButton(func(m *ui.Menu) {
 		for _, acc := range a.C.Accounts {
@@ -606,7 +598,7 @@ func (a *App) defaultModel(c *ui.Context, set proto.Settings) {
 		})
 	}, a.menuOptions(&a.setModelMenu))
 	if !a.setModelMenu && !a.subMenu && !a.lightMenu {
-		a.modelsRequested = false
+		a.menu.modelsRequested = false
 	}
 }
 
@@ -632,8 +624,8 @@ func (a *App) roleModel(c *ui.Context, key string, ref *proto.ModelRef, open *bo
 		}
 		if ref != nil {
 			m.Separator()
-			if a.modelsAccount != ref.Account {
-				a.modelsRequested = false
+			if a.menu.modelsAccount != ref.Account {
+				a.menu.modelsRequested = false
 			}
 			a.modelItems(m, ref.Account, ref.Model, func(id string) {
 				r := *ref
@@ -818,7 +810,6 @@ func (a *App) picker(c *ui.Context, key, prefix, value string) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 8, 0, 10).Gap(6).Radius(7).AlignItems(ui.Center).
 		Background(p.Sheet).Border(.5, p.Edge2).Shrink(0).Label(strings.TrimSpace(prefix + " " + value))
-	press(b)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}
@@ -836,7 +827,6 @@ func (a *App) picker(c *ui.Context, key, prefix, value string) ui.Element {
 func (a *App) pushButton(c *ui.Context, key, label string) ui.Element {
 	p := a.p
 	b := ui.ButtonBase(c.Key(key)).Height(28).Padding(0, 11).Radius(7).Center().Background(p.Sheet).Border(.5, p.Edge2).Label(label)
-	press(b)
 	if b.Hovered() {
 		b.Background(p.Hover)
 	}

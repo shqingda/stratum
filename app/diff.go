@@ -1,6 +1,10 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"slices"
+)
 
 // A line diff for whole files, as the review panel shows them: Myers'
 // O(ND) algorithm, fast on long files with small edits, cut into hunks
@@ -30,7 +34,7 @@ func myers(a, b []string) ([]edit, bool) {
 	for suf < len(a)-pre && suf < len(b)-pre && a[len(a)-1-suf] == b[len(b)-1-suf] {
 		suf++
 	}
-	var out []edit
+	out := make([]edit, 0, pre+suf)
 	for i := 0; i < pre; i++ {
 		out = append(out, edit{' ', i, i})
 	}
@@ -42,11 +46,17 @@ func myers(a, b []string) ([]edit, bool) {
 	return out, ok
 }
 
+const (
+	traceChunkShift = 14 // 16,384 int32s (64 KiB) per chunk to avoid slice-growth copies
+	traceChunkSize  = 1 << traceChunkShift
+	traceChunkMask  = traceChunkSize - 1
+)
+
 // middle diffs a and b, whose first lines are line off of the files.
 func middle(a, b []string, off int) ([]edit, bool) {
 	n, m := len(a), len(b)
 	replace := func() []edit {
-		var out []edit
+		out := make([]edit, 0, n+m)
 		for i := range a {
 			out = append(out, edit{'-', off + i, -1})
 		}
@@ -58,56 +68,69 @@ func middle(a, b []string, off int) ([]edit, bool) {
 	if n == 0 || m == 0 {
 		return replace(), true
 	}
+	if n > math.MaxInt32 || m > math.MaxInt32 {
+		return replace(), false
+	}
 	limit := min(n+m, maxEdits)
-	v := make([]int, 2*limit+2)
-	var trace [][]int
+	v := make([]int32, 2*limit+2)
+	// Store only the d active entries v[-(d-1), ..., d-1] before step d >= 1
+	// across fixed chunks: step d starts at logical index d*(d-1)/2.
+	var trace [][]int32
+	total := 0
 	at := func(k int) int { return k + limit + 1 }
 	for d := 0; d <= limit; d++ {
-		trace = append(trace, append([]int(nil), v...))
+		if d > 0 {
+			for k := -(d - 1); k <= d-1; k += 2 {
+				ci := total >> traceChunkShift
+				if ci >= len(trace) {
+					trace = append(trace, make([]int32, traceChunkSize))
+				}
+				trace[ci][total&traceChunkMask] = v[at(k)]
+				total++
+			}
+		}
 		for k := -d; k <= d; k += 2 {
 			var x int
 			if k == -d || k != d && v[at(k-1)] < v[at(k+1)] {
-				x = v[at(k+1)] // down: an insertion
+				x = int(v[at(k+1)]) // down: an insertion
 			} else {
-				x = v[at(k-1)] + 1 // right: a deletion
+				x = int(v[at(k-1)]) + 1 // right: a deletion
 			}
 			y := x - k
 			for x < n && y < m && a[x] == b[y] {
 				x, y = x+1, y+1
 			}
-			v[at(k)] = x
+			v[at(k)] = int32(x)
 			if x >= n && y >= m {
-				return backtrack(trace, at, n, m, off), true
+				return backtrack(trace, d, n, m, off), true
 			}
 		}
 	}
 	return replace(), false
 }
 
-// backtrack walks the saved frontiers from the end back to the start.
-func backtrack(trace [][]int, at func(int) int, n, m, off int) []edit {
-	var rev []edit
+// backtrack walks the chunked frontiers from the end back to the start.
+func backtrack(trace [][]int32, lastD, n, m, off int) []edit {
+	rev := make([]edit, 0, max(n, m)+lastD)
 	x, y := n, m
-	for d := len(trace) - 1; d >= 0; d-- {
-		v := trace[d]
+	for d := lastD; d >= 1; d-- {
+		base := d * (d - 1) / 2
+		prev := func(pk int) int {
+			idx := base + (pk+d-1)/2
+			return int(trace[idx>>traceChunkShift][idx&traceChunkMask])
+		}
 		k := x - y
 		var pk int
-		if k == -d || k != d && v[at(k-1)] < v[at(k+1)] {
+		if k == -d || k != d && prev(k-1) < prev(k+1) {
 			pk = k + 1
 		} else {
 			pk = k - 1
 		}
-		px := 0
-		if d > 0 {
-			px = v[at(pk)]
-		}
+		px := prev(pk)
 		py := px - pk
 		for x > px && y > py {
 			x, y = x-1, y-1
 			rev = append(rev, edit{' ', off + x, off + y})
-		}
-		if d == 0 {
-			break
 		}
 		if x == px {
 			y--
@@ -117,11 +140,12 @@ func backtrack(trace [][]int, at func(int) int, n, m, off int) []edit {
 			rev = append(rev, edit{'-', off + x, -1})
 		}
 	}
-	out := make([]edit, len(rev))
-	for i, e := range rev {
-		out[len(rev)-1-i] = e
+	for x > 0 && y > 0 {
+		x, y = x-1, y-1
+		rev = append(rev, edit{' ', off + x, off + y})
 	}
-	return out
+	slices.Reverse(rev)
+	return rev
 }
 
 // hunk is a run of edits with the kept lines around them.

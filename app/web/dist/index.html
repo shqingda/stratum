@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="color-scheme" content="light dark" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Stratum</title>
   <link rel="stylesheet" href="/style.css" />
@@ -42,12 +43,18 @@
   <div id="find-bar" class="hidden">
     <input id="find-input" type="text" placeholder="Find in view..." />
     <span id="find-count"></span>
-    <button id="find-prev" type="button" class="icon-btn" title="Previous">↑</button>
-    <button id="find-next" type="button" class="icon-btn" title="Next">↓</button>
-    <button id="find-close" type="button" class="icon-btn" title="Close">✕</button>
+    <button id="find-prev" type="button" class="icon-btn" title="Previous" aria-label="Previous">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <button id="find-next" type="button" class="icon-btn" title="Next" aria-label="Next">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button id="find-close" type="button" class="icon-btn" title="Close" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
   </div>
 
-  <div id="remark-modal" class="hidden">
+  <dialog id="remark-modal">
     <div class="remark-card">
       <div class="remark-title" id="remark-title">Add line comment</div>
       <textarea id="remark-text" rows="3" placeholder="Comment for the agent..."></textarea>
@@ -56,7 +63,7 @@
         <button id="remark-submit" type="button" class="btn btn-primary">Add</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <script src="/bundle.js"></script>
 </body>

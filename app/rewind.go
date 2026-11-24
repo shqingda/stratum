@@ -122,7 +122,6 @@ func (a *App) rewindButton(c *ui.Context, e *client.Entry, shown bool) {
 	p := a.p
 	seq := a.C.Turns[e.Turn].Seq
 	b := ui.ButtonBase(c.Key("rewind-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.RewindTo()).Tooltip(locales.RewindTo())
-	press(b)
 	focusRing(b, p)
 	target := float32(0)
 	if shown || b.Focused() || a.rewind.open && a.rewind.seq == seq {
@@ -163,7 +162,6 @@ func (a *App) editResendButton(c *ui.Context, e *client.Entry, shown bool) {
 	p := a.p
 	seq := a.C.Turns[e.Turn].Seq
 	b := ui.ButtonBase(c.Key("edit-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.EditAndResend()).Tooltip(locales.EditAndResend())
-	press(b)
 	focusRing(b, p)
 	target := float32(0)
 	if shown || b.Focused() {
@@ -246,7 +244,6 @@ func (a *App) rewindMenu(c *ui.Context) {
 			w.sel = min(w.sel, len(prompts)-1)
 			for i, pr := range prompts {
 				row := ui.ButtonBase(c.Key("rewind:"+strings.TrimSpace(pr.text))).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(pr.text)
-				press(row)
 				focusRing(row, p)
 				switch {
 				case i == w.sel:
@@ -283,7 +280,6 @@ func (a *App) rewindActionRows(c *ui.Context) {
 	ui.Text(c, w.prompt).FontSize(12.5).TextColor(p.Mute).Margin(2, 10, 4, 10).SingleLine().Ellipsis("…")
 	for i, act := range acts {
 		row := ui.ButtonBase(c.Key("rewind-act:"+act.action)).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(act.label)
-		press(row)
 		focusRing(row, p)
 		switch {
 		case i == w.sel:

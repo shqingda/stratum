@@ -21,7 +21,7 @@ type opt struct {
 
 // palOpts are the palette's rows for the query, by section.
 func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
-	q := strings.ToLower(strings.TrimSpace(a.query))
+	q := strings.ToLower(strings.TrimSpace(a.search.query))
 	match := func(s string) bool { return q == "" || strings.Contains(strings.ToLower(s), q) }
 	now := a.now()
 	for _, s := range a.C.Sessions {
@@ -64,8 +64,8 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 		add(opt{icon: "shield-half", label: locales.SwitchPermissionMode(), sub: modeName(cur.Mode) + " → " + modeName(next), run: func() {
 			a.do(a.C.Update(proto.SessionUpdate{Mode: &next}))
 		}})
-		add(opt{icon: "sparkles", label: locales.SwitchModel(), sub: cur.Model, run: func() { a.modelMenu = true }})
-		add(opt{icon: "brain", label: locales.SwitchEffort(), run: func() { a.modelMenu = true }})
+		add(opt{icon: "sparkles", label: locales.SwitchModel(), sub: cur.Model, run: func() { a.menu.modelMenu = true }})
+		add(opt{icon: "brain", label: locales.SwitchEffort(), run: func() { a.menu.modelMenu = true }})
 	}
 	if a.C.Busy {
 		add(opt{icon: "player-stop", label: locales.StopRunning(), kbd: "esc", run: func() { a.do(a.C.Cancel()) }})
@@ -132,7 +132,7 @@ func (a *App) palOpts(c *ui.Context) (sessions, actions []opt) {
 		add(opt{icon: "archive", label: map[bool]string{true: locales.Unarchive(), false: locales.Archive()}[s.Archived], sub: title(s), kbd: "⇧⌘A", run: func() { a.archive(s, !s.Archived) }})
 		add(opt{icon: "trash", label: locales.DeleteSession(), sub: title(s), run: func() { a.deleting = s.ID }})
 	}
-	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.noSide], kbd: "⌘\\", run: a.toggleSide})
+	add(opt{icon: "layout-sidebar-left-collapse", label: map[bool]string{true: locales.ShowSidebar(), false: locales.HideSidebar()}[a.side.noSide], kbd: "⌘\\", run: a.toggleSide})
 	themes := []struct{ id, name string }{{"", locales.ThemeAuto()}, {"light", locales.ThemeLight()}, {"dark", locales.ThemeDark()}}
 	for _, t := range themes {
 		if t.id != set.Theme {
@@ -222,7 +222,7 @@ func onOff(on bool) string {
 // palFiles are the workspace's files the query names; chosen, one opens
 // in the editor.
 func (a *App) palFiles() []opt {
-	q := strings.TrimSpace(a.query)
+	q := strings.TrimSpace(a.search.query)
 	cur := a.C.Current
 	if q == "" || cur == nil {
 		return nil
@@ -249,7 +249,7 @@ func (a *App) palFiles() []opt {
 
 // palHits are the messages the kernel found for the query.
 func (a *App) palHits() []opt {
-	q := strings.TrimSpace(a.query)
+	q := strings.TrimSpace(a.search.query)
 	if a.C.HitsFor != q {
 		return nil
 	}
@@ -266,7 +266,7 @@ func (a *App) palHits() []opt {
 		h := h
 		text := strings.NewReplacer("[", "", "]", "").Replace(strings.Join(strings.Fields(h.Snippet), " "))
 		out = append(out, opt{icon: "message", label: text, sub: name, run: func() {
-			a.jump, a.jumpIn = h.Seq, h.SessionID
+			a.search.jump, a.search.jumpIn = h.Seq, h.SessionID
 			if cur := a.C.Current; cur == nil || cur.ID != h.SessionID {
 				a.do(a.C.Open(h.SessionID))
 			}
@@ -277,26 +277,26 @@ func (a *App) palHits() []opt {
 
 // openPalette shows the palette, its query empty.
 func (a *App) openPalette(c *ui.Context) {
-	a.pal, a.query, a.palSel = true, "", 0
-	a.searchInput.Focus(c)
+	a.pal.open, a.search.query, a.pal.sel = true, "", 0
+	a.search.searchInput.Focus(c)
 }
 
 // palette is ⌘K: sessions and actions in one search, over the window.
 func (a *App) palette(c *ui.Context) {
-	if !a.pal {
+	if !a.pal.open {
 		return
 	}
 	p := a.p
-	a.send(a.C.Search(strings.TrimSpace(a.query)))
+	a.send(a.C.Search(strings.TrimSpace(a.search.query)))
 	sessions, actions := a.palOpts(c)
 	files, hits := a.palFiles(), a.palHits()
 	all := append(append(append(append([]opt(nil), sessions...), actions...), files...), hits...)
-	a.palSel = max(0, min(a.palSel, len(all)-1))
+	a.pal.sel = max(0, min(a.pal.sel, len(all)-1))
 	choose := func(i int) {
-		a.pal, a.query = false, ""
+		a.pal.open, a.search.query = false, ""
 		all[i].run()
 	}
-	ui.DialogBase(c, &a.pal, func(backdrop, panel ui.Element) {
+	ui.DialogBase(c, &a.pal.open, func(backdrop, panel ui.Element) {
 		scrim := ui.RGBA(18, 19, 26, .18)
 		if p.Dark {
 			scrim = ui.RGBA(6, 7, 10, .45)
@@ -312,29 +312,29 @@ func (a *App) palette(c *ui.Context) {
 		panel.Children(func() {
 			ui.Row(c).Height(50).Padding(0, 16).Gap(10).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 				sym(c, "search", 18, p.Mute)
-				ui.TextInputBase(c, &a.query).Bind(&a.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.Mute).
+				ui.TextInputBase(c, &a.search.query).Bind(&a.search.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.Mute).
 					FontSize(16).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
-					a.query = k.Text()
+					a.search.query = k.Text()
 					switch {
 					case k.Key == ui.KeyDown && k.Mods == 0:
 						if len(all) > 0 {
-							a.palSel = (a.palSel + 1) % len(all)
-							a.palScroll = true
+							a.pal.sel = (a.pal.sel + 1) % len(all)
+							a.pal.scroll = true
 						}
 					case k.Key == ui.KeyUp && k.Mods == 0:
 						if len(all) > 0 {
-							a.palSel = (a.palSel + len(all) - 1) % len(all)
-							a.palScroll = true
+							a.pal.sel = (a.pal.sel + len(all) - 1) % len(all)
+							a.pal.scroll = true
 						}
 					case k.Key == ui.KeyEnter && (k.Mods == 0 || k.Mods == ui.Cmd):
 						if len(all) > 0 {
-							choose(a.palSel)
+							choose(a.pal.sel)
 						}
 					case k.Key == ui.KeyW && k.Mods == ui.Cmd:
-						a.pal, a.query = false, ""
+						a.pal.open, a.search.query = false, ""
 					default:
 						if k.Key != ui.KeyEnter {
-							a.palSel = 0
+							a.pal.sel = 0
 						}
 						return false
 					}
@@ -348,7 +348,7 @@ func (a *App) palette(c *ui.Context) {
 						return
 					}
 					ui.Column(c).Padding(6, 6, 2, 6).Children(func() {
-						ui.Text(c, name).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 4, 10)
+						ui.Text(c, name).FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 4, 10)
 						for _, o := range opts {
 							a.palRow(c, o, i, choose)
 							i++
@@ -364,18 +364,10 @@ func (a *App) palette(c *ui.Context) {
 				}
 				ui.Box(c).Height(6)
 			})
-			ui.Row(c).Height(36).Padding(0, 14).Gap(14).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-				for _, h := range [][2]string{{"↑↓", locales.Select()}, {"⏎", locales.Open()}, {"esc", locales.Close()}} {
-					ui.Row(c).Gap(5).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, h[0]).FontSize(12).TextColor(p.Mute).Padding(0, 4).Radius(4).Background(p.Chip)
-						ui.Text(c, h[1]).FontSize(12.5).TextColor(p.Mute)
-					})
-				}
-			})
 		})
 	})
-	if !a.pal {
-		a.query = ""
+	if !a.pal.open {
+		a.search.query = ""
 	}
 }
 
@@ -383,14 +375,13 @@ func (a *App) palette(c *ui.Context) {
 func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 	p := a.p
 	b := ui.ButtonBase(c.Key(fmt.Sprintf("pal:%d", i))).Row().Height(34).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(o.label)
-	press(b)
 	focusRing(b, p)
 	switch {
-	case i == a.palSel:
+	case i == a.pal.sel:
 		b.Background(p.Sel)
-		if a.palScroll {
+		if a.pal.scroll {
 			b.ScrollIntoView()
-			a.palScroll = false
+			a.pal.scroll = false
 		}
 	case b.Hovered():
 		b.Background(p.Hover)
@@ -401,7 +392,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 	b.Children(func() {
 		ui.Box(c).Width(18).Center().Children(func() { sym(c, o.icon, 16, p.Fg2) })
 		ui.Row(c).Shrink(1).MinWidth(0).Children(func() {
-			pre, hit, post := split(o.label, a.query)
+			pre, hit, post := split(o.label, a.search.query)
 			text := func(s string, weight int) {
 				if s != "" {
 					t := ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
@@ -419,7 +410,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 		}
 		ui.Spacer(c)
 		kbd := o.kbd
-		if i == a.palSel {
+		if i == a.pal.sel {
 			kbd = "⏎"
 		}
 		if kbd != "" {

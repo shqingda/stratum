@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/locales"
@@ -131,7 +132,18 @@ func TestTask8Menus(t *testing.T) {
 				t.Fatalf("model update = %+v", update)
 			}
 			task8Click(t, tt, "中")
-			task8Command(t, a, proto.MethodModels, nil)
+			cmd2 := task8Command(t, a, proto.MethodModels, nil)
+			task8Models(a, cmd2.ID, []proto.Model{
+				{ID: "gpt-6-luna", Name: "GPT 6 Luna", Context: 200_000, Reasoning: true},
+				{ID: "gpt-6-sol", Name: "GPT 6 Sol", Context: 1_000_000, Reasoning: true, Default: true},
+			})
+			tt.Frame()
+			solAcc, ok := tt.Access("GPT 6 Sol")
+			if !ok {
+				t.Fatal("missing GPT 6 Sol row")
+			}
+			tt.Move(solAcc.Bounds.X+solAcc.Bounds.W/2, solAcc.Bounds.Y+solAcc.Bounds.H/2)
+			tt.Frame()
 			snapshot(t, tt, "t8-effort-"+appearance)
 			if err := tt.Click("极高"); err != nil {
 				t.Fatal(err)
@@ -194,7 +206,17 @@ func TestTask8AllMenuValues(t *testing.T) {
 			tt := task8Tester(a, false)
 			task8Click(t, tt, tc.pill)
 			if tc.field == "effort" {
-				task8Command(t, a, proto.MethodModels, nil)
+				mCmd := task8Command(t, a, proto.MethodModels, nil)
+				task8Models(a, mCmd.ID, []proto.Model{
+					{ID: "gpt-6-luna", Name: "GPT 6 Luna", Context: 200_000, Reasoning: true},
+				})
+				tt.Frame()
+				acc, ok := tt.Access("GPT 6 Luna")
+				if !ok {
+					t.Fatal("missing GPT 6 Luna row")
+				}
+				tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
+				tt.Frame()
 				if err := tt.Click(tc.path[len(tc.path)-1]); err != nil {
 					t.Fatal(err)
 				}
@@ -288,12 +310,12 @@ func TestTask8ModelMenuClosesOnSessionSwitch(t *testing.T) {
 	}
 	task8Models(a, first.ID, []proto.Model{{ID: "old", Name: "旧账号模型"}})
 	tt.Frame()
-	if a.modelsPending != second.ID || tt.HasText("旧账号模型") {
+	if a.menu.modelsPending != second.ID || tt.HasText("旧账号模型") {
 		t.Fatal("late response crossed session/account boundary")
 	}
 	task8Models(a, second.ID, []proto.Model{{ID: "other-model", Name: "新账号模型"}})
 	tt.Frame()
-	if !tt.HasText("新账号模型") || a.modelsPending != "" {
+	if !tt.HasText("新账号模型") || a.menu.modelsPending != "" {
 		t.Fatal("new session's model response not shown")
 	}
 }
@@ -331,7 +353,7 @@ func TestTask8ModelStates(t *testing.T) {
 		tt.Frame()
 		snapshot(t, tt, "t8-model-error-"+appearance)
 		tt.Key(0, ui.KeyEscape)
-		a.modelsAccount, a.modelsError = "chatgpt", ""
+		a.menu.modelsAccount, a.menu.modelsError = "chatgpt", ""
 		a.C.Current.Account = "another"
 		tt.Frame()
 		if b, _ := tt.Access("中"); b.Disabled {
@@ -615,7 +637,7 @@ func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
 	}
 
 	// Clear search query and verify Favorites section is shown.
-	a.modelQuery = ""
+	a.menu.modelQuery = ""
 	tt.Frame()
 	if !tt.HasText(locales.FavoriteModels()) {
 		t.Fatalf("expected Favorites section header, texts=%q", tt.Texts())
@@ -626,10 +648,132 @@ func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if a.modelMenu {
+	if a.menu.modelMenu {
 		t.Fatal("expected model popover to close after picking model")
 	}
 	if !slices.Contains(a.C.Settings.RecentModels, "chatgpt/o3-mini") {
 		t.Fatalf("RecentModels = %v, want chatgpt/o3-mini", a.C.Settings.RecentModels)
 	}
+}
+
+func TestModelPickerHoverCascadeEffort(t *testing.T) {
+	t.Run("hover-only submenus for effort and usage and click-outside dismiss", func(t *testing.T) {
+		a := task8App()
+		a.C.Settings = &proto.Settings{}
+		a.C.Accounts[0].Quota = &proto.AccountQuota{RemainingPct: 74, ResetAt: a.now().Add(3 * time.Hour)}
+		a.C.LastInput = 40_000
+		tt := task8Tester(a, false)
+
+		task8Click(t, tt, "gpt-6-luna")
+		cmd := task8Command(t, a, proto.MethodModels, nil)
+		task8Models(a, cmd.ID, []proto.Model{
+			{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Context: 128000, Reasoning: true},
+			{ID: "claude-sonnet-4", Name: "Claude Sonnet 4", Context: 200000, Reasoning: true},
+			{ID: "plain-model", Name: "Plain Model", Context: 64000, Reasoning: false},
+		})
+		tt.Frame()
+
+		// 1. Opening the menu does not show secondary cards before hovering.
+		if tt.HasText("推理强度") || tt.HasText("当前会话上下文") {
+			t.Fatalf("unexpected secondary menu before hover, texts=%q", tt.Texts())
+		}
+		if !tt.HasText("查看用量") {
+			t.Fatalf("missing View Usage row, texts=%q", tt.Texts())
+		}
+
+		// 2. Hovering View Usage opens the Usage sub-card with quota and context.
+		usageAcc, ok := tt.Access("查看用量")
+		if !ok {
+			t.Fatal("missing 查看用量 accessibility element")
+		}
+		tt.Move(usageAcc.Bounds.X+usageAcc.Bounds.W/2, usageAcc.Bounds.Y+usageAcc.Bounds.H/2)
+		tt.Frame()
+		if a.menu.hoverSub != "usage" || !tt.HasText("用量") || !tt.HasText("还剩 74%") || !tt.HasText("当前会话上下文") {
+			t.Fatalf("usage sub-card missing expected content (hoverSub=%q), texts=%q", a.menu.hoverSub, tt.Texts())
+		}
+
+		// 3. Hovering a non-reasoning model hides both Usage and Reasoning effort sub-cards.
+		plainAcc, ok := tt.Access("Plain Model")
+		if !ok {
+			t.Fatal("missing Plain Model accessibility element")
+		}
+		tt.Move(plainAcc.Bounds.X+plainAcc.Bounds.W/2, plainAcc.Bounds.Y+plainAcc.Bounds.H/2)
+		tt.Frame()
+		if tt.HasText("推理强度") || tt.HasText("当前会话上下文") {
+			t.Fatalf("expected sub-cards hidden when hovering non-reasoning model, texts=%q", tt.Texts())
+		}
+
+		// 4. Hovering another reasoning model shows Reasoning effort and clicking picks both.
+		acc, ok := tt.Access("Claude Sonnet 4")
+		if !ok {
+			t.Fatal("missing Claude Sonnet 4 accessibility element")
+		}
+		tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
+		tt.Frame()
+		if a.menu.hoverSub != "model:claude-sonnet-4" || !tt.HasText("推理强度") {
+			t.Fatalf("hoverSub = %q, expected effort submenu, texts=%q", a.menu.hoverSub, tt.Texts())
+		}
+
+		if err := tt.Click("高"); err != nil {
+			t.Fatal(err)
+		}
+		var update proto.SessionUpdate
+		task8Command(t, a, proto.MethodSessionUpdate, &update)
+		if update.Model == nil || *update.Model != "claude-sonnet-4" {
+			t.Fatalf("update.Model = %v, want claude-sonnet-4", update.Model)
+		}
+		if update.Effort == nil || *update.Effort != "high" {
+			t.Fatalf("update.Effort = %v, want high", update.Effort)
+		}
+		task8Command(t, a, proto.MethodSetSettings, nil)
+		if a.menu.modelMenu {
+			t.Fatal("expected model popover to close after selecting effort")
+		}
+		if !slices.Contains(a.C.Settings.RecentModels, "chatgpt/claude-sonnet-4") {
+			t.Fatalf("RecentModels = %v, want chatgpt/claude-sonnet-4", a.C.Settings.RecentModels)
+		}
+
+		// 5. Reopening and clicking empty space outside closes the popover.
+		task8Click(t, tt, "gpt-6-luna")
+		cmd2 := task8Command(t, a, proto.MethodModels, nil)
+		task8Models(a, cmd2.ID, []proto.Model{
+			{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Context: 128000, Reasoning: true},
+		})
+		tt.Frame()
+		if !a.menu.modelMenu {
+			t.Fatal("expected model popover open")
+		}
+		tt.Move(1180, 120)
+		tt.ClickAt(1180, 120)
+		tt.Frame()
+		if a.menu.modelMenu {
+			t.Fatal("expected clicking empty space outside to dismiss model popover")
+		}
+	})
+
+	t.Run("english locale submenus show full untruncated labels on hover", func(t *testing.T) {
+		t.Cleanup(func() { i18n.SetLocaleFunc(chinese) })
+		i18n.SetLocaleFunc(func() string { return "en" })
+
+		a := task8App()
+		tt := task8Tester(a, false)
+
+		task8Click(t, tt, "gpt-6-luna")
+		cmd := task8Command(t, a, proto.MethodModels, nil)
+		task8Models(a, cmd.ID, []proto.Model{{ID: "gpt-6-luna", Name: "GPT-6 Luna", Default: true, Reasoning: true}})
+		tt.Frame()
+
+		acc, ok := tt.Access("GPT-6 Luna")
+		if !ok {
+			t.Fatal("missing GPT-6 Luna row")
+		}
+		tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
+		tt.Frame()
+
+		for _, want := range []string{"Models", "View Usage", "Reasoning effort", "Default", "Minimal", "Low", "Medium", "High", "Extra High"} {
+			if !tt.HasText(want) {
+				t.Errorf("missing %q in English model picker, texts=%q", want, tt.Texts())
+			}
+		}
+	})
 }

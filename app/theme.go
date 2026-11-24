@@ -141,12 +141,6 @@ var (
 	springMomentum = ui.SpringOptions{Stiffness: 480, Damping: 36}   // ζ ≈ 0.82, for rotation / momentum
 )
 
-// press is a no-op on macOS desktop: pointer controls indicate interaction
-// through instant surface highlight rather than iOS touch-scale bounce.
-func press(e ui.Element) ui.Element {
-	return e
-}
-
 // focusRing gives keyboard-navigated controls a restrained Apple focus ring
 // without showing a box on pointer clicks.
 func focusRing(e ui.Element, p *Palette) ui.Element {
@@ -209,9 +203,9 @@ func (a *App) glass(e ui.Element, g glass.Glass) ui.Element {
 // while the glass still shows through.
 func sideTint(p *Palette) ui.Color {
 	if p.Dark {
-		return ui.RGBA(18, 18, 20, .58)
+		return ui.RGBA(18, 18, 20, .82)
 	}
-	return ui.RGBA(244, 245, 248, .50)
+	return ui.RGBA(242, 244, 247, .80)
 }
 
 func tintedGlass(p *Palette) glass.Glass {

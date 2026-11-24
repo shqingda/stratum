@@ -133,6 +133,11 @@
   "allModels": "全部模型",
   "favoriteModel": "收藏模型",
   "unfavoriteModel": "取消收藏",
+  "usageView": "查看用量",
+  "usageTitle": "用量",
+  "usageQuota": "账号额度",
+  "usageSession": "当前会话上下文",
+  "usageNoData": "暂无用量数据",
   "phaseStarting": "正在启动",
   "phaseConnecting": "正在连接",
   "phaseSyncing": "正在同步",
@@ -286,7 +291,7 @@
   "regenerateTitleNote": "根据对话内容重新生成会话标题",
   "sideAsk": "旁支对话",
   "sideAskNote": "问一句，不打断当前对话，只读不存盘",
-  "sideAskPlaceholder": "问一个不打断主对话的问题…",
+  "sideAskPlaceholder": "问一句（只读，不写入主对话）…",
   "sideAskBadge": "只读 · 不存盘",
   "searchShortcuts": "搜索快捷键",
   "noShortcutMatches": "没有匹配的快捷键。",
@@ -946,5 +951,8 @@
   "builtIn": "内置",
   "agentsNote": "主代理带领会话，在输入框按 Tab 切换；子代理接手任务，在消息里写 @名字 交给它。自己的代理写在 .stratum/agents/*.md、~/.stratum/agents/*.md 或 opencode.json。",
   "formatters": "格式化",
-  "formattersNote": "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。"
+  "formattersNote": "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。",
+  "openExternally": "在外部应用打开",
+  "findInView": "在当前视图中查找…",
+  "commentShort": "批注"
 }

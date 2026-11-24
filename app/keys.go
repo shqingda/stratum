@@ -26,15 +26,15 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyK, func() {
-		if a.pal {
-			a.pal, a.query = false, ""
+		if a.pal.open {
+			a.pal.open, a.search.query = false, ""
 		} else {
 			a.openPalette(c)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyP, func() {
-		if a.pal {
-			a.pal, a.query = false, ""
+		if a.pal.open {
+			a.pal.open, a.search.query = false, ""
 		} else {
 			a.openPalette(c)
 		}
@@ -45,18 +45,18 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyA, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && a.C.Current != nil {
 			s := *a.C.Current
 			a.archive(s, !s.Archived)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyU, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && a.C.Current != nil {
 			a.markUnread(a.C.Current.ID)
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyL, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			if inWeb {
 				a.webFocus = true
 			} else {
@@ -65,12 +65,12 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeySlash, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil && a.C.CanAct() {
-			a.modelMenu = !a.modelMenu
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && a.C.Current != nil && a.C.CanAct() {
+			a.menu.modelMenu = !a.menu.modelMenu
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Alt, ui.KeyC, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			a.copyLastReply(c)
 		}
 	})
@@ -93,12 +93,12 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyPeriod, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			a.stopTurn()
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketLeft, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			if inWeb {
 				if b := a.activeWeb(); b != nil && b.back {
 					b.page.GoBack()
@@ -109,7 +109,7 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeyBracketRight, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			if inWeb {
 				if b := a.activeWeb(); b != nil && b.forward {
 					b.page.GoForward()
@@ -121,12 +121,12 @@ func (a *App) keys(c *ui.Context) {
 	})
 	if !inTerm {
 		c.OnWindowShortcut(ui.Alt, ui.KeyUp, func() {
-			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && !c.FocusTakesText() {
 				a.stepSession(-1)
 			}
 		})
 		c.OnWindowShortcut(ui.Alt, ui.KeyDown, func() {
-			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && !c.FocusTakesText() {
+			if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && !c.FocusTakesText() {
 				a.stepSession(1)
 			}
 		})
@@ -134,14 +134,14 @@ func (a *App) keys(c *ui.Context) {
 	// ⌃` shows and hides the terminal, as in Claude's app and Codex; ⌘T
 	// opens another shell beside it, as in Terminal.app.
 	c.OnWindowShortcut(ui.Ctrl, ui.KeyBackquote, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			a.toggleTerminal()
 		}
 	})
 	// While the browser shows without the terminal, ⌘T opens a tab in it,
 	// as in Safari; ⌘R reloads its page.
-	web := a.browserShown() && !a.settingsOpen && !a.automationsOpen && !a.pal
-	if (a.termShown() || web) && !a.pal {
+	web := a.browserShown() && !a.settingsOpen && !a.automationsOpen && !a.pal.open
+	if (a.termShown() || web) && !a.pal.open {
 		c.OnWindowShortcut(ui.Cmd, ui.KeyT, func() {
 			switch {
 			case c.ShortcutRepeated():
@@ -178,7 +178,7 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd, ui.KeySemicolon, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal && a.C.Current != nil {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open && a.C.Current != nil {
 			if a.btwOpen {
 				a.btwOpen = false
 			} else {
@@ -197,7 +197,7 @@ func (a *App) keys(c *ui.Context) {
 		}
 	})
 	c.OnWindowShortcut(ui.Cmd|ui.Alt, ui.KeyI, func() {
-		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if !c.ShortcutRepeated() && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			a.rv.open = !a.rv.open
 		}
 	})
@@ -217,7 +217,7 @@ func (a *App) keys(c *ui.Context) {
 	})
 	if !inTerm {
 		c.OnWindowShortcut(ui.Shift, ui.KeyTab, func() {
-			if !c.ShortcutRepeated() && !a.pal && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
+			if !c.ShortcutRepeated() && !a.pal.open && !a.settingsOpen && a.C.Current != nil && !a.slash.open && !a.mention.open {
 				modes := modeRows()
 				cur := a.C.Current.Mode
 				next := modes[0]
@@ -246,7 +246,7 @@ func (a *App) keys(c *ui.Context) {
 			continue
 		}
 		c.OnWindowShortcut(key.mods, key.key, func() {
-			if !a.pal && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods&ui.Cmd != 0 && !a.searchInput.Focused(c)) {
+			if !a.pal.open && !c.ShortcutRepeated() && (!c.FocusTakesText() || key.key == ui.KeyEscape || key.mods&ui.Cmd != 0 && !a.search.searchInput.Focused(c)) {
 				a.keyRepeat = false
 				a.actionKey(key.mods, key.key)
 			}
@@ -257,7 +257,7 @@ func (a *App) keys(c *ui.Context) {
 // The oldest approval keeps its keys until answered; a repeated key never
 // advances to another approval while its response is still in flight.
 func (a *App) actionKey(mods ui.Modifiers, key ui.Key) bool {
-	if a.modelMenu || a.modeMenu {
+	if a.menu.modelMenu || a.menu.modeMenu {
 		return false
 	}
 	if key == ui.KeyEscape && mods == 0 && a.automationsOpen {
@@ -419,7 +419,7 @@ func (a *App) composerKey(k ui.TextKey) bool {
 	// The editor takes Shift+Cmd+A as Cmd+A, select all; in the composer
 	// it archives the session, as it does wherever else the focus is.
 	if k.Key == ui.KeyA && k.Mods == ui.Cmd|ui.Shift {
-		if a.C.Current != nil && !a.settingsOpen && !a.automationsOpen && !a.pal {
+		if a.C.Current != nil && !a.settingsOpen && !a.automationsOpen && !a.pal.open {
 			s := *a.C.Current
 			a.archive(s, !s.Archived)
 		}
@@ -476,7 +476,7 @@ func (a *App) approvalHint(c *ui.Context, id, hint string) string {
 	if len(a.C.Approvals) == 0 || a.C.Approvals[0].ID != id || a.C.Answering[id] || !a.C.CanAct() {
 		return ""
 	}
-	if hint != "esc" && a.searchInput.Focused(c) || hint == "⏎" && strings.TrimSpace(a.draft) != "" {
+	if hint != "esc" && a.search.searchInput.Focused(c) || hint == "⏎" && strings.TrimSpace(a.draft) != "" {
 		return ""
 	}
 	return hint
@@ -491,7 +491,7 @@ func (a *App) questionFirst() bool {
 // doubleEsc opens rewind on a second Esc in an empty composer, as Claude
 // Code does. The first Esc is left for whatever else handles it.
 func (a *App) doubleEsc() bool {
-	if a.rewind.open || a.pal || a.C.Busy {
+	if a.rewind.open || a.pal.open || a.C.Busy {
 		return false
 	}
 	if strings.TrimSpace(a.draft) != "" || len(a.rewindPrompts()) == 0 {

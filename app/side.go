@@ -46,9 +46,6 @@ func (a *App) sideAskCard(c *ui.Context) {
 		ui.Row(c).Height(38).Padding(0, 10, 0, 14).Gap(7).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
 			sym(c, "message", 14, p.Mute)
 			ui.Text(c, locales.SideAsk()).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine()
-			ui.Row(c).Height(20).Padding(0, 8).Radius(6).Background(p.Chip).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, locales.SideAskBadge()).FontSize(11).FontWeight(500).TextColor(p.Mute).SingleLine()
-			})
 			ui.Spacer(c)
 			if a.iconButtonSized(c, "side-close", "x", locales.Close(), 13).KeyShortcuts(ui.Cmd, ui.KeyW).Clicked() {
 				a.btwOpen = false

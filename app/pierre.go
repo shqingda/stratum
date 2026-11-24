@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/locales"
@@ -28,22 +29,41 @@ var (
 	evPierreFile  = mygo.NewEvent[pierreFilePayload]("pierre:file")
 )
 
+type pierreStrings struct {
+	Preview           string `json:"preview"`
+	Raw               string `json:"raw"`
+	OpenExternal      string `json:"openExternal"`
+	ToggleTree        string `json:"toggleTree"`
+	SelectFile        string `json:"selectFile"`
+	FindPlaceholder   string `json:"findPlaceholder"`
+	FindPrev          string `json:"findPrev"`
+	FindNext          string `json:"findNext"`
+	Close             string `json:"close"`
+	Comment           string `json:"comment"`
+	Revert            string `json:"revert"`
+	AddRemark         string `json:"addRemark"`
+	RemarkPlaceholder string `json:"remarkPlaceholder"`
+	Cancel            string `json:"cancel"`
+	Add               string `json:"add"`
+}
+
 type pierreThemePayload struct {
-	Dark  bool   `json:"dark"`
-	Bg    string `json:"bg"`
-	Sheet string `json:"sheet"`
-	Card  string `json:"card"`
-	Fg    string `json:"fg"`
-	Fg2   string `json:"fg2"`
-	Mute  string `json:"mute"`
-	Edge  string `json:"edge"`
-	Edge2 string `json:"edge2"`
-	Sel   string `json:"sel"`
-	Hover string `json:"hover"`
-	Chip  string `json:"chip"`
-	Live  string `json:"live"`
-	Plus  string `json:"plus"`
-	Minus string `json:"minus"`
+	Dark    bool          `json:"dark"`
+	Bg      string        `json:"bg"`
+	Sheet   string        `json:"sheet"`
+	Card    string        `json:"card"`
+	Fg      string        `json:"fg"`
+	Fg2     string        `json:"fg2"`
+	Mute    string        `json:"mute"`
+	Edge    string        `json:"edge"`
+	Edge2   string        `json:"edge2"`
+	Sel     string        `json:"sel"`
+	Hover   string        `json:"hover"`
+	Chip    string        `json:"chip"`
+	Live    string        `json:"live"`
+	Plus    string        `json:"plus"`
+	Minus   string        `json:"minus"`
+	Strings pierreStrings `json:"strings"`
 }
 
 type pierreModePayload struct {
@@ -324,6 +344,23 @@ func (a *App) buildPierreTheme() pierreThemePayload {
 		Live:  colorCSS(p.Live),
 		Plus:  colorCSS(p.Plus),
 		Minus: colorCSS(p.Minus),
+		Strings: pierreStrings{
+			Preview:           locales.Preview(),
+			Raw:               locales.Raw(),
+			OpenExternal:      locales.OpenExternally(),
+			ToggleTree:        locales.ToggleWorkspaceTree(),
+			SelectFile:        locales.SelectFileToPreview(),
+			FindPlaceholder:   locales.FindInView(),
+			FindPrev:          locales.FindPrevious(),
+			FindNext:          locales.FindNext(),
+			Close:             locales.CloseFind(),
+			Comment:           locales.CommentShort(),
+			Revert:            locales.Undo(),
+			AddRemark:         locales.AddRemark(),
+			RemarkPlaceholder: locales.RemarkPlaceholder(),
+			Cancel:            locales.Cancel(),
+			Add:               locales.AddIt(),
+		},
 	}
 }
 
@@ -451,7 +488,7 @@ func (a *App) syncPierre(mode string, turns []proto.ChangeTurn) {
 		return
 	}
 	theme := a.buildPierreTheme()
-	themeSig := fmt.Sprintf("%v:%s:%s:%s:%s", theme.Dark, theme.Bg, theme.Sheet, theme.Fg, theme.Live)
+	themeSig := fmt.Sprintf("%s:%v:%s:%s:%s:%s", i18n.Locale(), theme.Dark, theme.Bg, theme.Sheet, theme.Fg, theme.Live)
 	if themeSig != a.pierre.lastThemeSig {
 		a.pierre.lastThemeSig = themeSig
 		_ = evPierreTheme.EmitPage(page, theme)

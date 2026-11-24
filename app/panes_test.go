@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
+	"github.com/shqingda/stratum/locales"
 )
 
 func TestPlanPane(t *testing.T) {
@@ -26,7 +27,7 @@ func TestPlanPane(t *testing.T) {
 	tt.Frame()
 	tt.Advance(time.Second)
 	tt.Frame()
-	for _, want := range []string{"4 步 · 已完成 2 步", "跑测试，修掉失败的用例", "负数用例失败：Sub(-2, 3) = 1，期望 -5"} {
+	for _, want := range []string{locales.Plan(), "4 步 · 已完成 2 步", "跑测试，修掉失败的用例", "负数用例失败：Sub(-2, 3) = 1，期望 -5"} {
 		if !tt.HasText(want) {
 			t.Errorf("the plan lacks %q", want)
 		}
@@ -42,6 +43,9 @@ func TestFilesPane(t *testing.T) {
 	a.openIn = func(_ string, path string) error { opened = path; return nil }
 	tt := ui.NewTester(a.View, 1440, 880)
 	tt.Frame()
+	if tt.HasText(locales.Plan()) {
+		t.Fatalf("expected empty Plan tab to be hidden, texts=%q", tt.Texts())
+	}
 	if err := tt.Click("文件"); err != nil {
 		t.Fatal(err)
 	}

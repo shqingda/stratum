@@ -1,12 +1,12 @@
 package app
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"maps"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/egoist/mygo/plugins/glass"
@@ -72,79 +72,6 @@ type review struct {
 	previewErr     string
 	previewLoading bool
 	previewList    ui.ListState
-}
-
-// fileDiff is a file's change cut into hunks, computed once.
-type fileDiff struct {
-	hash           [32]byte
-	status         byte // 'A', 'D' or 'M'
-	hunks          []hunk
-	old, new       []string
-	oldTok, newTok [][]editor.Token // the lines' tokens, nil when the language is unknown
-	added, removed int
-	gaveUp         bool
-}
-
-func diffHash(d proto.ChangeDiff) [32]byte {
-	h := sha256.New()
-	if d.Before != nil {
-		h.Write([]byte{1})
-		h.Write([]byte(*d.Before))
-	} else {
-		h.Write([]byte{0})
-	}
-	if d.After != nil {
-		h.Write([]byte{1})
-		h.Write([]byte(*d.After))
-	} else {
-		h.Write([]byte{0})
-	}
-	var sum [32]byte
-	copy(sum[:], h.Sum(nil))
-	return sum
-}
-
-func newFileDiff(d proto.ChangeDiff) *fileDiff {
-	f := &fileDiff{hash: diffHash(d), status: 'M'}
-	switch {
-	case d.Before == nil:
-		f.status = 'A'
-	case d.After == nil:
-		f.status = 'D'
-	}
-	if d.Before != nil {
-		f.old = diffLines(*d.Before)
-	}
-	if d.After != nil {
-		f.new = diffLines(*d.After)
-	}
-	edits, ok := myers(f.old, f.new)
-	f.gaveUp = !ok
-	for _, e := range edits {
-		switch e.op {
-		case '+':
-			f.added++
-		case '-':
-			f.removed++
-		}
-	}
-	f.hunks = hunks(edits, diffContext)
-	f.oldTok, f.newTok = tokenize(d.Path, f.old), tokenize(d.Path, f.new)
-	return f
-}
-
-// tokenize highlights a file's lines as its language does.
-func tokenize(path string, lines []string) [][]editor.Token {
-	lang := editor.LanguageFor(path)
-	if lang == nil || lang.Tokenizer == nil || len(lines) > 20000 {
-		return nil
-	}
-	out := make([][]editor.Token, len(lines))
-	var state uint64
-	for i, l := range lines {
-		out[i], state = lang.Tokenizer.Tokenize(strings.TrimRight(l, "\r\n"), state, nil)
-	}
-	return out
 }
 
 // syncReview asks for what the panel shows and the client lacks.
@@ -242,70 +169,6 @@ func (a *App) shownTurns() []proto.ChangeTurn {
 	return turns[len(turns)-1:]
 }
 
-// syncDiffBytes is how large a file's two sides can be, together, for
-// its diff to be worked out on the UI thread: a small one shows in the
-// frame that asks for it, and a large one comes a moment later rather
-// than hold the window up.
-const syncDiffBytes = 64 << 10
-
-func (a *App) fileDiff(key string) *fileDiff {
-	if a.rv.diffs == nil {
-		a.rv.diffs = newLRU[string, *fileDiff](64)
-	}
-	d, hasSrc := a.diffSource(key)
-	if f, cached := a.rv.diffs.Get(key); cached {
-		if !hasSrc || f.hash == diffHash(d) {
-			return f
-		}
-	}
-	if !hasSrc {
-		return nil
-	}
-	size := 0
-	if d.Before != nil {
-		size += len(*d.Before)
-	}
-	if d.After != nil {
-		size += len(*d.After)
-	}
-	if size <= syncDiffBytes || a.update == nil {
-		f := newFileDiff(d)
-		a.rv.diffs.Put(key, f)
-		return f
-	}
-	if a.rv.computing == nil {
-		a.rv.computing = map[string]bool{}
-	}
-	if !a.rv.computing[key] {
-		a.rv.computing[key] = true
-		go func() {
-			f := newFileDiff(d)
-			a.update(func() {
-				delete(a.rv.computing, key)
-				// The file may have changed again meanwhile.
-				if cur, ok := a.diffSource(key); ok && cur.Before == d.Before && cur.After == d.After {
-					a.rv.diffs.Put(key, f)
-				}
-			})
-		}()
-	}
-	return nil
-}
-
-// diffSource is the two sides of the file a diff key names.
-func (a *App) diffSource(key string) (proto.ChangeDiff, bool) {
-	if path, uncommitted := strings.CutPrefix(key, client.DiffKey(0, "")); uncommitted {
-		d, ok := a.C.Workspace.Diffs[path]
-		return d, ok
-	}
-	if path, branch := strings.CutPrefix(key, client.DiffKey(-1, "")); branch {
-		d, ok := a.C.Workspace.BaseDiffs[path]
-		return d, ok
-	}
-	d, ok := a.C.Changes.Diffs[key]
-	return d, ok
-}
-
 // reviewToggle is the button in the bar that shows and hides the inspector.
 func (a *App) reviewToggle(c *ui.Context) {
 	p := a.p
@@ -314,21 +177,25 @@ func (a *App) reviewToggle(c *ui.Context) {
 	if a.rv.open {
 		tip = locales.HideChanges()
 	}
-	b := ui.ButtonBase(c.Key("review")).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
-		Label(tip).Tooltip(tip + "  ⌘⌥I").Background(p.Chip)
-	rim(b, p)
-	press(b)
+	hasDiff := w.Dirty || w.Added > 0 || w.Removed > 0
+	b := ui.ButtonBase(c.Key("review")).Row().Height(28).Radius(7).AlignItems(ui.Center).Justify(ui.Center).
+		Label(tip).Tooltip(tip + "  ⌘⌥I")
+	if hasDiff {
+		b.Padding(0, 8).Gap(5)
+	} else {
+		b.Width(28)
+	}
 	focusRing(b, p)
 	fg := p.Fg2
 	if a.rv.open {
 		b.Background(p.Sel)
 		fg = p.Live
 	} else if b.Hovered() {
-		b.Background(p.Sel)
+		b.Background(p.Hover)
 		fg = p.Fg
 	}
 	b.Children(func() {
-		if w.Dirty || w.Added > 0 || w.Removed > 0 {
+		if hasDiff {
 			if w.Added > 0 {
 				ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).TextColor(p.Plus).SingleLine()
 			}
@@ -336,8 +203,7 @@ func (a *App) reviewToggle(c *ui.Context) {
 				ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(12).TextColor(p.Minus).SingleLine()
 			}
 		}
-		ui.Text(c, locales.Inspect()).FontSize(13).FontWeight(500).TextColor(fg).SingleLine()
-		sym(c, "layout-sidebar-right", 15, fg)
+		sym(c, "layout-sidebar-right", 16, fg)
 	})
 	if b.Clicked() {
 		a.rv.open = !a.rv.open
@@ -350,7 +216,7 @@ func (a *App) reviewPanel(c *ui.Context) {
 	panel := ui.Column(c).Background(p.Sheet).Clip()
 	if a.rv.maximized {
 		panel.Grow(1).MinWidth(0)
-		if a.sideOpen > 0.001 && !c.Vibrancy() {
+		if a.side.sideOpen > 0.001 && !c.Vibrancy() {
 			panel.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
 		}
 	} else {
@@ -384,7 +250,6 @@ func (a *App) reviewPanel(c *ui.Context) {
 						label = "Split"
 					}
 					b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Background(p.Chip).Label(label)
-					press(b)
 					focusRing(b, p)
 					b.Children(func() {
 						ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
@@ -847,6 +712,8 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 	var bg, signCol ui.Color
 	text, sign := "", ""
 	var toks []editor.Token
+	isNew := true
+	idx := e.b
 	switch e.op {
 	case '+':
 		bg, signCol, sign, text = p.Plus.Alpha(.10), p.Plus, "+", d.new[e.b]
@@ -854,6 +721,7 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 			toks = d.newTok[e.b]
 		}
 	case '-':
+		isNew, idx = false, e.a
 		bg, signCol, sign, text = p.Minus.Alpha(.10), p.Minus, "−", d.old[e.a]
 		if d.oldTok != nil {
 			toks = d.oldTok[e.a]
@@ -868,17 +736,18 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 		if i < 0 {
 			return ""
 		}
-		return fmt.Sprint(i + 1)
+		return strconv.Itoa(i + 1)
 	}
+	type diffLineKey struct{ a, b int }
 	at := lineRemark(path, d, e)
-	row := ui.Row(c.Key(fmt.Sprintf("line:%d:%d", e.a, e.b))).Height(diffRowHeight).AlignItems(ui.Center)
+	row := ui.Row(c.Key(diffLineKey{e.a, e.b})).Height(diffRowHeight).AlignItems(ui.Center)
 	if e.op != ' ' {
 		row.Background(bg)
 	}
 	hover := row.Hovered()
 	row.Children(func() {
-		for i, n := range []string{num(e.a), num(e.b)} {
-			if i == 1 && (hover || a.rv.writing == at.at()) {
+		for i, n := range [2]string{num(e.a), num(e.b)} {
+			if i == 1 && (hover || (a.rv.writing != "" && a.rv.writing == at.at())) {
 				// The new line's number gives way to a + that comments on it.
 				b := ui.ButtonBase(c.Key("remark")).Size(38, diffRowHeight).Shrink(0).Center().Label(locales.AddRemark()).Tooltip(locales.AddRemark())
 				b.Children(func() {
@@ -892,10 +761,12 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 			ui.Text(c, n).Font("monospace").FontSize(13).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
 		}
 		ui.Text(c, sign).Font("monospace").FontSize(13).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
-		ui.RichText(c, a.codeSpans(c, strings.TrimRight(text, "\r\n"), toks)...).SingleLine().PreserveSpaces().
+		ui.RichText(c, a.cachedDiffSpans(c, d, isNew, idx, text, toks)...).SingleLine().PreserveSpaces().
 			Padding(0, 6).Grow(1).MinWidth(0).Selectable()
 	})
-	a.remarksAt(c, at)
+	if len(a.rv.remarks) > 0 || a.rv.writing != "" {
+		a.remarksAt(c, at)
+	}
 }
 
 // reviewFoot commits the folder, and takes back or redoes the turn of
@@ -973,41 +844,4 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 			}
 		}
 	})
-}
-
-// codeSpans colors a line of code by its tokens, as code blocks are.
-func (a *App) codeSpans(c *ui.Context, text string, toks []editor.Token) []ui.Span {
-	p := a.p
-	span := func(s string, st editor.TokenStyle) ui.Span {
-		sp := ui.Span{Text: s, Font: "monospace", Size: 12, Color: p.Fg, Italic: st.Italic}
-		if st.Color != (ui.Color{}) {
-			sp.Color = st.Color
-		}
-		if st.Bold {
-			sp.Weight = 600
-		}
-		return sp
-	}
-	if len(toks) == 0 {
-		return []ui.Span{span(text, editor.TokenStyle{})}
-	}
-	styles := editor.DefaultTheme(c.Theme()).Tokens
-	var out []ui.Span
-	at := 0
-	for _, t := range toks {
-		end := min(t.End, len(text))
-		if end <= at {
-			continue
-		}
-		var st editor.TokenStyle
-		if int(t.Kind) < len(styles) {
-			st = styles[t.Kind]
-		}
-		out = append(out, span(text[at:end], st))
-		at = end
-	}
-	if at < len(text) {
-		out = append(out, span(text[at:], editor.TokenStyle{}))
-	}
-	return out
 }

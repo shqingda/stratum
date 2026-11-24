@@ -16,12 +16,12 @@ func TestSidebarToggle(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Advance(40 * time.Millisecond)
-	if a.sideOpen <= 0 || a.sideOpen >= 1 {
-		t.Fatalf("the sidebar did not slide: %v", a.sideOpen)
+	if a.side.sideOpen <= 0 || a.side.sideOpen >= 1 {
+		t.Fatalf("the sidebar did not slide: %v", a.side.sideOpen)
 	}
 	tt.Advance(time.Second)
-	if a.sideOpen > 0.001 || tt.HasText("技能与 MCP") {
-		t.Fatalf("the sidebar stayed: %v", a.sideOpen)
+	if a.side.sideOpen > 0.001 || tt.HasText("技能与 MCP") {
+		t.Fatalf("the sidebar stayed: %v", a.side.sideOpen)
 	}
 	snapshot(t, tt, "sidebar-hidden")
 	// The toggle has not moved, so the same click brings the sidebar back.
@@ -29,8 +29,8 @@ func TestSidebarToggle(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Advance(time.Second)
-	if a.sideOpen < .999 || !tt.HasText("技能与 MCP") {
-		t.Fatalf("the sidebar did not come back: %v", a.sideOpen)
+	if a.side.sideOpen < .999 || !tt.HasText("技能与 MCP") {
+		t.Fatalf("the sidebar did not come back: %v", a.side.sideOpen)
 	}
 }
 
@@ -91,15 +91,15 @@ func TestSidebarSlidesWithoutFading(t *testing.T) {
 	open := img.RGBAAt(x, y)
 	a.toggleSide()
 	checked := 0
-	for i := 0; i < 60 && a.sideOpen > 0.05; i++ {
+	for i := 0; i < 60 && a.side.sideOpen > 0.05; i++ {
 		tt.Advance(16 * time.Millisecond)
 		tt.Frame()
-		if a.sideOpen <= 0.05 || a.sideOpen >= 0.95 {
+		if a.side.sideOpen <= 0.05 || a.side.sideOpen >= 0.95 {
 			continue
 		}
 		checked++
 		if got := tt.Image().RGBAAt(x, y); got != open {
-			t.Fatalf("at %.2f open the sidebar is %v, not %v as when open", a.sideOpen, got, open)
+			t.Fatalf("at %.2f open the sidebar is %v, not %v as when open", a.side.sideOpen, got, open)
 		}
 	}
 	if checked < 3 {

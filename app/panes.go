@@ -22,7 +22,9 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 		{"files", locales.Files()},
 		{"preview", locales.Browser()},
 		{"term", locales.Terminal()},
-		{"plan", locales.Plan()},
+	}
+	if a.latestPlan() != nil || a.rv.tab == "plan" {
+		tabs = append(tabs, struct{ id, label string }{"plan", locales.Plan()})
 	}
 	activeIdx := 0
 	for i, t := range tabs {
@@ -34,7 +36,7 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 	leftPad := float32(12)
 	if a.rv.maximized {
 		shut := toggleLeft(c) + 74 + 12
-		leftPad = 12*a.sideOpen + shut*(1-a.sideOpen)
+		leftPad = 12*a.side.sideOpen + shut*(1-a.side.sideOpen)
 	}
 	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12, 0, leftPad).Gap(6).AlignItems(ui.Center).DragWindow().Children(func() {
 		track := ui.Row(c.Key("rv-tabs")).Height(28).Padding(2, 2, 2, 2).Radius(8).Background(p.Chip).AlignItems(ui.Center)
@@ -52,28 +54,24 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			}
 			if trackW > 4 {
 				segW := (trackW - 4) / float32(len(tabs))
-				thumb := ui.Box(c.Key("rv-thumb")).Absolute().Top(2).Bottom(2).Left(2 + pos*segW).Width(segW).Radius(7).Background(thumbBg).PassThrough().ZIndex(0)
+				thumb := ui.Box(c.Key("rv-thumb")).Absolute().Top(2).Bottom(2).Left(2+pos*segW).Width(segW).Radius(6).
+					Background(thumbBg).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08)).PassThrough().ZIndex(0)
 				if p.Dark {
-					thumb.Border(.5, ui.RGBA(255, 255, 255, .14))
+					thumb.Border(.5, ui.RGBA(255, 255, 255, .12))
 				}
-				rim(thumb, p)
-				raise(thumb, p)
 			}
 			for _, t := range tabs {
 				on := a.rv.tab == t.id
 				b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).
 					Height(24).Padding(0, 8).Gap(4).Radius(6).AlignItems(ui.Center).Label(t.label).ZIndex(1)
-				press(b)
 				focusRing(b, p)
 				fg, weight := p.Fg2, 500
 				if on {
 					if trackW <= 4 {
-						b.Background(thumbBg)
+						b.Background(thumbBg).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08))
 						if p.Dark {
-							b.Border(.5, ui.RGBA(255, 255, 255, .14))
+							b.Border(.5, ui.RGBA(255, 255, 255, .12))
 						}
-						rim(b, p)
-						raise(b, p)
 					}
 					fg, weight = p.Fg, 600
 				} else if b.Hovered() {
@@ -238,7 +236,6 @@ func (a *App) filesPane(c *ui.Context) {
 								icon = "folder"
 							}
 							row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
-							press(row)
 							focusRing(row, p)
 							if row.Hovered() {
 								row.Background(p.Hover)

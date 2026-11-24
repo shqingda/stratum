@@ -134,6 +134,7 @@ var sfNames = map[string]string{
 	"shield-lock":                  "lock.shield",
 	"shield-off":                   "shield.slash",
 	"sparkles":                     "sparkles",
+	"speedometer":                  "speedometer",
 	"subtask":                      "list.bullet.indent",
 	"terminal-2":                   "terminal",
 	"tool":                         "wrench.and.screwdriver",
