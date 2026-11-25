@@ -657,7 +657,7 @@ func TestModelPickerSearchFavoriteAndRecent(t *testing.T) {
 }
 
 func TestModelPickerHoverCascadeEffort(t *testing.T) {
-	t.Run("hover-only submenus for effort and usage and click-outside dismiss", func(t *testing.T) {
+	t.Run("inline effort segmented bar and usage in model popover and click-outside dismiss", func(t *testing.T) {
 		a := task8App()
 		a.C.Settings = &proto.Settings{}
 		a.C.Accounts[0].Quota = &proto.AccountQuota{RemainingPct: 74, ResetAt: a.now().Add(3 * time.Hour)}
@@ -673,67 +673,41 @@ func TestModelPickerHoverCascadeEffort(t *testing.T) {
 		})
 		tt.Frame()
 
-		// 1. Opening the menu does not show secondary cards before hovering.
-		if tt.HasText("推理强度") || tt.HasText("当前会话上下文") {
-			t.Fatalf("unexpected secondary menu before hover, texts=%q", tt.Texts())
-		}
-		if !tt.HasText("查看用量") {
-			t.Fatalf("missing View Usage row, texts=%q", tt.Texts())
-		}
-
-		// 2. Hovering View Usage opens the Usage sub-card with quota and context.
-		usageAcc, ok := tt.Access("查看用量")
-		if !ok {
-			t.Fatal("missing 查看用量 accessibility element")
-		}
-		tt.Move(usageAcc.Bounds.X+usageAcc.Bounds.W/2, usageAcc.Bounds.Y+usageAcc.Bounds.H/2)
-		tt.Frame()
-		if a.menu.hoverSub != "usage" || !tt.HasText("用量") || !tt.HasText("还剩 74%") || !tt.HasText("当前会话上下文") {
-			t.Fatalf("usage sub-card missing expected content (hoverSub=%q), texts=%q", a.menu.hoverSub, tt.Texts())
+		// 1. Opening the menu shows models, inline reasoning effort bar, and inline usage right away.
+		for _, want := range []string{"GPT-6 Luna", "Claude Sonnet 4", "推理强度", "还剩 74%", "当前会话上下文"} {
+			if !tt.HasText(want) {
+				t.Fatalf("missing %q in unified model popover, texts=%q", want, tt.Texts())
+			}
 		}
 
-		// 3. Hovering a non-reasoning model hides both Usage and Reasoning effort sub-cards.
-		plainAcc, ok := tt.Access("Plain Model")
-		if !ok {
-			t.Fatal("missing Plain Model accessibility element")
-		}
-		tt.Move(plainAcc.Bounds.X+plainAcc.Bounds.W/2, plainAcc.Bounds.Y+plainAcc.Bounds.H/2)
-		tt.Frame()
-		if tt.HasText("推理强度") || tt.HasText("当前会话上下文") {
-			t.Fatalf("expected sub-cards hidden when hovering non-reasoning model, texts=%q", tt.Texts())
-		}
-
-		// 4. Hovering another reasoning model shows Reasoning effort and clicking picks both.
-		acc, ok := tt.Access("Claude Sonnet 4")
-		if !ok {
-			t.Fatal("missing Claude Sonnet 4 accessibility element")
-		}
-		tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
-		tt.Frame()
-		if a.menu.hoverSub != "model:claude-sonnet-4" || !tt.HasText("推理强度") {
-			t.Fatalf("hoverSub = %q, expected effort submenu, texts=%q", a.menu.hoverSub, tt.Texts())
-		}
-
+		// 2. Clicking effort updates session effort directly.
 		if err := tt.Click("高"); err != nil {
 			t.Fatal(err)
 		}
-		var update proto.SessionUpdate
-		task8Command(t, a, proto.MethodSessionUpdate, &update)
-		if update.Model == nil || *update.Model != "claude-sonnet-4" {
-			t.Fatalf("update.Model = %v, want claude-sonnet-4", update.Model)
+		var effUpdate proto.SessionUpdate
+		task8Command(t, a, proto.MethodSessionUpdate, &effUpdate)
+		if effUpdate.Effort == nil || *effUpdate.Effort != "high" {
+			t.Fatalf("update.Effort = %v, want high", effUpdate.Effort)
 		}
-		if update.Effort == nil || *update.Effort != "high" {
-			t.Fatalf("update.Effort = %v, want high", update.Effort)
+
+		// 3. Clicking another model switches model and closes popover.
+		if err := tt.Click("Claude Sonnet 4"); err != nil {
+			t.Fatal(err)
+		}
+		var modUpdate proto.SessionUpdate
+		task8Command(t, a, proto.MethodSessionUpdate, &modUpdate)
+		if modUpdate.Model == nil || *modUpdate.Model != "claude-sonnet-4" {
+			t.Fatalf("update.Model = %v, want claude-sonnet-4", modUpdate.Model)
 		}
 		task8Command(t, a, proto.MethodSetSettings, nil)
 		if a.menu.modelMenu {
-			t.Fatal("expected model popover to close after selecting effort")
+			t.Fatal("expected model popover to close after selecting model")
 		}
 		if !slices.Contains(a.C.Settings.RecentModels, "chatgpt/claude-sonnet-4") {
 			t.Fatalf("RecentModels = %v, want chatgpt/claude-sonnet-4", a.C.Settings.RecentModels)
 		}
 
-		// 5. Reopening and clicking empty space outside closes the popover.
+		// 4. Reopening and clicking empty space outside closes the popover.
 		task8Click(t, tt, "gpt-6-luna")
 		cmd2 := task8Command(t, a, proto.MethodModels, nil)
 		task8Models(a, cmd2.ID, []proto.Model{
@@ -770,7 +744,7 @@ func TestModelPickerHoverCascadeEffort(t *testing.T) {
 		tt.Move(acc.Bounds.X+acc.Bounds.W/2, acc.Bounds.Y+acc.Bounds.H/2)
 		tt.Frame()
 
-		for _, want := range []string{"Models", "View Usage", "Reasoning effort", "Default", "Minimal", "Low", "Medium", "High", "Extra High"} {
+		for _, want := range []string{"Models", "Reasoning effort", "Default", "Minimal", "Low", "Medium", "High", "Extra High"} {
 			if !tt.HasText(want) {
 				t.Errorf("missing %q in English model picker, texts=%q", want, tt.Texts())
 			}
@@ -790,11 +764,13 @@ func TestProjectRowMenuStaysOpenOnPointerLeave(t *testing.T) {
 	tt.Move(siteAcc.Bounds.X+siteAcc.Bounds.W/2, siteAcc.Bounds.Y+siteAcc.Bounds.H/2)
 	tt.Frame()
 
-	// Click the "..." button near the right end of the hovered project row (left of "+").
-	moreX := siteAcc.Bounds.X + siteAcc.Bounds.W - 36
-	moreY := siteAcc.Bounds.Y + siteAcc.Bounds.H/2
-	tt.Move(moreX, moreY)
-	tt.ClickAt(moreX, moreY)
+	// Click the "..." button near the right end of the hovered project row.
+	moreAcc, ok := tt.Find("ellipsis")
+	if !ok {
+		t.Fatal("missing project row ellipsis button")
+	}
+	tt.Move(moreAcc.X+moreAcc.W/2, moreAcc.Y+moreAcc.H/2)
+	tt.ClickAt(moreAcc.X+moreAcc.W/2, moreAcc.Y+moreAcc.H/2)
 	tt.Frame()
 	if !tt.HasText("在访达中显示") {
 		t.Fatalf("expected project menu open, texts=%q", tt.Texts())

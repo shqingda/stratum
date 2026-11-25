@@ -274,7 +274,7 @@ func (a *App) cachedDiffSpans(c *ui.Context, d *fileDiff, isNew bool, idx int, t
 func (a *App) codeSpans(c *ui.Context, text string, toks []editor.Token) []ui.Span {
 	p := a.p
 	span := func(s string, st editor.TokenStyle) ui.Span {
-		sp := ui.Span{Text: s, Font: "monospace", Size: 12, Color: p.Fg, Italic: st.Italic}
+		sp := ui.Span{Text: s, Font: "monospace", Size: 12, Color: p.OnSurface, Italic: st.Italic}
 		if st.Color != (ui.Color{}) {
 			sp.Color = st.Color
 		}

@@ -41,6 +41,10 @@ interface ThemePayload {
   live: string;
   plus: string;
   minus: string;
+  primaryContainer: string;
+  onPrimary: string;
+  onPrimaryContainer: string;
+  onSecondaryContainer: string;
   strings?: StringsPayload;
 }
 
@@ -88,7 +92,6 @@ interface FilePayload {
 const diffsView = document.getElementById("diffs-view")!;
 const filesView = document.getElementById("files-view")!;
 const filesTabs = document.getElementById("files-tabs")!;
-const filesCrumb = document.getElementById("files-crumb")!;
 const filesEmpty = document.getElementById("files-empty")!;
 const filesCode = document.getElementById("files-code")!;
 const filesMd = document.getElementById("files-md")!;
@@ -180,6 +183,10 @@ function applyTheme(t: ThemePayload) {
   r.setProperty("--live", t.live);
   r.setProperty("--plus", t.plus);
   r.setProperty("--minus", t.minus);
+  r.setProperty("--primary-container", t.primaryContainer);
+  r.setProperty("--on-primary", t.onPrimary);
+  r.setProperty("--on-primary-container", t.onPrimaryContainer);
+  r.setProperty("--on-secondary-container", t.onSecondaryContainer);
   document.documentElement.dataset.theme = isDark ? "dark" : "light";
 
   if (t.strings) {
@@ -396,7 +403,6 @@ function renderFile(payload: FilePayload) {
   renderTabs(payload.tabs ?? [], payload.path);
 
   if (!payload.path) {
-    filesCrumb.classList.add("hidden");
     mdToggle.classList.add("hidden");
     openExtBtn.classList.add("hidden");
     filesCode.classList.add("hidden");
@@ -406,8 +412,6 @@ function renderFile(payload: FilePayload) {
   }
 
   filesEmpty.classList.add("hidden");
-  filesCrumb.classList.remove("hidden");
-  filesCrumb.textContent = payload.path;
   openExtBtn.classList.remove("hidden");
 
   mdToggle.classList.toggle("hidden", !payload.isMarkdown);

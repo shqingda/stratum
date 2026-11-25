@@ -169,7 +169,7 @@ func (a *App) termFocused(c *ui.Context) bool {
 // default), on the panel's own background so the shell shows no box.
 func termTheme(p *Palette) *terminal.Theme {
 	th := keroTheme(keroPaper, p.Dark)
-	th.Background, th.CursorText = p.Sheet, p.Sheet
+	th.Background, th.CursorText = p.Surface, p.Surface
 	return th
 }
 
@@ -502,7 +502,8 @@ func (a *App) terminalPane(c *ui.Context) {
 	// A shell starts when the user opens the terminal (showTerminal), not
 	// for each session passed through with the tab showing.
 	set := a.termSet(cur.ID)
-	ui.Row(c).Height(40).Shrink(0).Padding(0, 6, 0, 10).Gap(2).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+	ui.Row(c).Height(42).Shrink(0).Padding(0, 8, 0, 10).Gap(4).AlignItems(ui.Center).
+		Background(p.SurfaceContainerLow).BorderWidth(0, 0, 1, 0).BorderColor(p.OutlineVariant).Children(func() {
 		ui.Row(c).Grow(1).MinWidth(0).Gap(2).AlignItems(ui.Center).Children(func() {
 			for i, tab := range set.tabs {
 				a.termTabButton(c, cur.ID, set, i, tab)
@@ -570,36 +571,34 @@ func (a *App) termTabButton(c *ui.Context, sid string, set *termSet, i int, tab 
 	p := a.p
 	on := i == set.active
 	name := termTabLabel(set.tabs, i)
-	row := ui.Row(c.Key("term-tab:"+tab.id)).Height(26).Padding(0, 2).Gap(0).Radius(7).AlignItems(ui.Center).Shrink(1).MinWidth(72).MaxWidth(200)
-	hover := row.Hovered()
-	fg, weight := p.Fg2, 500
+	row := ui.Row(c.Key("term-tab:"+tab.id)).Height(28).Padding(0, 4).Gap(2).Radius(10).AlignItems(ui.Center).Shrink(1).MinWidth(76).MaxWidth(200)
+	hover := row.Hovered() || row.FocusWithin()
+	fg, weight := p.OnSurfaceVariant, 500
 	switch {
 	case on:
-		row.Background(p.Chip)
-		fg, weight = p.Fg, 600
+		row.Background(p.SecondaryContainer)
+		fg, weight = p.OnSecondaryContainer, 600
 	case hover:
 		row.Background(p.Hover)
-		fg = p.Fg
+		fg = p.OnSurface
 	}
 	if tab.exited {
-		fg = p.Mute
+		fg = p.OnSurfaceVariant
 	}
 	row.Children(func() {
-		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(26).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name).Tooltip(termTabTooltip(tab))
-		focusRing(b, p)
+		b := ui.ButtonBase(c.Key("term-sel:"+tab.id)).Row().Grow(1).MinWidth(0).Height(28).Padding(0, 2, 0, 8).AlignItems(ui.Center).Label(name).Tooltip(termTabTooltip(tab))
+		m3Focus(b, p)
 		b.Children(func() {
 			ui.Text(c, name).FontSize(12.5).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").MinWidth(0)
 		})
 		if b.Clicked() {
 			a.selectTerminal(set, i)
 		}
-		// 22pt to hit, inside the 26pt tab: the mark stays Safari's size.
-		x := ui.ButtonBase(c.Key("term-x:"+tab.id)).Size(22, 22).Radius(5).Center().Shrink(0).Label(locales.CloseTerminal()).Tooltip(locales.CloseTerminal())
-		if x.Hovered() {
-			x.Background(p.Hover)
-		}
-		if hover || x.Focused() {
-			x.Children(func() { sym(c, "x", 10, p.Mute) })
+		x := ui.ButtonBase(c.Key("term-x:"+tab.id)).Size(22, 22).Radius(6).Center().Shrink(0).Label(locales.CloseTerminal()).Tooltip(locales.CloseTerminal())
+		m3Focus(x, p)
+		m3State(x, p, ui.Transparent, false)
+		if on || hover || x.Focused() {
+			x.Children(func() { sym(c, "x", 11, fg) })
 		}
 		if x.Clicked() {
 			a.askCloseTerminal(sid, tab)
@@ -648,14 +647,13 @@ func (a *App) termFindBar(c *ui.Context, tab *termTab) {
 	}
 	st := tab.t.SearchStatus()
 	p := a.p
-	bar := ui.Row(c.Key("term-find")).Absolute().Top(8).Right(14).Width(300).Height(38).Padding(0, 4, 0, 12).Gap(6).Radius(10).Background(p.Card).AlignItems(ui.Center).
+	bar := ui.Row(c.Key("term-find")).Absolute().Top(10).Right(14).Width(310).Height(40).Padding(0, 6, 0, 14).Gap(6).Radius(20).Background(p.SurfaceContainerHigh).AlignItems(ui.Center).
 		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .98, Opacity: 0}, Duration: 160 * time.Millisecond})
-	rim(bar, p)
-	lift(bar, p)
+	elevation2(bar, p)
 	bar.Children(func() {
-		sym(c, "search", 14, p.Mute)
-		ui.TextInputBase(c, &f.query).Bind(&f.input).Label(locales.FindInTerminal()).Placeholder(locales.FindInTerminal()).PlaceholderColor(p.Mute).
-			FontSize(13.5).TextColor(p.Fg).Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
+		sym(c, "search", 14, p.OnSurfaceVariant)
+		ui.TextInputBase(c, &f.query).Bind(&f.input).Label(locales.FindInTerminal()).Placeholder(locales.FindInTerminal()).PlaceholderColor(p.OnSurfaceVariant).
+			FontSize(13.5).TextColor(p.OnSurface).Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
 			f.query = k.Text()
 			switch {
 			case k.Key == ui.KeyEnter && k.Mods == 0, k.Key == ui.KeyUp && k.Mods == 0:
@@ -668,9 +666,9 @@ func (a *App) termFindBar(c *ui.Context, tab *termTab) {
 			return true
 		})
 		if strings.TrimSpace(f.query) != "" {
-			col := p.Mute
+			col := p.OnSurfaceVariant
 			if st.Total == 0 && !st.Searching {
-				col = p.Minus
+				col = p.Error
 			}
 			ui.Text(c, fmt.Sprintf("%d/%d", st.Selected, st.Total)).FontSize(12.5).TextColor(col).SingleLine().Shrink(0).FontFeatures("tnum")
 		}
@@ -698,20 +696,16 @@ func (a *App) terminateDialog(c *ui.Context) {
 		body = locales.TerminateBody(a.term.job)
 	}
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 12, 14, .18)
-		if p.Dark {
-			scrim = ui.RGBA(0, 0, 0, .42)
-		}
-		backdrop.Background(scrim)
-		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.TerminateTitle())
-		lift(panel, p).Children(func() {
-			ui.Text(c, locales.TerminateTitle()).FontSize(15).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, body).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
+		backdrop.Background(p.Scrim)
+		panel.Width(400).Padding(24).Radius(28).Background(p.SurfaceContainerHigh).Label(locales.TerminateTitle())
+		elevation3(panel, p).Children(func() {
+			ui.Text(c, locales.TerminateTitle()).FontSize(18).FontWeight(600).TextColor(p.OnSurface)
+			ui.Text(c, body).FontSize(14).LineHeight(1.5).TextColor(p.OnSurfaceVariant).Margin(10, 0, 20, 0)
 			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-				if a.button(c, "terminate-cancel", locales.Cancel(), "esc", false).Clicked() {
+				if a.button(c, "terminate-cancel", locales.Cancel(), "esc", false).AutoFocus().Clicked() {
 					open = false
 				}
-				if a.button(c, "terminate-ok", locales.Terminate(), "", true).Background(p.Minus).Clicked() {
+				if a.dangerButton(c, "terminate-ok", locales.Terminate(), "").Clicked() {
 					a.dropTerminal(a.term.closingSession, a.term.closing)
 					open = false
 				}

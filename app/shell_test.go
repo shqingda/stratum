@@ -20,29 +20,34 @@ func TestSidebarToggle(t *testing.T) {
 		t.Fatalf("the sidebar did not slide: %v", a.side.sideOpen)
 	}
 	tt.Advance(time.Second)
-	if a.side.sideOpen > 0.001 || tt.HasText("技能与 MCP") {
+	if a.side.sideOpen > 0.001 || tt.HasText("首页文案改写") {
 		t.Fatalf("the sidebar stayed: %v", a.side.sideOpen)
 	}
 	snapshot(t, tt, "sidebar-hidden")
-	// The toggle has not moved, so the same click brings the sidebar back.
+	// The toggle brings the sidebar back.
 	if err := tt.Click("显示边栏"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Advance(time.Second)
-	if a.side.sideOpen < .999 || !tt.HasText("技能与 MCP") {
+	if a.side.sideOpen < .999 || !tt.HasText("首页文案改写") {
 		t.Fatalf("the sidebar did not come back: %v", a.side.sideOpen)
 	}
 }
 
-func TestVibrantSidebarVisible(t *testing.T) {
+func TestRailAndSidebarVisible(t *testing.T) {
 	a := working()
 	tt := ui.NewTester(a.View, 1200, 800)
-	tt.SetVibrancy(true)
 	tt.Frame()
-	for _, s := range []string{"搜索", "新会话", "技能与 MCP"} {
+	for _, s := range []string{"新会话", "扩展", "设置"} {
 		r, ok := tt.Find(s)
-		if !ok || r.W <= 0 || r.H <= 0 || r.X >= sidebarWidth {
-			t.Fatalf("vibrant sidebar item %q invalid rect: ok=%v rect=%+v", s, ok, r)
+		if !ok || r.W <= 0 || r.H <= 0 || r.X >= railWidth {
+			t.Fatalf("rail item %q invalid rect: ok=%v rect=%+v", s, ok, r)
+		}
+	}
+	for _, s := range []string{"全部", "修复 Add 测试"} {
+		r, ok := tt.Find(s)
+		if !ok || r.W <= 0 || r.H <= 0 || r.X < railWidth || r.X >= railWidth+sidebarWidth {
+			t.Fatalf("sidebar item %q invalid rect: ok=%v rect=%+v", s, ok, r)
 		}
 	}
 }
@@ -74,27 +79,25 @@ func TestCopyMessages(t *testing.T) {
 	}
 }
 
-// TestSidebarSlidesWithoutFading: while the sidebar slides, its wash over
-// the window's glass stays as it is, so the sidebar does not flash gray.
+// TestSidebarSlidesWithoutFading verifies the opaque M3 drawer slides cleanly without grey wash flashing.
 func TestSidebarSlidesWithoutFading(t *testing.T) {
 	a := working()
 	tt := ui.NewTester(a.View, 1200, 800)
-	tt.SetVibrancy(true)
 	tt.Frame()
-	r, ok := tt.Find("技能与 MCP")
+	r, ok := tt.Find("修复 Add 测试")
 	if !ok {
 		t.Fatal("no sidebar")
 	}
 	img := tt.Image()
 	scale := float32(img.Bounds().Dx()) / 1200
-	x, y := int(4*scale), int((r.Y+r.H+40)*scale)
+	x, y := int((railWidth+16)*scale), int((r.Y+r.H+40)*scale)
 	open := img.RGBAAt(x, y)
 	a.toggleSide()
 	checked := 0
-	for i := 0; i < 60 && a.side.sideOpen > 0.05; i++ {
+	for i := 0; i < 60 && a.side.sideOpen > 0.15; i++ {
 		tt.Advance(16 * time.Millisecond)
 		tt.Frame()
-		if a.side.sideOpen <= 0.05 || a.side.sideOpen >= 0.95 {
+		if a.side.sideOpen <= 0.15 || a.side.sideOpen >= 0.95 {
 			continue
 		}
 		checked++

@@ -91,6 +91,7 @@ func (a *App) currentAgent() string {
 func (a *App) agentPill(c *ui.Context) {
 	cur := a.currentAgent()
 	b := a.pill(c, "agent", "", agentLabel(cur), true)
+	wasOpen := a.menu.agentMenu
 	b.Disabled(!a.C.CanAct()).PopoverMenuButton(func(m *ui.Menu) {
 		a.ensureMCP()
 		for _, ag := range primaryAgents(a.agentInfos()) {
@@ -102,11 +103,10 @@ func (a *App) agentPill(c *ui.Context) {
 				a.setAgent(ag.Name)
 			}
 		}
-		m.Separator()
-		if m.Item(locales.NextAgent()).ID("agent:next").Shortcut(0, ui.KeyTab).Chosen() {
-			a.cycleAgent(1)
-		}
 	}, a.menuOptions(&a.menu.agentMenu))
+	if a.menu.agentMenu && !wasOpen {
+		a.closeComposerPopovers("agent")
+	}
 }
 
 func (a *App) setAgent(name string) {
@@ -153,7 +153,7 @@ func (a *App) agentsSection(c *ui.Context) {
 			r := rows{p: p}
 			for _, ag := range part.items {
 				r.row(c, "agent:"+part.label+":"+ag.Name, agentLabel(ag.Name), agentNote(ag), func() {
-					ui.Text(c, agentSource(ag)).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…").MaxWidth(180)
+					ui.Text(c, agentSource(ag)).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine().Ellipsis("…").MaxWidth(180)
 				})
 			}
 		})
@@ -194,7 +194,7 @@ func (a *App) formattersSection(c *ui.Context) {
 				if f.Disabled {
 					what = locales.SettingOff()
 				}
-				ui.Text(c, what).FontSize(12).TextColor(p.Mute).SingleLine()
+				ui.Text(c, what).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine()
 			})
 		}
 	})

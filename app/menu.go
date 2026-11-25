@@ -42,7 +42,7 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 			a.openSettings()
 		}
 	})
-	// Safari's app menu clears its history under Settings.
+	// App menu clears browser data directly.
 	clearHistory = item(locales.ClearHistory()+"…", "", func(*ui.Context) { a.askClearWeb() })
 	view = []*mygo.MenuItem{
 		item(locales.ToggleSidebarMenu(), "CmdOrCtrl+\\", func(*ui.Context) { a.toggleSide() }),
@@ -57,8 +57,7 @@ func (a *App) MenuBar() (session []*mygo.MenuItem, settings *mygo.MenuItem, view
 			}
 		}),
 		mygo.Separator(),
-		// The text sizes of Settings, a step at a time, as Safari's and
-		// Mail's View menus zoom.
+		// Text sizes scale step by step from the View menu.
 		item(locales.ActualSize(), "CmdOrCtrl+0", func(*ui.Context) { a.zoomText(0) }),
 		item(locales.ZoomIn(), "CmdOrCtrl+Plus", func(*ui.Context) { a.zoomText(1) }),
 		item(locales.ZoomOut(), "CmdOrCtrl+-", func(*ui.Context) { a.zoomText(-1) }),

@@ -63,16 +63,17 @@ func main() {
 	mygo.App.WhenReady(func() {
 		mygo.App.SetMenu(menu(a))
 		win := mygo.NewWindow(mygo.WindowOptions{
-			Title:          "Stratum",
-			Width:          1200,
-			Height:         780,
-			MinWidth:       760,
-			MinHeight:      480,
-			StateKey:       "main",
-			TitleBarStyle:  mygo.TitleBarHiddenInset,
-			TitleBarHeight: 52,
-			Vibrancy:       mygo.VibrancyGlass,
-			Content:        ui.View(a.View),
+			Title:           "Stratum",
+			Width:           1240,
+			Height:          800,
+			MinWidth:        760,
+			MinHeight:       480,
+			StateKey:        "main",
+			TitleBarStyle:        mygo.TitleBarHidden,
+			TrafficLightPosition: &mygo.Point{X: 12, Y: 12},
+			TitleBarHeight:       36,
+			BackgroundColor:      "light-dark(#eef0f3, #131518)",
+			Content:         ui.View(a.View),
 		})
 		a.SetCloseWindow(win.Close)
 		// The terminal's tabs and what they showed outlast a quit, as
@@ -94,7 +95,7 @@ func main() {
 		if mygo.WebViewAvailable() {
 			wv, err := win.NewWebView(mygo.WebViewOptions{
 				URL:             "/",
-				BackgroundColor: "light-dark(#fbfbfc, #0d0d0e)",
+				BackgroundColor: "light-dark(#f8f9fc, #121419)",
 			})
 			if err != nil {
 				log.Printf("pierre webview unavailable, using native fallback: %v", err)
@@ -111,15 +112,14 @@ func main() {
 			browsing := mygo.NewSession("browser")
 			a.UseBrowser(func() (*mygo.WebView, error) {
 				return win.NewWebView(mygo.WebViewOptions{
-					BackgroundColor: "light-dark(#ffffff, #0d0d0e)",
+					BackgroundColor: "light-dark(#f8f9fc, #121419)",
 					Page: mygo.PageOptions{
 						Session:         browsing,
 						Untrusted:       true,
-						DevTools:        mygo.DevToolsEnabled, // Inspect Element, as Kero's
+						DevTools:        mygo.DevToolsEnabled,
 						PreloadScript:   preview.LogScript,
 						SwipeNavigation: true,
 						PinchZoom:       true,
-						UserAgentSuffix: "Version/26.0 Safari/605.1.15",
 					},
 				})
 			}, func(kinds app.WebData) error {

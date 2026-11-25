@@ -954,5 +954,48 @@
   "formattersNote": "代理写完文件后，按扩展名运行格式化程序。规则写在项目的 .stratum/formatters.json。",
   "openExternally": "在外部应用打开",
   "findInView": "在当前视图中查找…",
-  "commentShort": "批注"
+  "commentShort": "批注",
+  "extensions": "扩展",
+  "colorStyle": "色彩风格",
+  "colorStyleSoft": "柔和",
+  "colorStyleVivid": "鲜明",
+  "colorStyleTinted": "浸染",
+  "colorStyleMonochrome": "单色",
+  "pureBlack": "纯黑模式",
+  "pureBlackNote": "深色模式下使用 #000000 纯黑底色。",
+  "seedColor": "主题种子色",
+  "customHexColor": "自定义色值",
+  "presetBasalt": "玄武钴蓝",
+  "presetMalachite": "孔雀石绿",
+  "presetOchre": "砂岩赭石",
+  "presetGarnet": "页岩红榴",
+  "presetFeldspar": "长石紫",
+  "presetObsidian": "曜石单色",
+  "themePreview": "实时预览",
+  "filterAll": "全部",
+  "filterRunning": "运行中",
+  "filterPending": "待处理",
+  "filterArchived": "已归档",
+  "filterSessions": "筛选会话…",
+  "filterChanges": "筛选变更文件…",
+  "filterFiles": "筛选工作区文件…",
+  "browserOmnibox": "搜索或输入网址",
+  "kernelReady": "就绪",
+  "turnFilesEdited": "{count} 个文件",
+  "@turnFilesEdited": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "turnCommandsRan": "{count} 条命令",
+  "@turnCommandsRan": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reduceMotionNoteM3": "关闭非必要的位移与过渡动画，保持界面静止清晰。"
 }

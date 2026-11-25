@@ -37,7 +37,7 @@ const (
 	WebHistory
 )
 
-// webAll is every kind: Safari's Clear History, the app menu's.
+// webAll is every kind of browser data cleared by Clear History.
 const webAll = WebCookies | WebCache | WebHistory
 
 // webVisit is a page the browser showed, for its history.
@@ -50,8 +50,7 @@ type webVisit struct {
 // historyMax is how many visits the history keeps: the oldest go first.
 const historyMax = 5000
 
-// webDownload is a file a page of the browser downloads, as Safari's
-// Downloads list it.
+// webDownload is a file downloaded by the browser.
 type webDownload struct {
 	id              int
 	url, name, path string
@@ -195,16 +194,14 @@ func (a *App) removeVisits(u string) {
 	}
 }
 
-// askClearWeb asks what of the browser's data to clear, all of it
-// chosen, as Safari's Clear History… clears.
+// askClearWeb asks what of the browser's data to clear, all of it chosen.
 func (a *App) askClearWeb() {
 	if a.clearWebData != nil {
 		a.clearKinds, a.webClearing = webAll, true
 	}
 }
 
-// clearWebDialog asks which of the browser's data to clear, as Codex's
-// Clear browsing data does: the kinds, each with what it means.
+// clearWebDialog asks which of the browser's data to clear.
 func (a *App) clearWebDialog(c *ui.Context) {
 	if !a.webClearing {
 		return
@@ -212,15 +209,11 @@ func (a *App) clearWebDialog(c *ui.Context) {
 	open := true
 	p := a.p
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 12, 14, .18)
-		if p.Dark {
-			scrim = ui.RGBA(0, 0, 0, .42)
-		}
-		backdrop.Background(scrim)
-		panel.Width(400).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.ClearWebTitle())
-		lift(panel, p).Children(func() {
-			ui.Text(c, locales.ClearWebTitle()).FontSize(15).FontWeight(600).TextColor(p.Fg)
-			ui.Column(c).Gap(10).Margin(14, 0, 12, 0).Children(func() {
+		backdrop.Background(p.Scrim)
+		panel.Width(420).Padding(24).Radius(28).Background(p.SurfaceContainerHigh).Label(locales.ClearWebTitle())
+		elevation3(panel, p).Children(func() {
+			ui.Text(c, locales.ClearWebTitle()).FontSize(20).FontWeight(500).TextColor(p.OnSurface)
+			ui.Column(c).Gap(10).Margin(16, 0, 12, 0).Children(func() {
 				for _, k := range []struct {
 					kind      WebData
 					label, at string
@@ -230,20 +223,18 @@ func (a *App) clearWebDialog(c *ui.Context) {
 					{WebCache, locales.WebCacheKind(), locales.WebCacheKindNote()},
 				} {
 					on := a.clearKinds&k.kind != 0
-					// The row is the check box, as a Mac's label with its box
-					// toggles it: the box drawn as macOS draws one.
-					row := ui.CheckboxBase(c.Key(fmt.Sprint("clear-kind:", k.kind)), &on).Row().Gap(9).AlignItems(ui.Start).Label(k.label)
-					focusRing(row, p)
+					row := ui.CheckboxBase(c.Key(fmt.Sprint("clear-kind:", k.kind)), &on).Row().Gap(12).AlignItems(ui.Start).Label(k.label)
+					m3Focus(row, p)
 					row.Children(func() {
-						box := ui.Box(c).Size(16, 16).Shrink(0).Radius(4).Margin(1, 0, 0, 0).Center()
+						box := ui.Box(c).Size(18, 18).Shrink(0).Radius(4).Margin(1, 0, 0, 0).Center()
 						if on {
-							box.Background(p.Acc).Children(func() { sym(c, "check", 11, p.OnAcc) })
+							box.Background(p.Primary).Children(func() { sym(c, "check", 12, p.OnPrimary) })
 						} else {
-							box.Background(p.Sheet).Border(.5, p.Edge2)
+							box.Border(1.5, p.OnSurfaceVariant)
 						}
 						ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-							ui.Text(c, k.label).FontSize(13.5).FontWeight(500).TextColor(p.Fg)
-							ui.Text(c, k.at).FontSize(12).LineHeight(1.4).TextColor(p.Mute)
+							ui.Text(c, k.label).FontSize(13.5).FontWeight(500).TextColor(p.OnSurface)
+							ui.Text(c, k.at).FontSize(12).LineHeight(1.4).TextColor(p.OnSurfaceVariant)
 						})
 					})
 					if on {
@@ -253,12 +244,14 @@ func (a *App) clearWebDialog(c *ui.Context) {
 					}
 				}
 			})
-			ui.Text(c, locales.CantUndo()).FontSize(12).TextColor(p.Mute).Margin(0, 0, 14, 0)
+			ui.Text(c, locales.CantUndo()).FontSize(12).TextColor(p.OnSurfaceVariant).Margin(0, 0, 16, 0)
 			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-				if a.button(c, "clear-web-cancel", locales.Cancel(), "esc", false).Clicked() {
+				cancel := a.button(c, "clear-web-cancel", locales.Cancel(), "esc", false)
+				cancel.AutoFocus()
+				if cancel.Clicked() {
 					open = false
 				}
-				ok := a.button(c, "clear-web-ok", locales.ClearWebOK(), "", true).Background(p.Minus).Disabled(a.clearKinds == 0)
+				ok := a.dangerButton(c, "clear-web-ok", locales.ClearWebOK(), "").Disabled(a.clearKinds == 0)
 				if a.clearKinds != 0 && ok.Clicked() {
 					a.clearWeb(a.clearKinds)
 					open = false
@@ -344,12 +337,10 @@ func (a *App) webMoreMenu(c *ui.Context) {
 		return
 	}
 	p := a.p
-	bt := ui.ButtonBase(c.Key("web-more")).Size(28, 28).Radius(7).Center().Label(locales.MoreBrowser()).Tooltip(locales.MoreBrowser())
-	focusRing(bt, p)
-	if bt.Hovered() {
-		bt.Background(p.Hover)
-	}
-	bt.Children(func() { sym(c, "dots", 16, p.Fg2) })
+	bt := ui.ButtonBase(c.Key("web-more")).Size(30, 30).Radius(15).Center().Label(locales.MoreBrowser()).Tooltip(locales.MoreBrowser())
+	m3Focus(bt, p)
+	m3State(bt, p, ui.Color{}, false)
+	bt.Children(func() { sym(c, "dots", 16, p.OnSurfaceVariant) })
 	bt.PopoverMenuButton(func(m *ui.Menu) {
 		if m.Item(locales.ClearCookies()).ID("web-clear-cookies").Chosen() {
 			a.clearWeb(WebCookies)
@@ -689,8 +680,7 @@ func (a *App) edit(f func()) {
 	f()
 }
 
-// downloadsButton is Safari's Downloads in the toolbar: its list of the
-// browser's downloads, each shown in Finder when clicked.
+// downloadsButton is the toolbar's Downloads list.
 func (a *App) downloadsButton(c *ui.Context) {
 	if a.newBrowser == nil {
 		return
@@ -700,14 +690,12 @@ func (a *App) downloadsButton(c *ui.Context) {
 	for _, d := range a.webDownloads {
 		busy = busy || !d.done || d.staged != ""
 	}
-	bt := ui.ButtonBase(c.Key("web-downloads")).Size(28, 28).Radius(7).Center().Label(locales.Downloads()).Tooltip(locales.Downloads())
-	focusRing(bt, p)
-	if bt.Hovered() || a.downloadsOpen {
-		bt.Background(p.Hover)
-	}
-	col := p.Fg2
+	bt := ui.ButtonBase(c.Key("web-downloads")).Size(30, 30).Radius(15).Center().Label(locales.Downloads()).Tooltip(locales.Downloads())
+	m3Focus(bt, p)
+	m3State(bt, p, ui.Color{}, a.downloadsOpen)
+	col := p.OnSurfaceVariant
 	if busy {
-		col = p.Live
+		col = p.Primary
 	}
 	bt.Children(func() { sym(c, "download", 16, col) })
 	if bt.Clicked() {
@@ -716,15 +704,15 @@ func (a *App) downloadsButton(c *ui.Context) {
 	pop := ui.Popover(c, bt, &a.downloadsOpen, func() {
 		ui.Column(c).FillWidth().Gap(2).Children(func() {
 			ui.Row(c).Padding(4, 6, 6, 8).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, locales.Downloads()).FontSize(13).FontWeight(600).TextColor(p.Fg)
+				ui.Text(c, locales.Downloads()).FontSize(13).FontWeight(600).TextColor(p.OnSurface)
 				ui.Spacer(c)
 				if len(a.webDownloads) > 0 && a.pushButton(c, "downloads-clear", locales.ClearList()).Height(24).Clicked() {
-					// Safari's Clear: the list, not the files.
+					// Clear the list entries, keeping downloaded files on disk.
 					a.webDownloads = slices.DeleteFunc(a.webDownloads, func(d *webDownload) bool { return d.done && d.staged == "" })
 				}
 			})
 			if len(a.webDownloads) == 0 {
-				ui.Text(c, locales.NoDownloads()).FontSize(12.5).TextColor(p.Mute).Padding(10, 8, 14, 8)
+				ui.Text(c, locales.NoDownloads()).FontSize(12.5).TextColor(p.OnSurfaceVariant).Padding(10, 8, 14, 8)
 				return
 			}
 			for i := len(a.webDownloads) - 1; i >= 0; i-- {
@@ -733,41 +721,39 @@ func (a *App) downloadsButton(c *ui.Context) {
 		})
 	})
 	pop.AttachTo(bt, ui.AnchorBottomEnd, ui.AnchorTopEnd).Margin(6, 0, 0, 0).
-		Width(300).Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(6).NoShadow()
-	lift(pop, p)
-	rim(pop, p)
+		Width(308).Background(p.SurfaceContainerHigh).Radius(16).Padding(8).NoShadow()
+	elevation2(pop, p)
 }
 
 // downloadRow is a download in the list: its name, and how it went.
 func (a *App) downloadRow(c *ui.Context, d *webDownload) {
 	p := a.p
-	status, col := locales.Downloading(), p.Live
+	status, col := locales.Downloading(), p.Primary
 	switch {
 	case d.err != "":
 		status, col = locales.DownloadFailed(d.err), p.Minus
 	case d.canceled:
-		status, col = locales.DownloadCanceled(), p.Mute
+		status, col = locales.DownloadCanceled(), p.OnSurfaceVariant
 	case d.staged != "":
-		status, col = locales.ChoosingWhere(), p.Mute
+		status, col = locales.ChoosingWhere(), p.OnSurfaceVariant
 	case d.done:
-		status, col = shortHost(d.url), p.Mute
+		status, col = shortHost(d.url), p.OnSurfaceVariant
 		if fi, err := os.Stat(d.path); err == nil {
 			status = formatBytes(fi.Size()) + " · " + status
 		}
 	}
 	found := d.done && d.err == "" && !d.canceled && d.staged == ""
-	row := ui.ButtonBase(c.Key(fmt.Sprint("download:", d.id))).Row().FillWidth().Padding(6, 8).Gap(9).Radius(7).AlignItems(ui.Center).
+	row := ui.ButtonBase(c.Key(fmt.Sprint("download:", d.id))).Row().FillWidth().Padding(8, 10).Gap(10).Radius(10).AlignItems(ui.Center).
 		Label(d.name).Disabled(!found)
 	if found {
 		row.Tooltip(locales.RevealInFinder())
-		if row.Hovered() {
-			row.Background(p.Hover)
-		}
+		m3Focus(row, p)
+		m3State(row, p, ui.Color{}, false)
 	}
 	row.Children(func() {
-		sym(c, "file", 18, p.Fg2)
+		sym(c, "file", 18, p.OnSurfaceVariant)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
-			ui.Text(c, d.name).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
+			ui.Text(c, d.name).FontSize(12.5).FontWeight(500).TextColor(p.OnSurface).SingleLine().Ellipsis("…")
 			ui.Text(c, status).FontSize(11.5).TextColor(col).SingleLine().Ellipsis("…")
 		})
 	})
@@ -812,7 +798,7 @@ func (a *App) browserSettingsPage(c *ui.Context) {
 			if strings.TrimSpace(a.historyQuery) != "" {
 				empty = locales.NoHistoryFound()
 			}
-			ui.Text(c, empty).FontSize(13).TextColor(p.Mute).Padding(14, 12)
+			ui.Text(c, empty).FontSize(13).TextColor(p.OnSurfaceVariant).Padding(14, 12)
 			return
 		}
 		r := rows{p: p}
@@ -890,27 +876,25 @@ func (a *App) historyRow(c *ui.Context, r *rows, v webVisit) {
 	if title == "" {
 		title = v.URL
 	}
-	row := ui.ButtonBase(c.Key("visit:"+v.URL)).Row().FillWidth().MinHeight(46).Padding(7, 8, 7, 12).Gap(10).AlignItems(ui.Center).
+	row := ui.ButtonBase(c.Key("visit:"+v.URL)).Row().FillWidth().MinHeight(48).Padding(8, 10, 8, 14).Gap(10).AlignItems(ui.Center).
 		Label(title).Tooltip(v.URL)
-	if row.Hovered() {
-		row.Background(p.Hover)
-	}
+	m3Focus(row, p)
+	m3State(row, p, ui.Color{}, false)
 	removed := false
 	row.Children(func() {
-		sym(c, "world", 15, p.Mute)
+		sym(c, "world", 16, p.OnSurfaceVariant)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Text(c, title).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
-			ui.Text(c, shortHost(v.URL)+" · "+ago(a.now(), v.At)).FontSize(12).TextColor(p.Mute).SingleLine().Ellipsis("…")
+			ui.Text(c, title).FontSize(13).FontWeight(500).TextColor(p.OnSurface).SingleLine().Ellipsis("…")
+			ui.Text(c, shortHost(v.URL)+" · "+ago(a.now(), v.At)).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine().Ellipsis("…")
 		})
-		x := ui.ButtonBase(c.Key("visit-remove:"+v.URL)).Size(24, 24).Radius(6).Center().
+		x := ui.ButtonBase(c.Key("visit-remove:"+v.URL)).Size(28, 28).Radius(14).Center().
 			Label(locales.RemoveFromHistory()).Tooltip(locales.RemoveFromHistory())
-		if !row.Hovered() && !x.Hovered() {
+		if !row.Hovered() && !row.FocusWithin() && !x.Hovered() {
 			x.Opacity(0)
 		}
-		if x.Hovered() {
-			x.Background(p.Chip)
-		}
-		x.Children(func() { sym(c, "x", 13, p.Mute) })
+		m3Focus(x, p)
+		m3State(x, p, ui.Color{}, false)
+		x.Children(func() { sym(c, "x", 14, p.OnSurfaceVariant) })
 		if x.Clicked() {
 			removed = true
 		}
@@ -954,19 +938,22 @@ func (a *App) suggestionList(c *ui.Context, field ui.Element, text string, sugg 
 				if title == "" {
 					title = v.URL
 				}
-				row := ui.ButtonBase(c.Key("suggest:"+v.URL)).Row().FillWidth().Height(36).Padding(0, 8).Gap(9).Radius(7).
+				row := ui.ButtonBase(c.Key("suggest:"+v.URL)).Row().FillWidth().Height(40).Padding(0, 10).Gap(10).Radius(10).
 					AlignItems(ui.Center).Label(title).KeepFocus()
-				switch {
-				case i == a.webSuggest:
-					row.Background(p.Sel)
-				case row.Hovered():
-					row.Background(p.Hover)
+				if i == a.webSuggest {
+					row.Background(p.SecondaryContainer)
+				} else {
+					m3State(row, p, ui.Color{}, false)
 				}
 				row.Children(func() {
-					sym(c, "history", 14, p.Mute)
+					fg, sub := p.OnSurface, p.OnSurfaceVariant
+					if i == a.webSuggest {
+						fg = p.OnSecondaryContainer
+					}
+					sym(c, "history", 15, sub)
 					ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-						ui.Text(c, title).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine().Ellipsis("…")
-						ui.Text(c, v.URL).FontSize(11.5).TextColor(p.Mute).SingleLine().Ellipsis("…")
+						ui.Text(c, title).FontSize(12.5).FontWeight(500).TextColor(fg).SingleLine().Ellipsis("…")
+						ui.Text(c, v.URL).FontSize(11.5).TextColor(sub).SingleLine().Ellipsis("…")
 					})
 				})
 				if row.Clicked() {
@@ -975,9 +962,9 @@ func (a *App) suggestionList(c *ui.Context, field ui.Element, text string, sugg 
 			}
 		})
 	})
-	pop.AttachTo(field, ui.AnchorBottomStart, ui.AnchorTopStart).Margin(4, 0, 0, 0).
-		Width(max(field.Bounds().W, 260)).Background(p.Card).Border(.5, p.Edge2).Radius(10).Padding(4).NoShadow()
-	lift(pop, p)
+	pop.AttachTo(field, ui.AnchorBottomStart, ui.AnchorTopStart).Margin(6, 0, 0, 0).
+		Width(max(field.Bounds().W, 280)).Background(p.SurfaceContainerHigh).Radius(16).Padding(6).NoShadow()
+	elevation2(pop, p)
 	if !open {
 		a.webSuggestOff = text // Escape or a click away: until the next key
 	}

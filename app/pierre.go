@@ -48,22 +48,26 @@ type pierreStrings struct {
 }
 
 type pierreThemePayload struct {
-	Dark    bool          `json:"dark"`
-	Bg      string        `json:"bg"`
-	Sheet   string        `json:"sheet"`
-	Card    string        `json:"card"`
-	Fg      string        `json:"fg"`
-	Fg2     string        `json:"fg2"`
-	Mute    string        `json:"mute"`
-	Edge    string        `json:"edge"`
-	Edge2   string        `json:"edge2"`
-	Sel     string        `json:"sel"`
-	Hover   string        `json:"hover"`
-	Chip    string        `json:"chip"`
-	Live    string        `json:"live"`
-	Plus    string        `json:"plus"`
-	Minus   string        `json:"minus"`
-	Strings pierreStrings `json:"strings"`
+	Dark                 bool          `json:"dark"`
+	Bg                   string        `json:"bg"`
+	Sheet                string        `json:"sheet"`
+	Card                 string        `json:"card"`
+	Fg                   string        `json:"fg"`
+	Fg2                  string        `json:"fg2"`
+	Mute                 string        `json:"mute"`
+	Edge                 string        `json:"edge"`
+	Edge2                string        `json:"edge2"`
+	Sel                  string        `json:"sel"`
+	Hover                string        `json:"hover"`
+	Chip                 string        `json:"chip"`
+	Live                 string        `json:"live"`
+	Plus                 string        `json:"plus"`
+	Minus                string        `json:"minus"`
+	PrimaryContainer     string        `json:"primaryContainer"`
+	OnPrimary            string        `json:"onPrimary"`
+	OnPrimaryContainer   string        `json:"onPrimaryContainer"`
+	OnSecondaryContainer string        `json:"onSecondaryContainer"`
+	Strings              pierreStrings `json:"strings"`
 }
 
 type pierreModePayload struct {
@@ -329,21 +333,25 @@ func (a *App) buildPierreTheme() pierreThemePayload {
 		p = light
 	}
 	return pierreThemePayload{
-		Dark:  p.Dark,
-		Bg:    colorCSS(p.Bg),
-		Sheet: colorCSS(p.Sheet),
-		Card:  colorCSS(p.Card),
-		Fg:    colorCSS(p.Fg),
-		Fg2:   colorCSS(p.Fg2),
-		Mute:  colorCSS(p.Mute),
-		Edge:  colorCSS(p.Edge),
-		Edge2: colorCSS(p.Edge2),
-		Sel:   colorCSS(p.Sel),
-		Hover: colorCSS(p.Hover),
-		Chip:  colorCSS(p.Chip),
-		Live:  colorCSS(p.Live),
-		Plus:  colorCSS(p.Plus),
-		Minus: colorCSS(p.Minus),
+		Dark:                 p.Dark,
+		Bg:                   colorCSS(p.SurfaceContainer),
+		Sheet:                colorCSS(p.Surface),
+		Card:                 colorCSS(p.SurfaceContainerLow),
+		Fg:                   colorCSS(p.OnSurface),
+		Fg2:                  colorCSS(p.OnSurfaceVariant),
+		Mute:                 colorCSS(p.OnSurfaceVariant),
+		Edge:                 colorCSS(p.OutlineVariant),
+		Edge2:                colorCSS(p.Outline),
+		Sel:                  colorCSS(p.SecondaryContainer),
+		Hover:                colorCSS(p.Hover),
+		Chip:                 colorCSS(p.SurfaceContainerHigh),
+		Live:                 colorCSS(p.Primary),
+		Plus:                 colorCSS(p.Plus),
+		Minus:                colorCSS(p.Minus),
+		PrimaryContainer:     colorCSS(p.PrimaryContainer),
+		OnPrimary:            colorCSS(p.OnPrimary),
+		OnPrimaryContainer:   colorCSS(p.OnPrimaryContainer),
+		OnSecondaryContainer: colorCSS(p.OnSecondaryContainer),
 		Strings: pierreStrings{
 			Preview:           locales.Preview(),
 			Raw:               locales.Raw(),

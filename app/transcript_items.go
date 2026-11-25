@@ -177,39 +177,35 @@ func (a *App) fold(c *ui.Context, steps []*client.Entry) {
 		for _, e := range steps {
 			names = append(names, e.Detail)
 		}
-		row := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(locales.Browse() + " " + strings.Join(names, " ")).Expanded(open)
-		focusRing(row, p)
-		if row.Hovered() {
-			row.Background(p.Hover)
-		}
+		row := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 8).Margin(0, -8).Gap(8).Radius(8).AlignItems(ui.Center).Label(locales.Browse() + " " + strings.Join(names, " ")).Expanded(open)
+		m3Focus(row, p)
+		m3State(row, p, ui.Transparent, false)
 		if row.Clicked() {
 			a.transcriptList().HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
 		row.Children(func() {
-			ui.Box(c).Width(16).Center().Children(func() { sym(c, "file-search", 15, p.Mute) })
-			ui.Text(c, locales.Browse()).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
-			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
+			ui.Box(c).Width(16).Center().Children(func() { sym(c, "file-search", 15, p.OnSurfaceVariant) })
+			ui.Text(c, locales.Browse()).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine().Shrink(0)
+			ui.Text(c, strings.Join(names, " ")).Font("monospace").FontSize(12.5).TextColor(p.OnSurface).SingleLine().PreserveSpaces().Ellipsis("…").MinWidth(0)
 			ui.Spacer(c)
-			if row.Hovered() || open {
-				disclosureChevron(c, key, open, 10, p.Mute)
+			if row.Hovered() || row.FocusVisible() || open {
+				disclosureChevron(c, key, open, 10, p.OnSurfaceVariant)
 			}
 		})
 	} else {
-		row := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(7).Radius(6).AlignItems(ui.Center).Label(locales.ExpandSteps()).Expanded(open)
-		focusRing(row, p)
-		if row.Hovered() {
-			row.Background(p.Hover)
-		}
+		row := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 8).Margin(0, -8).Gap(7).Radius(8).AlignItems(ui.Center).Label(locales.ExpandSteps()).Expanded(open)
+		m3Focus(row, p)
+		m3State(row, p, ui.Transparent, false)
 		if row.Clicked() {
 			a.transcriptList().HoldPlace()
 			open = !open
 			a.opened[key] = open
 		}
 		row.Children(func() {
-			disclosureChevron(c, key, open, 12, p.Mute)
-			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(13.5).TextColor(p.Mute).SingleLine()
+			disclosureChevron(c, key, open, 12, p.OnSurfaceVariant)
+			ui.Text(c, strings.Join(parts, locales.ClauseSeparator())).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine()
 			ui.Spacer(c)
 		})
 	}

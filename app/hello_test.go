@@ -162,7 +162,7 @@ func TestComposerAttached(t *testing.T) {
 	a := emptySession(proto.Workspace{})
 	tt := helloTester(a)
 	snapshot(t, tt, "composer-idle")
-	wantTexts(t, tt, "chevron.up.chevron.down")
+	wantTexts(t, tt, "chevron.down")
 	if tt.HasText("附带") || tt.HasText("eye") {
 		t.Errorf("an empty card shows the attached row or a mode symbol: %q", tt.Texts())
 	}

@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"hash/fnv"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -75,32 +74,31 @@ func modeName(mode string) string {
 
 func (a *App) bar(c *ui.Context) {
 	p := a.p
-	// Past the sidebar the title starts at 20; with the sidebar in, past
-	// its 74-point toggle pill; in between, as far as the sidebar is.
-	shut := toggleLeft(c) + 74 + 12
-	left := float32(math.Round(float64(22*a.side.sideOpen + shut*(1-a.side.sideOpen))))
-	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 10, 0, left).Gap(10).AlignItems(ui.Center).DragWindow().Children(func() {
+	ui.Row(c).Height(sheetBar).Shrink(0).Padding(0, 12, 0, 14).Gap(10).AlignItems(ui.Center).
+		DragWindow().Children(func() {
+		if a.side.noSide {
+			if exp := a.iconButtonSized(c, "side-expand", "layout-sidebar-left-expand", locales.ShowSidebar(), 18); exp.Clicked() {
+				a.toggleSide()
+			}
+		}
 		cur := a.C.Current
 		if cur == nil {
-			ui.Text(c, phaseText(a.C.Phase)).FontSize(14.5).FontWeight(600).TextColor(p.Mute)
+			ui.Text(c, phaseText(a.C.Phase)).FontSize(15).FontWeight(600).TextColor(p.OnSurfaceVariant)
 			return
 		}
 		if !a.helloShown() {
 			if a.renaming == cur.ID && a.renameIn == "bar" {
-				a.renameInput(c, *cur).FontSize(14.5).FontWeight(600).MaxWidth(360)
+				a.renameInput(c, *cur).FontSize(15).FontWeight(600).MaxWidth(360)
 			} else {
-				// Clicked, the title can be changed where it is.
-				t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Padding(3, 7).Margin(0, 0, 0, -7).Radius(6).
+				t := ui.ButtonBase(c.Key("bar-title")).Row().MinWidth(0).Shrink(1).Padding(4, 10).Margin(0, 0, 0, -6).Radius(10).
 					Label(locales.Rename()).Tooltip(locales.Rename())
-				focusRing(t, p)
-				if t.Hovered() {
-					t.Background(p.Hover)
-				}
+				m3Focus(t, p)
+				m3State(t, p, ui.Transparent, false)
 				if t.Clicked() {
 					a.rename(*cur, "bar")
 				}
 				t.Children(func() {
-					ui.Text(c, title(*cur)).FontSize(14.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+					ui.Text(c, title(*cur)).FontSize(15).FontWeight(600).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
 				})
 			}
 		}
@@ -142,78 +140,64 @@ func (a *App) transcript(c *ui.Context) {
 	if a.thinking() {
 		n++
 	}
-	list := ui.List(c, st, n, func(i int) {
-		row := ui.Row(c).Justify(ui.Center).Padding(0, 28)
-		row.Children(func() {
-			col := ui.Column(c).Grow(1).MaxWidth(columnWidth)
-			if i == hit {
-				// The row ⌘F found, marked without moving what is in it.
-				col.Margin(-4, -10, -4, -10).Padding(4, 10, 4, 10).Radius(10).Background(p.Sel)
-			}
-			col.Children(func() {
-				if i >= len(items) {
-					a.turn(c, true, func() { a.running(c) })
-					return
+	ui.Box(c.Key("transcript-wrap")).Grow(1).MinHeight(0).Children(func() {
+		ui.List(c, st, n, func(i int) {
+			row := ui.Row(c).Justify(ui.Center).Padding(0, 28)
+			row.Children(func() {
+				col := ui.Column(c).Grow(1).MaxWidth(columnWidth)
+				if i == hit {
+					col.Margin(-4, -10, -4, -10).Padding(4, 10, 4, 10).Radius(12).Background(p.PrimaryContainer.Alpha(.45))
 				}
-				it := items[i]
-				switch {
-				case it.older:
-					a.olderRow(c)
-				case it.ap != nil:
-					a.waitTurn(c, func() { a.ask(c, *it.ap) })
-				case it.fold != nil:
-					a.turn(c, it.live, func() { a.fold(c, it.fold) })
-				case it.work != nil:
-					a.turn(c, false, func() { a.work(c, it.work, it.done) })
-				case it.sum:
-					a.turn(c, false, func() { a.summary(c, it.done) })
-				default:
-					a.entry(c, it.e, it.live)
-				}
+				col.Children(func() {
+					if i >= len(items) {
+						a.turn(c, true, func() { a.running(c) })
+						return
+					}
+					it := items[i]
+					switch {
+					case it.older:
+						a.olderRow(c)
+					case it.ap != nil:
+						a.waitTurn(c, func() { a.ask(c, *it.ap) })
+					case it.fold != nil:
+						a.turn(c, it.live, func() { a.fold(c, it.fold) })
+					case it.work != nil:
+						a.turn(c, false, func() { a.work(c, it.work, it.done) })
+					case it.sum:
+						a.turn(c, false, func() { a.summary(c, it.done) })
+					default:
+						a.entry(c, it.e, it.live)
+					}
+				})
 			})
-		})
-	}).Grow(1).Padding(18, 0, a.side.dockH+28, 0)
-	// Rows fade out under the bar, and above the composer floating at the
-	// foot, rather than being cut at an edge.
-	if h := list.Bounds().H; h > 0 {
-		black := ui.RGBA(0, 0, 0, 1)
-		foot := max(0, h-a.side.dockH)
-		list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
-			{Color: ui.Transparent, At: 0}, {Color: black, At: 28 / h},
-			{Color: black, At: max(28, foot-56) / h}, {Color: ui.Transparent, At: foot / h}}})
-	}
-	// A list not shown in the last frame (a session just opened) says it
-	// is not at its end, though it starts there: the pill would flash.
-	shown := a.listShown == st
-	a.listShown = st
-	if len(items) > 0 && shown && !st.AtEnd() {
-		a.scrollBottomPill(c)
-	}
+		}).Fill().Padding(18, 0, 18, 0)
+		shown := a.listShown == st
+		a.listShown = st
+		if len(items) > 0 && shown && !st.AtEnd() {
+			a.scrollBottomPill(c)
+		}
+	})
 }
 
-// scrollBottomPill floats a Liquid Glass pill above the composer when the
-// user scrolls up through a long conversation.
 func (a *App) scrollBottomPill(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Absolute().Left(0).Right(0).Bottom(a.side.dockH + 16).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
-		b := ui.ButtonBase(c.Key("scroll-bottom")).Row().Height(32).Padding(0, 12).Gap(6).Radius(16).
-			AlignItems(ui.Center).Border(.5, p.Edge2).
-			Label(locales.ScrollToBottom()).Tooltip(locales.ScrollToBottom()).
+	ui.Row(c).Absolute().Left(0).Right(0).Bottom(14).Justify(ui.Center).PassThrough().ZIndex(15).Children(func() {
+		b := ui.ButtonBase(c.Key("scroll-bottom")).Row().Height(34).Padding(0, 14).Gap(6).Radius(17).
+			AlignItems(ui.Center).Label(locales.ScrollToBottom()).Tooltip(locales.ScrollToBottom()).
 			Transition(ui.ElementTransition{
 				Enter:    &ui.Motion{Y: 10, Scale: .92, Opacity: 0},
 				Exit:     &ui.Motion{Y: 8, Scale: .94, Opacity: 0},
 				Duration: 180 * time.Millisecond,
 			})
-		a.glass(b, glassButton(p))
-		focusRing(b, p)
-		rim(b, p)
-		lift(b, p)
+		m3Focus(b, p)
+		m3State(b, p, p.SurfaceContainerHigh, false)
+		b.Shadow(0, 2, 8, 0, ui.RGBA(0, 0, 0, .08))
 		b.Children(func() {
 			if a.C.Busy {
-				ui.Box(c).Size(6, 6).Radius(3).Background(p.Live)
+				ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Primary)
 			}
-			ui.Text(c, locales.ScrollToBottom()).FontSize(12.5).FontWeight(500).TextColor(p.Fg).SingleLine()
-			sym(c, "chevron-down", 13, p.Fg2)
+			ui.Text(c, locales.ScrollToBottom()).FontSize(12.5).FontWeight(600).TextColor(p.OnSurface).SingleLine()
+			sym(c, "chevron-down", 14, p.OnSurfaceVariant)
 		})
 		if b.Clicked() {
 			a.transcriptList().ScrollToEnd()
@@ -265,44 +249,32 @@ func (a *App) waitTurn(c *ui.Context, content func()) {
 func (a *App) turnRail(c *ui.Context, live, still bool, content func()) {
 	p := a.p
 	ui.Row(c).AlignItems(ui.Stretch).Children(func() {
-		rail := ui.Box(c).Width(2).Shrink(0).Clip()
+		rail := ui.Box(c).Width(2.5).Radius(1.25).Shrink(0).Clip()
 		if live {
-			// While the turn waits on the user nothing of it moves.
 			if still || len(a.C.Approvals) > 0 || a.reduceMotion() {
-				rail.Background(p.Live.Alpha(.45))
+				rail.Background(p.Primary.Alpha(.5))
 			} else {
-				rail.Background(p.LiveBg)
-				pulse := rail.Loop("pulse", 2800*time.Millisecond, ui.EaseInOut)
+				rail.Background(p.PrimaryContainer)
+				pulse := rail.Loop("pulse", 2200*time.Millisecond, ui.EaseInOut)
 				rail.Children(func() {
-					ui.Box(c).Absolute().Left(0).TopPercent(pulse*140 - 40).Width(2).HeightPercent(40).
-						LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: p.Live.Alpha(0), At: 0}, {Color: p.Live, At: .5}, {Color: p.Live.Alpha(0), At: 1}}})
+					ui.Box(c).Absolute().Left(0).TopPercent(pulse*140 - 40).Width(2.5).HeightPercent(40).
+						LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: p.Primary.Alpha(0), At: 0}, {Color: p.Primary, At: .5}, {Color: p.Primary.Alpha(0), At: 1}}})
 				})
 			}
 		}
-		ui.Column(c).Grow(1).MinWidth(0).Padding(0, 0, 0, 12).Children(content)
+		ui.Column(c).Grow(1).MinWidth(0).Padding(0, 0, 0, 14).Children(content)
 	})
 }
 
-// running says the turn is at work before anything of it shows.
 func (a *App) running(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Height(28).Gap(8).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Height(30).Gap(8).AlignItems(ui.Center).Children(func() {
 		if a.reduceMotion() {
-			ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
-			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
-			return
+			ui.Box(c).Size(8, 8).Radius(4).Background(p.Primary)
+		} else {
+			spinner(c, p, 14)
 		}
-		spinner(c, p, 12)
-		// A faint blue light passes over the words, left to right.
-		words := ui.Box(c)
-		at := words.Loop("shine", 1800*time.Millisecond, ui.EaseInOut)*1.6 - .3
-		black := ui.RGBA(0, 0, 0, 1)
-		words.Children(func() {
-			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Fg2)
-			ui.Text(c, locales.ThinkingNow()).FontSize(13.5).TextColor(p.Live).Absolute().Left(0).Top(0).AccessHidden(true).
-				MaskLinearGradient(ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
-					{Color: ui.Transparent, At: at - .25}, {Color: black, At: at}, {Color: ui.Transparent, At: at + .25}}})
-		})
+		ui.Text(c, locales.ThinkingNow()).FontSize(13.5).FontWeight(500).TextColor(p.OnSurfaceVariant)
 	})
 }
 
@@ -374,7 +346,11 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 				a.sentImages(c, e)
 			}
 			if e.Text != "" {
-				ui.Column(c).MaxWidthPercent(80).Padding(9, 15).Radius(18).Background(p.Bubble).Children(func() {
+				bubbleBg := p.SurfaceContainerLow
+				if p.Dark {
+					bubbleBg = p.SurfaceContainerHigh
+				}
+				ui.Column(c).MaxWidthPercent(80).Padding(11, 16).Radius(18, 6, 18, 18).Background(bubbleBg).Children(func() {
 					a.userMessageText(c, e.Text)
 				})
 			}
@@ -383,32 +359,32 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 				ts = a.msgTime(a.C.Turns[e.Turn].Start)
 			}
 			if ts != "" || e.Text != "" || a.rewindable(e) {
+				actVisible := msg.Hovered() || msg.FocusWithin()
 				ui.Row(c).Gap(2).AlignItems(ui.Center).Children(func() {
 					if ts != "" {
 						tbox := ui.Box(c).Padding(0, 4).Children(func() {
-							ui.Text(c, ts).FontSize(12).TextColor(p.Mute).SingleLine()
+							ui.Text(c, ts).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine()
 						})
 						target := float32(0)
-						if msg.Hovered() {
+						if actVisible {
 							target = 1
 						}
 						tbox.Opacity(tbox.AnimateTo("ts-shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
 					}
 					if e.Text != "" {
-						a.copyButton(c, e.Text, msg.Hovered())
+						a.copyButton(c, e.Text, actVisible)
 					}
 					if a.rewindable(e) {
 						if e.Text != "" {
-							a.editResendButton(c, e, msg.Hovered())
+							a.editResendButton(c, e, actVisible)
 						}
-						a.rewindButton(c, e, msg.Hovered())
+						a.rewindButton(c, e, actVisible)
 					}
 				})
 			}
 		})
 	default:
 		if e.Typed {
-			// A command the user ran is theirs, in no turn: no rail.
 			ui.Column(c).Margin(2, 0, 10, 0).Children(func() { a.card(c, e) })
 			return
 		}
@@ -416,30 +392,28 @@ func (a *App) entry(c *ui.Context, e *client.Entry, live bool) {
 	}
 }
 
-// userMessageText renders a user's prompt with its /skill and @file words
-// in the accent, the / or @ faint, as the composer showed them.
 func (a *App) userMessageText(c *ui.Context, text string) {
 	p := a.p
 	toks := refTokens(text, nil)
 	if len(toks) == 0 {
-		ui.Text(c, text).FontSize(15).TextColor(p.Fg).LineHeight(1.55).Selectable()
+		ui.Text(c, text).FontSize(14.5).TextColor(p.OnSurface).LineHeight(1.55).Selectable()
 		return
 	}
-	blue := skillAccent(p)
+	blue := p.Primary
 	var spans []ui.Span
 	pos := 0
 	for _, t := range toks {
 		if t.start > pos {
-			spans = append(spans, ui.Span{Text: text[pos:t.start], Size: 15, Color: p.Fg})
+			spans = append(spans, ui.Span{Text: text[pos:t.start], Size: 14.5, Color: p.OnSurface})
 		}
 		spans = append(spans,
-			ui.Span{Text: text[t.start : t.start+1], Size: 15, Color: blue.Alpha(.55)},
-			ui.Span{Text: text[t.start+1 : t.end], Size: 15, Color: blue, Weight: 500},
+			ui.Span{Text: text[t.start : t.start+1], Size: 14.5, Color: blue.Alpha(.75)},
+			ui.Span{Text: text[t.start+1 : t.end], Size: 14.5, Color: blue, Weight: 600},
 		)
 		pos = t.end
 	}
 	if pos < len(text) {
-		spans = append(spans, ui.Span{Text: text[pos:], Size: 15, Color: p.Fg})
+		spans = append(spans, ui.Span{Text: text[pos:], Size: 14.5, Color: p.OnSurface})
 	}
 	ui.RichText(c, spans...).LineHeight(1.55).Selectable()
 }
@@ -468,9 +442,10 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 				canRetry := a.canRetryTurn(e.Turn)
 				isLast := a.isLastAssistant(e)
 				act := ui.Row(c).Margin(2, 0, 0, -6).Gap(2).AlignItems(ui.Center)
+				actHover := msg.Hovered() || msg.FocusWithin()
 				if !isLast {
 					target := float32(0)
-					if msg.Hovered() {
+					if actHover {
 						target = 1
 					}
 					act.Opacity(act.AnimateTo("reply-act", target, ui.Animation{Duration: 120 * time.Millisecond}))
@@ -482,10 +457,10 @@ func (a *App) body(c *ui.Context, e *client.Entry) {
 					}
 					if ts != "" {
 						tbox := ui.Box(c).Padding(0, 6).Children(func() {
-							ui.Text(c, ts).FontSize(12).TextColor(p.Mute).SingleLine()
+							ui.Text(c, ts).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine()
 						})
 						target := float32(0)
-						if msg.Hovered() {
+						if actHover {
 							target = 1
 						}
 						tbox.Opacity(tbox.AnimateTo("reply-ts", target, ui.Animation{Duration: 120 * time.Millisecond}))
@@ -514,22 +489,20 @@ var noteIcons = map[string]string{"fail": "alert-circle", "fallback": "arrows-ex
 // go on.
 func (a *App) note(c *ui.Context, e *client.Entry) {
 	p := a.p
-	icon, col := noteIcons[e.Note], p.Mute
+	icon, col := noteIcons[e.Note], p.OnSurfaceVariant
 	if icon == "" {
 		icon = "info-circle"
 	}
 	if e.Note == "fail" {
-		col = p.Minus
+		col = p.Error
 	}
 	key := "note:" + strconv.Itoa(e.Key)
 	open := a.opened[key]
 	ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(2, 0, 6, 0).Children(func() {
-		row := ui.ButtonBase(c.Key(key)).Row().MinHeight(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).MinWidth(0).Label(e.Text).Disabled(e.Output == "")
+		row := ui.ButtonBase(c.Key(key)).Row().MinHeight(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(8).AlignItems(ui.Center).MinWidth(0).Label(e.Text).Disabled(e.Output == "")
 		if e.Output != "" {
-			focusRing(row, p)
-			if row.Hovered() {
-				row.Background(p.Hover)
-			}
+			m3Focus(row, p)
+			m3State(row, p, ui.Transparent, false)
 		}
 		if row.Clicked() {
 			a.transcriptList().HoldPlace()
@@ -537,22 +510,20 @@ func (a *App) note(c *ui.Context, e *client.Entry) {
 		}
 		row.Children(func() {
 			ui.Box(c).Width(16).Center().Children(func() { sym(c, icon, 14, col) })
-			ui.Text(c, e.Text).FontSize(13.5).TextColor(p.Mute).MinWidth(0)
+			ui.Text(c, e.Text).FontSize(13.5).TextColor(p.OnSurfaceVariant).MinWidth(0)
 			if e.Output != "" {
-				disclosureChevron(c, key, open, 10, p.Mute)
+				disclosureChevron(c, key, open, 10, p.OnSurfaceVariant)
 			}
 		})
 		if e.Note == "limit" && a.last(e) && !a.C.Busy && a.textButton(c, "go-on", locales.ContinueTurn()).Clicked() {
 			a.do(a.C.Prompt(locales.ContinueTurn()))
 		}
-		// A turn that failed can be run again from where it stands, as
-		// Safari offers to reload a page that did not load.
 		if e.Note == "fail" && a.last(e) && !a.C.Busy && a.canRetryTurn(e.Turn) && a.textButton(c, "retry-failed", locales.Retry()).Clicked() {
 			a.retryTurn(e.Turn)
 		}
 	})
 	if open {
-		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+		ui.Text(c, e.Output).FontSize(13.5).LineHeight(1.55).TextColor(p.OnSurfaceVariant).Padding(10, 12).Radius(12).Background(p.SurfaceContainerLow).
 			Margin(0, 0, 8, 24).Selectable().
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 120 * time.Millisecond})
 	}
@@ -586,22 +557,20 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	}
 	open := a.opened[e.CallID]
 	canOpen := e.Output != "" && !e.Skipped
-	row := ui.ButtonBase(c.Key("step:"+e.CallID)).Row().Height(28).Padding(0, 6).Margin(0, -6).Gap(8).Radius(6).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
+	row := ui.ButtonBase(c.Key("step:"+e.CallID)).Row().Height(28).Padding(0, 8).Margin(0, -8).Gap(8).Radius(8).AlignItems(ui.Center).Label(t.verb + " " + e.Detail)
 	if canOpen {
-		focusRing(row, p)
-		if row.Hovered() {
-			row.Background(p.Hover)
-		}
+		m3Focus(row, p)
+		m3State(row, p, ui.Transparent, false)
 	}
 	if row.Clicked() && canOpen {
 		a.transcriptList().HoldPlace()
 		a.opened[e.CallID] = !open
 	}
 	row.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 14, p.Mute) })
-		ui.Text(c, t.verb).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, t.symbol, 14, p.OnSurfaceVariant) })
+		ui.Text(c, t.verb).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine().Shrink(0)
 		if e.Detail != "" {
-			d := ui.Text(c, e.Detail).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+			d := ui.Text(c, e.Detail).FontSize(13).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
 			if e.Text != "task" && e.Text != "run_tasks" {
 				d.Font("monospace")
 			}
@@ -609,13 +578,13 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		ui.Spacer(c)
 		switch {
 		case !e.Done:
-			ui.Box(c).Size(2, 12).Background(p.Live)
+			ui.Box(c).Size(3, 12).Radius(1.5).Background(p.Primary)
 		case e.Skipped:
-			ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
+			ui.Text(c, locales.Skipped()).FontSize(12).TextColor(p.OnSurfaceVariant).SingleLine().Shrink(0)
 		case e.Failed:
-			ui.Box(c).Size(7, 2).Background(p.Minus)
-		case e.Output != "" && (row.Hovered() || open):
-			disclosureChevron(c, "step:"+e.CallID, open, 10, p.Mute)
+			sym(c, "alert-circle", 13, p.Error)
+		case e.Output != "" && (row.Hovered() || row.FocusVisible() || open):
+			disclosureChevron(c, "step:"+e.CallID, open, 10, p.OnSurfaceVariant)
 		}
 	})
 	if !e.Done && len(e.Steps) > 0 {
@@ -629,7 +598,7 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 		if lines := strings.Split(out, "\n"); len(lines) > 40 {
 			out = strings.Join(lines[:40], "\n") + "\n" + locales.MoreLines(len(lines)-40)
 		}
-		o := ui.Text(c, out).FontSize(13).TextColor(p.Fg2).Padding(9, 11).Radius(8).Background(p.Chip).
+		o := ui.Text(c, out).FontSize(13).TextColor(p.OnSurfaceVariant).Padding(10, 12).Radius(12).Background(p.SurfaceContainerLow).
 			Margin(2, 0, 8, 24).Selectable().PreserveSpaces()
 		if e.Text != "task" && e.Text != "run_tasks" {
 			o.Font("monospace")
@@ -637,12 +606,11 @@ func (a *App) step(c *ui.Context, e *client.Entry) {
 	}
 }
 
-// olderRow loads the log before what is shown once it scrolls into view.
 func (a *App) olderRow(c *ui.Context) {
 	if !a.C.LoadingOlder {
 		a.do(a.C.LoadOlder())
 	}
-	ui.Text(c, locales.LoadingEarlier()).FontSize(13).TextColor(a.p.Mute).Center().Padding(4, 0, 16, 0)
+	ui.Text(c, locales.LoadingEarlier()).FontSize(13).TextColor(a.p.OnSurfaceVariant).Center().Padding(4, 0, 16, 0)
 }
 
 // seek scrolls to the message a search chose, loading older pages until
@@ -674,9 +642,9 @@ func (a *App) seek(items []item) {
 // taskSteps are the last few steps of a running sub-agent, under its task.
 func (a *App) taskSteps(c *ui.Context, steps []string) {
 	p := a.p
-	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
+	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.OutlineVariant).Children(func() {
 		if n := len(steps) - 3; n > 0 {
-			ui.Text(c, locales.EarlierSteps(n)).FontSize(12.5).TextColor(p.Mute).Height(20)
+			ui.Text(c, locales.EarlierSteps(n)).FontSize(12.5).TextColor(p.OnSurfaceVariant).Height(20)
 			steps = steps[n:]
 		}
 		for i, s := range steps {
@@ -686,43 +654,41 @@ func (a *App) taskSteps(c *ui.Context, steps []string) {
 				verb = t.verb
 			}
 			ui.Row(c.Key(i)).Height(20).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, verb).FontSize(12.5).TextColor(p.Mute).Shrink(0)
-				ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+				ui.Text(c, verb).FontSize(12.5).TextColor(p.OnSurfaceVariant).Shrink(0)
+				ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		}
 	})
 }
 
-// taskGraph is a running run_tasks call: each task with its state, what
-// it waits on, and the step it is at.
 func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 	p := a.p
-	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.Edge2).Children(func() {
+	ui.Column(c).Margin(0, 0, 4, 24).Padding(0, 0, 0, 10).BorderWidth(0, 0, 0, 1).BorderColor(p.OutlineVariant).Children(func() {
 		for i, t := range tasks {
 			ui.Column(c.Key(i)).Children(func() {
 				ui.Row(c).Height(22).Gap(7).AlignItems(ui.Center).Children(func() {
 					ui.Box(c).Size(12, 14).Shrink(0).Center().Children(func() {
 						switch t.State {
 						case "run":
-							ui.Box(c).Size(2, 12).Background(p.Live)
+							ui.Box(c).Size(3, 12).Radius(1.5).Background(p.Primary)
 						case "done":
-							sym(c, "check", 12, p.Fg2)
+							sym(c, "check", 12, p.Plus)
 						case "fail":
-							ui.Box(c).Size(7, 2).Background(p.Minus)
+							sym(c, "alert-circle", 12, p.Error)
 						default:
-							ui.Box(c).Size(6, 6).Radius(3).Border(1, p.Mute)
+							ui.Box(c).Size(6, 6).Radius(3).Border(1, p.Outline)
 						}
 					})
-					color := p.Fg
+					color := p.OnSurface
 					if t.State == "" || t.State == "skip" {
-						color = p.Fg2
+						color = p.OnSurfaceVariant
 					}
 					ui.Text(c, t.Description).FontSize(13).TextColor(color).SingleLine().Ellipsis("…").MinWidth(0)
 					switch {
 					case t.State == "skip":
-						ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.Mute).Shrink(0)
+						ui.Text(c, locales.Skipped()).FontSize(12.5).TextColor(p.OnSurfaceVariant).Shrink(0)
 					case t.State == "" && len(t.After) > 0:
-						ui.Text(c, locales.WaitingFor(strings.Join(t.After, locales.ListSeparator()))).FontSize(12.5).TextColor(p.Mute).SingleLine().Shrink(0)
+						ui.Text(c, locales.WaitingFor(strings.Join(t.After, locales.ListSeparator()))).FontSize(12.5).TextColor(p.OnSurfaceVariant).SingleLine().Shrink(0)
 					}
 				})
 				if t.State == "run" && len(t.Steps) > 0 {
@@ -731,8 +697,8 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 						name = v.verb
 					}
 					ui.Row(c).Height(18).Gap(6).Padding(0, 0, 0, 19).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, name).FontSize(12.5).TextColor(p.Mute).Shrink(0)
-						ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
+						ui.Text(c, name).FontSize(12.5).TextColor(p.OnSurfaceVariant).Shrink(0)
+						ui.Text(c, detail).Font("monospace").FontSize(12.5).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
 					})
 				}
 			})
@@ -740,7 +706,6 @@ func (a *App) taskGraph(c *ui.Context, tasks []*client.GraphTask) {
 	})
 }
 
-// mcpTool splits the name of an MCP server's tool, mcp__server__tool.
 func mcpTool(name string) (server, tool string, ok bool) {
 	rest, ok := strings.CutPrefix(name, "mcp__")
 	if !ok {
@@ -749,32 +714,28 @@ func mcpTool(name string) (server, tool string, ok bool) {
 	return strings.Cut(rest, "__")
 }
 
-// copyButton copies a message. It comes up while the pointer is over the
-// message, keeping its place so nothing moves, and says it copied.
 func (a *App) copyButton(c *ui.Context, text string, shown bool) {
 	p := a.p
 	h := fnv.New64a()
 	h.Write([]byte(text))
 	key := h.Sum64()
 	done := c.Now().Sub(copied[key]) < 2*time.Second
-	b := ui.ButtonBase(c.Key(key)).Size(26, 26).Radius(7).Center().Label(locales.Copy()).Tooltip(locales.Copy())
-	focusRing(b, p)
+	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(8).Center().Label(locales.Copy()).Tooltip(locales.Copy())
+	m3Focus(b, p)
 	target := float32(0)
 	if shown || done || b.Focused() {
 		target = 1
 	}
 	b.Opacity(b.AnimateTo("shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
-	if b.Hovered() {
-		b.Background(p.Hover)
-	}
+	m3State(b, p, ui.Transparent, false)
 	b.Children(func() {
 		ui.Box(c).Absolute().Fill().Center().
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .6, Opacity: 0}, Exit: &ui.Motion{Scale: .6, Opacity: 0}}).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .7, Opacity: 0}, Exit: &ui.Motion{Scale: .7, Opacity: 0}}).
 			Key(done).Children(func() {
 			if done {
 				sym(c, "check", 14, p.Plus)
 			} else {
-				sym(c, "copy", 14, p.Mute)
+				sym(c, "copy", 14, p.OnSurfaceVariant)
 			}
 		})
 	})
@@ -860,13 +821,11 @@ func (a *App) retryTurn(turn int) {
 
 func (a *App) retryButton(c *ui.Context, turn int) {
 	p := a.p
-	b := ui.ButtonBase(c.Key(fmt.Sprintf("retry:%d", turn))).Size(26, 26).Radius(7).Center().
+	b := ui.ButtonBase(c.Key(fmt.Sprintf("retry:%d", turn))).Size(28, 28).Radius(8).Center().
 		Label(locales.Retry()).Tooltip(locales.Retry()).Disabled(a.C.Busy)
-	focusRing(b, p)
-	if b.Hovered() {
-		b.Background(p.Hover)
-	}
-	b.Children(func() { sym(c, "refresh", 14, p.Mute) })
+	m3Focus(b, p)
+	m3State(b, p, ui.Transparent, false)
+	b.Children(func() { sym(c, "refresh", 14, p.OnSurfaceVariant) })
 	if b.Clicked() {
 		a.retryTurn(turn)
 	}

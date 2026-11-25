@@ -1,39 +1,43 @@
 :root {
   color-scheme: light dark;
-  --bg: #eceef2;
-  --sheet: #fbfbfc;
-  --card: #ffffff;
-  --fg: #12131a;
-  --fg2: #5b6272;
-  --mute: #8a91a0;
-  --edge: rgba(18, 19, 26, 0.1);
-  --edge2: rgba(18, 19, 26, 0.16);
-  --sel: rgba(18, 19, 26, 0.055);
-  --hover: rgba(18, 19, 26, 0.035);
-  --chip: rgba(18, 19, 26, 0.05);
-  --live: #2b5fa6;
-  --plus: #3b7356;
-  --minus: #a8474b;
-  --scrollbar-thumb: rgba(18, 19, 26, 0.34);
+  --bg: #e9edf2;
+  --sheet: #f8f9fc;
+  --card: #f2f4f8;
+  --fg: #191c20;
+  --fg2: #44474e;
+  --mute: #44474e;
+  --edge: #e0e3e8;
+  --edge2: #74777f;
+  --sel: #d5e3ff;
+  --hover: rgba(25, 28, 32, 0.08);
+  --chip: #e4e7ec;
+  --live: #3b6698;
+  --primary-container: #d5e3ff;
+  --on-primary: #ffffff;
+  --on-primary-container: #001b3c;
+  --on-secondary-container: #131c2b;
+  --plus: #2b6d4c;
+  --minus: #ba1a1a;
+  --scrollbar-thumb: rgba(25, 28, 32, 0.34);
   --scrollbar-track: transparent;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
-  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+  --font-sans: "Inter", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, Menlo, monospace;
   accent-color: var(--live);
 }
 
 :root[data-theme="dark"] {
-  --scrollbar-thumb: rgba(244, 244, 245, 0.32);
+  --scrollbar-thumb: rgba(226, 226, 233, 0.32);
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--live) 22%, transparent);
+  background: color-mix(in oklab, var(--live) 24%, transparent);
 }
 
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--live) 50%, transparent);
-  outline-offset: 1px;
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
 }
 
 * {
@@ -82,8 +86,8 @@ body {
 }
 
 .diff-card {
-  border: 0.5px solid var(--edge);
-  border-radius: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
   background: var(--card);
   overflow: hidden;
 }
@@ -92,8 +96,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
-  border-bottom: 0.5px solid var(--edge);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--edge);
   background: var(--sheet);
   font-size: 12.5px;
 }
@@ -126,11 +130,11 @@ body {
 }
 
 .diff-btn {
-  border: 0.5px solid var(--edge2);
+  border: 1px solid var(--edge);
   background: transparent;
   color: var(--fg2);
-  border-radius: 6px;
-  padding: 2px 8px;
+  border-radius: 8px;
+  padding: 3px 10px;
   font-size: 11.5px;
   cursor: pointer;
   flex-shrink: 0;
@@ -201,7 +205,7 @@ body {
 
 .file-tab.active {
   background: var(--sel);
-  color: var(--fg);
+  color: var(--on-secondary-container);
   font-weight: 600;
 }
 
@@ -230,8 +234,9 @@ body {
 .seg {
   display: inline-flex;
   padding: 2px;
-  border-radius: 7px;
-  background: var(--chip);
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
 }
 
 .seg-btn {
@@ -239,16 +244,15 @@ body {
   background: transparent;
   color: var(--fg2);
   font-size: 11.5px;
-  padding: 3px 8px;
-  border-radius: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
   cursor: pointer;
 }
 
 .seg-btn.active {
-  background: var(--card);
-  color: var(--fg);
+  background: var(--sel);
+  color: var(--on-secondary-container);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .icon-btn {
@@ -272,18 +276,6 @@ body {
 .icon-btn:hover {
   background: var(--hover);
   color: var(--fg);
-}
-
-#files-crumb {
-  padding: 5px 12px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--mute);
-  border-bottom: 0.5px solid var(--edge);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 0;
 }
 
 #files-body {
@@ -461,36 +453,36 @@ body {
 }
 
 #remark-modal::backdrop {
-  background: rgba(18, 19, 26, 0.22);
+  background: rgba(25, 28, 32, 0.32);
 }
 
 :root[data-theme="dark"] #remark-modal::backdrop {
-  background: rgba(6, 7, 10, 0.48);
+  background: rgba(0, 0, 0, 0.56);
 }
 
 .remark-card {
-  width: 340px;
+  width: 360px;
   max-width: calc(100% - 24px);
-  background: var(--card);
-  border: 0.5px solid var(--edge2);
-  border-radius: 12px;
-  padding: 14px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  background: var(--chip);
+  border: 1px solid var(--edge);
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .remark-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 #remark-text {
   width: 100%;
-  border: 0.5px solid var(--edge2);
-  border-radius: 8px;
-  padding: 8px;
+  border: 1px solid var(--edge2);
+  border-radius: 12px;
+  padding: 10px;
   background: var(--sheet);
   color: var(--fg);
   font: inherit;
@@ -501,21 +493,21 @@ body {
 .remark-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 .btn {
-  border: 0.5px solid var(--edge2);
+  border: 1px solid var(--edge2);
   background: transparent;
   color: var(--fg);
-  border-radius: 7px;
-  padding: 5px 12px;
+  border-radius: 999px;
+  padding: 6px 14px;
   font: inherit;
   cursor: pointer;
 }
 
 .btn-primary {
   background: var(--live);
-  color: #ffffff;
+  color: var(--on-primary);
   border-color: transparent;
 }

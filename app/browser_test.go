@@ -122,7 +122,7 @@ func TestBrowserLoadsWhatTheAddressSays(t *testing.T) {
 	}
 }
 
-func TestBrowserAddressReadsAsSafariDoes(t *testing.T) {
+func TestBrowserAddressResolution(t *testing.T) {
 	for in, want := range map[string]string{
 		"localhost:3000":          "http://localhost:3000",
 		"127.0.0.1:8080/a":        "http://127.0.0.1:8080/a",
@@ -139,7 +139,7 @@ func TestBrowserAddressReadsAsSafariDoes(t *testing.T) {
 	}
 }
 
-func TestBrowserTabsCloseAsSafarisDo(t *testing.T) {
+func TestBrowserTabsBehavior(t *testing.T) {
 	a, tabs := browserApp(t)
 	a.showBrowser()
 	tt := ui.NewTester(a.View, 1440, 880)
@@ -177,8 +177,8 @@ func TestBrowserTabsCloseAsSafarisDo(t *testing.T) {
 	if got := a.activeWeb().title; got != "Calc" {
 		t.Fatalf("after closing the last tab %q is in front", got)
 	}
-	if tt.HasText("Calc") {
-		t.Error("one tab still shows the tab bar")
+	if !tt.HasText("Calc") {
+		t.Error("Chrome/M3 tab bar should stay visible even with a single tab")
 	}
 	a.closeWebTab(a.activeWeb().id)
 	tt.Frame()
@@ -292,7 +292,7 @@ func TestBrowserShowsTheAgentAtWork(t *testing.T) {
 	}
 }
 
-func TestBrowserKeysAreSafaris(t *testing.T) {
+func TestBrowserKeyboardShortcuts(t *testing.T) {
 	a, tabs := browserApp(t)
 	a.showBrowser()
 	tt := ui.NewTester(a.View, 1440, 880)
@@ -321,9 +321,7 @@ func TestBrowserKeysAreSafaris(t *testing.T) {
 	}
 }
 
-// TestBrowserReopensItsTabs: the tabs' pages stay in the settings, and the
-// browser opens them again the first time it shows, as Safari reopens
-// its windows.
+// TestBrowserReopensItsTabs verifies saved tabs reopen when the browser opens.
 func TestBrowserReopensItsTabs(t *testing.T) {
 	a, tabs := browserApp(t)
 	a.C.Settings = &proto.Settings{BrowserTabs: []string{"http://localhost:5173/", "https://example.com/"}, BrowserTab: 1}

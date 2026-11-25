@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -89,35 +88,35 @@ func (a *App) mentionMenu(c *ui.Context) {
 	m.sel = min(m.sel, len(flat)-1)
 	m.open = true
 	p := a.p
-	list := ui.Column(c.Key("mention-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
-	rim(list, p)
-	lift(list, p)
+	list := ui.Column(c.Key("mention-menu")).Margin(0, 8, 8, 8).Padding(6).Radius(16).Background(p.SurfaceContainerHigh).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Animation: &animFast})
+	elevation2(list, p)
 	list.Children(func() {
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			n := 0
 			for _, g := range groups {
-				ui.Text(c, g.label).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 2, 10)
+				ui.Text(c, g.label).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.OnSurfaceVariant).Margin(6, 10, 2, 10)
 				for _, it := range g.items {
 					i, item := n, it
 					n++
-					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(item.name).KeepFocus()
-					focusRing(row, p)
-					switch {
-					case i == m.sel:
-						row.Background(p.Sel)
+					row := ui.ButtonBase(c.Key("file:"+item.kind+":"+item.text)).Row().Height(34).Padding(0, 10).Gap(8).Radius(10).AlignItems(ui.Center).Justify(ui.Start).Label(item.name).KeepFocus()
+					m3Focus(row, p)
+					fg, sub := p.OnSurface, p.OnSurfaceVariant
+					if i == m.sel {
+						row.Background(p.SecondaryContainer)
+						fg = p.OnSecondaryContainer
 						if m.scrollSel {
 							row.ScrollIntoView()
 							m.scrollSel = false
 						}
-					case row.Hovered():
-						row.Background(p.Hover)
+					} else {
+						m3State(row, p, ui.Color{}, false)
 					}
 					row.Children(func() {
-						sym(c, mentionIcon(item.kind), 14, p.Mute)
-						ui.Text(c, item.name).FontSize(13.5).TextColor(p.Fg).SingleLine().Shrink(0)
+						sym(c, mentionIcon(item.kind), 14, sub)
+						ui.Text(c, item.name).FontSize(13.5).TextColor(fg).SingleLine().Shrink(0)
 						if item.note != "" {
-							ui.Text(c, item.note).FontSize(12.5).TextColor(p.Mute).SingleLine().TruncateMiddle().MinWidth(0)
+							ui.Text(c, item.note).FontSize(12.5).TextColor(sub).SingleLine().TruncateMiddle().MinWidth(0)
 						}
 					})
 					if row.Clicked() {

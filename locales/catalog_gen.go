@@ -6679,3 +6679,293 @@ func CommentShort() string { return In(i18n.Locale()).CommentShort() }
 func (msgs Messages) CommentShort() string {
 	return Catalog.Format(msgs.locale, "commentShort", nil)
 }
+
+// Extensions says "扩展"
+// in the language the app shows.
+func Extensions() string { return In(i18n.Locale()).Extensions() }
+
+// Extensions says "扩展"
+// in the language of msgs.
+func (msgs Messages) Extensions() string {
+	return Catalog.Format(msgs.locale, "extensions", nil)
+}
+
+// ColorStyle says "色彩风格"
+// in the language the app shows.
+func ColorStyle() string { return In(i18n.Locale()).ColorStyle() }
+
+// ColorStyle says "色彩风格"
+// in the language of msgs.
+func (msgs Messages) ColorStyle() string {
+	return Catalog.Format(msgs.locale, "colorStyle", nil)
+}
+
+// ColorStyleSoft says "柔和"
+// in the language the app shows.
+func ColorStyleSoft() string { return In(i18n.Locale()).ColorStyleSoft() }
+
+// ColorStyleSoft says "柔和"
+// in the language of msgs.
+func (msgs Messages) ColorStyleSoft() string {
+	return Catalog.Format(msgs.locale, "colorStyleSoft", nil)
+}
+
+// ColorStyleVivid says "鲜明"
+// in the language the app shows.
+func ColorStyleVivid() string { return In(i18n.Locale()).ColorStyleVivid() }
+
+// ColorStyleVivid says "鲜明"
+// in the language of msgs.
+func (msgs Messages) ColorStyleVivid() string {
+	return Catalog.Format(msgs.locale, "colorStyleVivid", nil)
+}
+
+// ColorStyleTinted says "浸染"
+// in the language the app shows.
+func ColorStyleTinted() string { return In(i18n.Locale()).ColorStyleTinted() }
+
+// ColorStyleTinted says "浸染"
+// in the language of msgs.
+func (msgs Messages) ColorStyleTinted() string {
+	return Catalog.Format(msgs.locale, "colorStyleTinted", nil)
+}
+
+// ColorStyleMonochrome says "单色"
+// in the language the app shows.
+func ColorStyleMonochrome() string { return In(i18n.Locale()).ColorStyleMonochrome() }
+
+// ColorStyleMonochrome says "单色"
+// in the language of msgs.
+func (msgs Messages) ColorStyleMonochrome() string {
+	return Catalog.Format(msgs.locale, "colorStyleMonochrome", nil)
+}
+
+// PureBlack says "纯黑模式"
+// in the language the app shows.
+func PureBlack() string { return In(i18n.Locale()).PureBlack() }
+
+// PureBlack says "纯黑模式"
+// in the language of msgs.
+func (msgs Messages) PureBlack() string {
+	return Catalog.Format(msgs.locale, "pureBlack", nil)
+}
+
+// PureBlackNote says "深色模式下使用 #000000 纯黑底色。"
+// in the language the app shows.
+func PureBlackNote() string { return In(i18n.Locale()).PureBlackNote() }
+
+// PureBlackNote says "深色模式下使用 #000000 纯黑底色。"
+// in the language of msgs.
+func (msgs Messages) PureBlackNote() string {
+	return Catalog.Format(msgs.locale, "pureBlackNote", nil)
+}
+
+// SeedColor says "主题种子色"
+// in the language the app shows.
+func SeedColor() string { return In(i18n.Locale()).SeedColor() }
+
+// SeedColor says "主题种子色"
+// in the language of msgs.
+func (msgs Messages) SeedColor() string {
+	return Catalog.Format(msgs.locale, "seedColor", nil)
+}
+
+// CustomHexColor says "自定义色值"
+// in the language the app shows.
+func CustomHexColor() string { return In(i18n.Locale()).CustomHexColor() }
+
+// CustomHexColor says "自定义色值"
+// in the language of msgs.
+func (msgs Messages) CustomHexColor() string {
+	return Catalog.Format(msgs.locale, "customHexColor", nil)
+}
+
+// PresetBasalt says "玄武钴蓝"
+// in the language the app shows.
+func PresetBasalt() string { return In(i18n.Locale()).PresetBasalt() }
+
+// PresetBasalt says "玄武钴蓝"
+// in the language of msgs.
+func (msgs Messages) PresetBasalt() string {
+	return Catalog.Format(msgs.locale, "presetBasalt", nil)
+}
+
+// PresetMalachite says "孔雀石绿"
+// in the language the app shows.
+func PresetMalachite() string { return In(i18n.Locale()).PresetMalachite() }
+
+// PresetMalachite says "孔雀石绿"
+// in the language of msgs.
+func (msgs Messages) PresetMalachite() string {
+	return Catalog.Format(msgs.locale, "presetMalachite", nil)
+}
+
+// PresetOchre says "砂岩赭石"
+// in the language the app shows.
+func PresetOchre() string { return In(i18n.Locale()).PresetOchre() }
+
+// PresetOchre says "砂岩赭石"
+// in the language of msgs.
+func (msgs Messages) PresetOchre() string {
+	return Catalog.Format(msgs.locale, "presetOchre", nil)
+}
+
+// PresetGarnet says "页岩红榴"
+// in the language the app shows.
+func PresetGarnet() string { return In(i18n.Locale()).PresetGarnet() }
+
+// PresetGarnet says "页岩红榴"
+// in the language of msgs.
+func (msgs Messages) PresetGarnet() string {
+	return Catalog.Format(msgs.locale, "presetGarnet", nil)
+}
+
+// PresetFeldspar says "长石紫"
+// in the language the app shows.
+func PresetFeldspar() string { return In(i18n.Locale()).PresetFeldspar() }
+
+// PresetFeldspar says "长石紫"
+// in the language of msgs.
+func (msgs Messages) PresetFeldspar() string {
+	return Catalog.Format(msgs.locale, "presetFeldspar", nil)
+}
+
+// PresetObsidian says "曜石单色"
+// in the language the app shows.
+func PresetObsidian() string { return In(i18n.Locale()).PresetObsidian() }
+
+// PresetObsidian says "曜石单色"
+// in the language of msgs.
+func (msgs Messages) PresetObsidian() string {
+	return Catalog.Format(msgs.locale, "presetObsidian", nil)
+}
+
+// ThemePreview says "实时预览"
+// in the language the app shows.
+func ThemePreview() string { return In(i18n.Locale()).ThemePreview() }
+
+// ThemePreview says "实时预览"
+// in the language of msgs.
+func (msgs Messages) ThemePreview() string {
+	return Catalog.Format(msgs.locale, "themePreview", nil)
+}
+
+// FilterAll says "全部"
+// in the language the app shows.
+func FilterAll() string { return In(i18n.Locale()).FilterAll() }
+
+// FilterAll says "全部"
+// in the language of msgs.
+func (msgs Messages) FilterAll() string {
+	return Catalog.Format(msgs.locale, "filterAll", nil)
+}
+
+// FilterRunning says "运行中"
+// in the language the app shows.
+func FilterRunning() string { return In(i18n.Locale()).FilterRunning() }
+
+// FilterRunning says "运行中"
+// in the language of msgs.
+func (msgs Messages) FilterRunning() string {
+	return Catalog.Format(msgs.locale, "filterRunning", nil)
+}
+
+// FilterPending says "待处理"
+// in the language the app shows.
+func FilterPending() string { return In(i18n.Locale()).FilterPending() }
+
+// FilterPending says "待处理"
+// in the language of msgs.
+func (msgs Messages) FilterPending() string {
+	return Catalog.Format(msgs.locale, "filterPending", nil)
+}
+
+// FilterArchived says "已归档"
+// in the language the app shows.
+func FilterArchived() string { return In(i18n.Locale()).FilterArchived() }
+
+// FilterArchived says "已归档"
+// in the language of msgs.
+func (msgs Messages) FilterArchived() string {
+	return Catalog.Format(msgs.locale, "filterArchived", nil)
+}
+
+// FilterSessions says "筛选会话…"
+// in the language the app shows.
+func FilterSessions() string { return In(i18n.Locale()).FilterSessions() }
+
+// FilterSessions says "筛选会话…"
+// in the language of msgs.
+func (msgs Messages) FilterSessions() string {
+	return Catalog.Format(msgs.locale, "filterSessions", nil)
+}
+
+// FilterChanges says "筛选变更文件…"
+// in the language the app shows.
+func FilterChanges() string { return In(i18n.Locale()).FilterChanges() }
+
+// FilterChanges says "筛选变更文件…"
+// in the language of msgs.
+func (msgs Messages) FilterChanges() string {
+	return Catalog.Format(msgs.locale, "filterChanges", nil)
+}
+
+// FilterFiles says "筛选工作区文件…"
+// in the language the app shows.
+func FilterFiles() string { return In(i18n.Locale()).FilterFiles() }
+
+// FilterFiles says "筛选工作区文件…"
+// in the language of msgs.
+func (msgs Messages) FilterFiles() string {
+	return Catalog.Format(msgs.locale, "filterFiles", nil)
+}
+
+// BrowserOmnibox says "搜索或输入网址"
+// in the language the app shows.
+func BrowserOmnibox() string { return In(i18n.Locale()).BrowserOmnibox() }
+
+// BrowserOmnibox says "搜索或输入网址"
+// in the language of msgs.
+func (msgs Messages) BrowserOmnibox() string {
+	return Catalog.Format(msgs.locale, "browserOmnibox", nil)
+}
+
+// KernelReady says "就绪"
+// in the language the app shows.
+func KernelReady() string { return In(i18n.Locale()).KernelReady() }
+
+// KernelReady says "就绪"
+// in the language of msgs.
+func (msgs Messages) KernelReady() string {
+	return Catalog.Format(msgs.locale, "kernelReady", nil)
+}
+
+// TurnFilesEdited says "{count} 个文件"
+// in the language the app shows.
+func TurnFilesEdited(count int) string { return In(i18n.Locale()).TurnFilesEdited(count) }
+
+// TurnFilesEdited says "{count} 个文件"
+// in the language of msgs.
+func (msgs Messages) TurnFilesEdited(count int) string {
+	return Catalog.Format(msgs.locale, "turnFilesEdited", map[string]any{"count": count})
+}
+
+// TurnCommandsRan says "{count} 条命令"
+// in the language the app shows.
+func TurnCommandsRan(count int) string { return In(i18n.Locale()).TurnCommandsRan(count) }
+
+// TurnCommandsRan says "{count} 条命令"
+// in the language of msgs.
+func (msgs Messages) TurnCommandsRan(count int) string {
+	return Catalog.Format(msgs.locale, "turnCommandsRan", map[string]any{"count": count})
+}
+
+// ReduceMotionNoteM3 says "关闭非必要的位移与过渡动画，保持界面静止清晰。"
+// in the language the app shows.
+func ReduceMotionNoteM3() string { return In(i18n.Locale()).ReduceMotionNoteM3() }
+
+// ReduceMotionNoteM3 says "关闭非必要的位移与过渡动画，保持界面静止清晰。"
+// in the language of msgs.
+func (msgs Messages) ReduceMotionNoteM3() string {
+	return Catalog.Format(msgs.locale, "reduceMotionNoteM3", nil)
+}

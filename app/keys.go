@@ -138,8 +138,7 @@ func (a *App) keys(c *ui.Context) {
 			a.toggleTerminal()
 		}
 	})
-	// While the browser shows without the terminal, ⌘T opens a tab in it,
-	// as in Safari; ⌘R reloads its page.
+	// While the browser shows without the terminal, ⌘T opens a tab and ⌘R reloads its page.
 	web := a.browserShown() && !a.settingsOpen && !a.automationsOpen && !a.pal.open
 	if (a.termShown() || web) && !a.pal.open {
 		c.OnWindowShortcut(ui.Cmd, ui.KeyT, func() {

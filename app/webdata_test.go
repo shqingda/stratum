@@ -104,7 +104,7 @@ func TestBrowserToolbarMenu(t *testing.T) {
 	nt, ok1 := tt.Find("新建标签页")
 	dl, ok2 := tt.Find("下载")
 	more, ok3 := tt.Find("更多")
-	if !ok1 || !ok2 || !ok3 || dl.Y != nt.Y || more.Y != nt.Y || dl.X <= nt.X || more.X <= dl.X {
+	if !ok1 || !ok2 || !ok3 || nt.Y <= dl.Y || more.Y != dl.Y || more.X <= dl.X {
 		t.Fatalf("toolbar: New Tab %v %v, Downloads %v %v, More %v %v", nt, ok1, dl, ok2, more, ok3)
 	}
 
@@ -152,8 +152,7 @@ func TestBrowserToolbarMenu(t *testing.T) {
 	}
 }
 
-// Downloads go where Settings say, numbered beside a file of the name,
-// and list in the toolbar's Downloads with their size, as Safari's.
+// Downloads go where Settings say and appear in the toolbar Downloads popover with their size.
 func TestBrowserDownloads(t *testing.T) {
 	a, _ := browserApp(t)
 	a.clearWebData = func(WebData) error { return nil }

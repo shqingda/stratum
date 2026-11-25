@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/shqingda/stratum/client"
@@ -178,32 +177,31 @@ func (a *App) reviewToggle(c *ui.Context) {
 		tip = locales.HideChanges()
 	}
 	hasDiff := w.Dirty || w.Added > 0 || w.Removed > 0
-	b := ui.ButtonBase(c.Key("review")).Row().Height(28).Radius(7).AlignItems(ui.Center).Justify(ui.Center).
-		Label(tip).Tooltip(tip + "  ⌘⌥I")
+	b := ui.ButtonBase(c.Key("review")).Row().Height(32).Radius(10).AlignItems(ui.Center).Justify(ui.Center).
+		Label(tip).Tooltip(tip + "  ⌘⌥I").Expanded(a.rv.open)
 	if hasDiff {
-		b.Padding(0, 8).Gap(5)
+		b.Padding(0, 10).Gap(5)
 	} else {
-		b.Width(28)
+		b.Width(32)
 	}
-	focusRing(b, p)
-	fg := p.Fg2
+	m3Focus(b, p)
+	m3State(b, p, ui.Transparent, a.rv.open)
+	fg := p.OnSurfaceVariant
 	if a.rv.open {
-		b.Background(p.Sel)
-		fg = p.Live
+		fg = p.OnSecondaryContainer
 	} else if b.Hovered() {
-		b.Background(p.Hover)
-		fg = p.Fg
+		fg = p.OnSurface
 	}
 	b.Children(func() {
 		if hasDiff {
 			if w.Added > 0 {
-				ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).TextColor(p.Plus).SingleLine()
+				ui.Text(c, fmt.Sprintf("+%d", w.Added)).Font("monospace").FontSize(12).FontWeight(600).TextColor(p.Plus).SingleLine()
 			}
 			if w.Removed > 0 {
-				ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(12).TextColor(p.Minus).SingleLine()
+				ui.Text(c, fmt.Sprintf("−%d", w.Removed)).Font("monospace").FontSize(12).FontWeight(600).TextColor(p.Minus).SingleLine()
 			}
 		}
-		sym(c, "layout-sidebar-right", 16, fg)
+		sym(c, "layout-sidebar-right", 18, fg)
 	})
 	if b.Clicked() {
 		a.rv.open = !a.rv.open
@@ -213,14 +211,11 @@ func (a *App) reviewToggle(c *ui.Context) {
 func (a *App) reviewPanel(c *ui.Context) {
 	p := a.p
 	turns := a.shownTurns()
-	panel := ui.Column(c).Background(p.Sheet).Clip()
+	panel := ui.Column(c).Background(p.SurfaceContainerLow).Clip()
 	if a.rv.maximized {
 		panel.Grow(1).MinWidth(0)
-		if a.side.sideOpen > 0.001 && !c.Vibrancy() {
-			panel.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
-		}
 	} else {
-		panel.Width(a.reviewWidth()).Shrink(0).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
+		panel.Width(a.reviewWidth()).Shrink(0)
 	}
 	panel.Children(func() {
 		a.reviewTabs(c, fileCount(turns))
@@ -238,7 +233,7 @@ func (a *App) reviewPanel(c *ui.Context) {
 			a.browserPane(c)
 			return
 		}
-		const scopeBarH = 40
+		const scopeBarH = 44
 		renderScopeBar := func(row ui.Element) {
 			row.Height(scopeBarH).AlignItems(ui.Center).Children(func() {
 				a.scope(c)
@@ -249,10 +244,12 @@ func (a *App) reviewPanel(c *ui.Context) {
 					if split {
 						label = "Split"
 					}
-					b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(24).Padding(0, 8).Radius(6).AlignItems(ui.Center).Background(p.Chip).Label(label)
-					focusRing(b, p)
+					b := ui.ButtonBase(c.Key("rv-diff-style")).Row().Height(26).Padding(0, 10).Radius(8).AlignItems(ui.Center).
+						Label(label)
+					m3Focus(b, p)
+					m3State(b, p, p.SurfaceContainerHigh, false)
 					b.Children(func() {
-						ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+						ui.Text(c, label).FontSize(11.5).FontWeight(500).TextColor(p.OnSurfaceVariant).SingleLine()
 					})
 					if b.Clicked() {
 						if split {
@@ -266,9 +263,9 @@ func (a *App) reviewPanel(c *ui.Context) {
 					a.foldAll(c, turns)
 				}
 				add, del := a.totals(turns)
-				ui.Row(c).Gap(6).Margin(0, 14, 0, 0).Children(func() {
-					ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(13).TextColor(p.Plus)
-					ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(13).TextColor(p.Minus)
+				ui.Row(c).Gap(6).Margin(0, 14, 0, 6).Children(func() {
+					ui.Text(c, fmt.Sprintf("+%d", add)).Font("monospace").FontSize(12.5).FontWeight(600).TextColor(p.Plus)
+					ui.Text(c, fmt.Sprintf("−%d", del)).Font("monospace").FontSize(12.5).FontWeight(600).TextColor(p.Minus)
 				})
 			})
 		}
@@ -309,19 +306,12 @@ func (a *App) reviewPanel(c *ui.Context) {
 				}
 			}
 		}
-		if a.pierre.wv != nil {
-			renderScopeBar(ui.Row(c).Shrink(0).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge))
-			renderChangesBody()
-		} else {
-			ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
-				ui.Column(c).Grow(1).MinHeight(0).Padding(scopeBarH, 0, 0, 0).Children(func() {
-					renderChangesBody()
-				})
-				ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(scopeBarH + 8).PassThrough().
-					Material(glass.ScrollEdge{Background: p.Sheet})
-				renderScopeBar(ui.Row(c).Absolute().Top(0).Left(0).Right(0))
+		ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+			renderScopeBar(ui.Row(c).Shrink(0))
+			ui.Column(c).Grow(1).MinHeight(0).Children(func() {
+				renderChangesBody()
 			})
-		}
+		})
 		if a.C.Current != nil {
 			a.remarksBar(c)
 			a.reviewFoot(c, turns)
@@ -331,34 +321,50 @@ func (a *App) reviewPanel(c *ui.Context) {
 
 func (a *App) reviewNote(c *ui.Context, s string) {
 	ui.Column(c).Grow(1).Center().Children(func() {
-		ui.Text(c, s).FontSize(13.5).TextColor(a.p.Mute)
+		ui.Text(c, s).FontSize(13.5).TextColor(a.p.OnSurfaceVariant)
 	})
 }
 
-// scope is the segmented control between the last turn and all of them.
+// scope renders an M3 Segmented Button between last turn, uncommitted, and branch changes.
 func (a *App) scope(c *ui.Context) {
 	p := a.p
-	ui.Row(c).Padding(2).Radius(8).Background(p.Chip).Margin(0, 12).Children(func() {
+	ui.Row(c).Margin(0, 12).Padding(2).Radius(14).Background(p.SurfaceContainerHigh).Gap(2).Children(func() {
 		base := locales.AgainstBranch()
 		if b := a.C.Workspace.Base; b != "" {
 			base = locales.AgainstBase(b)
 		}
-		for _, s := range []struct {
+		opts := []struct {
 			label               string
 			uncommitted, branch bool
-		}{{locales.LastTurn(), false, false}, {locales.Uncommitted(), true, false}, {base, false, true}} {
+		}{{locales.LastTurn(), false, false}, {locales.Uncommitted(), true, false}, {base, false, true}}
+		for _, s := range opts {
 			on := a.rv.uncommitted == s.uncommitted && a.rv.branch == s.branch
-			b := ui.ButtonBase(c.Key(fmt.Sprintf("scope:%v:%v", s.uncommitted, s.branch))).Height(24).Padding(0, 10).Radius(6).Center().Label(s.label).Selected(on)
-			col, weight := p.Fg2, 400
+			b := ui.ButtonBase(c.Key(fmt.Sprintf("scope:%v:%v", s.uncommitted, s.branch))).Row().Height(26).
+				Padding(0, 10).Gap(4).Radius(12).Center().Label(s.label).Selected(on)
+			m3Focus(b, p)
 			if on {
-				b.Background(p.Card).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08)).Border(.5, p.Edge2)
-				col, weight = p.Fg, 500
+				selBg := p.Surface
+				if p.Dark {
+					selBg = p.SurfaceContainerHighest
+				}
+				b.Background(selBg)
+			} else {
+				m3State(b, p, ui.Transparent, false)
 			}
-			b.Children(func() { ui.Text(c, s.label).FontSize(13).FontWeight(weight).TextColor(col) })
+			col, weight := p.OnSurfaceVariant, 500
+			if on {
+				col, weight = p.OnSurface, 600
+			}
+			b.Children(func() {
+				if on {
+					sym(c, "check", 12, col)
+				}
+				ui.Text(c, s.label).FontSize(12).FontWeight(weight).TextColor(col).SingleLine()
+			})
 			if b.Clicked() && !on {
 				a.rv.uncommitted, a.rv.branch, a.rv.sel, a.rv.turn = s.uncommitted, s.branch, "", 0
 				if s.uncommitted || s.branch {
-					a.C.Workspace.BranchStale = true // read it as it is now
+					a.C.Workspace.BranchStale = true
 				}
 			}
 		}
@@ -393,13 +399,12 @@ func (a *App) turnLabel(seq int64) string {
 }
 
 func (a *App) reviewFiles(c *ui.Context, turns []proto.ChangeTurn) {
-	p := a.p
 	if a.rv.sel == "" || !slices.ContainsFunc(turns, func(t proto.ChangeTurn) bool {
 		return slices.ContainsFunc(t.Files, func(f proto.ChangeFile) bool { return client.DiffKey(t.TurnSeq, f.Path) == a.rv.sel })
 	}) {
 		a.rv.sel = client.DiffKey(turns[0].TurnSeq, turns[0].Files[0].Path)
 	}
-	ui.Scroll(c).Shrink(0).MaxHeight(240).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+	ui.Scroll(c).Shrink(0).MaxHeight(240).Children(func() {
 		ui.Column(c).Padding(6, 8).Children(func() {
 			for _, t := range turns {
 				for _, f := range t.Files {
@@ -414,19 +419,18 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 	p := a.p
 	key := client.DiffKey(turn, f.Path)
 	on := a.rv.sel == key
-	row := ui.ButtonBase(c.Key("file:"+key)).Row().Height(28).Padding(0, 8).Gap(8).Radius(6).AlignItems(ui.Center).Label(f.Path)
-	focusRing(row, p)
-	switch {
-	case on:
-		row.Background(p.Sel)
-	case row.Hovered():
-		row.Background(p.Hover)
+	row := ui.ButtonBase(c.Key("file:"+key)).Row().Height(30).Padding(0, 10).Gap(8).Radius(10).AlignItems(ui.Center).Label(f.Path)
+	m3Focus(row, p)
+	rowBg := ui.Transparent
+	if on {
+		rowBg = p.SurfaceContainerHigh
 	}
+	m3State(row, p, rowBg, false)
 	if row.Clicked() {
 		a.rv.sel, a.rv.jump = key, key
 	}
 	gone := false
-	status, col := "M", p.Mute
+	status, col := "M", p.OnSurfaceVariant
 	if d := a.fileDiff(key); d != nil {
 		switch d.status {
 		case 'A':
@@ -439,20 +443,20 @@ func (a *App) fileRow(c *ui.Context, turn int64, f proto.ChangeFile) {
 	row.ContextMenu(func(m *ui.Menu) { a.fileContextMenu(c, m, f.Path, gone) })
 	reverted := a.C.Changes.FileReverted(turn, f.Path)
 	row.Children(func() {
-		ui.Text(c, status).FontSize(11.5).FontWeight(600).TextColor(col).Width(12).TextAlign(ui.Center).Shrink(0)
+		ui.Text(c, status).FontSize(11.5).FontWeight(600).TextColor(col).Width(14).TextAlign(ui.Center).Shrink(0)
 		dir, base := a.splitPath(f.Path)
 		ui.Row(c).Grow(1).MinWidth(0).Children(func() {
 			if dir != "" {
-				ui.Text(c, dir).FontSize(13.5).TextColor(p.Mute).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
+				ui.Text(c, dir).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
 			}
-			name := ui.Text(c, base).FontSize(13.5).TextColor(p.Fg).SingleLine().Shrink(0)
+			name := ui.Text(c, base).FontSize(13).FontWeight(500).TextColor(p.OnSurface).SingleLine().Shrink(0)
 			if reverted {
-				name.TextColor(p.Mute).Strikethrough()
+				name.TextColor(p.OnSurfaceVariant).Strikethrough()
 			}
 		})
 		ui.Row(c).Gap(6).Shrink(0).Children(func() {
-			ui.Text(c, fmt.Sprintf("+%d", f.Added)).Font("monospace").FontSize(12.5).TextColor(p.Plus).Opacity(nonzero(f.Added))
-			ui.Text(c, fmt.Sprintf("−%d", f.Removed)).Font("monospace").FontSize(12.5).TextColor(p.Minus).Opacity(nonzero(f.Removed))
+			ui.Text(c, fmt.Sprintf("+%d", f.Added)).Font("monospace").FontSize(12).TextColor(p.Plus).Opacity(nonzero(f.Added))
+			ui.Text(c, fmt.Sprintf("−%d", f.Removed)).Font("monospace").FontSize(12).TextColor(p.Minus).Opacity(nonzero(f.Removed))
 		})
 	})
 }
@@ -593,11 +597,11 @@ func (a *App) diffItemView(c *ui.Context, it *diffItem) {
 		if it.hunk >= 0 {
 			pad = 8
 		}
-		ui.Text(c, it.note).FontSize(13).TextColor(p.Mute).Padding(pad, 14)
+		ui.Text(c, it.note).FontSize(13).TextColor(p.OnSurfaceVariant).Padding(pad, 14)
 	case 'h':
 		h := it.d.hunks[it.hunk]
 		ui.Row(c).Height(30).Padding(0, 8, 0, 14).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, h.head()).Font("monospace").FontSize(12.5).TextColor(p.Mute).SingleLine().Grow(1).MinWidth(0)
+			ui.Text(c, h.head()).Font("monospace").FontSize(12.5).TextColor(p.OnSurfaceVariant).SingleLine().Grow(1).MinWidth(0)
 			if it.turn > 0 && !a.C.Changes.FileReverted(it.turn, it.file.Path) {
 				b := a.barButton(c, "hunk", "arrow-back-up", locales.UndoHunk(), func() {}).Height(24)
 				b.Disabled(a.C.Busy).Tooltip(map[bool]string{true: locales.CantRestoreWhileRunning()}[a.C.Busy])
@@ -641,26 +645,24 @@ func (a *App) fileHead(c *ui.Context, key string, f proto.ChangeFile) {
 	p := a.p
 	folded := a.rv.folded[key]
 	dir, base := a.splitPath(f.Path)
-	head := ui.ButtonBase(c.Key("head:"+key)).Row().Height(32).Padding(0, 12, 0, 8).Gap(6).AlignItems(ui.Center).
-		Label(dir+base).Expanded(!folded).Background(p.Sheet).BorderWidth(.5, 0).BorderColor(p.Edge)
-	focusRing(head, p)
-	if head.Hovered() {
-		head.Background(p.Hover)
-	}
+	head := ui.ButtonBase(c.Key("head:"+key)).Row().Height(34).Padding(0, 12, 0, 10).Gap(6).AlignItems(ui.Center).
+		Label(dir+base).Expanded(!folded).Background(p.SurfaceContainerHigh)
+	m3Focus(head, p)
+	m3State(head, p, p.SurfaceContainerHigh, false)
 	gone := false
 	if d := a.fileDiff(key); d != nil && d.status == 'D' {
 		gone = true
 	}
 	head.ContextMenu(func(m *ui.Menu) { a.fileContextMenu(c, m, f.Path, gone) })
 	head.Children(func() {
-		sym(c, map[bool]string{true: "chevron-right", false: "chevron-down"}[folded], 14, p.Mute)
+		sym(c, map[bool]string{true: "chevron-right", false: "chevron-down"}[folded], 14, p.OnSurfaceVariant)
 		name := ui.ButtonBase(c.Key("name:" + key)).Row().MinWidth(0).Shrink(1).Label(locales.OpenInEditor()).Tooltip(locales.OpenInEditor()).Disabled(gone)
 		hover := name.Hovered() && !gone
 		name.Children(func() {
 			if dir != "" {
-				ui.Text(c, dir).FontSize(13).TextColor(p.Mute).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
+				ui.Text(c, dir).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine().TruncateMiddle().Shrink(1).MinWidth(0)
 			}
-			t := ui.Text(c, base).FontSize(13).FontWeight(500).TextColor(p.Fg).SingleLine().Shrink(0)
+			t := ui.Text(c, base).FontSize(13).FontWeight(600).TextColor(p.OnSurface).SingleLine().Shrink(0)
 			if hover {
 				t.Underline()
 			}
@@ -714,15 +716,19 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 	var toks []editor.Token
 	isNew := true
 	idx := e.b
+	bgAlpha := float32(.20)
+	if p.Dark {
+		bgAlpha = .14
+	}
 	switch e.op {
 	case '+':
-		bg, signCol, sign, text = p.Plus.Alpha(.10), p.Plus, "+", d.new[e.b]
+		bg, signCol, sign, text = p.PlusContainer.Alpha(bgAlpha), p.Plus, "+", d.new[e.b]
 		if d.newTok != nil {
 			toks = d.newTok[e.b]
 		}
 	case '-':
 		isNew, idx = false, e.a
-		bg, signCol, sign, text = p.Minus.Alpha(.10), p.Minus, "−", d.old[e.a]
+		bg, signCol, sign, text = p.MinusContainer.Alpha(bgAlpha), p.Minus, "−", d.old[e.a]
 		if d.oldTok != nil {
 			toks = d.oldTok[e.a]
 		}
@@ -744,23 +750,22 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 	if e.op != ' ' {
 		row.Background(bg)
 	}
-	hover := row.Hovered()
+	hover := row.Hovered() || row.FocusWithin()
 	row.Children(func() {
 		for i, n := range [2]string{num(e.a), num(e.b)} {
 			if i == 1 && (hover || (a.rv.writing != "" && a.rv.writing == at.at())) {
-				// The new line's number gives way to a + that comments on it.
 				b := ui.ButtonBase(c.Key("remark")).Size(38, diffRowHeight).Shrink(0).Center().Label(locales.AddRemark()).Tooltip(locales.AddRemark())
 				b.Children(func() {
-					ui.Box(c).Size(18, 18).Radius(5).Background(p.Acc).Center().Children(func() { sym(c, "plus", 12, p.OnAcc) })
+					ui.Box(c).Size(18, 18).Radius(6).Background(p.Primary).Center().Children(func() { sym(c, "plus", 12, p.OnPrimary) })
 				})
 				if b.Clicked() {
 					a.writeRemark(c, at)
 				}
 				continue
 			}
-			ui.Text(c, n).Font("monospace").FontSize(13).TextColor(p.Faint).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
+			ui.Text(c, n).Font("monospace").FontSize(12.5).TextColor(p.OnSurfaceVariant.Alpha(.65)).Width(38).TextAlign(ui.End).Padding(0, 4, 0, 0).Shrink(0).SingleLine()
 		}
-		ui.Text(c, sign).Font("monospace").FontSize(13).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
+		ui.Text(c, sign).Font("monospace").FontSize(12.5).TextColor(signCol).Width(16).TextAlign(ui.Center).Shrink(0)
 		ui.RichText(c, a.cachedDiffSpans(c, d, isNew, idx, text, toks)...).SingleLine().PreserveSpaces().
 			Padding(0, 6).Grow(1).MinWidth(0).Selectable()
 	})
@@ -769,8 +774,6 @@ func (a *App) diffRow(c *ui.Context, path string, d *fileDiff, e edit) {
 	}
 }
 
-// reviewFoot commits the folder, and takes back or redoes the turn of
-// the file shown.
 func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 	p := a.p
 	var turn int64
@@ -787,7 +790,7 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 		return
 	}
 	reverted := a.C.Changes.Reverted[turn]
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).Gap(8).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12).Gap(8).AlignItems(ui.Center).Children(func() {
 		if dirty {
 			a.commitField(c)
 		} else {
@@ -803,8 +806,8 @@ func (a *App) reviewFoot(c *ui.Context, turns []proto.ChangeTurn) {
 				note = w.PR.Title
 			}
 			if note != "" {
-				ui.Row(c).Height(28).Grow(1).MinWidth(0).Radius(7).Background(p.Chip).Padding(0, 10).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, note).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…").MinWidth(0)
+				ui.Row(c).Height(30).Grow(1).MinWidth(0).Radius(10).Background(p.SurfaceContainerHigh).Padding(0, 10).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, note).FontSize(12.5).TextColor(p.OnSurfaceVariant).SingleLine().Ellipsis("…").MinWidth(0)
 				})
 			} else {
 				ui.Spacer(c)

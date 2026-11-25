@@ -49,8 +49,7 @@ func TestOptionCmdEnterAllowsAlways(t *testing.T) {
 	}
 }
 
-// TestCmdPlusZoomsText checks that ⌘+ steps the text size up, as View ›
-// Zoom In does in Safari and Mail.
+// TestCmdPlusZoomsText checks that ⌘+ steps the text size up via View zoom.
 func TestCmdPlusZoomsText(t *testing.T) {
 	a := working()
 	a.C.Busy, a.C.Approvals, a.C.Queued = false, nil, nil

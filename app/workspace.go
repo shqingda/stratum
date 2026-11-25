@@ -132,25 +132,21 @@ func openBrowser(u string) error {
 	return exec.Command("open", u).Start()
 }
 
-// barButton is a button of the bar or inspector, lifted slightly off the sheet.
 func (a *App) barButton(c *ui.Context, key, symbol, label string, children func()) ui.Element {
 	p := a.p
-	b := ui.ButtonBase(c.Key(key)).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).
-		Label(label).Background(p.Card).Border(.5, p.Edge2)
-	rim(b, p)
-	if b.Hovered() {
-		b.Background(p.Card.Mix(p.Fg, .04))
-	}
+	b := ui.ButtonBase(c.Key(key)).Row().Height(30).Padding(0, 12).Gap(6).Radius(12).AlignItems(ui.Center).
+		Label(label)
+	m3Focus(b, p)
+	m3State(b, p, p.SurfaceContainerHigh, false)
 	b.Children(func() {
-		sym(c, symbol, 15, p.Fg2)
-		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg).SingleLine()
+		sym(c, symbol, 15, p.OnSurfaceVariant)
+		ui.Text(c, label).FontSize(13).FontWeight(500).TextColor(p.OnSurface).SingleLine()
 		children()
 	})
 	return b
 }
 
-// workspaceCapsule groups the project switcher, branch switcher, and installed
-// external openers into one compact top-bar capsule.
+// workspaceCapsule renders a borderless M3 tonal AssistChip for switching workspace/branch or opening externally.
 func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	p := a.p
 	dir := cur.Cwd
@@ -161,17 +157,18 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 	if br := a.C.Workspace.Branch; br != "" {
 		label += " · " + br
 	}
-	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(28).Padding(0, 9).Gap(5).Radius(8).AlignItems(ui.Center).
-		Background(p.Chip).Shrink(1).MinWidth(0).Label(label)
-	rim(b, p)
-	focusRing(b, p)
-	if b.Hovered() {
-		b.Background(p.Sel)
+	b := ui.ButtonBase(c.Key("workspace-capsule")).Row().Height(30).Padding(0, 10).Gap(6).Radius(10).AlignItems(ui.Center).
+		Shrink(1).MinWidth(0).Label(label)
+	m3Focus(b, p)
+	base := ui.Transparent
+	if a.menu.openMenu {
+		base = p.SurfaceContainerLow
 	}
+	m3State(b, p, base, false)
 	b.Children(func() {
-		sym(c, "folder", 13, p.Mute)
-		ui.Text(c, label).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").MinWidth(0)
-		sym(c, "chevron-down", 11, p.Mute)
+		sym(c, "folder", 17, p.OnSurfaceVariant)
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
+		sym(c, "chevron-down", 12, p.OnSurfaceVariant)
 	})
 	b.PopoverMenuButton(func(m *ui.Menu) {
 		menuText := func(it *ui.MenuItem, text string) *ui.MenuItem {
@@ -245,8 +242,8 @@ func (a *App) workspaceCapsule(c *ui.Context, cur *proto.Session) {
 // commitField is the commit message; left empty, the session's title.
 func (a *App) commitField(c *ui.Context) {
 	p := a.p
-	ui.TextInputBase(c, &a.commitMsg).Bind(&a.commitInput).Label(locales.CommitMessage()).Placeholder(strings.TrimSpace(a.C.Current.Title)).PlaceholderColor(p.Mute).
-		FontSize(13.5).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0).Height(28).Radius(7).Background(p.Chip).Padding(0, 10)
+	ui.TextInputBase(c, &a.commitMsg).Bind(&a.commitInput).Label(locales.CommitMessage()).Placeholder(strings.TrimSpace(a.C.Current.Title)).PlaceholderColor(p.OnSurfaceVariant).
+		FontSize(13.5).TextColor(p.OnSurface).SingleLine().Grow(1).MinWidth(0).Height(32).Radius(10).Background(p.SurfaceContainerHighest).Padding(0, 12)
 }
 
 func (a *App) commitGo(c *ui.Context) {

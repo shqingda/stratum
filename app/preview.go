@@ -32,11 +32,11 @@ func (a *App) previewPane(c *ui.Context) {
 	}
 
 	// Address bar + actions
-	ui.Row(c).Height(44).Shrink(0).Padding(0, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
+	ui.Row(c).Height(44).Shrink(0).Padding(0, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.OutlineVariant).Children(func() {
 		inp := ui.TextInputBase(c.Key("preview-url"), &st.url).
-			Placeholder(locales.PreviewUrlPlaceholder()).PlaceholderColor(p.Mute).
-			Font("monospace").FontSize(12.5).TextColor(p.Fg).SingleLine().
-			Height(30).Padding(0, 10).Radius(8).Background(p.Chip).Grow(1).MinWidth(0)
+			Placeholder(locales.PreviewUrlPlaceholder()).PlaceholderColor(p.OnSurfaceVariant).
+			Font("monospace").FontSize(12.5).TextColor(p.OnSurface).SingleLine().
+			Height(32).Padding(0, 12).Radius(16).Background(p.SurfaceContainerHighest).Grow(1).MinWidth(0)
 		if inp.Submitted() {
 			a.do(a.C.OpenPreview(st.url))
 		}
@@ -75,7 +75,7 @@ func (a *App) previewPane(c *ui.Context) {
 				if title == "" {
 					title = snap.URL
 				}
-				ui.Text(c, title).FontSize(13.5).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+				ui.Text(c, title).FontSize(13.5).FontWeight(600).TextColor(p.OnSurface).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 				if snap.Status > 0 {
 					col := p.Plus
 					if snap.Status >= 400 {
@@ -94,18 +94,18 @@ func (a *App) previewPane(c *ui.Context) {
 				if w > 0 && h > 0 {
 					dispH = dispW * float32(h) / float32(w)
 				}
-				ui.Image(c.Key("preview-shot"), st.img).Size(dispW, dispH).Fit(ui.Contain).Radius(10).Border(.5, p.Edge)
+				ui.Image(c.Key("preview-shot"), st.img).Size(dispW, dispH).Fit(ui.Contain).Radius(12)
 			}
 
 			// Console & Network section
-			ui.Text(c, locales.PreviewConsole()).FontSize(12.5).FontWeight(600).TextColor(p.Fg).Margin(4, 0, 0, 0)
+			ui.Text(c, locales.PreviewConsole()).FontSize(12.5).FontWeight(600).TextColor(p.OnSurface).Margin(4, 0, 0, 0)
 			if len(snap.Console) == 0 && len(snap.Network) == 0 {
-				ui.Text(c, locales.PreviewNoErrors()).FontSize(12.5).TextColor(p.Mute)
+				ui.Text(c, locales.PreviewNoErrors()).FontSize(12.5).TextColor(p.OnSurfaceVariant)
 			} else {
 				group(c, p, func() {
 					ui.Column(c).Padding(10).Gap(6).Children(func() {
 						for i, ce := range snap.Console {
-							col := p.Live
+							col := p.Primary
 							if ce.Level == "error" {
 								col = p.Minus
 							}

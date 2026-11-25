@@ -39,10 +39,10 @@ func (a *App) remarksAt(c *ui.Context, at remark) {
 		if r.at() != atKey {
 			continue
 		}
-		ui.Row(c.Key(fmt.Sprintf("remark:%d", i))).Margin(4, 12, 4, 92).Padding(6, 6, 6, 10).Gap(8).Radius(8).
-			Background(p.Card).Border(.5, p.Edge2).AlignItems(ui.Start).Children(func() {
-			sym(c, "message", 14, p.Mute)
-			ui.Text(c, r.text).FontSize(13).TextColor(p.Fg).Grow(1).MinWidth(0).Selectable()
+		ui.Row(c.Key(fmt.Sprintf("remark:%d", i))).Margin(4, 12, 4, 92).Padding(8, 8, 8, 12).Gap(8).Radius(12).
+			Background(p.SurfaceContainerLow).AlignItems(ui.Start).Children(func() {
+			sym(c, "message", 14, p.OnSurfaceVariant)
+			ui.Text(c, r.text).FontSize(13).TextColor(p.OnSurface).Grow(1).MinWidth(0).Selectable()
 			if a.iconPill(c, fmt.Sprintf("unremark:%d", i), "x", locales.RemoveRemark()).Size(24, 24).Clicked() {
 				a.rv.remarks = append(a.rv.remarks[:i:i], a.rv.remarks[i+1:]...)
 			}
@@ -51,10 +51,10 @@ func (a *App) remarksAt(c *ui.Context, at remark) {
 	if a.rv.writing != atKey {
 		return
 	}
-	ui.Row(c.Key("remark-new")).Margin(4, 12, 4, 92).Padding(4, 4, 4, 10).Gap(6).Radius(8).
-		Background(p.Card).Border(1, p.Acc).AlignItems(ui.Center).Children(func() {
+	ui.Row(c.Key("remark-new")).Margin(4, 12, 4, 92).Padding(6, 6, 6, 12).Gap(6).Radius(12).
+		Background(p.SurfaceContainerHigh).Border(1, p.Primary.Alpha(.55)).AlignItems(ui.Center).Children(func() {
 		ui.TextInputBase(c, &a.rv.remarkDraft).Bind(&a.rv.remarkInput).Label(locales.AddRemark()).
-			Placeholder(locales.RemarkPlaceholder()).PlaceholderColor(p.Mute).FontSize(13).TextColor(p.Fg).
+			Placeholder(locales.RemarkPlaceholder()).PlaceholderColor(p.OnSurfaceVariant).FontSize(13).TextColor(p.OnSurface).
 			Grow(1).MinWidth(0).SingleLine().OnTextKey(func(k ui.TextKey) bool {
 			a.rv.remarkDraft = k.Text()
 			if k.Key == ui.KeyEnter && k.Mods == 0 {
@@ -94,9 +94,10 @@ func (a *App) remarksBar(c *ui.Context) {
 		return
 	}
 	p := a.p
-	ui.Row(c).Height(40).Shrink(0).Padding(0, 10, 0, 14).Gap(8).AlignItems(ui.Center).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
-		sym(c, "message", 14, p.Mute)
-		ui.Text(c, locales.RemarkCount(fmt.Sprint(len(a.rv.remarks)))).FontSize(13).TextColor(p.Fg2)
+	ui.Row(c).Height(42).Shrink(0).Padding(0, 10, 0, 14).Gap(8).AlignItems(ui.Center).
+		Background(p.SurfaceContainerLow).BorderWidth(1, 0, 0, 0).BorderColor(p.OutlineVariant.Alpha(.20)).Children(func() {
+		sym(c, "message", 14, p.OnSurfaceVariant)
+		ui.Text(c, locales.RemarkCount(fmt.Sprint(len(a.rv.remarks)))).FontSize(13).TextColor(p.OnSurfaceVariant)
 		ui.Spacer(c)
 		if a.barButton(c, "remarks-clear", "trash", locales.ClearRemarks(), func() {}).Height(26).Clicked() {
 			a.rv.remarks, a.rv.writing = nil, ""

@@ -84,16 +84,16 @@ func TestComputerAppsCard(t *testing.T) {
 	a := working()
 	a.C.Queued = nil
 	a.out = make(chan []proto.Command, 16)
-	args, _ := json.Marshal(map[string]any{"action": "request_access", "apps": []string{"Notes", "Safari", "Terminal"}, "reason": "把会议纪要写进备忘录"})
+	args, _ := json.Marshal(map[string]any{"action": "request_access", "apps": []string{"Notes", "Chromium", "Terminal"}, "reason": "把会议纪要写进备忘录"})
 	a.C.Approvals = []proto.Approval{{ID: "apps", Tool: "computer", Kind: "computer", Args: args,
 		Reason: "It asks to see and use these apps until Stratum quits.",
-		Apps:   []proto.AppAccess{{Name: "Notes", Tier: "full"}, {Name: "Safari", Tier: "read"}, {Name: "Terminal", Tier: "click"}}}}
+		Apps:   []proto.AppAccess{{Name: "Notes", Tier: "full"}, {Name: "Chromium", Tier: "read"}, {Name: "Terminal", Tier: "click"}}}}
 	tt := ui.NewTester(a.View, 1440, 880)
 	tt.Frame()
 	for _, want := range []string{
 		"电脑操控", "把会议纪要写进备忘录",
 		"Notes", "完全控制", "能点按、输入和按键",
-		"Safari", "只能查看", "能在截图中看到，不能点按或输入",
+		"Chromium", "只能查看", "能在截图中看到，不能点按或输入",
 		"Terminal", "只能点按", "能点按和滚动，不能输入或按键",
 		"要在 Stratum 退出前查看和使用这些应用", "代理使用电脑时，按 esc 可以随时停止",
 	} {

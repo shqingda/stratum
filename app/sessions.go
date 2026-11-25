@@ -97,11 +97,18 @@ func (a *App) archivedToast(c *ui.Context) {
 	}
 	c.After(left)
 	p := a.p
-	ui.Row(c).Margin(0, 10, 8, 10).Height(36).Padding(0, 6, 0, 12).Gap(8).Radius(10).Background(p.Card).AlignItems(ui.Center).
+	ui.Row(c).Margin(0, 10, 8, 10).Height(38).Padding(0, 8, 0, 12).Gap(8).Radius(12).
+		Background(p.InverseSurface).AlignItems(ui.Center).
 		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 8, Opacity: 0}, Exit: &ui.Motion{Y: 8, Opacity: 0}}).Children(func() {
-		sym(c, "archive", 14, p.Mute)
-		ui.Text(c, locales.ArchivedSession(u.title)).FontSize(13).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		if a.textButton(c, "undo-archive", locales.Undo()).Tooltip(locales.Undo() + "  ⌘Z").Clicked() {
+		sym(c, "archive", 14, p.InverseOnSurface)
+		ui.Text(c, locales.ArchivedSession(u.title)).FontSize(13).TextColor(p.InverseOnSurface).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		undoBtn := ui.ButtonBase(c.Key("undo-archive")).Height(26).Padding(0, 10).Radius(8).Center().
+			Label(locales.Undo()).Tooltip(locales.Undo() + "  ⌘Z")
+		m3Focus(undoBtn, p)
+		undoBtn.Children(func() {
+			ui.Text(c, locales.Undo()).FontSize(12.5).FontWeight(600).TextColor(p.InversePrimary).SingleLine()
+		})
+		if undoBtn.Clicked() {
 			a.undoArchive()
 		}
 	})
@@ -145,16 +152,15 @@ func (a *App) toastHUD(c *ui.Context) {
 		a.toast.said = true
 	}
 	p := a.p
-	ui.Row(c).Absolute().Top(barHeight + 8).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
-		pill := ui.Row(c.Key("toast-hud")).Height(32).Padding(0, 12).Gap(7).Radius(16).
-			Border(.5, p.Edge2).AlignItems(ui.Center).
+	ui.Row(c).Absolute().Top(barHeight + 14).Left(0).Right(0).Justify(ui.Center).PassThrough().ZIndex(40).Children(func() {
+		pill := ui.Row(c.Key("toast-hud")).Height(36).Padding(0, 16).Gap(8).Radius(12).
+			Background(p.InverseSurface).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Opacity: 0}, Exit: &ui.Motion{Y: -4, Opacity: 0}})
-		a.glass(pill, tintedGlass(p))
-		lift(pill, p).Children(func() {
+		elevation2(pill, p).Children(func() {
 			if t.icon != "" {
-				sym(c, t.icon, 13, p.Fg2)
+				sym(c, t.icon, 14, p.InversePrimary)
 			}
-			ui.Text(c, t.text).FontSize(12.5).FontWeight(500).TextColor(p.Fg)
+			ui.Text(c, t.text).FontSize(13).FontWeight(500).TextColor(p.InverseOnSurface)
 		})
 	})
 }
@@ -177,20 +183,16 @@ func (a *App) deleteDialog(c *ui.Context) {
 	}
 	p := a.p
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 12, 14, .18)
-		if p.Dark {
-			scrim = ui.RGBA(0, 0, 0, .42)
-		}
-		backdrop.Background(scrim)
-		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(locales.DeleteTitle(title(s)))
-		lift(panel, p).Children(func() {
-			ui.Text(c, locales.DeleteTitle(title(s))).FontSize(15).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.DeleteBody()).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
+		backdrop.Background(p.Scrim)
+		panel.Width(400).Padding(24).Radius(28).Background(p.SurfaceContainerHigh).Label(locales.DeleteTitle(title(s)))
+		elevation3(panel, p).Children(func() {
+			ui.Text(c, locales.DeleteTitle(title(s))).FontSize(18).FontWeight(600).TextColor(p.OnSurface)
+			ui.Text(c, locales.DeleteBody()).FontSize(14).LineHeight(1.5).TextColor(p.OnSurfaceVariant).Margin(10, 0, 20, 0)
 			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-				if a.button(c, "delete-cancel", locales.Cancel(), "esc", false).Clicked() {
+				if a.button(c, "delete-cancel", locales.Cancel(), "esc", false).AutoFocus().Clicked() {
 					a.deleting = ""
 				}
-				if a.button(c, "delete-ok", locales.Delete(), "", true).Background(p.Minus).Clicked() {
+				if a.dangerButton(c, "delete-ok", locales.Delete(), "").Clicked() {
 					a.do(a.C.Delete(s.ID))
 					a.deleting = ""
 				}
@@ -209,20 +211,16 @@ func (a *App) removeProjectDialog(c *ui.Context) {
 	n := len(a.removing)
 	head := locales.RemoveProjectTitle(a.removingName)
 	ui.DialogBase(c, &open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(12, 12, 14, .18)
-		if p.Dark {
-			scrim = ui.RGBA(0, 0, 0, .42)
-		}
-		backdrop.Background(scrim)
-		panel.Width(380).Padding(18, 18, 14, 18).Radius(14).Background(p.Card).Label(head)
-		lift(panel, p).Children(func() {
-			ui.Text(c, head).FontSize(15).FontWeight(600).TextColor(p.Fg)
-			ui.Text(c, locales.RemoveProjectBody(n)).FontSize(13.5).LineHeight(1.5).TextColor(p.Fg2).Margin(8, 0, 16, 0)
+		backdrop.Background(p.Scrim)
+		panel.Width(400).Padding(24).Radius(28).Background(p.SurfaceContainerHigh).Label(head)
+		elevation3(panel, p).Children(func() {
+			ui.Text(c, head).FontSize(18).FontWeight(600).TextColor(p.OnSurface)
+			ui.Text(c, locales.RemoveProjectBody(n)).FontSize(14).LineHeight(1.5).TextColor(p.OnSurfaceVariant).Margin(10, 0, 20, 0)
 			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
-				if a.button(c, "remove-cancel", locales.Cancel(), "esc", false).Clicked() {
+				if a.button(c, "remove-cancel", locales.Cancel(), "esc", false).AutoFocus().Clicked() {
 					open = false
 				}
-				if a.button(c, "remove-ok", locales.RemoveProject(), "", true).Background(p.Minus).Clicked() {
+				if a.dangerButton(c, "remove-ok", locales.RemoveProject(), "").Clicked() {
 					for _, id := range a.removing {
 						a.do(a.C.Delete(id))
 					}
@@ -246,7 +244,7 @@ func (a *App) rename(s proto.Session, in string) {
 // does not.
 func (a *App) renameInput(c *ui.Context, s proto.Session) ui.Element {
 	p := a.p
-	in := ui.TextInputBase(c, &a.renameDraft).Bind(&a.renameField).Label(locales.Rename()).TextColor(p.Fg).Grow(1).MinWidth(0).SingleLine().
+	in := ui.TextInputBase(c, &a.renameDraft).Bind(&a.renameField).Label(locales.Rename()).TextColor(p.OnSurface).Grow(1).MinWidth(0).SingleLine().
 		OnTextKey(func(k ui.TextKey) bool {
 			a.renameDraft = k.Text()
 			if k.Key == ui.KeyEnter && k.Mods == 0 {

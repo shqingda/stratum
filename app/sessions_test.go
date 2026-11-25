@@ -1,12 +1,10 @@
 package app
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -116,9 +114,8 @@ func TestNextWaitingAndSeen(t *testing.T) {
 	}
 }
 
-// TestSidebarFooter: the footer is one row with the Stratum brand lockup and
-// the quota ring, with no gear; it opens the Scheme B popover with the quota
-// card and Settings.
+// TestSidebarFooter: the footer is one clean row with the Stratum brand lockup
+// and zero duplicated quota percentage or duplicate Settings gear outside the rail.
 func TestSidebarFooter(t *testing.T) {
 	a := task8App()
 	a.C.Accounts = []proto.Account{
@@ -129,38 +126,13 @@ func TestSidebarFooter(t *testing.T) {
 	if _, ok := tt.Find("Stratum"); !ok {
 		t.Errorf("the footer does not show Stratum: %q", tt.Texts())
 	}
-	if _, ok := tt.Find("74%"); !ok {
-		t.Errorf("the footer does not show the quota as a percent: %q", tt.Texts())
+	if _, ok := tt.Find("74%"); ok {
+		t.Error("the footer still duplicates the quota percentage")
 	}
 	if _, ok := tt.Find("还剩 74%"); ok {
-		t.Error("the footer still says the quota on a line of its own")
+		t.Error("the footer still duplicates the quota line")
 	}
-	if _, ok := tt.Find("设置"); ok {
-		t.Error("the footer still has a gear for Settings")
-	}
-	left, _ := formatQuota(a.now(), a.p, a.C.Accounts[0].Quota)
-	if err := tt.Click(locales.AccountQuota("Stratum", left)); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	snapshot(t, tt, "sidebar-footer-menu")
-	texts := strings.Join(tt.Texts(), "|")
-	for _, want := range []string{"还剩 74%", "设置…"} {
-		if !strings.Contains(texts, want) {
-			t.Errorf("no %q in the popover %q", want, texts)
-		}
-	}
-	if strings.Contains(texts, "添加账号…") {
-		t.Errorf("unexpected 添加账号… in the popover %q", texts)
-	}
-	if err := tt.Click(locales.SettingsMenu()); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if !a.settingsOpen {
-		t.Error("设置… does not open Settings")
-	}
-	if a.menu.accountMenuOpen {
-		t.Error("popover stayed open after choosing Settings")
+	if r, ok := tt.Find("设置"); ok && r.X >= railWidth {
+		t.Errorf("the footer still has a gear for Settings outside the rail: %+v", r)
 	}
 }

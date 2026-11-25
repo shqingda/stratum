@@ -170,7 +170,7 @@ func (a *App) card(c *ui.Context, e *client.Entry) {
 		if a.cardStep(c, e, locales.Results(pc.count), false) {
 			a.cardOutput(c, "out:"+e.CallID, func() {
 				for _, row := range pc.rows {
-					ui.Text(c, row).Font("monospace").FontSize(13).TextColor(a.p.Fg2).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
+					ui.Text(c, row).Font("monospace").FontSize(13).TextColor(a.p.OnSurfaceVariant).Selectable().PreserveSpaces().SingleLine().Ellipsis("…").MinWidth(0).Tooltip(row)
 				}
 			})
 		}
@@ -210,13 +210,12 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 	if a.inWork && !a.editLine(c, e, path, oldText, newText) {
 		return
 	}
-	box := ui.Column(c.Key("card:"+e.CallID)).Margin(8, 0, 14, 0).Radius(12).Background(p.Card).Clip()
+	box := ui.Column(c.Key("card:"+e.CallID)).Margin(8, 0, 14, 0).Radius(16).Background(p.SurfaceContainerLow).Clip()
 	box.ContextMenu(func(m *ui.Menu) {
 		if path != "" && m.Item(locales.CopyPath()).Chosen() {
 			c.WriteClipboard(path)
 		}
 	})
-	raise(box, p)
 	diff := ui.Local(box, "diff", func() cardDiff { return cardDiff{} })
 	if diff.lines == nil || diff.oldText != oldText || diff.newText != newText {
 		*diff = cardDiff{oldText: oldText, newText: newText}
@@ -242,36 +241,40 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 		note += locales.LineEndingsChanged()
 	}
 	box.Children(func() {
-		ui.Row(c).Height(36).Padding(0, 8, 0, 12).Gap(8).AlignItems(ui.Center).Children(func() {
-			sym(c, "pencil", 15, p.Fg2)
-			ui.Text(c, path).Font("monospace").FontSize(13.5).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0).Tooltip(path)
-			ui.Text(c, fmt.Sprintf("+%d", diff.added)).Font("monospace").FontSize(13).TextColor(p.Plus).Shrink(0)
-			ui.Text(c, fmt.Sprintf("−%d", diff.removed)).Font("monospace").FontSize(13).TextColor(p.Minus).Shrink(0)
+		ui.Row(c).Height(38).Padding(0, 10, 0, 12).Gap(8).AlignItems(ui.Center).Children(func() {
+			sym(c, "pencil", 15, p.OnSurfaceVariant)
+			ui.Text(c, path).Font("monospace").FontSize(13).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0).Tooltip(path)
+			ui.Text(c, fmt.Sprintf("+%d", diff.added)).Font("monospace").FontSize(12.5).FontWeight(600).TextColor(p.Plus).Shrink(0)
+			ui.Text(c, fmt.Sprintf("−%d", diff.removed)).Font("monospace").FontSize(12.5).FontWeight(600).TextColor(p.Minus).Shrink(0)
 			ui.Spacer(c)
 			a.fileUndo(c, e, path)
 		})
 		if note != "" {
-			ui.Text(c, note).FontSize(12.5).TextColor(p.Mute).Padding(0, 12, 6, 12)
+			ui.Text(c, note).FontSize(12.5).TextColor(p.OnSurfaceVariant).Padding(0, 12, 6, 12)
 		}
 		limit := min(12, len(lines))
 		if a.opened[e.CallID] {
 			limit = len(lines)
 		}
-		ui.Column(c).BorderWidth(.5, 0, 0, 0).BorderColor(p.Edge).Children(func() {
+		ui.Column(c).BorderWidth(1, 0, 0, 0).BorderColor(p.OutlineVariant.Alpha(.20)).Background(p.SurfaceContainerLowest).Children(func() {
+			bgAlpha := float32(.20)
+			if p.Dark {
+				bgAlpha = .14
+			}
 			for _, line := range lines[:limit] {
-				bg, signColor := ui.Transparent, p.Mute
+				bg, signColor := ui.Transparent, p.OnSurfaceVariant
 				if line.sign == "+" {
-					bg, signColor = p.Plus.Alpha(.10), p.Plus
+					bg, signColor = p.PlusContainer.Alpha(bgAlpha), p.Plus
 				} else if line.sign == "−" {
-					bg, signColor = p.Minus.Alpha(.10), p.Minus
+					bg, signColor = p.MinusContainer.Alpha(bgAlpha), p.Minus
 				}
 				ui.Row(c).Height(20).Children(func() {
-					num := ui.Text(c, strconv.Itoa(line.number+max(first, 1)-1)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(p.Faint).TextAlign(ui.End)
+					num := ui.Text(c, strconv.Itoa(line.number+max(first, 1)-1)).Width(34).Shrink(0).Padding(0, 4, 0, 6).Font("monospace").FontSize(12.5).FixedLineHeight(20).TextColor(p.OnSurfaceVariant.Alpha(.65)).TextAlign(ui.End)
 					if first == 0 {
 						num.Tooltip(locales.LineNumberInArgs())
 					}
-					ui.Text(c, line.sign).Width(14).Height(20).Shrink(0).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(signColor).Background(bg)
-					text := ui.Text(c, strings.TrimSuffix(line.text, "\n")).Grow(1).MinWidth(0).Height(20).Padding(0, 6).Font("monospace").FontSize(13).FixedLineHeight(20).TextColor(p.Fg).Background(bg).PreserveSpaces().SingleLine().Selectable()
+					ui.Text(c, line.sign).Width(14).Height(20).Shrink(0).Font("monospace").FontSize(12.5).FixedLineHeight(20).TextColor(signColor).Background(bg)
+					text := ui.Text(c, strings.TrimSuffix(line.text, "\n")).Grow(1).MinWidth(0).Height(20).Padding(0, 6).Font("monospace").FontSize(12.5).FixedLineHeight(20).TextColor(p.OnSurface).Background(bg).PreserveSpaces().SingleLine().Selectable()
 					if !strings.HasSuffix(line.text, "\n") {
 						text.Tooltip(locales.NoNewlineAtEnd())
 					}
@@ -283,8 +286,8 @@ func (a *App) diffCard(c *ui.Context, e *client.Entry, path, oldText, newText, n
 			if a.opened[e.CallID] {
 				label = locales.ShowLess()
 			}
-			if ui.ButtonBase(c.Key("expand")).Label(label).Height(28).Children(func() {
-				ui.Text(c, label).FontSize(12.5).TextColor(p.Mute).Padding(6, 12)
+			if ui.ButtonBase(c.Key("expand")).Label(label).Height(30).Children(func() {
+				ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.Primary).Padding(6, 12)
 			}).Clicked() {
 				a.opened[e.CallID] = !a.opened[e.CallID]
 			}
@@ -313,25 +316,25 @@ func (a *App) cardStep(c *ui.Context, e *client.Entry, summary string, failed bo
 		a.opened[e.CallID] = open
 	}
 	row.Children(func() {
-		ui.Box(c).Width(16).Center().Children(func() { sym(c, tool.symbol, 15, p.Mute) })
-		ui.Text(c, tool.verb).FontSize(13.5).TextColor(p.Fg2).SingleLine().Shrink(0)
-		ui.Text(c, e.Detail).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0)
+		ui.Box(c).Width(16).Center().Children(func() { sym(c, tool.symbol, 15, p.OnSurfaceVariant) })
+		ui.Text(c, tool.verb).FontSize(13).TextColor(p.OnSurfaceVariant).SingleLine().Shrink(0)
+		ui.Text(c, e.Detail).Font("monospace").FontSize(12.5).TextColor(p.OnSurface).SingleLine().Ellipsis("…").MinWidth(0)
 		ui.Spacer(c)
-		color := p.Mute
+		color := p.OnSurfaceVariant
 		if failed {
-			color = p.Minus
+			color = p.Error
 		}
-		ui.Text(c, summary).FontSize(12.5).TextColor(color).SingleLine().Shrink(0)
-		if row.Hovered() || open {
-			disclosureChevron(c, "card:"+e.CallID, open, 10, p.Mute)
+		ui.Text(c, summary).FontSize(12).FontWeight(500).TextColor(color).SingleLine().Shrink(0)
+		if row.Hovered() || row.FocusVisible() || open {
+			disclosureChevron(c, "card:"+e.CallID, open, 10, p.OnSurfaceVariant)
 		}
 	})
 	return open
 }
 
 func (a *App) cardOutput(c *ui.Context, key string, content func()) {
-	ui.Column(c.Key(key)).Padding(9, 11).Radius(8).Background(a.p.Chip).Margin(2, 0, 8, 24).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -6, Scale: .985, Opacity: 0}, Duration: 200 * time.Millisecond}).
+	ui.Column(c.Key(key)).Padding(12, 14).Radius(16).Background(a.p.SurfaceContainerLow).Margin(2, 0, 8, 24).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
 		Children(content)
 }
 
@@ -363,14 +366,14 @@ func (a *App) shellCard(c *ui.Context, e *client.Entry) {
 	if a.cardStep(c, e, summary, exit != "" || e.Failed) {
 		a.cardOutput(c, "out:"+e.CallID, func() {
 			if omitted > 0 {
-				ui.Text(c, locales.OmittedLines(omitted)).FontSize(12.5).TextColor(a.p.Mute)
+				ui.Text(c, locales.OmittedLines(omitted)).FontSize(12.5).TextColor(a.p.OnSurfaceVariant)
 			}
 			for i, line := range lines {
-				color := a.p.Fg2
+				color := a.p.OnSurfaceVariant
 				if exit != "" && i == len(lines)-1 {
-					color = a.p.Minus
+					color = a.p.Error
 				}
-				ui.Text(c, line).Font("monospace").FontSize(13).TextColor(color).Selectable().PreserveSpaces()
+				ui.Text(c, line).Font("monospace").FontSize(12.5).TextColor(color).Selectable().PreserveSpaces()
 			}
 		})
 	}
@@ -428,7 +431,8 @@ func (a *App) fileUndo(c *ui.Context, e *client.Entry, path string) {
 	if reverted {
 		label, icon = locales.Redo(), "arrow-forward-up"
 	}
-	b := ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(7).AlignItems(ui.Center).Label(label + " " + path)
+	b := ui.ButtonBase(c).Row().Height(28).Padding(0, 10).Gap(6).Radius(8).AlignItems(ui.Center).Label(label + " " + path)
+	m3Focus(b, p)
 	switch {
 	case turn == 0:
 		b.Disabled(true).Tooltip(locales.TurnChangesLoading())
@@ -440,13 +444,11 @@ func (a *App) fileUndo(c *ui.Context, e *client.Entry, path string) {
 			tip = locales.RedoFileTip(path)
 		}
 		b.Tooltip(tip)
-		if b.Hovered() {
-			b.Background(p.Hover)
-		}
+		m3State(b, p, ui.Transparent, false)
 	}
 	b.Children(func() {
-		sym(c, icon, 15, p.Fg2)
-		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.Fg2).SingleLine()
+		sym(c, icon, 14, p.OnSurfaceVariant)
+		ui.Text(c, label).FontSize(12.5).FontWeight(500).TextColor(p.OnSurfaceVariant).SingleLine()
 	})
 	if b.Clicked() {
 		a.do(a.C.Revert(turn, abs, reverted))

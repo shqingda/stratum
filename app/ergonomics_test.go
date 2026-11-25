@@ -2,10 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
-	"slices"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -53,9 +49,14 @@ func TestErgonomicsSplitWidths(t *testing.T) {
 		t.Fatalf("the sidebar at its narrowest is %v wide, hidden %v", got, a.side.noSide)
 	}
 	a.resizeSide(-100)
-	if !a.side.noSide || a.sideWidth() != sidebarWidth {
-		t.Fatalf("dragged past its narrowest the sidebar stayed (hidden %v, %v wide)", a.side.noSide, a.sideWidth())
+	if a.side.noSide || a.sideWidth() != sideMinWidth {
+		t.Fatalf("dragged past minimum width should clamp without collapsing (noSide=%v, width=%v, want %v)", a.side.noSide, a.sideWidth(), sideMinWidth)
 	}
+	a.toggleSide()
+	if !a.side.noSide {
+		t.Fatal("explicit toggleSide should collapse sidebar")
+	}
+	a.toggleSide()
 
 	if got := a.reviewWidth(); got != reviewWidth {
 		t.Fatalf("default reviewWidth = %v, want %v", got, reviewWidth)
@@ -75,8 +76,8 @@ func TestErgonomicsSplitWidths(t *testing.T) {
 	}
 	a.rv.open = true
 	a.resizeReview(1000)
-	if a.rv.open || a.reviewWidth() != reviewMaxWidth {
-		t.Fatalf("dragged closed the panel stayed open %v at %v", a.rv.open, a.reviewWidth())
+	if !a.rv.open || a.reviewWidth() != reviewMinWidth {
+		t.Fatalf("dragged past minimum width should clamp review panel without collapsing (open=%v, width=%v, want %v)", a.rv.open, a.reviewWidth(), reviewMinWidth)
 	}
 	a.resetReviewWidth()
 	if got := a.reviewWidth(); got != reviewWidth {
@@ -339,132 +340,43 @@ func TestErgonomicsNarrowWindowRules(t *testing.T) {
 	}
 }
 
-func TestCoreTextOpticalTracking(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("Core Text optical tracking check is macOS-only")
-	}
-	var w11, w11Spaced, w22 float32
-	tt := ui.NewTester(func(c *ui.Context) {
-		ui.Column(c).AlignItems(ui.Start).Children(func() {
-			e11 := ui.Text(c, "Stratum 1234567890").FontSize(11)
-			e11Spaced := ui.Text(c, "Stratum 1234567890").FontSize(11).LetterSpacing(0.11)
-			e22 := ui.Text(c, "Stratum 1234567890").FontSize(22)
-			w11 = e11.Bounds().W
-			w11Spaced = e11Spaced.Bounds().W
-			w22 = e22.Bounds().W
-		})
-	}, 400, 160)
-	tt.Frame()
-	t.Logf("CoreText widths: 11pt=%.3f, 11pt+0.11=%.3f, 22pt=%.3f, 2*w11=%.3f (ratio=%.4f)",
-		w11, w11Spaced, w22, w11*2, (w11*2)/w22)
-	if w11 <= 0 || w11Spaced <= 0 || w22 <= 0 {
-		t.Fatalf("expected positive text widths, got w11=%v w11Spaced=%v w22=%v", w11, w11Spaced, w22)
-	}
-	if (w11*2)/w22 <= 1.01 {
-		t.Fatalf("expected Core Text to apply automatic positive optical tracking at 11pt vs 22pt, got ratio=%.4f", (w11*2)/w22)
-	}
-}
-
-func TestErgonomicsScrollEdgePanes(t *testing.T) {
+func TestNavigationRailDestinations(t *testing.T) {
 	a := task8App()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# Title\n\nBody text\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	a.C.Current.Cwd = dir
-	a.C.Files = []string{"main.go", "README.md"}
-	a.C.Entries = append(a.C.Entries, &client.Entry{
-		Key:  -99,
-		Role: client.Tool,
-		Text: "update_plan",
-		Args: json.RawMessage(`{"title":"Plan","steps":[{"step":"Step 1","status":"done"},{"step":"Step 2","status":"in_progress","note":"working"}]}`),
-	})
-
-	a.rv.open = true
-	a.rv.tab = "files"
 	tt := task8Tester(a, false)
-	if tt.Image() == nil {
-		t.Fatal("expected non-nil image for files tree")
+	if a.activeNavPage() != "sessions" {
+		t.Fatalf("default activeNavPage = %q, want sessions", a.activeNavPage())
 	}
 
-	// Open markdown preview and code preview inside filesPane.
-	a.openFilePreview(dir, "README.md")
+	if err := tt.Click(locales.Automations()); err != nil {
+		t.Fatalf("Click(Automations): %v", err)
+	}
 	tt.Frame()
-	if tt.Image() == nil {
-		t.Fatal("expected non-nil image for markdown preview")
+	if a.activeNavPage() != "automations" || !a.automationsOpen {
+		t.Fatalf("expected automations active, got nav=%q open=%v", a.activeNavPage(), a.automationsOpen)
 	}
-	a.openFilePreview(dir, "main.go")
+
+	if err := tt.Click(locales.Extensions()); err != nil {
+		t.Fatalf("Click(Extensions): %v", err)
+	}
 	tt.Frame()
-	if tt.Image() == nil {
-		t.Fatal("expected non-nil image for code preview")
+	if a.activeNavPage() != "mcp" {
+		t.Fatalf("expected mcp active, got nav=%q", a.activeNavPage())
 	}
 
-	// Switch to planPane.
-	a.rv.tab = "plan"
+	if err := tt.Click(locales.Settings()); err != nil {
+		t.Fatalf("Click(Settings): %v", err)
+	}
 	tt.Frame()
-	if tt.Image() == nil {
-		t.Fatal("expected non-nil image for plan pane")
+	if a.activeNavPage() != "settings" || !a.settingsOpen {
+		t.Fatalf("expected settings active, got nav=%q open=%v", a.activeNavPage(), a.settingsOpen)
 	}
 
-	// Switch to native Changes view.
-	a.rv.tab = ""
+	if err := tt.Click(locales.Sessions()); err != nil {
+		t.Fatalf("Click(Sessions): %v", err)
+	}
 	tt.Frame()
-	if tt.Image() == nil {
-		t.Fatal("expected non-nil image for native changes pane")
-	}
-}
-
-func TestErgonomicsHapticFeedback(t *testing.T) {
-	a := task8App()
-	a.C.Settings = &proto.Settings{}
-	var got []hapticPattern
-	a.haptic = func(p hapticPattern) {
-		got = append(got, p)
-	}
-
-	// Dragging sidebar past collapse threshold fires alignment haptic.
-	a.resizeSide(-sideMinWidth)
-	if !a.side.noSide || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
-		t.Fatalf("expected alignment haptic on sidebar collapse, got noSide=%v haptics=%v", a.side.noSide, got)
-	}
-
-	// Resetting split widths and clicking tabs/scopes do not fire haptics.
-	got = nil
-	a.resetSideWidth()
-	a.resetReviewWidth()
-	if len(got) != 0 {
-		t.Fatalf("expected no haptics on width resets, got %v", got)
-	}
-
-	// Dragging review panel past collapse threshold fires alignment haptic.
-	got = nil
-	a.rv.open = true
-	a.resizeReview(reviewMinWidth)
-	if a.rv.open || !slices.Equal(got, []hapticPattern{hapticAlignment}) {
-		t.Fatalf("expected alignment haptic on review collapse, got open=%v haptics=%v", a.rv.open, got)
-	}
-
-	// Switching right-panel tab and Changes scope does not fire haptics.
-	got = nil
-	a.rv.open = true
-	a.rv.tab = ""
-	tt := task8Tester(a, false)
-	tt.Click(locales.Files())
-	tt.Frame()
-	if len(got) != 0 {
-		t.Fatalf("expected no haptics when switching tab, got %v", got)
-	}
-
-	got = nil
-	a.rv.tab = ""
-	tt.Frame()
-	tt.Click(locales.Uncommitted())
-	tt.Frame()
-	if len(got) != 0 {
-		t.Fatalf("expected no haptics when switching scope, got %v", got)
+	if a.activeNavPage() != "sessions" || a.settingsOpen || a.automationsOpen {
+		t.Fatalf("expected sessions restored, got nav=%q settings=%v auto=%v", a.activeNavPage(), a.settingsOpen, a.automationsOpen)
 	}
 }
 

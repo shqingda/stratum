@@ -292,20 +292,19 @@ func TestToolCardDimensions(t *testing.T) {
 	e := cardEntry("edit_file", map[string]string{"path": "a.go", "old_text": "before\n", "new_text": "after\n"}, "Edited a.go (1 replacement)")
 	a := cardApp(e)
 	tt := ui.NewTester(a.View, 1200, 780)
-	number, ok := tt.Find("1")
+	minus, ok := tt.Find("−")
 	if !ok {
-		t.Fatal("no line number")
+		t.Fatal("no minus gutter")
 	}
-	minus, _ := tt.Find("−")
 	plus, _ := tt.Find("+")
 	before, _ := tt.Find("before")
 	after, _ := tt.Find("after")
 	undo, _ := tt.Find("撤销 a.go")
-	if number.W != 34 || minus.W != 14 || minus.X-number.X != 34 || before.X-minus.X != 14 || before.H != 20 || after.Y-before.Y != 20 || plus.Y-minus.Y != 20 {
-		t.Fatalf("diff grid: number=%+v minus=%+v plus=%+v before=%+v after=%+v", number, minus, plus, before, after)
+	if minus.W != 14 || before.X-minus.X != 14 || before.H != 20 || after.Y-before.Y != 20 || plus.Y-minus.Y != 20 {
+		t.Fatalf("diff grid: minus=%+v plus=%+v before=%+v after=%+v", minus, plus, before, after)
 	}
-	// The 28-high undo is centered in a 36-high header, followed by a .5 border.
-	if before.Y-(undo.Y-4) != 36.5 {
+	// The 28-high undo is centered in a 38-high header, followed by a 1dp border.
+	if before.Y-(undo.Y-5) != 39 {
 		t.Errorf("header height: first row=%+v undo=%+v", before, undo)
 	}
 }

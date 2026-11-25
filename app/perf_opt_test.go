@@ -41,8 +41,8 @@ func TestPaletteLerp(t *testing.T) {
 	if !mid.Dark {
 		t.Fatal("t=0.5 should have Dark=true")
 	}
-	if mid.Bg == light.Bg || mid.Bg == dark.Bg {
-		t.Fatal("t=0.5 Bg should be interpolated")
+	if mid.Surface == light.Surface || mid.Surface == dark.Surface {
+		t.Fatal("t=0.5 Surface should be interpolated")
 	}
 }
 

@@ -115,8 +115,14 @@ type App struct {
 	keyProvider, key string
 
 	settingsOpen, addingAccount, setModelMenu bool
+	railExpanded                              bool
 	settingsPage                              string // a settingsPages id
-	settingsQuery, keysQuery                  string
+	navPage                                   string // "", "sessions", "automations", "mcp", "settings"
+	sideSearchOpen                            bool
+	sideQuery                                 string
+	sideSearchInput                           ui.Handle
+	sideFilter                                string // "", "run", "wait", "archived"
+	settingsQuery, keysQuery, seedDraft       string
 	subMenu, lightMenu                        bool
 	accountsSeen                              int
 	mcpUI                                     mcpState
@@ -160,7 +166,6 @@ type App struct {
 	pick            func() []string                   // the open panel
 	pickDir         func() string                     // the open panel, for a folder
 	update          func(func())                      // runs on the UI thread, as Serve was given
-	haptic          func(hapticPattern)               // trackpad haptic feedback hook
 	menuRuns        []func(c *ui.Context)             // commands from the menu bar, for the next frame
 }
 
@@ -183,9 +188,10 @@ type sideState struct {
 
 // palState holds the ⌘K command palette's visibility and selection state.
 type palState struct {
-	open   bool // the ⌘K palette shows
-	sel    int  // its row chosen by the arrow keys
-	scroll bool // scroll palette selection into view once after ↑/↓
+	open   bool   // the ⌘K palette shows
+	sel    int    // its row chosen by the arrow keys
+	scroll bool   // scroll palette selection into view once after ↑/↓
+	filter string // "", "sessions", "actions", "files", "messages"
 }
 
 // searchState holds palette search query and message-jump state.
@@ -212,7 +218,7 @@ type menuState struct {
 
 // New returns an app over c, not connected yet.
 func New(c *client.Client) *App {
-	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, haptic: performHaptic, opened: map[string]bool{}, locale: &memLocale{},
+	a := &App{C: c, now: time.Now, webSuggest: -1, openURL: openBrowser, pick: pickFiles, pickDir: pickFolder, opened: map[string]bool{}, locale: &memLocale{},
 		rv: review{asked: map[string]bool{}, diffs: newLRU[string, *fileDiff](64)}}
 	a.openIn = a.openInBackground
 	a.newTerm, a.shellJob = startShell, foregroundJob
@@ -220,14 +226,13 @@ func New(c *client.Client) *App {
 }
 
 // restoreFocus puts the keyboard back in the composer when the session
-// changes, and when the palette, settings or automations close: what
-// comes next is typing, as in Claude's and Codex's apps.
+// changes, and when overlays close.
 func (a *App) restoreFocus(c *ui.Context) {
 	id := ""
 	if a.C.Current != nil {
 		id = a.C.Current.ID
 	}
-	over := a.pal.open || a.settingsOpen || a.automationsOpen
+	over := a.pal.open || a.activeNavPage() != "sessions"
 	if !over && (id != a.focusSession || a.overWas) && id != "" {
 		a.composerInput.Focus(c)
 	}
@@ -337,7 +342,7 @@ func (a *App) quiet(cmds []proto.Command, err error) {
 	}
 }
 
-// View builds a frame of the window.
+// View builds a frame of the window using Material You tonal strata containers.
 func (a *App) View(c *ui.Context) {
 	a.syncMenus()
 	a.syncReview()
@@ -345,21 +350,34 @@ func (a *App) View(c *ui.Context) {
 	if a.reduceMotion() {
 		c.DisableAnimations()
 	}
+	set := a.settings()
+	seed, ok := ParseSeedHex(set.SeedColor)
+	if !ok {
+		seed = defaultSeed
+	}
+	style := NormalizeColorStyle(set.ColorStyle)
+	lightP := SeededPalette(seed, false, style, false)
+	darkP := SeededPalette(seed, true, style, set.PureBlack)
+
 	isDark := c.Theme().Dark
+	switch set.Theme {
+	case "dark":
+		isDark = true
+	case "light":
+		isDark = false
+	}
 	darkTarget := float32(0)
 	if isDark {
 		darkTarget = 1
 	}
-	themeMix := c.Root().Spring("theme", darkTarget, springDefault)
-	a.p = PaletteLerp(themeMix)
-	c.SetTheme(Theme(a.p, a.p.Dark))
-	if z := textZoom(a.settings().TextSize); c.Zoom() != z {
+	themeMix := c.Root().AnimateTo("theme", darkTarget, animColor)
+	a.p = PaletteLerpBetween(lightP, darkP, themeMix)
+	c.SetTheme(Theme(a.p, isDark))
+	if z := textZoom(set.TextSize); c.Zoom() != z {
 		c.SetZoom(z)
 	}
-	vibrant := c.Vibrancy()
-	if vibrant {
-		c.Root().Background(ui.Transparent)
-	}
+	c.Root().Background(a.p.SurfaceContainer)
+
 	if a.needsLogin() {
 		a.onboarding(c)
 		a.clearWebDialog(c)
@@ -375,56 +393,64 @@ func (a *App) View(c *ui.Context) {
 		a.pierre.focusComposerNext = false
 		a.composerInput.Focus(c)
 	}
-	if a.settingsOpen {
-		ui.Box(c.Key("view-settings")).Fill().
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
-			Children(func() { a.settingsView(c, vibrant) })
-		a.clearWebDialog(c)
-		a.keys(c)
-		return
-	}
-	if a.automationsOpen {
-		ui.Box(c.Key("view-automations")).Fill().
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .985, Opacity: 0}, Duration: 180 * time.Millisecond}).
-			Children(func() { a.automationsView(c, vibrant) })
-		a.clearWebDialog(c)
-		a.keys(c)
-		return
-	}
+
+	activePage := a.activeNavPage()
 	a.fitPanel(c)
 	rvTarget := float32(0)
-	if a.rv.open {
+	if a.rv.open && activePage == "sessions" {
 		rvTarget = 1
 	}
-	// Keep the review drawer spring on the root so collapsing the sidebar
-	// never shifts child indices and replays the opening animation.
-	a.side.rvOpen = c.Root().Spring("review", rvTarget, springDefault)
-	shell := ui.Row(c).Fill().AlignItems(ui.Stretch)
-	// One spring moves the sidebar and the title bar beside it, as versta
-	// does: it can be turned around halfway, and the sidebar is clipped,
-	// not squeezed, so its rows hold still while it slides. It does not
-	// fade, as Finder's does not: faded, its wash over the window's glass
-	// let the dark glass through, a flash of gray at each toggle.
+	a.side.rvOpen = c.Root().AnimateTo("review", rvTarget, animStandard)
+
+	shell := ui.Row(c).Fill().AlignItems(ui.Stretch).Background(a.p.SurfaceContainer)
 	target := float32(1)
 	if a.side.noSide {
 		target = 0
 	}
-	a.side.sideOpen = shell.Spring("side", target, springDefault)
-	sw := a.sideWidth()
+	a.side.sideOpen = shell.AnimateTo("side", target, animStandard)
+
 	shell.Children(func() {
-		if a.side.sideOpen > 0.001 {
-			sideW := float32(math.Round(float64(a.side.sideOpen * sw)))
-			ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip().
-				Children(func() { a.sidebar(c, vibrant) })
-		} else {
-			a.visibleSessions = a.sessionOrder()
-		}
-		a.main(c)
-		if a.side.sideOpen > 0.99 {
-			a.splitHandle(c, "split-side", sw, func(dx float32) { a.resizeSide(dx) }, a.resetSideWidth)
-		}
-		a.sideToggle(c)
+		a.rail(c)
+		stage := ui.Row(c.Key("stage")).Grow(1).MinWidth(0).Padding(8, 8, 8, 0).AlignItems(ui.Stretch)
+		stage.Children(func() {
+			switch activePage {
+			case "settings":
+				ui.Box(c.Key("view-settings")).Grow(1).MinWidth(0).Radius(18).Background(a.p.Surface).
+					Clip().
+					Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
+					Children(func() { a.settingsView(c) })
+				a.visibleSessions = a.sessionOrder()
+			case "automations":
+				ui.Box(c.Key("view-automations")).Grow(1).MinWidth(0).Radius(18).Background(a.p.Surface).
+					Clip().
+					Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
+					Children(func() { a.automationsView(c) })
+				a.visibleSessions = a.sessionOrder()
+			case "mcp":
+				ui.Box(c.Key("view-extensions")).Grow(1).MinWidth(0).Radius(18).Background(a.p.Surface).
+					Clip().
+					Transition(ui.ElementTransition{Enter: &ui.Motion{Opacity: 0}, Duration: 160 * time.Millisecond}).
+					Children(func() { a.extensionsView(c) })
+				a.visibleSessions = a.sessionOrder()
+			default:
+				sw := a.sideWidth()
+				if a.side.sideOpen > 0.001 {
+					sideW := float32(math.Round(float64(a.side.sideOpen * sw)))
+					ui.Row(c).Width(sideW).Shrink(0).AlignItems(ui.Stretch).Clip().
+						Children(func() { a.sidebar(c) })
+					if a.side.sideOpen > 0.99 {
+						a.splitHandle(c, "split-side", func(dx float32) { a.resizeSide(dx) }, a.resetSideWidth)
+					} else {
+						ui.Box(c).Width(8 * a.side.sideOpen).Shrink(0)
+					}
+				} else {
+					a.visibleSessions = a.sessionOrder()
+				}
+				a.main(c)
+			}
+		})
 	})
+
 	a.palette(c)
 	a.toastHUD(c)
 	a.clearWebDialog(c)
@@ -488,23 +514,8 @@ func (a *App) dragSplit(key string, width float32, dx float32) *splitDrag {
 	return d
 }
 
-func (a *App) fireHaptic(p hapticPattern) {
-	if a.haptic != nil {
-		a.haptic(p)
-	}
-}
-
 func (a *App) resizeSide(dx float32) {
 	d := a.dragSplit("split-side", a.sideWidth(), dx)
-	// Dragged well past its narrowest, the sidebar folds away at the width
-	// it had, as Finder's and Mail's do; ⌘\ brings it back.
-	if d.raw < sideMinWidth/2 {
-		a.side.sideW = d.start
-		a.side.noSide, a.side.sideMoved = true, false
-		a.side.split = splitDrag{}
-		a.fireHaptic(hapticAlignment)
-		return
-	}
 	a.side.sideW = max(sideMinWidth, min(sideMaxWidth, d.raw))
 }
 
@@ -515,14 +526,6 @@ func (a *App) resetSideWidth() {
 
 func (a *App) resizeReview(dx float32) {
 	d := a.dragSplit("split-review", a.reviewWidth(), -dx)
-	// Past half its narrowest, the panel closes, as Xcode's inspectors do.
-	if d.raw < reviewMinWidth/2 {
-		a.side.rvW = d.start
-		a.rv.open = false
-		a.side.split = splitDrag{}
-		a.fireHaptic(hapticAlignment)
-		return
-	}
 	a.side.rvW = max(reviewMinWidth, min(reviewMaxWidth, d.raw))
 }
 
@@ -551,11 +554,11 @@ func (a *App) saveWidths() {
 	a.do(a.C.SaveSettings(s))
 }
 
-// splitHandle draws an 8pt ergonomic resize target centered on a pane seam.
-// Hovering reveals a subtle accent hairline; double-clicking resets to default.
-func (a *App) splitHandle(c *ui.Context, key string, x float32, onDrag func(dx float32), onReset func()) {
+// splitHandle draws an 8pt ergonomic M3 pill drag handle between tonal panes.
+// Hovering or dragging reveals a 4×36dp rounded pill; double-clicking resets width.
+func (a *App) splitHandle(c *ui.Context, key string, onDrag func(dx float32), onReset func()) {
 	p := a.p
-	h := ui.Box(c.Key(key)).Absolute().Top(0).Bottom(0).Left(x - 4).Width(8).Cursor(ui.CursorResizeColumn).Center().ZIndex(12)
+	h := ui.Box(c.Key(key)).Width(8).FillHeight().Shrink(0).Cursor(ui.CursorResizeColumn).Center()
 	if dx, _, ok := h.Dragged(); ok && dx != 0 {
 		onDrag(dx)
 	} else if a.side.split.key == key && !h.Pressed() {
@@ -565,18 +568,20 @@ func (a *App) splitHandle(c *ui.Context, key string, x float32, onDrag func(dx f
 	if h.DoubleClicked() {
 		onReset()
 	}
-	target := float32(0)
-	if h.Pressed() {
-		target = .85
-	} else if h.Hovered() {
-		target = .4
+	pillCol := p.OutlineVariant.Alpha(.5)
+	pillH := float32(28)
+	switch {
+	case h.Pressed():
+		pillCol = p.Primary
+		pillH = 40
+	case h.Hovered():
+		pillCol = p.OnSurfaceVariant
+		pillH = 36
 	}
-	op := h.AnimateTo("line", target, ui.Animation{Duration: 140 * time.Millisecond})
-	if op > 0.01 {
-		h.Children(func() {
-			ui.Box(c).Width(1.5).FillHeight().Background(p.Live.Alpha(op))
-		})
-	}
+	h.Children(func() {
+		ui.Box(c).Width(3).Height(pillH).Radius(1.5).Background(pillCol).
+			Transition(ui.ElementTransition{Size: true, Colors: true, Duration: 140 * time.Millisecond})
+	})
 }
 
 // helloShown is an empty session, whose composer sits in the middle.
@@ -584,24 +589,19 @@ func (a *App) helloShown() bool {
 	return a.C.CanAct() && len(a.C.Entries) == 0 && len(a.C.Approvals) == 0
 }
 
-// main is the sheet the session is on. It fills the window; a hairline
-// parts it from the sidebar, and another from the review panel beside it.
+// main renders the main conversation stage and optional right supporting workbench
+// inside borderless Material You rounded tonal strata islands.
 func (a *App) main(c *ui.Context) {
 	p := a.p
 	if a.rv.open && a.rv.maximized {
-		ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Stretch).Clip().Children(func() {
+		ui.Row(c.Key("rv-max")).Grow(1).MinWidth(0).Radius(18).Background(p.SurfaceContainerLow).
+			AlignItems(ui.Stretch).Clip().Children(func() {
 			a.reviewPanel(c)
 		})
 		return
 	}
-	// Keyed: the sidebar before it comes and goes at the ends of its
-	// slide, and the sheet, by its place, would be built anew, the
-	// composer and the transcript's scroll with it, as a jump.
-	sheet := ui.Column(c.Key("sheet")).Grow(1).MinWidth(0).Background(p.Sheet).Clip()
+	sheet := ui.Column(c.Key("sheet")).Grow(1).MinWidth(0).Radius(18).Background(p.Surface).Clip()
 	a.hero.sheet = sheet.LayoutBounds()
-	if a.side.sideOpen > 0.001 && !c.Vibrancy() {
-		sheet.BorderWidth(0, 0, 0, .5).BorderColor(p.Edge)
-	}
 	sheet.Children(func() {
 		a.bar(c)
 		a.transcript(c)
@@ -616,26 +616,30 @@ func (a *App) main(c *ui.Context) {
 		if a.side.rvOverlay {
 			w, _ := c.Size()
 			if w > 0 {
-				rw = min(rw, w*0.85)
+				rw = min(rw, (w-a.curRailWidth()-16)*0.85)
 			}
-			rvWrap := ui.Row(c).Absolute().Top(0).Bottom(0).Right(0).Width(rw).ZIndex(20).AlignItems(ui.Stretch).Clip()
-			lift(rvWrap, p)
+			rvWrap := ui.Row(c).Absolute().Top(0).Bottom(0).Right(0).Width(rw).ZIndex(20).
+				Radius(18).Background(p.SurfaceContainerLow).AlignItems(ui.Stretch).Clip()
+			elevation3(rvWrap, p)
 			if a.side.rvOpen < 0.999 {
-				rvWrap.Translate((1-a.side.rvOpen)*20, 0).Opacity(min(1, a.side.rvOpen*1.35))
+				rvWrap.Translate((1-a.side.rvOpen)*24, 0).Opacity(min(1, a.side.rvOpen*1.35))
 			}
 			rvWrap.Children(func() {
 				a.reviewPanel(c)
 			})
 		} else {
-			rvWrap := ui.Row(c).Width(a.side.rvOpen * rw).Shrink(0).AlignItems(ui.Stretch).Clip()
+			if a.side.rvOpen > 0.99 {
+				a.splitHandle(c, "split-review", func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
+			} else {
+				ui.Box(c).Width(8 * a.side.rvOpen).Shrink(0)
+			}
+			rvWrap := ui.Row(c).Width(a.side.rvOpen*rw).Shrink(0).Radius(18).Background(p.SurfaceContainerLow).
+				AlignItems(ui.Stretch).Clip()
 			if a.side.rvOpen < 0.999 {
-				rvWrap.Translate((1-a.side.rvOpen)*10, 0).Opacity(min(1, a.side.rvOpen*1.35))
+				rvWrap.Translate((1-a.side.rvOpen)*12, 0).Opacity(min(1, a.side.rvOpen*1.35))
 			}
 			rvWrap.Children(func() {
 				a.reviewPanel(c)
-				if a.side.rvOpen > 0.99 {
-					a.splitHandle(c, "split-review", 0, func(dx float32) { a.resizeReview(dx) }, a.resetReviewWidth)
-				}
 			})
 		}
 	}
@@ -654,7 +658,7 @@ func textZoom(size string) float32 {
 
 // minMain is the narrowest the session's sheet gets beside the panel
 // before the sidebar makes room.
-const minMain = 600
+const minMain = 580
 
 // fitPanel puts the sidebar away when the review panel opens in a window
 // too narrow for all three, overlays the panel when even without the sidebar
@@ -662,11 +666,12 @@ const minMain = 600
 // the window widens or the panel closes.
 func (a *App) fitPanel(c *ui.Context) {
 	w, _ := c.Size()
-	if a.rv.open == a.side.panelWas && w == a.side.lastW {
+	stageW := max(0, w-a.curRailWidth()-8)
+	if a.rv.open == a.side.panelWas && stageW == a.side.lastW {
 		return
 	}
 	a.side.panelWas = a.rv.open
-	a.side.lastW = w
+	a.side.lastW = stageW
 	if !a.rv.open {
 		a.side.rvOverlay = false
 		if a.side.sideMoved {
@@ -675,12 +680,12 @@ func (a *App) fitPanel(c *ui.Context) {
 		return
 	}
 	needAll := a.sideWidth() + a.reviewWidth() + minMain
-	if !a.side.noSide && w < needAll {
+	if !a.side.noSide && stageW < needAll {
 		a.side.noSide, a.side.sideMoved = true, true
-	} else if a.side.sideMoved && w >= needAll {
+	} else if a.side.sideMoved && stageW >= needAll {
 		a.side.noSide, a.side.sideMoved = false, false
 	}
-	a.side.rvOverlay = w < a.reviewWidth()+minMain
+	a.side.rvOverlay = stageW < a.reviewWidth()+minMain+8
 }
 
 // transcriptList returns the scroll state for the active session.
@@ -730,12 +735,16 @@ func (a *App) closeOrDismiss(c *ui.Context) {
 		a.btwOpen = false
 	case a.settingsOpen:
 		a.settingsOpen = false
+		a.navPage = ""
 	case a.automationsOpen:
 		if a.automationsUI.deletingID != "" {
 			a.automationsUI.deletingID, a.automationsUI.deletingName = "", ""
 		} else {
 			a.automationsOpen = false
+			a.navPage = ""
 		}
+	case a.navPage == "mcp":
+		a.navPage = ""
 	case a.find.on:
 		a.closeFind()
 	case a.closeWindow != nil:

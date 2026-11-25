@@ -688,6 +688,13 @@ type Settings struct {
 	Fallback bool `json:"fallback,omitempty"`
 	// Theme is "light" or "dark", or "" to follow the system.
 	Theme string `json:"theme,omitempty"`
+	// SeedColor is the hex seed color (e.g. "#3B6698") for HCT theme generation.
+	SeedColor string `json:"seedColor,omitempty"`
+	// ColorStyle selects the HCT derivation strategy: "soft" (default),
+	// "vivid", "tinted", or "monochrome".
+	ColorStyle string `json:"colorStyle,omitempty"`
+	// PureBlack uses true #000000 surface in dark mode when enabled.
+	PureBlack bool `json:"pureBlack,omitempty"`
 	// Quiet lists what the app does not tell the user about while in the
 	// background: "wait", "done", "fail" notifications, or the "badge".
 	Quiet []string `json:"quiet,omitempty"`

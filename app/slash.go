@@ -2,7 +2,6 @@ package app
 
 import (
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
@@ -193,28 +192,28 @@ func (a *App) slashMenu(c *ui.Context) {
 	s.sel = min(s.sel, len(items)-1)
 	s.open = true
 	p := a.p
-	list := ui.Column(c.Key("slash-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
-	rim(list, p)
-	lift(list, p)
+	list := ui.Column(c.Key("slash-menu")).Margin(0, 8, 8, 8).Padding(6).Radius(16).Background(p.SurfaceContainerHigh).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Animation: &animFast})
+	elevation2(list, p)
 	list.Children(func() {
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			for i, it := range items {
-				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(32).Padding(0, 10).Gap(12).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name).KeepFocus()
-				focusRing(row, p)
-				switch {
-				case i == s.sel:
-					row.Background(p.Sel)
+				row := ui.ButtonBase(c.Key("slash:"+it.name)).Row().Height(34).Padding(0, 10).Gap(12).Radius(10).AlignItems(ui.Center).Justify(ui.Start).Label("/" + it.name).KeepFocus()
+				m3Focus(row, p)
+				fg, sub := p.OnSurface, p.OnSurfaceVariant
+				if i == s.sel {
+					row.Background(p.SecondaryContainer)
+					fg = p.OnSecondaryContainer
 					if s.scrollSel {
 						row.ScrollIntoView()
 						s.scrollSel = false
 					}
-				case row.Hovered():
-					row.Background(p.Hover)
+				} else {
+					m3State(row, p, ui.Color{}, false)
 				}
 				row.Children(func() {
-					ui.Text(c, "/"+it.name).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Width(slashName).Shrink(0)
-					ui.Text(c, it.note).FontSize(12.5).TextColor(p.Mute).SingleLine().MinWidth(0)
+					ui.Text(c, "/"+it.name).Font("monospace").FontSize(13).TextColor(fg).SingleLine().Ellipsis("…").Width(slashName).Shrink(0)
+					ui.Text(c, it.note).FontSize(12.5).TextColor(sub).SingleLine().MinWidth(0)
 				})
 				if row.Clicked() {
 					it.run(c)

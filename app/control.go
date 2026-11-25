@@ -40,7 +40,7 @@ func (a *App) ControlIndicator() *ControlIndicator {
 				Title: locales.AgentUsingComputer(), Width: pillW, Height: pillH,
 				Panel: true, Frameless: true, Transparent: true, Hidden: true, DisableResize: true,
 				AlwaysOnTop: true, IgnoreMouseEvents: true, DisableShadow: false,
-				Vibrancy: mygo.VibrancyHUD, CornerRadius: pillH / 2,
+				CornerRadius: pillH / 2,
 				Content: ui.View(a.controlPill),
 			})
 			win.SetContentProtection(true)
@@ -130,15 +130,19 @@ func (ci *ControlIndicator) pressed() {
 // controlPill is the pill: a dot, what is going on, and the key that
 // stops it.
 func (a *App) controlPill(c *ui.Context) {
-	dark := c.Theme().Dark
-	p := PaletteFor(dark)
+	set := a.settings()
+	seed, ok := ParseSeedHex(set.SeedColor)
+	if !ok {
+		seed = defaultSeed
+	}
+	p := SeededPalette(seed, c.Theme().Dark, NormalizeColorStyle(set.ColorStyle), set.PureBlack)
 	c.Root().Background(ui.Transparent)
-	ui.Row(c).Grow(1).Gap(9).AlignItems(ui.Center).Padding(0, 16, 0, 15).Children(func() {
-		// A still dot, as the system's own for the camera and recording.
-		ui.Box(c).Size(8, 8).Radius(4).Background(p.Live).Shrink(0)
-		ui.Text(c, locales.AgentUsingComputer()).FontSize(13).FontWeight(600).TextColor(p.Fg).SingleLine().Ellipsis("…").MinWidth(0).Grow(1)
-		ui.Text(c, "esc").FontSize(11).FontWeight(500).TextColor(p.Fg2).Padding(1, 6).Radius(5).
-			Border(.5, p.Edge2).SingleLine().Shrink(0)
-		ui.Text(c, locales.Stop()).FontSize(12.5).TextColor(p.Fg2).SingleLine().Shrink(0)
+	ui.Row(c).Grow(1).Gap(9).AlignItems(ui.Center).Padding(0, 16, 0, 15).
+		Background(p.InverseSurface).Radius(pillH / 2).Children(func() {
+		ui.Box(c).Size(8, 8).Radius(4).Background(p.Primary).Shrink(0)
+		ui.Text(c, locales.AgentUsingComputer()).FontSize(13).FontWeight(600).TextColor(p.InverseOnSurface).SingleLine().Ellipsis("…").MinWidth(0).Grow(1)
+		ui.Text(c, "esc").FontSize(11).FontWeight(500).TextColor(p.InverseOnSurface).Padding(1, 6).Radius(5).
+			Border(1, p.InverseOnSurface.Alpha(.28)).SingleLine().Shrink(0)
+		ui.Text(c, locales.Stop()).FontSize(12.5).TextColor(p.InverseOnSurface).SingleLine().Shrink(0)
 	})
 }

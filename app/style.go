@@ -10,47 +10,66 @@ import (
 	"github.com/shqingda/stratum/locales"
 )
 
-// mdThemes are the Markdown looks of the two palettes, made once.
-var mdThemes = map[*Palette]*markdown.Theme{}
+// mdThemes caches Markdown themes keyed by a compact palette signature.
+var mdThemes = map[string]*markdown.Theme{}
 
-// mdTheme is prose as the mockups set it: 13.5 on 1.55, code in ink with
-// keywords bold rather than in colors, as Mono keeps color for what is
-// alive.
+func paletteSignature(p *Palette) string {
+	return FormatHex(p.Surface) + "|" + FormatHex(p.Primary) + "|" + FormatHex(p.SurfaceContainerLow) + "|" + FormatHex(p.OnSurface)
+}
+
+// mdTheme builds an M3 tonal Markdown theme with semantic syntax highlighting
+// harmonized with the active HCT palette.
 func mdTheme(p *Palette, t *ui.Theme) *markdown.Theme {
-	if th, ok := mdThemes[p]; ok {
+	sig := paletteSignature(p)
+	if th, ok := mdThemes[sig]; ok {
 		return th
 	}
 	code := editor.DefaultTheme(t)
 	code.Tokens = [len(code.Tokens)]editor.TokenStyle{}
 	set := func(k editor.TokenKind, s editor.TokenStyle) { code.Tokens[k] = s }
-	set(editor.TokenKeyword, editor.TokenStyle{Color: p.Fg, Bold: true})
-	set(editor.TokenString, editor.TokenStyle{Color: p.Fg2})
-	set(editor.TokenComment, editor.TokenStyle{Color: p.Mute, Italic: true})
-	set(editor.TokenNumber, editor.TokenStyle{Color: p.Fg2})
-	set(editor.TokenConstant, editor.TokenStyle{Color: p.Fg2})
-	set(editor.TokenPunctuation, editor.TokenStyle{Color: p.Fg2})
-	set(editor.TokenOperator, editor.TokenStyle{Color: p.Fg2})
-	set(editor.TokenHeading, editor.TokenStyle{Color: p.Fg, Bold: true})
+	kwTone, strTone, fnTone := 42.0, 38.0, 44.0
+	if p.Dark {
+		kwTone, strTone, fnTone = 78.0, 76.0, 80.0
+	}
+	seedH := HctFromColor(p.Seed).Hue
+	chroma := 46.0
+	if p.Style == ColorStyleMonochrome {
+		chroma = 0
+	}
+	kwColor := HctFrom(seedH, chroma, kwTone).Color()
+	strColor := HctFrom(sanitizeDegrees(seedH+110), chroma*0.85, strTone).Color()
+	numColor := HctFrom(sanitizeDegrees(seedH+210), chroma*0.85, fnTone).Color()
+	set(editor.TokenKeyword, editor.TokenStyle{Color: kwColor, Bold: true})
+	set(editor.TokenString, editor.TokenStyle{Color: strColor})
+	set(editor.TokenComment, editor.TokenStyle{Color: p.OnSurfaceVariant, Italic: true})
+	set(editor.TokenNumber, editor.TokenStyle{Color: numColor})
+	set(editor.TokenConstant, editor.TokenStyle{Color: numColor})
+	set(editor.TokenPunctuation, editor.TokenStyle{Color: p.OnSurfaceVariant})
+	set(editor.TokenOperator, editor.TokenStyle{Color: p.Primary})
+	set(editor.TokenHeading, editor.TokenStyle{Color: p.Primary, Bold: true})
 	set(editor.TokenInserted, editor.TokenStyle{Color: p.Plus})
 	set(editor.TokenDeleted, editor.TokenStyle{Color: p.Minus})
-	set(editor.TokenInvalid, editor.TokenStyle{Color: p.Minus})
+	set(editor.TokenInvalid, editor.TokenStyle{Color: p.Error})
 	th := &markdown.Theme{
-		FontSize: 15, LineHeight: 1.6, CodeLineHeight: 1.6,
-		Text: p.Fg, Muted: p.Mute, Link: p.Fg, Strong: p.Fg, LinkWeight: 500,
-		Code: p.Fg, CodeBackground: p.Chip, CodeSize: 12.5 / 13.5,
-		CodeBlockBackground: p.Chip, CodeBlockBorder: ui.Transparent, CodeBlockRadius: 10, CodeBlockPadding: 11 / 13.5,
-		CodeColors: code, QuoteBar: p.Faint, QuoteText: p.Fg2, Rule: p.Edge,
-		TableBorder: p.Edge, TableHeader: p.Chip, Checkbox: p.Fg,
+		FontSize: 14.5, LineHeight: 1.6, CodeLineHeight: 1.55,
+		Text: p.OnSurface, Muted: p.OnSurfaceVariant, Link: p.Primary, Strong: p.OnSurface, LinkWeight: 600,
+		Code: p.OnSurface, CodeBackground: p.SurfaceContainerHigh, CodeSize: 13.0 / 14.5,
+		CodeBlockBackground: p.SurfaceContainerLow, CodeBlockBorder: p.OutlineVariant, CodeBlockRadius: 12, CodeBlockPadding: 12.0 / 14.5,
+		CodeColors: code, QuoteBar: p.Primary, QuoteText: p.OnSurfaceVariant, Rule: p.OutlineVariant,
+		TableBorder: p.OutlineVariant, TableHeader: p.SurfaceContainerHigh, Checkbox: p.Primary,
 	}
-	mdThemes[p] = th
+	if len(mdThemes) > 32 {
+		clear(mdThemes)
+	}
+	mdThemes[sig] = th
 	return th
 }
 
 // copied holds when each code block, by its code, was last copied.
 var copied = map[uint64]time.Time{}
 
-// codeBlock is a fenced block as the mockups draw it: a 30-point header
-// with the language and a copy icon, the code under it.
+// codeBlock renders a fenced code block inside an M3 SurfaceContainerLow container
+// with an integrated header bar and accessible copy button.
 func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 	p := a.p
 	copyButton := func() ui.Element {
@@ -58,19 +77,17 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 		h.Write([]byte(b.Code()))
 		key := h.Sum64()
 		done := c.Now().Sub(copied[key]) < 2*time.Second
-		btn := ui.ButtonBase(c).Size(26, 26).Radius(7).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
-		focusRing(btn, p)
-		if btn.Hovered() {
-			btn.Background(p.Hover)
-		}
+		btn := ui.ButtonBase(c).Size(28, 28).Radius(8).Center().Label(locales.CopyCode()).Tooltip(locales.Copy()).Disabled(b.Open)
+		m3Focus(btn, p)
+		m3State(btn, p, ui.Transparent, done)
 		btn.Children(func() {
 			ui.Box(c).Absolute().Fill().Center().
-				Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .6, Opacity: 0}, Exit: &ui.Motion{Scale: .6, Opacity: 0}}).
+				Transition(ui.ElementTransition{Enter: &ui.Motion{Scale: .7, Opacity: 0}, Exit: &ui.Motion{Scale: .7, Opacity: 0}, Duration: 150 * time.Millisecond}).
 				Key(done).Children(func() {
 				if done {
-					sym(c, "check", 13, p.Plus)
+					sym(c, "check", 14, p.Plus)
 				} else {
-					sym(c, "copy", 13, p.Mute)
+					sym(c, "copy", 14, p.OnSurfaceVariant)
 				}
 			})
 		})
@@ -81,16 +98,14 @@ func (a *App) codeBlock(c *ui.Context, b *markdown.CodeBlockView) {
 		}
 		return btn
 	}
-	ui.Column(c).Radius(10).Background(p.Chip).Margin(10, 0, 12, 0).Clip().Children(func() {
+	ui.Column(c).Radius(16).Background(p.SurfaceContainerLow).Margin(10, 0, 12, 0).Clip().Children(func() {
 		if b.Language == "" {
-			// No language to name: the copy button sits over the code's
-			// top right rather than on a header line of its own.
 			b.Body(c)
 			copyButton().Absolute().Top(6).Right(8)
 			return
 		}
-		ui.Row(c).Height(30).Padding(0, 8, 0, 12).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, b.Language).FontSize(12.5).TextColor(p.Mute)
+		ui.Row(c).Height(34).Padding(0, 8, 0, 14).AlignItems(ui.Center).Background(p.SurfaceContainerHigh).Children(func() {
+			ui.Text(c, b.Language).FontSize(12).FontWeight(500).TextColor(p.OnSurfaceVariant)
 			ui.Spacer(c)
 			copyButton()
 		})

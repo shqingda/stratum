@@ -121,17 +121,15 @@ func (a *App) openRewind() {
 func (a *App) rewindButton(c *ui.Context, e *client.Entry, shown bool) {
 	p := a.p
 	seq := a.C.Turns[e.Turn].Seq
-	b := ui.ButtonBase(c.Key("rewind-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.RewindTo()).Tooltip(locales.RewindTo())
-	focusRing(b, p)
+	b := ui.ButtonBase(c.Key("rewind-msg:"+strconv.FormatInt(seq, 10))).Size(28, 28).Radius(14).Center().Label(locales.RewindTo()).Tooltip(locales.RewindTo())
+	m3Focus(b, p)
 	target := float32(0)
 	if shown || b.Focused() || a.rewind.open && a.rewind.seq == seq {
 		target = 1
 	}
-	b.Opacity(b.AnimateTo("shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
-	if b.Hovered() {
-		b.Background(p.Hover)
-	}
-	b.Children(func() { sym(c, "history", 14, p.Mute) })
+	b.Opacity(b.AnimateTo("shown", target, animFast))
+	m3State(b, p, ui.Color{}, false)
+	b.Children(func() { sym(c, "history", 14, p.OnSurfaceVariant) })
 	if b.Clicked() {
 		text := e.Text
 		if text == "" {
@@ -161,17 +159,15 @@ func (a *App) editAndResend(c *ui.Context, seq int64, text string) {
 func (a *App) editResendButton(c *ui.Context, e *client.Entry, shown bool) {
 	p := a.p
 	seq := a.C.Turns[e.Turn].Seq
-	b := ui.ButtonBase(c.Key("edit-msg:"+strconv.FormatInt(seq, 10))).Size(26, 26).Radius(7).Center().Label(locales.EditAndResend()).Tooltip(locales.EditAndResend())
-	focusRing(b, p)
+	b := ui.ButtonBase(c.Key("edit-msg:"+strconv.FormatInt(seq, 10))).Size(28, 28).Radius(14).Center().Label(locales.EditAndResend()).Tooltip(locales.EditAndResend())
+	m3Focus(b, p)
 	target := float32(0)
 	if shown || b.Focused() {
 		target = 1
 	}
-	b.Opacity(b.AnimateTo("shown", target, ui.Animation{Duration: 120 * time.Millisecond}))
-	if b.Hovered() {
-		b.Background(p.Hover)
-	}
-	b.Children(func() { sym(c, "pencil", 14, p.Mute) })
+	b.Opacity(b.AnimateTo("shown", target, animFast))
+	m3State(b, p, ui.Color{}, false)
+	b.Children(func() { sym(c, "pencil", 14, p.OnSurfaceVariant) })
 	if b.Clicked() {
 		a.editAndResend(c, seq, e.Text)
 	}
@@ -225,12 +221,11 @@ func (a *App) rewindMenu(c *ui.Context) {
 		return
 	}
 	p := a.p
-	list := ui.Column(c.Key("rewind-menu")).Margin(0, 8, 6, 8).Padding(4).Radius(12).Background(p.Card).
-		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Duration: 150 * time.Millisecond})
-	rim(list, p)
-	lift(list, p)
+	list := ui.Column(c.Key("rewind-menu")).Margin(0, 8, 8, 8).Padding(6).Radius(16).Background(p.SurfaceContainerHigh).
+		Transition(ui.ElementTransition{Enter: &ui.Motion{Y: 6, Scale: .985, Opacity: 0}, Animation: &animFast})
+	elevation2(list, p)
 	list.Children(func() {
-		ui.Text(c, locales.Rewind()).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).Margin(6, 10, 2, 10)
+		ui.Text(c, locales.Rewind()).FontSize(12).FontWeight(600).LetterSpacing(.18).TextColor(p.OnSurfaceVariant).Margin(6, 10, 2, 10)
 		ui.Scroll(c).MaxHeight(320).Children(func() {
 			if w.step == "actions" {
 				a.rewindActionRows(c)
@@ -238,27 +233,28 @@ func (a *App) rewindMenu(c *ui.Context) {
 			}
 			prompts := a.rewindPrompts()
 			if len(prompts) == 0 {
-				ui.Text(c, locales.RewindEmpty()).FontSize(13).TextColor(p.Mute).Padding(8, 10)
+				ui.Text(c, locales.RewindEmpty()).FontSize(13).TextColor(p.OnSurfaceVariant).Padding(8, 10)
 				return
 			}
 			w.sel = min(w.sel, len(prompts)-1)
 			for i, pr := range prompts {
-				row := ui.ButtonBase(c.Key("rewind:"+strings.TrimSpace(pr.text))).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(pr.text)
-				focusRing(row, p)
-				switch {
-				case i == w.sel:
-					row.Background(p.Sel)
+				row := ui.ButtonBase(c.Key("rewind:"+strings.TrimSpace(pr.text))).Row().Height(34).Padding(0, 10).Radius(10).AlignItems(ui.Center).Justify(ui.Start).Label(pr.text)
+				m3Focus(row, p)
+				fg, sub := p.OnSurface, p.OnSurfaceVariant
+				if i == w.sel {
+					row.Background(p.SecondaryContainer)
+					fg = p.OnSecondaryContainer
 					if w.scrollSel {
 						row.ScrollIntoView()
 						w.scrollSel = false
 					}
-				case row.Hovered():
-					row.Background(p.Hover)
+				} else {
+					m3State(row, p, ui.Color{}, false)
 				}
 				row.Children(func() {
-					ui.Text(c, pr.text).FontSize(13).TextColor(p.Fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+					ui.Text(c, pr.text).FontSize(13).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 					if i < 9 {
-						ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(p.Faint).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
+						ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(sub).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
 					}
 				})
 				if row.Clicked() {
@@ -277,24 +273,25 @@ func (a *App) rewindActionRows(c *ui.Context) {
 		return
 	}
 	w.sel = min(w.sel, len(acts)-1)
-	ui.Text(c, w.prompt).FontSize(12.5).TextColor(p.Mute).Margin(2, 10, 4, 10).SingleLine().Ellipsis("…")
+	ui.Text(c, w.prompt).FontSize(12.5).TextColor(p.OnSurfaceVariant).Margin(2, 10, 4, 10).SingleLine().Ellipsis("…")
 	for i, act := range acts {
-		row := ui.ButtonBase(c.Key("rewind-act:"+act.action)).Row().Height(32).Padding(0, 10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(act.label)
-		focusRing(row, p)
-		switch {
-		case i == w.sel:
-			row.Background(p.Sel)
+		row := ui.ButtonBase(c.Key("rewind-act:"+act.action)).Row().Height(34).Padding(0, 10).Radius(10).AlignItems(ui.Center).Justify(ui.Start).Label(act.label)
+		m3Focus(row, p)
+		fg, sub := p.OnSurface, p.OnSurfaceVariant
+		if i == w.sel {
+			row.Background(p.SecondaryContainer)
+			fg = p.OnSecondaryContainer
 			if w.scrollSel {
 				row.ScrollIntoView()
 				w.scrollSel = false
 			}
-		case row.Hovered():
-			row.Background(p.Hover)
+		} else {
+			m3State(row, p, ui.Color{}, false)
 		}
 		row.Children(func() {
-			ui.Text(c, act.label).FontSize(13).TextColor(p.Fg).SingleLine().Grow(1).MinWidth(0)
+			ui.Text(c, act.label).FontSize(13).TextColor(fg).SingleLine().Grow(1).MinWidth(0)
 			if i < 9 {
-				ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(p.Faint).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
+				ui.Text(c, strconv.Itoa(i+1)).FontSize(11).TextColor(sub).FontFeatures("tnum").Margin(0, 0, 0, 8).Shrink(0)
 			}
 		})
 		if row.Clicked() {
@@ -302,7 +299,7 @@ func (a *App) rewindActionRows(c *ui.Context) {
 		}
 	}
 	if a.rewindShell(w.seq) && len(acts) > 1 {
-		ui.Text(c, locales.RewindShell()).FontSize(12).TextColor(p.Mute).Margin(4, 10, 4, 10)
+		ui.Text(c, locales.RewindShell()).FontSize(12).TextColor(p.OnSurfaceVariant).Margin(4, 10, 4, 10)
 	}
 }
 

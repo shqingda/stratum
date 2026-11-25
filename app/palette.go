@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/locales"
@@ -277,11 +276,11 @@ func (a *App) palHits() []opt {
 
 // openPalette shows the palette, its query empty.
 func (a *App) openPalette(c *ui.Context) {
-	a.pal.open, a.search.query, a.pal.sel = true, "", 0
+	a.pal.open, a.search.query, a.pal.sel, a.pal.filter = true, "", 0, ""
 	a.search.searchInput.Focus(c)
 }
 
-// palette is ⌘K: sessions and actions in one search, over the window.
+// palette is ⌘K: M3 SearchView with category FilterChips and keyboard navigation.
 func (a *App) palette(c *ui.Context) {
 	if !a.pal.open {
 		return
@@ -290,30 +289,33 @@ func (a *App) palette(c *ui.Context) {
 	a.send(a.C.Search(strings.TrimSpace(a.search.query)))
 	sessions, actions := a.palOpts(c)
 	files, hits := a.palFiles(), a.palHits()
+	switch a.pal.filter {
+	case "sessions":
+		actions, files, hits = nil, nil, nil
+	case "actions":
+		sessions, files, hits = nil, nil, nil
+	case "files":
+		sessions, actions, hits = nil, nil, nil
+	case "messages":
+		sessions, actions, files = nil, nil, nil
+	}
 	all := append(append(append(append([]opt(nil), sessions...), actions...), files...), hits...)
 	a.pal.sel = max(0, min(a.pal.sel, len(all)-1))
 	choose := func(i int) {
-		a.pal.open, a.search.query = false, ""
+		a.pal.open, a.search.query, a.pal.filter = false, "", ""
 		all[i].run()
 	}
 	ui.DialogBase(c, &a.pal.open, func(backdrop, panel ui.Element) {
-		scrim := ui.RGBA(18, 19, 26, .18)
-		if p.Dark {
-			scrim = ui.RGBA(6, 7, 10, .45)
-		}
-		backdrop.Background(scrim).Justify(ui.Start).Padding(84, 16, 16, 16)
-		panel.Width(520).MaxWidthPercent(100).Radius(14).Background(p.Card).Clip().Label(locales.CommandPalette()).
-			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -8, Scale: .98, Opacity: 0}, Duration: 170 * time.Millisecond})
-		if p.Dark {
-			panel.Shadow(0, 0, 0, .5, ui.RGBA(0, 0, 0, .8)).Shadow(0, 18, 48, -8, ui.RGBA(0, 0, 0, .6)).InsetShadow(0, .5, 0, 0, ui.RGBA(255, 255, 255, .08))
-		} else {
-			panel.Shadow(0, 0, 0, .5, ink.Alpha(.14)).Shadow(0, 12, 32, -8, ink.Alpha(.22))
-		}
+		backdrop.Background(p.Scrim).Justify(ui.Start).Padding(72, 16, 16, 16)
+		panel.Width(580).MaxWidthPercent(100).Radius(24).Background(p.SurfaceContainerHigh).
+			Clip().Label(locales.CommandPalette()).
+			Transition(ui.ElementTransition{Enter: &ui.Motion{Y: -8, Scale: .98, Opacity: 0}, Animation: &animFast})
+		elevation3(panel, p)
 		panel.Children(func() {
-			ui.Row(c).Height(50).Padding(0, 16).Gap(10).AlignItems(ui.Center).BorderWidth(0, 0, .5, 0).BorderColor(p.Edge).Children(func() {
-				sym(c, "search", 18, p.Mute)
-				ui.TextInputBase(c, &a.search.query).Bind(&a.search.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.Mute).
-					FontSize(16).TextColor(p.Fg).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
+			ui.Row(c).Height(56).Padding(0, 20).Gap(12).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.OutlineVariant.Alpha(.20)).Children(func() {
+				sym(c, "search", 18, p.OnSurfaceVariant)
+				ui.TextInputBase(c, &a.search.query).Bind(&a.search.searchInput).Label(locales.Search()).Placeholder(locales.PalettePlaceholder()).PlaceholderColor(p.OnSurfaceVariant).
+					FontSize(16).TextColor(p.OnSurface).Grow(1).SingleLine().AutoFocus().OnTextKey(func(k ui.TextKey) bool {
 					a.search.query = k.Text()
 					switch {
 					case k.Key == ui.KeyDown && k.Mods == 0:
@@ -331,7 +333,7 @@ func (a *App) palette(c *ui.Context) {
 							choose(a.pal.sel)
 						}
 					case k.Key == ui.KeyW && k.Mods == ui.Cmd:
-						a.pal.open, a.search.query = false, ""
+						a.pal.open, a.search.query, a.pal.filter = false, "", ""
 					default:
 						if k.Key != ui.KeyEnter {
 							a.pal.sel = 0
@@ -341,14 +343,46 @@ func (a *App) palette(c *ui.Context) {
 					return true
 				})
 			})
+			ui.Row(c).Height(42).Padding(0, 16).Gap(6).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.OutlineVariant.Alpha(.20)).Children(func() {
+				chips := []struct{ id, label string }{
+					{"", locales.FilterAll()},
+					{"sessions", locales.Sessions()},
+					{"actions", locales.Actions()},
+					{"files", locales.Files()},
+					{"messages", locales.PaletteMessages()},
+				}
+				for _, ch := range chips {
+					on := a.pal.filter == ch.id
+					cb := ui.ButtonBase(c.Key("pal-filter:"+ch.id)).Row().Height(28).Padding(0, 10).Gap(4).Radius(10).AlignItems(ui.Center).
+						Label(ch.label).Checked(on).KeepFocus()
+					m3Focus(cb, p)
+					fg, weight := p.OnSurfaceVariant, 500
+					if on {
+						m3State(cb, p, p.SecondaryContainer, true)
+						fg, weight = p.OnSecondaryContainer, 600
+					} else {
+						m3State(cb, p, p.SurfaceContainerHighest, false)
+					}
+					cb.Children(func() {
+						if on {
+							sym(c, "check", 12, fg)
+						}
+						ui.Text(c, ch.label).FontSize(12).FontWeight(weight).TextColor(fg).SingleLine()
+					})
+					if cb.Clicked() {
+						a.pal.filter = ch.id
+						a.pal.sel = 0
+					}
+				}
+			})
 			ui.Scroll(c).MaxHeight(380).Children(func() {
 				i := 0
 				section := func(name string, opts []opt) {
 					if len(opts) == 0 {
 						return
 					}
-					ui.Column(c).Padding(6, 6, 2, 6).Children(func() {
-						ui.Text(c, name).FontSize(11.5).FontWeight(600).TextColor(p.Mute).Margin(6, 10, 4, 10)
+					ui.Column(c).Padding(8, 10, 4, 10).Children(func() {
+						ui.Text(c, name).FontSize(11.5).FontWeight(600).TextColor(p.OnSurfaceVariant).Margin(4, 10, 4, 10)
 						for _, o := range opts {
 							a.palRow(c, o, i, choose)
 							i++
@@ -362,40 +396,41 @@ func (a *App) palette(c *ui.Context) {
 				if len(all) == 0 {
 					emptyState(c, p, "search", locales.PaletteNoMatches(), "", nil)
 				}
-				ui.Box(c).Height(6)
+				ui.Box(c).Height(8)
 			})
 		})
 	})
 	if !a.pal.open {
-		a.search.query = ""
+		a.search.query, a.pal.filter = "", ""
 	}
 }
 
 // palRow is one row, the query's match in it bold.
 func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 	p := a.p
-	b := ui.ButtonBase(c.Key(fmt.Sprintf("pal:%d", i))).Row().Height(34).Padding(0, 10).Gap(10).Radius(8).AlignItems(ui.Center).Label(o.label)
-	focusRing(b, p)
-	switch {
-	case i == a.pal.sel:
-		b.Background(p.Sel)
+	b := ui.ButtonBase(c.Key(fmt.Sprintf("pal:%d", i))).Row().Height(38).Padding(0, 12).Gap(10).Radius(12).AlignItems(ui.Center).Label(o.label)
+	m3Focus(b, p)
+	fg, sub := p.OnSurface, p.OnSurfaceVariant
+	if i == a.pal.sel {
+		b.Background(p.SecondaryContainer)
+		fg = p.OnSecondaryContainer
 		if a.pal.scroll {
 			b.ScrollIntoView()
 			a.pal.scroll = false
 		}
-	case b.Hovered():
-		b.Background(p.Hover)
+	} else {
+		m3State(b, p, ui.Color{}, false)
 	}
 	if b.Clicked() {
 		choose(i)
 	}
 	b.Children(func() {
-		ui.Box(c).Width(18).Center().Children(func() { sym(c, o.icon, 16, p.Fg2) })
+		ui.Box(c).Width(18).Center().Children(func() { sym(c, o.icon, 16, sub) })
 		ui.Row(c).Shrink(1).MinWidth(0).Children(func() {
 			pre, hit, post := split(o.label, a.search.query)
 			text := func(s string, weight int) {
 				if s != "" {
-					t := ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(p.Fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
+					t := ui.Text(c, s).FontSize(14).FontWeight(weight).TextColor(fg).SingleLine().PreserveSpaces().Shrink(1).MinWidth(0)
 					if o.mono {
 						t.Font("monospace").FontSize(13)
 					}
@@ -406,7 +441,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			text(post, 400)
 		})
 		if o.sub != "" {
-			ui.Text(c, o.sub).FontSize(13).TextColor(p.Mute).SingleLine().Ellipsis("…").Shrink(0).MaxWidth(160)
+			ui.Text(c, o.sub).FontSize(13).TextColor(sub).SingleLine().Ellipsis("…").Shrink(0).MaxWidth(160)
 		}
 		ui.Spacer(c)
 		kbd := o.kbd
@@ -414,7 +449,7 @@ func (a *App) palRow(c *ui.Context, o opt, i int, choose func(int)) {
 			kbd = "⏎"
 		}
 		if kbd != "" {
-			ui.Text(c, kbd).FontSize(12).TextColor(p.Mute).Shrink(0)
+			ui.Text(c, kbd).FontSize(12).TextColor(sub).Shrink(0)
 		}
 	})
 }

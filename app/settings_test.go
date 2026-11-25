@@ -3,9 +3,11 @@ package app
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
+	"github.com/shqingda/stratum/locales"
 	"github.com/shqingda/stratum/proto"
 )
 
@@ -105,23 +107,16 @@ func TestSettings(t *testing.T) {
 	}
 	tt.Frame()
 	snapshot(t, tt, "settings-accounts")
-	if err := tt.Click("DeepSeek 选项"); err != nil {
-		t.Fatal(err)
+	if !tt.HasText("Sign in with ChatGPT") {
+		t.Fatal("accounts page did not list the sign-ins directly")
 	}
-	if err := tt.ChooseMenuItem("退出登录"); err != nil {
+	if err := tt.Click("退出登录 DeepSeek"); err != nil {
 		t.Fatal(err)
 	}
 	var ref proto.AccountRef
 	json.Unmarshal(sent(proto.MethodLogout), &ref)
 	if ref.Account != "deepseek" {
 		t.Fatalf("signed out of %+v", ref)
-	}
-	if err := tt.Click("添加账号…"); err != nil {
-		t.Fatal(err)
-	}
-	tt.Frame()
-	if !tt.HasText("Sign in with ChatGPT") {
-		t.Fatal("添加账号 did not show the sign-ins")
 	}
 	tt.SetDark(true)
 	tt.Frame()
@@ -172,7 +167,7 @@ func clickSwitch(t *testing.T, tt *ui.Tester, s string) {
 	if !ok {
 		t.Fatalf("no row %q", s)
 	}
-	tt.ClickAt(r.X-12+540-10-15, r.Y+r.H/2)
+	tt.ClickAt(r.X-15+572-1-12-18, r.Y+r.H/2)
 	tt.Frame()
 }
 
@@ -278,5 +273,53 @@ func TestRoleModelEffort(t *testing.T) {
 	}
 	if saved.Sub == nil || saved.Sub.Effort != "low" {
 		t.Fatalf("saved Sub = %+v", saved.Sub)
+	}
+}
+
+func TestThemeStudioPersistence(t *testing.T) {
+	a := working()
+	a.C.Busy, a.C.Approvals = false, nil
+	a.C.Settings = &proto.Settings{}
+	a.out = make(chan []proto.Command, 16)
+	tt := ui.NewTester(a.View, 1120, 800)
+	a.openSettings()
+	a.settingsPage = "appearance"
+	tt.SetDark(true)
+	tt.Frame()
+
+	for _, label := range []string{locales.ColorStyleVivid(), locales.PresetMalachite()} {
+		if err := tt.Click(label); err != nil {
+			t.Fatalf("Click(%q): %v", label, err)
+		}
+		tt.Frame()
+	}
+	pbLabel, ok1 := tt.Find(locales.PureBlack())
+	pbNote, ok2 := tt.Find(locales.PureBlackNote())
+	if !ok1 || !ok2 {
+		t.Fatalf("missing PureBlack row: label=%v note=%v", ok1, ok2)
+	}
+	tt.ClickAt(pbLabel.X-15+572-1-12-18, (pbLabel.Y+pbNote.Y+pbNote.H)/2)
+	tt.Frame()
+
+	var saved proto.Settings
+	for done := false; !done; {
+		select {
+		case cmds := <-a.out:
+			for _, cmd := range cmds {
+				if cmd.Method == proto.MethodSetSettings {
+					_ = json.Unmarshal(cmd.Params, &saved)
+				}
+			}
+		default:
+			done = true
+		}
+	}
+	if saved.ColorStyle != "vivid" || saved.SeedColor != "#2E7D63" || !saved.PureBlack {
+		t.Fatalf("saved theme studio settings = %+v, want vivid / #2E7D63 / PureBlack=true", saved)
+	}
+	tt.Advance(300 * time.Millisecond)
+	tt.Frame()
+	if a.p == nil || a.p.Surface != (ui.RGB(0, 0, 0)) {
+		t.Fatalf("expected PureBlack Surface=#000000, got %+v", a.p.Surface)
 	}
 }

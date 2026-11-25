@@ -188,7 +188,7 @@ func (a *App) sentImages(c *ui.Context, e *client.Entry) {
 			if h > 0 {
 				w = min(w*120/h, 240)
 			}
-			ui.Image(c.Key(i), src).Size(w, 120).Fit(ui.Cover).Radius(8).Border(.5, a.p.Edge2)
+			ui.Image(c.Key(i), src).Size(w, 120).Fit(ui.Cover).Radius(12)
 		}
 	})
 }

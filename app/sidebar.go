@@ -15,131 +15,103 @@ import (
 )
 
 const (
-	barHeight    = 52
-	sheetBar     = 52 // matches barHeight so all three panes share one top bar baseline
-	sidebarWidth = 264
+	barHeight    = 48
+	sheetBar     = 48 // matches barHeight so all panes share one M3 Top App Bar baseline
+	sidebarWidth = 276
 )
 
-// sym draws an SF Symbol.
-// iconButton is a 28-point square button holding a symbol.
+// iconButton is a 32-point M3 tonal icon button holding a symbol.
 func (a *App) iconButton(c *ui.Context, key, symbol, tip string) ui.Element {
-	return a.iconButtonSized(c, key, symbol, tip, 17)
+	return a.iconButtonSized(c, key, symbol, tip, 18)
 }
 
 func (a *App) iconButtonSized(c *ui.Context, key, symbol, tip string, size float32) ui.Element {
-	b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(7).Center().Label(tip).Tooltip(tip)
-	focusRing(b, a.p)
-	if b.Hovered() {
-		b.Background(a.p.Hover)
-	}
-	b.Children(func() { sym(c, symbol, size, a.p.Fg2) })
+	p := a.p
+	b := ui.ButtonBase(c.Key(key)).Size(32, 32).Radius(10).Center().Label(tip).Tooltip(tip)
+	m3Focus(b, p)
+	m3State(b, p, ui.Transparent, false)
+	b.Children(func() { sym(c, symbol, size, p.OnSurfaceVariant) })
 	return b
 }
 
-func (a *App) sidebar(c *ui.Context, vibrant bool) {
+func (a *App) sidebar(c *ui.Context) {
 	p := a.p
-	side := ui.Column(c).Width(a.sideWidth()).Shrink(0)
-	topGap := float32(barHeight)
-	if vibrant {
-		// Window VibrancyGlass provides the single native glass layer; add a
-		// Tinted frost wash and one right hairline so there are no nested frames.
-		side.Background(sideTint(p)).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
-	} else {
-		side.Background(p.Side).BorderWidth(0, .5, 0, 0).BorderColor(p.Edge)
-	}
+	side := ui.Column(c).Width(a.sideWidth()).Shrink(0).Radius(18).
+		Background(p.SurfaceContainerLow).Clip()
 	side.Children(func() {
-		ui.Box(c).Height(topGap + 6).Shrink(0).DragWindow()
-		ui.Column(c).Padding(0, 12, 20, 12).Gap(2).Children(func() {
-			if a.navItem(c, "search", "search", locales.Search(), "⌘ K").Clicked() {
-				a.openPalette(c)
+		// M3 Pane Header with FlClash-style in-bar expanding filter search.
+		ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10, 0, 16).Gap(6).AlignItems(ui.Center).DragWindow().Children(func() {
+			if a.sideSearchOpen {
+				ui.Row(c).Grow(1).MinWidth(0).Height(32).Radius(16).Background(p.SurfaceContainerHigh).
+					Padding(0, 6, 0, 12).Gap(6).AlignItems(ui.Center).Children(func() {
+					sym(c, "search", 14, p.OnSurfaceVariant)
+					ui.TextInputBase(c.Key("side-search-in"), &a.sideQuery).Bind(&a.sideSearchInput).
+						Label(locales.FilterSessions()).Placeholder(locales.FilterSessions()).PlaceholderColor(p.OnSurfaceVariant).
+						FontSize(13).TextColor(p.OnSurface).Grow(1).MinWidth(0).SingleLine().AutoFocus().
+						OnTextKey(func(k ui.TextKey) bool {
+							a.sideQuery = k.Text()
+							if k.Key == ui.KeyEscape {
+								a.sideSearchOpen, a.sideQuery = false, ""
+								return true
+							}
+							return false
+						})
+					if clr := a.iconButtonSized(c, "side-search-close", "x", locales.Close(), 13); clr.Clicked() {
+						a.sideSearchOpen, a.sideQuery = false, ""
+					}
+				})
+			} else {
+				ui.Text(c, locales.Sessions()).FontSize(16).FontWeight(600).TextColor(p.OnSurface).SingleLine()
+				ui.Spacer(c)
+				if sb := a.iconButtonSized(c, "side-search-btn", "search", locales.Search(), 17); sb.Clicked() {
+					a.sideSearchOpen = true
+					a.sideSearchInput.Focus(c)
+				}
 			}
-			if a.navItem(c, "skills", "puzzle", locales.SettingsMcp(), "").Clicked() {
-				a.openMCP()
-			}
-			if a.navItem(c, "automations", "clock-play", locales.Automations(), "").Clicked() {
-				a.openAutomations()
+			if col := a.iconButtonSized(c, "side", "layout-sidebar-left-collapse", locales.HideSidebar(), 18); col.Clicked() {
+				a.toggleSide()
 			}
 		})
-		list := ui.Scroll(c).Grow(1).Padding(0, 8, 12, 8).Children(func() { a.sessions(c) })
-		// The list fades into the footer rather than being cut at it.
-		if h := list.Bounds().H; h > 0 {
-			black := ui.RGBA(0, 0, 0, 1)
-			list.MaskLinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: 1 - 36/h}, {Color: ui.Transparent, At: 1}}})
-		}
+
+		// Single-row borderless tonal filter track (fits English & Chinese without ellipsis)
+		ui.Row(c).Shrink(0).Margin(0, 10, 8, 10).Padding(3).Height(34).Radius(17).
+			Background(p.SurfaceContainerHigh).AlignItems(ui.Center).Gap(2).Children(func() {
+			for _, f := range []struct{ id, label string }{
+				{"", locales.FilterAll()},
+				{"run", locales.FilterRunning()},
+				{"wait", locales.FilterPending()},
+				{"archived", locales.FilterArchived()},
+			} {
+				active := a.sideFilter == f.id
+				tab := ui.ButtonBase(c.Key("sf:"+f.id)).Row().Grow(1).Shrink(0).Height(28).Padding(0, 6).Radius(14).
+					Center().Label(f.label).Checked(active)
+				m3Focus(tab, p)
+				col, weight := p.OnSurfaceVariant, 500
+				if active {
+					selBg := p.Surface
+					if p.Dark {
+						selBg = p.SurfaceContainerHighest
+					}
+					tab.Background(selBg)
+					col, weight = p.OnSurface, 600
+				} else {
+					m3State(tab, p, ui.Transparent, false)
+				}
+				if tab.Clicked() {
+					a.sideFilter = f.id
+					a.showArchived = f.id == "archived"
+				}
+				tab.Children(func() {
+					ui.Text(c, f.label).FontSize(12).FontWeight(weight).TextColor(col).SingleLine()
+				})
+			}
+		})
+
+		ui.Scroll(c).Grow(1).Padding(2, 8, 12, 8).Children(func() { a.sessions(c) })
 		a.archivedToast(c)
 		a.footer(c)
 	})
 	a.deleteDialog(c)
-}
-
-// sideToggle is the Safari-style floating Liquid Glass pill holding New Session
-// and Sidebar Toggle. It sits at the top-right of the open sidebar and glides
-// smoothly beside the window traffic lights as the sidebar collapses.
-func (a *App) sideToggle(c *ui.Context) {
-	p := a.p
-	tip := locales.HideSidebar()
-	if a.side.noSide {
-		tip = locales.ShowSidebar()
-	}
-	const pillW, pillH = float32(74), float32(32)
-	leftClosed := toggleLeft(c)
-	leftOpen := a.sideWidth() - 14 - pillW
-	left := leftClosed + a.side.sideOpen*(leftOpen-leftClosed)
-	bg := ui.RGBA(255, 255, 255, .94)
-	shadow := ui.RGBA(0, 0, 0, .08)
-	if p.Dark {
-		bg = ui.RGBA(38, 38, 42, .90)
-		shadow = ui.RGBA(0, 0, 0, .36)
-	}
-	pill := ui.Row(c.Key("side-pill")).Absolute().Left(left).Top((barHeight-pillH)/2).
-		Size(pillW, pillH).Radius(pillH/2).Padding(0, 5).Gap(4).AlignItems(ui.Center).Justify(ui.Center).
-		Background(bg).Border(.5, p.Edge).Shadow(0, 2, 6, -1, shadow).ZIndex(10)
-	pill.Children(func() {
-		newBtn := ui.ButtonBase(c.Key("bar-new")).Size(30, 26).Radius(13).Center().
-			Label(locales.NewSession()).Tooltip(locales.NewSession()).KeyShortcuts(ui.Cmd, ui.KeyN)
-		focusRing(newBtn, p)
-		newCol := p.Fg
-		if newBtn.Hovered() {
-			newBtn.Background(p.Hover)
-		}
-		newBtn.Children(func() { sym(c, "edit", 17, newCol) })
-		if newBtn.Clicked() {
-			a.do(a.C.NewSession())
-		}
-
-		togBtn := ui.ButtonBase(c.Key("side")).Size(30, 26).Radius(13).Center().
-			Label(tip).Tooltip(tip)
-		focusRing(togBtn, p)
-		togCol := p.Fg
-		if togBtn.Hovered() {
-			togBtn.Background(p.Hover)
-		}
-		togBtn.Children(func() { sym(c, "layout-sidebar", 18, togCol) })
-		if togBtn.Clicked() {
-			a.toggleSide()
-		}
-	})
-}
-
-// toggleLeft is where the sidebar pill rests when collapsed: past the traffic lights.
-func toggleLeft(c *ui.Context) float32 { return max(c.TitleBar().Left+10, 14) }
-
-func (a *App) navItem(c *ui.Context, key, symbol, label, kbd string) ui.Element {
-	p := a.p
-	it := ui.ButtonBase(c.Key(key)).Row().Height(32).Padding(0, 9).Gap(9).Radius(7).AlignItems(ui.Center).Label(label)
-	focusRing(it, p)
-	if it.Hovered() {
-		it.Background(p.Hover)
-	}
-	it.Children(func() {
-		ui.Box(c).Width(17).Center().Children(func() { sym(c, symbol, 16, p.Fg2) })
-		ui.Text(c, label).FontSize(14).TextColor(p.Fg).SingleLine()
-		ui.Spacer(c)
-		if kbd != "" {
-			ui.Text(c, kbd).FontSize(12).TextColor(p.Mute)
-		}
-	})
-	return it
 }
 
 // sessionGroups are the sessions as the sidebar groups them.
@@ -164,7 +136,29 @@ func (a *App) groupSessions() *sessionGroups {
 		}
 		clear(g.cwdByFolder)
 	}
+	q := strings.ToLower(strings.TrimSpace(a.sideQuery))
 	for _, s := range a.C.Sessions {
+		if q != "" {
+			t := strings.ToLower(title(s) + " " + filepath.Base(s.Cwd))
+			if !strings.Contains(t, q) {
+				continue
+			}
+		}
+		st := a.state(s)
+		switch a.sideFilter {
+		case "run":
+			if s.Archived || st != "run" {
+				continue
+			}
+		case "wait":
+			if s.Archived || (st != "wait" && st != "unread" && st != "fail") {
+				continue
+			}
+		case "archived":
+			if !s.Archived {
+				continue
+			}
+		}
 		switch {
 		case s.Archived:
 			g.archived = append(g.archived, s)
@@ -202,9 +196,7 @@ func (a *App) toggleProjectCollapsed(cwd string) {
 	a.do(a.C.SaveSettings(s))
 }
 
-// sessionOrder is the sessions in the order the sidebar shows them, for
-// ⌘1–⌘9 and ⌘[ ⌘] to count by while the sidebar is hidden: the numbers
-// stay those the sidebar would show, as Safari's tabs keep theirs.
+// sessionOrder is the sessions in the order the sidebar shows them, for ⌘1–⌘9 and ⌘[ ⌘].
 func (a *App) sessionOrder() []string {
 	g := a.groupSessions()
 	ids := a.visibleSessions[:0]
@@ -219,14 +211,13 @@ func (a *App) sessionOrder() []string {
 			add(g.byFolder[f])
 		}
 	}
-	if a.showArchived {
+	if a.showArchived || a.sideFilter == "archived" {
 		add(g.archived)
 	}
 	return ids
 }
 
-// sessions lists the sessions: the ones waiting on the user first, then
-// the rest by workspace, each newest first.
+// sessions lists the sessions: pinned first, then grouped by workspace, then archived.
 func (a *App) sessions(c *ui.Context) {
 	a.visibleSessions = a.visibleSessions[:0]
 	if len(a.C.Sessions) == 0 {
@@ -235,8 +226,12 @@ func (a *App) sessions(c *ui.Context) {
 	}
 	g := a.groupSessions()
 	pinned, archived, folders, byFolder, cwdByFolder := g.pinned, g.archived, g.folders, g.byFolder, g.cwdByFolder
+	if len(pinned) == 0 && len(folders) == 0 && len(archived) == 0 {
+		emptyState(c, a.p, "search", locales.PaletteNoMatches(), "", nil)
+		return
+	}
 	if len(pinned) > 0 {
-		a.group(c, "pin", locales.Pinned(), 0)
+		a.group(c, "pin", locales.Pinned(), len(pinned))
 		for _, s := range pinned {
 			a.sessionRow(c, s)
 		}
@@ -250,25 +245,24 @@ func (a *App) sessions(c *ui.Context) {
 			}
 		}
 	}
-	if len(archived) > 0 {
+	if len(archived) > 0 && (a.sideFilter == "" || a.sideFilter == "archived") {
 		p := a.p
-		b := ui.ButtonBase(c.Key("archived")).Row().Height(26).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).Radius(6).AlignItems(ui.Center).
-			Label(locales.Archived()).Expanded(a.showArchived)
-		focusRing(b, p)
-		if b.Hovered() {
-			b.Background(p.Hover)
-		}
+		open := a.showArchived || a.sideFilter == "archived"
+		b := ui.ButtonBase(c.Key("archived")).Row().Height(30).Margin(12, 0, 4, 0).Padding(0, 10).Gap(8).Radius(10).AlignItems(ui.Center).
+			Label(locales.Archived()).Expanded(open)
+		m3Focus(b, p)
+		m3State(b, p, ui.Transparent, false)
 		if b.Clicked() {
 			a.showArchived = !a.showArchived
 		}
 		b.Children(func() {
-			sym(c, "archive", 13, p.Mute)
-			ui.Text(c, locales.Archived()).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).SingleLine()
-			disclosureChevron(c, "archived", a.showArchived, 11, p.Mute)
+			sym(c, "archive", 14, p.OnSurfaceVariant)
+			ui.Text(c, locales.Archived()).FontSize(12.5).FontWeight(600).TextColor(p.OnSurfaceVariant).SingleLine()
+			disclosureChevron(c, "archived", open, 12, p.OnSurfaceVariant)
 			ui.Spacer(c)
-			ui.Text(c, fmt.Sprint(len(archived))).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
+			ui.Text(c, fmt.Sprint(len(archived))).FontSize(12.5).FontWeight(500).TextColor(p.OnSurfaceVariant).FontFeatures("tnum")
 		})
-		if a.showArchived {
+		if open {
 			for _, s := range archived {
 				a.sessionRow(c, s)
 			}
@@ -278,14 +272,14 @@ func (a *App) sessions(c *ui.Context) {
 
 func (a *App) group(c *ui.Context, symbol, label string, n int) {
 	p := a.p
-	ui.Row(c).Height(24).Margin(16, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).Children(func() {
+	ui.Row(c).Height(26).Margin(10, 0, 4, 0).Padding(0, 10).Gap(7).AlignItems(ui.Center).Children(func() {
 		if symbol != "" {
-			sym(c, symbol, 13, p.Mute)
+			sym(c, symbol, 13, p.OnSurfaceVariant)
 		}
-		ui.Text(c, label).FontSize(12.5).FontWeight(600).LetterSpacing(.18).TextColor(p.Mute).SingleLine()
+		ui.Text(c, label).FontSize(12.5).FontWeight(600).TextColor(p.OnSurfaceVariant).SingleLine()
 		if n > 0 {
 			ui.Spacer(c)
-			ui.Text(c, fmt.Sprint(n)).FontSize(12.5).FontWeight(500).TextColor(p.Mute)
+			ui.Text(c, fmt.Sprint(n)).FontSize(12.5).FontWeight(500).TextColor(p.OnSurfaceVariant).FontFeatures("tnum")
 		}
 	})
 }
@@ -293,7 +287,7 @@ func (a *App) group(c *ui.Context, symbol, label string, n int) {
 func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Session) {
 	p := a.p
 	collapsed := a.projectCollapsed(cwd)
-	row := ui.Row(c.Key("proj:"+cwd)).Height(28).Margin(13, 0, 3, 0).Padding(0, 4, 0, 8).Gap(4).Radius(7).AlignItems(ui.Center)
+	row := ui.Row(c.Key("proj:"+cwd)).Height(32).Margin(10, 0, 2, 0).Padding(0, 4, 0, 8).Gap(6).Radius(10).AlignItems(ui.Center)
 	if row.Hovered() {
 		row.Background(p.Hover)
 	}
@@ -309,8 +303,6 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 		}
 		m.Separator()
 		if m.Item(locales.RemoveProject() + "…").Danger().Chosen() {
-			// It deletes every session in it, for good: ask first, as
-			// Finder does before emptying the Trash.
 			a.removing, a.removingName = a.removing[:0], label
 			for _, s := range sessions {
 				a.removing = append(a.removing, s.ID)
@@ -319,24 +311,24 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 	}
 	row.ContextMenu(fillMenu)
 	row.Children(func() {
-		toggle := ui.ButtonBase(c.Key("proj-toggle:" + cwd)).Row().Grow(1).MinWidth(0).Height(28).Gap(6).AlignItems(ui.Center).
+		toggle := ui.ButtonBase(c.Key("proj-toggle:" + cwd)).Row().Grow(1).MinWidth(0).Height(32).Gap(7).AlignItems(ui.Center).
 			KeepFocus().Label(label).Expanded(!collapsed)
-		focusRing(toggle, p)
+		m3Focus(toggle, p)
 		toggle.Children(func() {
-			disclosureChevron(c, "proj:"+cwd, !collapsed, 11, p.Mute)
-			sym(c, "folder", 15, p.Fg2)
-			ui.Text(c, label).FontSize(13.5).FontWeight(600).TextColor(p.Fg2).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+			disclosureChevron(c, "proj:"+cwd, !collapsed, 12, p.OnSurfaceVariant)
+			sym(c, "folder", 15, p.OnSurfaceVariant)
+			ui.Text(c, label).FontSize(13.5).FontWeight(600).TextColor(p.OnSurfaceVariant).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		})
 		if toggle.Clicked() {
 			a.toggleProjectCollapsed(cwd)
 		}
 		menuOpen := a.menu.projectMenu == cwd
-		if row.Hovered() || menuOpen {
-			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(label)
-			if menuOpen || more.Hovered() {
-				more.Background(p.Sel)
-			}
-			more.Children(func() { sym(c, "dots", 14, p.Fg2) })
+		// Show row actions on hover, open menu, or keyboard focus within the row (modern-web-guidance: natural-interactions).
+		if row.Hovered() || row.FocusWithin() || menuOpen {
+			more := ui.ButtonBase(c.Key("proj-more:"+cwd)).Size(26, 26).Radius(8).Center().KeepFocus().Label(label)
+			m3Focus(more, p)
+			m3State(more, p, ui.Transparent, menuOpen)
+			more.Children(func() { sym(c, "dots", 14, p.OnSurfaceVariant) })
 			more.PopoverMenuButton(fillMenu, a.menuOptions(&menuOpen))
 			if menuOpen {
 				a.menu.projectMenu = cwd
@@ -344,11 +336,10 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 				a.menu.projectMenu = ""
 			}
 
-			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(24, 24).Radius(6).Center().KeepFocus().Label(locales.NewSession()).Tooltip(locales.NewSession())
-			if add.Hovered() {
-				add.Background(p.Sel)
-			}
-			add.Children(func() { sym(c, "plus", 14, p.Fg2) })
+			add := ui.ButtonBase(c.Key("proj-new:"+cwd)).Size(26, 26).Radius(8).Center().KeepFocus().Label(locales.NewSession()).Tooltip(locales.NewSession())
+			m3Focus(add, p)
+			m3State(add, p, ui.Transparent, false)
+			add.Children(func() { sym(c, "plus", 14, p.OnSurfaceVariant) })
 			if add.Clicked() {
 				a.do(a.C.NewSessionIn(cwd))
 			}
@@ -356,9 +347,7 @@ func (a *App) projectGroup(c *ui.Context, label, cwd string, sessions []proto.Se
 	})
 }
 
-// state is what the slot left of a session's title shows: "wait" for an
-// approval, "run" while a turn runs, "unread" or "fail" for a turn that
-// ended unseen, "" otherwise.
+// state returns the session status mark: "wait", "run", "unread", "fail", or "".
 func (a *App) state(s proto.Session) string {
 	cur := a.C.Current
 	if cur == nil || cur.ID != s.ID {
@@ -378,200 +367,80 @@ func (a *App) sessionRow(c *ui.Context, s proto.Session) {
 	p := a.p
 	on := a.C.Current != nil && a.C.Current.ID == s.ID
 	st := a.state(s)
-	n := len(a.visibleSessions) // its ⌘ number
-	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(32).Padding(0, 9).Gap(9).Radius(8).AlignItems(ui.Center).Label(title(s))
+	n := len(a.visibleSessions) // ⌘1..⌘9 number
+	row := ui.ButtonBase(c.Key("s:"+s.ID)).Row().Height(36).Padding(0, 10).Gap(9).Radius(12).AlignItems(ui.Center).Label(title(s))
 	if row.Hovered() && !s.Updated.IsZero() {
 		row.Tooltip(ago(a.now(), s.Updated))
 	}
-	focusRing(row, p)
-	switch {
-	case on:
-		row.Background(p.Sel)
-	case row.Hovered():
-		row.Background(p.Hover)
+	m3Focus(row, p)
+	rowBg := ui.Transparent
+	if on {
+		rowBg = p.SurfaceContainerHigh
 	}
+	m3State(row, p, rowBg, false)
 	if row.Clicked() {
 		a.do(a.C.Open(s.ID))
 	}
 	row.ContextMenu(func(m *ui.Menu) { a.sessionMenu(m, s) })
-	leftSt := st
-	if leftSt == "wait" {
-		leftSt = ""
-	}
 	if a.renaming == s.ID && a.renameIn == "side" {
 		row.Children(func() {
-			slot(c, p, leftSt)
+			slot(c, p, st)
 			a.renameInput(c, s).FontSize(14)
 		})
 		return
 	}
 	row.Children(func() {
-		slot(c, p, leftSt)
-		fg, weight := p.Fg2, 400
+		slot(c, p, st)
+		fg, weight := p.OnSurfaceVariant, 450
 		if on {
-			fg, weight = p.Fg, 500
+			fg, weight = p.OnSurface, 600
+		} else if row.Hovered() {
+			fg = p.OnSurface
 		}
 		ui.Text(c, title(s)).FontSize(14).FontWeight(weight).TextColor(fg).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		switch {
-		case c.Modifiers()&(ui.Cmd|ui.Shift|ui.Alt|ui.Ctrl) == ui.Cmd && n <= 9:
-			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).FontWeight(500).FontFeatures("tnum").TextColor(p.Fg2).Background(p.Chip).Padding(1, 5).Radius(4).SingleLine()
-		case st == "wait":
-			badge := locales.BadgeApproval()
-			if on && a.questionFirst() {
-				badge = locales.BadgeQuestion()
-			}
-			ui.Text(c, badge).FontSize(11.5).FontWeight(500).TextColor(p.Live).Background(p.LiveBg).Padding(1, 6).Radius(5)
+		if c.Modifiers()&(ui.Cmd|ui.Shift|ui.Alt|ui.Ctrl) == ui.Cmd && n <= 9 {
+			ui.Text(c, fmt.Sprintf("⌘%d", n)).FontSize(11.5).FontWeight(600).FontFeatures("tnum").
+				TextColor(p.OnSurfaceVariant).Background(p.SurfaceContainerHigh).Padding(2, 6).Radius(6).SingleLine()
 		}
 	})
 }
 
-// slot is the 12-point status mark of a session.
+// slot draws a calm status dot or icon for the session row.
 func slot(c *ui.Context, p *Palette, st string) {
-	ui.Box(c).Size(12, 14).Shrink(0).Center().Children(func() {
+	ui.Box(c).Size(16, 16).Shrink(0).Center().Children(func() {
 		switch st {
 		case "wait":
-			ui.Box(c).Size(7, 7).Radius(3.5).Background(p.Live)
-		case "run":
-			spinner(c, p, 12)
+			ui.Box(c).Size(8, 8).Radius(4).Background(p.Primary).Label(locales.BadgeApproval())
 		case "unread":
-			ui.Box(c).Size(6, 6).Radius(3).Background(p.Fg2)
+			ui.Box(c).Size(8, 8).Radius(4).Background(p.Primary)
+		case "run":
+			spinner(c, p, 14)
 		case "fail":
-			ui.Box(c).Size(7, 7).Radius(2).Background(p.Minus)
+			sym(c, "alert-circle", 14, p.Error)
 		}
 	})
 }
 
-// spinner is a faint ring with a quarter of it lit, going round: work
-// under way.
+// spinner renders an M3 primary circular progress arc.
 func spinner(c *ui.Context, p *Palette, size float32) ui.Element {
-	ring := ui.Box(c).Size(size, size).Radius(size/2).Border(1.6, p.LiveBg.Alpha(.2))
+	ring := ui.Box(c).Size(size, size).Radius(size/2).Border(1.8, p.PrimaryContainer)
 	turn := ring.Loop("spin", 900*time.Millisecond, ui.Linear)
 	black := ui.RGBA(0, 0, 0, 1)
 	ring.Children(func() {
-		ui.Box(c).Absolute().Fill().Radius(size/2).Border(1.6, p.Live).
-			MaskConicGradient(ui.ConicGradient{Angle: turn * 360, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: .28}, {Color: ui.Transparent, At: .3}, {Color: ui.Transparent, At: 1}}})
+		ui.Box(c).Absolute().Fill().Radius(size/2).Border(1.8, p.Primary).
+			MaskConicGradient(ui.ConicGradient{Angle: turn * 360, Stops: []ui.GradientStop{{Color: black, At: 0}, {Color: black, At: .3}, {Color: ui.Transparent, At: .32}, {Color: ui.Transparent, At: 1}}})
 	})
 	return ring
 }
 
 func (a *App) footer(c *ui.Context) {
 	p := a.p
-	cur := a.account()
-	var q *proto.AccountQuota
-	if cur != nil {
-		q = cur.Quota
-	}
-	left, _ := formatQuota(a.now(), p, q)
-	ui.Column(c).Shrink(0).Padding(6, 8, 10, 8).Children(func() {
-		label := "Stratum"
-		if left != "" {
-			label = locales.AccountQuota("Stratum", left)
-		}
-		b := ui.ButtonBase(c.Key("profile-card")).Row().Height(32).Padding(0, 8, 0, 10).Gap(8).Radius(8).
-			AlignItems(ui.Center).Label(label)
-		if left != "" {
-			b.Tooltip(left)
-		}
-		focusRing(b, p)
-		switch {
-		case a.menu.accountMenuOpen:
-			b.Background(p.Sel)
-		case b.Hovered():
-			b.Background(p.Hover)
-		}
-		if b.Clicked() {
-			a.menu.accountMenuOpen = !a.menu.accountMenuOpen
-		}
-		b.Children(func() {
-			ui.Row(c).Gap(7).AlignItems(ui.Center).Grow(1).MinWidth(0).Children(func() {
-				brandMark(c, 16, p.Fg)
-				ui.Text(c, "Stratum").FontSize(13.5).FontWeight(600).LetterSpacing(-.18).TextColor(p.Fg).SingleLine().Ellipsis("…")
-			})
-			if q != nil && q.RemainingPct >= 0 {
-				low := q.RemainingPct < 15
-				ink := p.Mute
-				if low {
-					ink = p.Minus
-				}
-				ui.Row(c).Gap(5).AlignItems(ui.Center).Shrink(0).Children(func() {
-					ui.Image(c, ring(p, q.RemainingPct, low)).Size(14, 14).Shrink(0)
-					ui.Text(c, fmt.Sprintf("%d%%", q.RemainingPct)).FontSize(12.5).TextColor(ink).FontFeatures("tnum").SingleLine()
-				})
-			}
-			chevron := "chevron-up"
-			if a.menu.accountMenuOpen {
-				chevron = "chevron-down"
-			}
-			sym(c, chevron, 11, p.Mute)
-		})
-		a.footerPopover(c, b, q)
+	ui.Row(c).Shrink(0).Height(42).Padding(0, 14, 4, 14).Gap(8).AlignItems(ui.Center).Children(func() {
+		brandMark(c, 16, p.Primary)
+		ui.Text(c, "Stratum").FontSize(13.5).FontWeight(600).TextColor(p.OnSurfaceVariant).SingleLine().Ellipsis("…")
 	})
 }
 
-// footerPopover shows the Scheme B brand/quota summary card and Settings action
-// above the sidebar footer button.
-func (a *App) footerPopover(c *ui.Context, anchor ui.Element, q *proto.AccountQuota) {
-	p := a.p
-	pop := ui.Popover(c, anchor, &a.menu.accountMenuOpen, func() {
-		ui.Column(c).FillWidth().Gap(4).Children(func() {
-			ui.Column(c).FillWidth().Background(p.Chip).Radius(8).Padding(10, 12).Gap(7).Children(func() {
-				ui.Row(c).AlignItems(ui.Center).Children(func() {
-					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-						brandMark(c, 14, p.Fg)
-						ui.Text(c, "Stratum").FontSize(13).FontWeight(600).LetterSpacing(-.15).TextColor(p.Fg).SingleLine()
-					})
-					ui.Spacer(c)
-					if q != nil && q.RemainingPct >= 0 {
-						pct := max(0, min(100, q.RemainingPct))
-						pctCol := p.Fg
-						if pct < 15 {
-							pctCol = p.Minus
-						}
-						ui.Text(c, locales.QuotaRemaining(pct)).FontSize(12).FontWeight(600).TextColor(pctCol).FontFeatures("tnum").SingleLine()
-					}
-				})
-				if q != nil && q.RemainingPct >= 0 {
-					pct := max(0, min(100, q.RemainingPct))
-					barCol := p.Fg
-					if pct < 15 {
-						barCol = p.Minus
-					} else if pct < 35 {
-						barCol = p.Live
-					}
-					ui.Box(c).FillWidth().Height(4).Radius(2).Background(p.Edge2).Clip().Children(func() {
-						ui.Box(c).WidthPercent(float32(pct)).Height(4).Radius(2).Background(barCol)
-					})
-				}
-				if reset := formatQuotaReset(a.now(), q); reset != "" {
-					ui.Text(c, reset).FontSize(11.5).TextColor(p.Mute).SingleLine()
-				}
-			})
-
-			row := ui.ButtonBase(c.Key("footer-settings")).Row().FillWidth().Height(32).Padding(0, 10).Gap(8).Radius(7).
-				AlignItems(ui.Center).Label(locales.SettingsMenu())
-			focusRing(row, p)
-			if row.Hovered() {
-				row.Background(p.Hover)
-			}
-			row.Children(func() {
-				sym(c, "settings", 15, p.Fg2)
-				ui.Text(c, locales.SettingsMenu()).FontSize(13.5).TextColor(p.Fg).SingleLine()
-				ui.Spacer(c)
-				ui.Text(c, "⌘,").FontSize(12).TextColor(p.Mute).SingleLine()
-			})
-			if row.Clicked() {
-				a.menu.accountMenuOpen = false
-				a.openSettings()
-			}
-		})
-	})
-	pop.AttachTo(anchor, ui.AnchorTopStart, ui.AnchorBottomStart).Margin(0, 0, 6, 0).
-		Width(248).Background(p.Card).Border(.5, p.Edge2).Radius(12).Padding(6).NoShadow()
-	lift(pop, p)
-	rim(pop, p)
-}
-
-// accountName is what an account is called: its name, or its ID.
 func accountName(acc proto.Account) string {
 	if acc.Name != "" {
 		return acc.Name
@@ -579,7 +448,6 @@ func accountName(acc proto.Account) string {
 	return acc.ID
 }
 
-// account is the current session's account, or the first one.
 func (a *App) account() *proto.Account {
 	for i, acc := range a.C.Accounts {
 		if a.C.Current != nil && acc.ID == a.C.Current.Account {
@@ -613,7 +481,6 @@ func initials(name string) string {
 	return string(out)
 }
 
-// ago says how long ago t was, as briefly as the sidebar wants it.
 func ago(now, t time.Time) string {
 	if t.IsZero() {
 		return ""

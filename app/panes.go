@@ -7,14 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/shqingda/stratum/client"
 	"github.com/shqingda/stratum/locales"
 )
 
-// reviewTabs switches the review panel between the changes, the
-// commands the agent ran, its plan, and the workspace's files.
+// reviewTabs renders Material Design 3 Primary Tabs with an animated bottom Primary indicator.
 func (a *App) reviewTabs(c *ui.Context, files int) {
 	p := a.p
 	tabs := []struct{ id, label string }{
@@ -33,55 +31,44 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			break
 		}
 	}
-	leftPad := float32(12)
-	if a.rv.maximized {
-		shut := toggleLeft(c) + 74 + 12
-		leftPad = 12*a.side.sideOpen + shut*(1-a.side.sideOpen)
-	}
-	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 12, 0, leftPad).Gap(6).AlignItems(ui.Center).DragWindow().Children(func() {
-		track := ui.Row(c.Key("rv-tabs")).Height(28).Padding(2, 2, 2, 2).Radius(8).Background(p.Chip).AlignItems(ui.Center)
+	ui.Row(c).Height(barHeight).Shrink(0).Padding(0, 10, 0, 12).Gap(6).AlignItems(ui.Center).
+		BorderWidth(0, 0, 1, 0).BorderColor(p.OutlineVariant).DragWindow().Children(func() {
+		track := ui.Row(c.Key("rv-tabs")).FillHeight().AlignItems(ui.Center)
 		if a.rv.maximized {
-			track.Width(400).Shrink(1)
+			track.Width(440).Shrink(1)
 		} else {
 			track.Grow(1).MinWidth(0)
 		}
 		trackW := track.Bounds().W
-		pos := track.Spring("tab-pos", float32(activeIdx), springDefault) // critically damped: a tap carries no momentum
+		pos := track.AnimateTo("tab-pos", float32(activeIdx), animStandard)
 		track.Children(func() {
-			thumbBg := p.Card
-			if p.Dark {
-				thumbBg = ui.Hex("#2C2C31")
-			}
-			if trackW > 4 {
-				segW := (trackW - 4) / float32(len(tabs))
-				thumb := ui.Box(c.Key("rv-thumb")).Absolute().Top(2).Bottom(2).Left(2+pos*segW).Width(segW).Radius(6).
-					Background(thumbBg).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08)).PassThrough().ZIndex(0)
-				if p.Dark {
-					thumb.Border(.5, ui.RGBA(255, 255, 255, .12))
-				}
+			if trackW > 8 {
+				segW := trackW / float32(len(tabs))
+				indW := min(float32(36), max(float32(18), segW*0.55))
+				ui.Box(c.Key("rv-ind")).Absolute().Bottom(0).Left(pos*segW + (segW-indW)/2).
+					Size(indW, 3).Radius(3, 3, 0, 0).Background(p.Primary).PassThrough().ZIndex(2)
 			}
 			for _, t := range tabs {
 				on := a.rv.tab == t.id
 				b := ui.ButtonBase(c.Key("tab:"+t.label)).Row().Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).
-					Height(24).Padding(0, 8).Gap(4).Radius(6).AlignItems(ui.Center).Label(t.label).ZIndex(1)
-				focusRing(b, p)
-				fg, weight := p.Fg2, 500
+					Height(32).Padding(0, 8).Gap(5).Radius(16).AlignItems(ui.Center).Label(t.label).ZIndex(1)
+				m3Focus(b, p)
+				m3State(b, p, ui.Transparent, false)
+				fg, weight := p.OnSurfaceVariant, 500
 				if on {
-					if trackW <= 4 {
-						b.Background(thumbBg).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, .08))
-						if p.Dark {
-							b.Border(.5, ui.RGBA(255, 255, 255, .12))
-						}
-					}
-					fg, weight = p.Fg, 600
+					fg, weight = p.Primary, 600
 				} else if b.Hovered() {
-					b.Background(p.Hover)
-					fg = p.Fg
+					fg = p.OnSurface
 				}
 				b.Children(func() {
-					ui.Text(c, t.label).FontSize(13).FontWeight(weight).TextColor(fg).SingleLine()
+					ui.Text(c, t.label).FontSize(13.5).FontWeight(weight).TextColor(fg).SingleLine()
 					if t.id == "" && files > 0 {
-						ui.Text(c, fmt.Sprint(files)).FontSize(11.5).FontWeight(500).TextColor(p.Mute).SingleLine()
+						ui.Box(c).Height(18).Padding(0, 6).Radius(9).Background(p.SurfaceContainerHigh).Center().Children(func() {
+							ui.Text(c, fmt.Sprint(files)).FontSize(11).FontWeight(600).TextColor(p.OnSurfaceVariant).FontFeatures("tnum").SingleLine()
+						})
+					}
+					if trackW <= 8 && on {
+						ui.Box(c).Absolute().Bottom(0).Left(12).Right(12).Height(3).Radius(3, 3, 0, 0).Background(p.Primary)
 					}
 				})
 				if b.Clicked() {
@@ -102,10 +89,10 @@ func (a *App) reviewTabs(c *ui.Context, files int) {
 			tip = locales.RestorePane()
 			icon = "minimize-2"
 		}
-		if a.iconButton(c, "rv-maximize", icon, tip).Clicked() {
+		if a.iconButtonSized(c, "rv-maximize", icon, tip, 18).Clicked() {
 			a.rv.maximized = !a.rv.maximized
 		}
-		if a.iconButtonSized(c, "rv-close", "x", locales.HideChanges(), 14.5).Clicked() {
+		if a.iconButtonSized(c, "rv-close", "x", locales.HideChanges(), 18).Clicked() {
 			a.rv.open = false
 			a.rv.maximized = false
 		}
@@ -150,37 +137,35 @@ func (a *App) planPane(c *ui.Context) {
 		}
 	}
 	ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
-		ui.Scroll(c).Grow(1).MinHeight(0).Padding(14, 18).Children(func() {
+		ui.Scroll(c).Grow(1).MinHeight(0).Padding(16, 18).Children(func() {
 			title := pl.Title
 			if title == "" {
 				title = locales.Plan()
 			}
-			ui.Text(c, title).FontSize(14).FontWeight(600).TextColor(p.Fg).Margin(0, 0, 2, 0)
-			ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(13).TextColor(p.Mute).Margin(0, 0, 14, 0)
+			ui.Text(c, title).FontSize(15).FontWeight(600).TextColor(p.OnSurface).Margin(0, 0, 4, 0)
+			ui.Text(c, locales.PlanProgress(len(pl.Steps), done)).FontSize(12.5).TextColor(p.OnSurfaceVariant).Margin(0, 0, 14, 0)
 			for _, s := range pl.Steps {
-				ui.Row(c).Gap(10).Padding(7, 0).Children(func() {
-					box := ui.Box(c).Size(16, 16).Radius(5).Shrink(0).Margin(2, 0, 0, 0).Center()
-					fg := p.Fg
+				ui.Row(c).Gap(10).Padding(8, 0).Children(func() {
+					box := ui.Box(c).Size(18, 18).Radius(6).Shrink(0).Margin(1, 0, 0, 0).Center()
+					fg := p.OnSurface
 					switch s.Status {
 					case "done":
-						fg = p.Mute
-						box.Background(p.Fg2).Children(func() { sym(c, "check", 11, p.Bg) })
+						fg = p.OnSurfaceVariant
+						box.Background(p.Primary).Children(func() { sym(c, "check", 12, p.OnPrimary) })
 					case "in_progress":
-						box.Border(1.5, p.Live).Children(func() { ui.Box(c).Size(6, 6).Radius(2).Background(p.Live) })
+						box.Background(p.PrimaryContainer).Border(1.5, p.Primary).Children(func() { ui.Box(c).Size(6, 6).Radius(2).Background(p.Primary) })
 					default:
-						box.Border(1.2, p.Faint)
+						box.Border(1.5, p.Outline)
 					}
 					ui.Column(c).Grow(1).MinWidth(0).Children(func() {
 						ui.Text(c, s.Step).FontSize(14).LineHeight(1.45).TextColor(fg)
 						if s.Note != "" {
-							ui.Text(c, s.Note).FontSize(13).LineHeight(1.45).TextColor(p.Mute)
+							ui.Text(c, s.Note).FontSize(13).LineHeight(1.45).TextColor(p.OnSurfaceVariant)
 						}
 					})
 				})
 			}
 		})
-		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(16).PassThrough().
-			Material(glass.ScrollEdge{Background: p.Sheet})
 	})
 }
 
@@ -207,12 +192,14 @@ func (a *App) filesPane(c *ui.Context) {
 	}
 	renderTree := func() {
 		q := strings.TrimSpace(a.rv.fileQuery)
-		const searchBarH = 44
 		ui.Column(c).Grow(1).MinHeight(0).Clip().Children(func() {
+			ui.Column(c).Shrink(0).Padding(10, 12, 8, 12).Children(func() {
+				ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.FilterFiles())
+			})
 			rendered := false
 			if q == "" {
 				if nodes := a.buildTreeNodes(cur.Cwd); len(nodes) > 0 {
-					a.fileTreeListNodes(c, cur.Cwd, nodes, searchBarH+4)
+					a.fileTreeListNodes(c, cur.Cwd, nodes, 6)
 					rendered = true
 				}
 			}
@@ -224,22 +211,20 @@ func (a *App) filesPane(c *ui.Context) {
 					}
 				}
 				if len(a.C.Files) == 0 {
-					ui.Column(c).Grow(1).MinHeight(0).Padding(searchBarH+4, 0, 0, 0).Children(func() {
+					ui.Column(c).Grow(1).MinHeight(0).Children(func() {
 						a.reviewNote(c, locales.NoFilesFound())
 					})
 				} else {
-					ui.Scroll(c).Grow(1).MinHeight(0).Padding(searchBarH+4, 8, 12, 8).Children(func() {
+					ui.Scroll(c).Grow(1).MinHeight(0).Padding(8, 8, 12, 8).Children(func() {
 						for _, f := range a.C.Files {
 							isDir := strings.HasSuffix(f, "/")
 							icon := "file-text"
 							if isDir {
 								icon = "folder"
 							}
-							row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(30).Padding(0, 10).Gap(8).Radius(6).AlignItems(ui.Center).Justify(ui.Start).Label(f)
-							focusRing(row, p)
-							if row.Hovered() {
-								row.Background(p.Hover)
-							}
+							row := ui.ButtonBase(c.Key("rf:"+f)).Row().Height(32).Padding(0, 10).Gap(8).Radius(8).AlignItems(ui.Center).Justify(ui.Start).Label(f)
+							m3Focus(row, p)
+							m3State(row, p, ui.Transparent, false)
 							file := f
 							row.ContextMenu(func(m *ui.Menu) {
 								if !isDir && m.Item(locales.Preview()).Chosen() {
@@ -265,8 +250,8 @@ func (a *App) filesPane(c *ui.Context) {
 								}
 							})
 							row.Children(func() {
-								sym(c, icon, 14, p.Mute)
-								ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.Fg).SingleLine().TruncateMiddle().MinWidth(0)
+								sym(c, icon, 15, p.OnSurfaceVariant)
+								ui.Text(c, f).Font("monospace").FontSize(13).TextColor(p.OnSurface).SingleLine().TruncateMiddle().MinWidth(0)
 							})
 							if row.Clicked() && !isDir {
 								abs := filepath.Join(cur.Cwd, f)
@@ -286,11 +271,6 @@ func (a *App) filesPane(c *ui.Context) {
 					})
 				}
 			}
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(searchBarH + 8).PassThrough().
-				Material(glass.ScrollEdge{Background: p.Sheet})
-			ui.Column(c).Absolute().Top(0).Left(0).Right(0).Padding(10, 12, 6, 12).Children(func() {
-				ui.SearchField(c, &a.rv.fileQuery).Label(locales.Search()).Placeholder(locales.Search())
-			})
 		})
 	}
 	if !split {
@@ -302,9 +282,9 @@ func (a *App) filesPane(c *ui.Context) {
 			if a.rv.previewPath != "" {
 				a.filePreviewView(c, cur.Cwd, true)
 			} else {
-				ui.Row(c).Height(34).Shrink(0).Padding(0, 8).AlignItems(ui.Center).Children(func() {
+				ui.Row(c).Height(38).Shrink(0).Padding(0, 10).AlignItems(ui.Center).Children(func() {
 					ui.Spacer(c)
-					if a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(24, 24).Clicked() {
+					if a.iconPill(c, "fp-tree-toggle", "layout-sidebar-right", locales.ToggleWorkspaceTree()).Size(28, 28).Clicked() {
 						a.rv.treeHidden = !a.rv.treeHidden
 					}
 				})
@@ -312,7 +292,7 @@ func (a *App) filesPane(c *ui.Context) {
 			}
 		})
 		if !a.rv.treeHidden {
-			ui.Column(c).Width(240).Shrink(0).BorderWidth(0, 0, 0, .5).BorderColor(p.Edge).Children(func() {
+			ui.Column(c).Width(244).Shrink(0).BorderWidth(0, 0, 0, 1).BorderColor(p.OutlineVariant).Children(func() {
 				renderTree()
 			})
 		}
